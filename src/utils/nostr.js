@@ -11,7 +11,6 @@ const RELAYS = [
   'wss://wot.utxo.one'
 ];
 
-export { RELAYS };
 
 export const publishToNostr = async (event) => {
   if (!event) return null;
@@ -33,7 +32,7 @@ export const publishToNostr = async (event) => {
   }
 };
 
-export const signInWithNostr = () => {
+const signInWithNostr = () => {
   const json = {
     kind: 1,
     created_at: Math.floor(Date.now() / 1000),
@@ -97,4 +96,4 @@ async function fetchUserProfile(pubkey) {
   }
 }
 
-export { loggedInUser }; 
+export { loggedInUser, RELAYS, signInWithNostr, fetchUserProfile }; 

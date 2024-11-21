@@ -6,6 +6,20 @@ export const RunTracker = () => {
   const [time, setTime] = useState(0);
   const [distance, setDistance] = useState(0);
   const [runHistory, setRunHistory] = useState([]);
+  const [distanceUnit, setDistanceUnit] = useState(() => 
+    localStorage.getItem('distanceUnit') || 'km'
+  );
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [lastRun, setLastRun] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+
+  useEffect(() => {
+    const storedProfile = localStorage.getItem('nostrProfile');
+    if (storedProfile) {
+      setUserProfile(JSON.parse(storedProfile));
+    }
+    loadRunHistory();
+  }, []);
 
   useEffect(() => {
     let interval;
@@ -17,7 +31,15 @@ export const RunTracker = () => {
     return () => clearInterval(interval);
   }, [isRunning, isPaused]);
 
-   const startRun = () => {
+  const loadRunHistory = () => {
+    const storedRuns = JSON.parse(localStorage.getItem('runHistory') || '[]');
+    setRunHistory(storedRuns);
+    if (storedRuns.length > 0) {
+      setLastRun(storedRuns[storedRuns.length - 1]);
+    }
+  };
+
+  const startRun = () => {
     setIsRunning(true);
     setIsPaused(false);
   };
@@ -32,7 +54,8 @@ export const RunTracker = () => {
 
   const handleDistanceChange = (e) => {
     const value = parseFloat(e.target.value) || 0;
-    setDistance(value);
+    const converted = distanceUnit === 'mi' ? convertDistance(value, 'mi', 'km') : value;
+    setDistance(converted);
   };
 
   const stopRun = () => {
@@ -48,10 +71,15 @@ export const RunTracker = () => {
     localStorage.setItem('runHistory', JSON.stringify(updatedRuns));
     
     setRunHistory([...runHistory, runData]);
+    updateLastRun(runData);
     setIsRunning(false);
     setIsPaused(false);
     setTime(0);
     setDistance(0);
+  };
+
+  const updateLastRun = (runData) => {
+    setLastRun(runData);
   };
 
   const formatTime = (seconds) => {
@@ -63,27 +91,146 @@ export const RunTracker = () => {
       .padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  const toggleDistanceUnit = () => {
+    const newUnit = distanceUnit === 'km' ? 'mi' : 'km';
+    setDistanceUnit(newUnit);
+    localStorage.setItem('distanceUnit', newUnit);
+  };
+
+  const convertDistance = (value, from, to) => {
+    if (from === to) return value;
+    return from === 'km' ? value * 0.621371 : value * 1.60934;
+  };
+
+  const displayDistance = (value) => {
+    const converted = distanceUnit === 'mi' ? convertDistance(value, 'km', 'mi') : value;
+    return converted.toFixed(2);
+  };
+
+  const handlePostToNostr = (run) => {
+    // TODO: Implement Nostr posting logic
+    console.log('Posting to Nostr:', run);
+  };
+
   return (
     <div className="run-tracker">
-      <div className="time-display">{formatTime(time)}</div>
+      {userProfile?.banner && (
+        <div className="dashboard-banner">
+          <img 
+            src={userProfile.banner} 
+            alt="Profile Banner" 
+            className="banner-image" 
+          />
+          {userProfile.picture && (
+            <img 
+              src={userProfile.picture} 
+              alt="Profile" 
+              className="profile-overlay" 
+            />
+          )}
+        </div>
+      )}
+      
+      <h2 className="page-title">Dashboard</h2>
+      
+      <div className="time-display">
+        {formatTime(time)}
+      </div>
+
+      <div className="controls-top">
+        {!isRunning ? (
+          <button className="primary-btn" onClick={startRun}>Start Run</button>
+        ) : (
+          <>
+            {isPaused ? (
+              <button className="primary-btn" onClick={resumeRun}>Resume</button>
+            ) : (
+              <button className="secondary-btn" onClick={pauseRun}>Pause</button>
+            )}
+            <button className="danger-btn" onClick={stopRun}>End Run</button>
+          </>
+        )}
+      </div>
+      
+      <div className="distance-unit-toggle">
+        <button 
+          className={`unit-btn ${distanceUnit === 'km' ? 'active' : ''}`}
+          onClick={toggleDistanceUnit}
+        >
+          KM
+        </button>
+        <button 
+          className={`unit-btn ${distanceUnit === 'mi' ? 'active' : ''}`}
+          onClick={toggleDistanceUnit}
+        >
+          MI
+        </button>
+      </div>
+
       <div className="distance-input">
-        <label htmlFor="distance">Distance (km): </label>
         <input
           type="number"
-          id="distance"
-          value={distance}
+          value={displayDistance(distance)}
           onChange={handleDistanceChange}
-          step="0.1"
-          min="0"
-          disabled={!isRunning}
+          placeholder={`Distance (${distanceUnit})`}
+          step="0.01"
         />
       </div>
-      <div className="controls">
-        {!isRunning && <button onClick={startRun}>Start Run</button>}
-        {isRunning && !isPaused && <button onClick={pauseRun}>Pause</button>}
-        {isRunning && isPaused && <button onClick={resumeRun}>Resume</button>}
-        {isRunning && <button onClick={stopRun}>Stop</button>}
-      </div>
+
+      {lastRun && (
+        <div className="last-run">
+          <h3>Previous Run</h3>
+          <div className="last-run-details">
+            <span>Date: {lastRun.date}</span>
+            <span>Duration: {formatTime(lastRun.duration)}</span>
+            <span>Distance: {displayDistance(lastRun.distance)} {distanceUnit}</span>
+          </div>
+          <div className="run-actions">
+            <button 
+              className="view-history-btn"
+              onClick={() => setShowHistoryModal(true)}
+            >
+              View All Runs
+            </button>
+            <button 
+              className="share-btn"
+              onClick={() => handlePostToNostr(lastRun)}
+            >
+              Share to Nostr
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showHistoryModal && (
+        <div className="modal-overlay" onClick={() => setShowHistoryModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Run History</h2>
+            <div className="history-list">
+              {runHistory.map((run) => (
+                <div key={run.id} className="history-item">
+                  <div className="run-date">{run.date}</div>
+                  <div className="run-details">
+                    <span>Duration: {formatTime(run.duration)}</span>
+                    <span>Distance: {displayDistance(run.distance)} {distanceUnit}</span>
+                    <span>
+                      Pace: {run.duration > 0 ? 
+                        ((run.duration / 60) / run.distance).toFixed(2) : '0'
+                      } min/km
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button 
+              className="close-modal-btn"
+              onClick={() => setShowHistoryModal(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

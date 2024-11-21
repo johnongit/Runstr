@@ -45,10 +45,20 @@ export const RunClub = () => {
         .map(tag => tag[1]);
 
       // Fetch profiles and run histories for each teammate
-      const profiles = await pool.current.list(RELAYS, [{
-        kinds: [0],
-        authors: teamMates
-      }]);
+      const profiles = await Promise.all(
+        teamMates.map(async (pubkey) => {
+          try {
+            const profile = await pool.current.list(RELAYS, [{
+              kinds: [0],
+              authors: [pubkey]
+            }]);
+            return profile[0] || null;
+          } catch (err) {
+            console.warn(`Failed to fetch profile for ${pubkey}:`, err);
+            return null;
+          }
+        })
+      );
 
       const runHistories = await pool.current.list(RELAYS, [{
         kinds: [1],
@@ -57,12 +67,14 @@ export const RunClub = () => {
       }]);
 
       const teammateData = teamMates.map(pubkey => {
-        const profile = profiles.find(p => p.pubkey === pubkey)?.content;
-        const runs = runHistories.filter(r => r.pubkey === pubkey);
+        const profile = profiles.find(p => p?.pubkey === pubkey)?.content;
+        const runCount = runHistories.filter(run => run.pubkey === pubkey).length;
         return {
           pubkey,
           profile: profile ? JSON.parse(profile) : {},
-          runs
+          picture: profile?.picture || '/default-avatar.png',
+          name: profile?.name || 'Anonymous Runner',
+          runCount
         };
       });
 

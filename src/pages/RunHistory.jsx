@@ -7,16 +7,28 @@ export const RunHistory = () => {
   const [additionalContent, setAdditionalContent] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const [distanceUnit] = useState(() => 
+    localStorage.getItem('distanceUnit') || 'km'
+  );
 
   useEffect(() => {
-    const loadRunHistory = () => {
-      const storedRuns = localStorage.getItem('runHistory');
-      if (storedRuns) {
-        setRunHistory(JSON.parse(storedRuns));
-      }
-    };
     loadRunHistory();
   }, []);
+
+  const loadRunHistory = () => {
+    const storedRuns = localStorage.getItem('runHistory');
+    if (storedRuns) {
+      setRunHistory(JSON.parse(storedRuns));
+    }
+  };
+
+  const handleDeleteRun = (runId) => {
+    if (window.confirm('Are you sure you want to delete this run?')) {
+      const updatedRuns = runHistory.filter(run => run.id !== runId);
+      localStorage.setItem('runHistory', JSON.stringify(updatedRuns));
+      setRunHistory(updatedRuns);
+    }
+  };
 
   const handlePostToNostr = (run) => {
     setSelectedRun(run);
@@ -71,6 +83,11 @@ ${additionalContent}
       .padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  const displayDistance = (value) => {
+    const converted = distanceUnit === 'mi' ? value * 0.621371 : value;
+    return `${converted.toFixed(2)} ${distanceUnit}`;
+  };
+
   return (
     <div className="run-history">
       <h2>Run History</h2>
@@ -83,10 +100,23 @@ ${additionalContent}
               <div className="run-date">{run.date}</div>
               <div className="run-details">
                 <span>Duration: {formatTime(run.duration)}</span>
-                <span>Distance: {run.distance.toFixed(2)} km</span>
+                <span>Distance: {displayDistance(run.distance)}</span>
                 <span>Pace: {run.duration > 0 ? ((run.duration / 60) / run.distance).toFixed(2) : '0'} min/km</span>
               </div>
-              <button onClick={() => handlePostToNostr(run)}>Share to Nostr</button>
+              <div className="run-actions">
+                <button 
+                  onClick={() => handlePostToNostr(run)}
+                  className="share-btn"
+                >
+                  Share to Nostr
+                </button>
+                <button 
+                  onClick={() => handleDeleteRun(run.id)}
+                  className="delete-btn"
+                >
+                  Delete
+                </button>
+              </div>
             </li>
           ))}
         </ul>
