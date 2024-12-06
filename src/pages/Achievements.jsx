@@ -1,85 +1,149 @@
-import { useState, useEffect, useMemo } from 'react';
-import { RELAYS } from '../utils/nostr';
-import { SimplePool } from 'nostr-tools';
+import { useState, useEffect } from 'react';
+
+const ACHIEVEMENT_GOALS = {
+  beginner: [
+    {
+      id: 'first_run',
+      name: 'First Run',
+      description: 'Complete your first run',
+      icon: '🎯',
+      requirement: { runs: 1 }
+    },
+    {
+      id: 'five_runs',
+      name: 'Getting Started',
+      description: 'Complete 5 runs',
+      icon: '🏃',
+      requirement: { runs: 5 }
+    },
+    {
+      id: '5k',
+      name: '5K Runner',
+      description: 'Complete a 5K run',
+      icon: '🥉',
+      requirement: { distance: 5 }
+    }
+  ],
+  intermediate: [
+    {
+      id: '10k',
+      name: '10K Achievement',
+      description: 'Complete a 10K run',
+      icon: '🥈',
+      requirement: { distance: 10 }
+    },
+    {
+      id: 'twenty_runs',
+      name: 'Regular Runner',
+      description: 'Complete 20 runs',
+      icon: '⭐',
+      requirement: { runs: 20 }
+    },
+    {
+      id: 'speed_demon',
+      name: 'Speed Demon',
+      description: 'Run at a pace under 5:00 min/km',
+      icon: '⚡',
+      requirement: { pace: 5 }
+    }
+  ],
+  advanced: [
+    {
+      id: 'half_marathon',
+      name: 'Half Marathon',
+      description: 'Complete a 21.1K run',
+      icon: '🥇',
+      requirement: { distance: 21.1 }
+    },
+    {
+      id: 'fifty_runs',
+      name: 'Dedicated Runner',
+      description: 'Complete 50 runs',
+      icon: '🌟',
+      requirement: { runs: 50 }
+    },
+    {
+      id: 'marathon',
+      name: 'Marathon Runner',
+      description: 'Complete a 42.2K run',
+      icon: '👑',
+      requirement: { distance: 42.2 }
+    }
+  ]
+};
 
 export const Achievements = () => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [achievements, setAchievements] = useState(null);
-  const pool = useMemo(() => new SimplePool(), []);
+  const [achievements, setAchievements] = useState({});
+  const [runHistory, setRunHistory] = useState([]);
 
   useEffect(() => {
-    const fetchRunHistory = async () => {
-      if (!window.nostr) return;
-
-      try {
-        const pubkey = await window.nostr.getPublicKey();
-        const runs = await pool.list(RELAYS, [{
-          kinds: [1],
-          authors: [pubkey],
-          '#t': ['Runstr']
-        }]);
-
-        // Process runs to extract distance and time information
-        const processedRuns = runs.map(run => {
-          const content = run.content;
-          const distanceMatch = content.match(/Distance: ([\d.]+) km/);
-          const durationMatch = content.match(/Duration: (\d{2}):(\d{2}):(\d{2})/);
-          
-          return {
-            date: run.created_at,
-            distance: distanceMatch ? parseFloat(distanceMatch[1]) : 0,
-            duration: durationMatch ? 
-              parseInt(durationMatch[1]) * 3600 + 
-              parseInt(durationMatch[2]) * 60 + 
-              parseInt(durationMatch[3]) : 0
-          };
-        });
-
-        // Calculate achievements
-        const firstRun = processedRuns.sort((a, b) => a.date - b.date)[0];
-        const longestRun = processedRuns.sort((a, b) => b.distance - a.distance)[0];
-        const fastestRun = processedRuns
-          .filter(run => run.distance > 0 && run.duration > 0)
-          .sort((a, b) => (a.duration / a.distance) - (b.duration / a.distance))[0];
-
-        setAchievements({ firstRun, longestRun, fastestRun });
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching run history:', error);
-        setError(error.message);
-        setLoading(false);
+    const loadRunHistory = () => {
+      const storedRuns = localStorage.getItem('runHistory');
+      if (storedRuns) {
+        setRunHistory(JSON.parse(storedRuns));
       }
     };
 
-    fetchRunHistory();
-  }, [pool]);
+    loadRunHistory();
+  }, []);
+
+  useEffect(() => {
+    const calculateAchievements = () => {
+      const completed = {};
+      
+      // Calculate total runs
+      const totalRuns = runHistory.length;
+      
+      // Process each run to check achievements
+      runHistory.forEach(run => {
+        // Check distance achievements
+        if (run.distance >= 5 && !completed['5k']) completed['5k'] = true;
+        if (run.distance >= 10 && !completed['10k']) completed['10k'] = true;
+        if (run.distance >= 21.1 && !completed['half_marathon']) completed['half_marathon'] = true;
+        if (run.distance >= 42.2 && !completed['marathon']) completed['marathon'] = true;
+        
+        // Check pace achievements
+        const paceMinKm = (run.duration / 60) / run.distance;
+        if (paceMinKm < 5 && !completed['speed_demon']) completed['speed_demon'] = true;
+      });
+      
+      // Check run count achievements
+      if (totalRuns >= 1) completed['first_run'] = true;
+      if (totalRuns >= 5) completed['five_runs'] = true;
+      if (totalRuns >= 20) completed['twenty_runs'] = true;
+      if (totalRuns >= 50) completed['fifty_runs'] = true;
+      
+      setAchievements(completed);
+    };
+
+    calculateAchievements();
+  }, [runHistory]);
 
   return (
-    <div>
-      {loading ? (
-        <p>Loading...</p>
-      ) : error ? (
-        <p>Error: {error}</p>
-      ) : (
-        <>
-          <h2>Achievements</h2>
-          <p>Your running milestones and badges</p>
-          {achievements && (
-            <div>
-              {achievements.firstRun && (
-                <p>First Run: {new Date(achievements.firstRun.date * 1000).toLocaleDateString()}</p>
-              )}
-              {achievements.longestRun && (
-                <p>Longest Run: {achievements.longestRun.distance} km</p>
-              )}
-              {achievements.fastestRun && (
-                <p>Fastest Run: {(achievements.fastestRun.duration / achievements.fastestRun.distance / 60).toFixed(2)} min/km</p>
-              )}
-            </div>
-          )}
-        </>
-      )}
+    <div className="achievements-container">
+      <h2>Achievements</h2>
+      <p>Track your running milestones</p>
+
+      {Object.entries(ACHIEVEMENT_GOALS).map(([level, goals]) => (
+        <div key={level} className="achievement-section">
+          <h3 className="achievement-level">{level.charAt(0).toUpperCase() + level.slice(1)}</h3>
+          <div className="achievements-grid">
+            {goals.map(goal => (
+              <div 
+                key={goal.id}
+                className={`achievement-card ${achievements[goal.id] ? 'completed' : ''}`}
+              >
+                <span className="achievement-icon">{goal.icon}</span>
+                <h4>{goal.name}</h4>
+                <p>{goal.description}</p>
+                {achievements[goal.id] && (
+                  <span className="completion-badge">✓</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }; 

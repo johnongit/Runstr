@@ -43,16 +43,27 @@ const signInWithNostr = () => {
   const encodedJson = encodeURIComponent(JSON.stringify(json));
   const callbackUrl = `${window.location.origin}/login?event=`;
   
-  // Add a small delay to ensure the app switch works properly on mobile
-  setTimeout(() => {
-    // Try to use universal links first
+  // Check if running on iOS or Android
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isAndroid = /Android/.test(navigator.userAgent);
+  
+  if (isIOS || isAndroid) {
+    // Try custom scheme first for mobile
+    window.location.href = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
+    
+    // Fallback to universal link after a short delay
+    setTimeout(() => {
+      window.location.href = `https://amber.nostr.app/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
+    }, 500);
+  } else {
+    // For desktop browsers, use universal link first
     window.location.href = `https://amber.nostr.app/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
     
-    // Fallback to custom scheme after a short delay if universal link doesn't work
+    // Fallback to custom scheme
     setTimeout(() => {
       window.location.href = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
     }, 500);
-  }, 100);
+  }
 };
 
 export const handleNostrCallback = async (eventParam) => {
@@ -105,4 +116,26 @@ async function fetchUserProfile(pubkey) {
   }
 }
 
-export { loggedInUser, RELAYS, signInWithNostr, fetchUserProfile }; 
+export { loggedInUser, RELAYS, signInWithNostr, fetchUserProfile, checkAmberInstalled }; 
+
+const checkAmberInstalled = () => {
+  // Check if running on iOS
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  
+  // Check if running on Android
+  const isAndroid = /Android/.test(navigator.userAgent);
+  
+  if (isIOS || isAndroid) {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve(false);
+      }, 2500);
+
+      window.addEventListener('blur', () => {
+        clearTimeout(timeout);
+        resolve(true);
+      }, { once: true });
+    });
+  }
+  return Promise.resolve(true);
+}; 

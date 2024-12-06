@@ -1,218 +1,131 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { SimplePool } from 'nostr-tools';
 import { signInWithNostr, publishToNostr, RELAYS } from '../utils/nostr';
 
 export const Wallet = () => {
   const pool = useRef(new SimplePool());
-  const [wallets, setWallets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWallet, setSelectedWallet] = useState(null);
-  const [newWalletName, setNewWalletName] = useState('');
-  const [tokens, setTokens] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [sendAmount, setSendAmount] = useState('');
   const [recipientPubkey, setRecipientPubkey] = useState('');
+  const [balance, setBalance] = useState(0);
+  const [receiveToken, setReceiveToken] = useState('');
   const mintUrl = 'https://legend.lnbits.com/cashu/api/v1/4gr9Xcmz3XEkUNwiBiQGoL';
 
-  useEffect(() => {
-    fetchWallets();
-
-    // Add token and transaction subscriptions
-    if (window.nostr && selectedWallet) {
-      const currentPool = pool.current;
-      const subs = currentPool.sub(RELAYS, [
-        {
-          kinds: [7375],
-          '#a': [`37375:${window.nostr.getPublicKey()}:${selectedWallet.id}`]
-        },
-        {
-          kinds: [7376],
-          '#a': [`37375:${window.nostr.getPublicKey()}:${selectedWallet.id}`]
-        }
-      ]);
-
-      subs.on('event', (event) => {
-        if (event.kind === 7375) {
-          handleTokenEvent(event);
-        } else if (event.kind === 7376) {
-          handleTransactionEvent(event);
-        }
-      });
-
-      return () => {
-        currentPool.close(RELAYS);
-      };
-    }
-  }, [selectedWallet]);
-
-  const fetchWallets = async () => {
-    if (!window.nostr) {
-      setLoading(false);
-      return;
-    }
-
+  const initializeWallet = useCallback(async () => {
     try {
-      // Subscribe to kind 37375 events for wallet data
-      const sub = window.nostr.subscribe([{
-        kinds: [37375],
-        authors: [await window.nostr.getPublicKey()]
+      const pubkey = await window.nostr.getPublicKey();
+      
+      const handleTokenEvent = (data) => {
+        setTransactions(prev => [...prev, {
+          id: Date.now(),
+          type: 'in',
+          amount: data.amount || 0,
+          timestamp: Math.floor(Date.now() / 1000)
+        }]);
+        setBalance(prev => prev + (data.amount || 0));
+      };
+
+      const handleTransactionEvent = (data) => {
+        setTransactions(prev => [...prev, {
+          id: Date.now(),
+          type: 'out',
+          amount: data.amount || 0,
+          timestamp: Math.floor(Date.now() / 1000)
+        }]);
+        setBalance(prev => prev - (data.amount || 0));
+      };
+
+      const sub = pool.current.sub(RELAYS, [{
+        kinds: [7375, 7376],
+        authors: [pubkey]
       }]);
 
-      sub.on('event', async (event) => {
-        // Skip deleted wallets
-        if (event.tags.some(tag => tag[0] === 'deleted')) return;
-
-        const walletId = event.tags.find(tag => tag[0] === 'd')?.[1];
-        if (!walletId) return;
-
-        // Decrypt wallet content
-        const decryptedContent = await window.nostr.nip04.decrypt(
-          event.pubkey,
-          event.content
-        );
-        
-        const walletData = JSON.parse(decryptedContent);
-        
-        setWallets(prev => {
-          const existing = prev.findIndex(w => w.id === walletId);
-          if (existing >= 0) {
-            prev[existing] = {
-              id: walletId,
-              name: walletData.find(d => d[0] === 'name')?.[1],
-              balance: walletData.find(d => d[0] === 'balance')?.[1] || '0',
-              createdAt: event.created_at
-            };
-            return [...prev];
+      const handleWalletEvent = async (event) => {
+        try {
+          const decryptedContent = await window.nostr.nip04.decrypt(
+            event.pubkey,
+            event.content
+          );
+          
+          const data = JSON.parse(decryptedContent);
+          
+          if (event.kind === 7375) {
+            handleTokenEvent(data);
+          } else if (event.kind === 7376) {
+            handleTransactionEvent(data);
           }
-          return [...prev, {
-            id: walletId,
-            name: walletData.find(d => d[0] === 'name')?.[1],
-            balance: walletData.find(d => d[0] === 'balance')?.[1] || '0',
-            createdAt: event.created_at
-          }];
-        });
-      });
+        } catch (error) {
+          console.error('Error handling wallet event:', error);
+        }
+      };
 
+      sub.on('event', handleWalletEvent);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching wallets:', error);
+      console.error('Error initializing wallet:', error);
       setLoading(false);
     }
-  };
+  }, []);
 
-  const createWallet = async () => {
+  useEffect(() => {
     if (!window.nostr) {
-      signInWithNostr();
+      setLoading(false);
       return;
     }
 
+    const currentPool = pool.current;
+    initializeWallet();
+
+    return () => {
+      currentPool.close(RELAYS);
+    };
+  }, [initializeWallet]);
+
+  const handleReceiveToken = async () => {
+    if (!receiveToken) return;
+
     try {
-      const walletId = Math.random().toString(36).substring(2, 15);
-      const content = JSON.stringify([
-        ['name', newWalletName],
-        ['balance', '0', 'sat'],
-        ['unit', 'sat']
-      ]);
-
-      const encryptedContent = await window.nostr.nip04.encrypt(
-        await window.nostr.getPublicKey(),
-        content
-      );
-
       const event = {
-        kind: 37375,
+        kind: 7375,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [['d', walletId]],
-        content: encryptedContent
+        content: await window.nostr.nip04.encrypt(
+          await window.nostr.getPublicKey(),
+          JSON.stringify({
+            token: receiveToken,
+            mint: mintUrl
+          })
+        ),
+        tags: []
       };
 
-      await window.nostr.signEvent(event);
-      setNewWalletName('');
+      await publishToNostr(event);
+      setReceiveToken('');
     } catch (error) {
-      console.error('Error creating wallet:', error);
+      console.error('Error receiving token:', error);
+      alert('Failed to receive token');
     }
-  };
-
-  const handleTokenEvent = async (event) => {
-    if (!event.tags.some(t => t[0] === 'a')) return;
-    
-    const decryptedContent = await window.nostr.nip04.decrypt(
-      event.pubkey,
-      event.content
-    );
-    
-    const tokenData = JSON.parse(decryptedContent);
-    setTokens(prev => [...prev, {
-      id: event.id,
-      mint: tokenData.mint,
-      proofs: tokenData.proofs,
-      amount: tokenData.proofs.reduce((sum, p) => sum + parseInt(p.amount), 0)
-    }]);
-  };
-
-  const handleTransactionEvent = async (event) => {
-    if (!event.tags.some(t => t[0] === 'a')) return;
-    
-    const decryptedContent = await window.nostr.nip04.decrypt(
-      event.pubkey,
-      event.content
-    );
-    
-    const txData = JSON.parse(decryptedContent);
-    setTransactions(prev => [...prev, {
-      id: event.id,
-      type: txData.find(t => t[0] === 'direction')[1],
-      amount: parseInt(txData.find(t => t[0] === 'amount')[1]),
-      timestamp: event.created_at
-    }]);
   };
 
   const sendTokens = async () => {
-    if (!selectedWallet || !sendAmount || !recipientPubkey) return;
+    if (!sendAmount || !recipientPubkey) return;
     
-    const amount = parseInt(sendAmount);
-    const availableTokens = tokens.filter(t => !t.spent);
-    const totalAvailable = availableTokens.reduce((sum, t) => sum + t.amount, 0);
-    
-    if (totalAvailable < amount) {
-      alert('Insufficient funds');
-      return;
-    }
-
     try {
-      // Create token transfer event
-      const transferEvent = {
+      const amount = parseInt(sendAmount);
+      const event = {
         kind: 7375,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [['a', `37375:${await window.nostr.getPublicKey()}:${selectedWallet.id}`]],
         content: await window.nostr.nip04.encrypt(
           recipientPubkey,
           JSON.stringify({
-            mint: mintUrl,
-            proofs: availableTokens.slice(0, amount)
+            amount,
+            mint: mintUrl
           })
-        )
+        ),
+        tags: []
       };
 
-      await publishToNostr(transferEvent);
-
-      // Create transaction history event
-      const historyEvent = {
-        kind: 7376,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [['a', `37375:${await window.nostr.getPublicKey()}:${selectedWallet.id}`]],
-        content: await window.nostr.nip04.encrypt(
-          await window.nostr.getPublicKey(),
-          JSON.stringify([
-            ['direction', 'out'],
-            ['amount', amount.toString(), 'sat'],
-            ['recipient', recipientPubkey]
-          ])
-        )
-      };
-
-      await publishToNostr(historyEvent);
-
+      await publishToNostr(event);
       setSendAmount('');
       setRecipientPubkey('');
     } catch (error) {
@@ -223,75 +136,66 @@ export const Wallet = () => {
 
   return (
     <div className="wallet-container">
-      <h2>Cashu Wallets</h2>
+      <h2>Cashu Wallet</h2>
       
       {!window.nostr ? (
-        <button onClick={signInWithNostr}>Connect Nostr to View Wallets</button>
+        <button onClick={signInWithNostr}>Connect Nostr to Access Wallet</button>
+      ) : loading ? (
+        <p>Loading wallet...</p>
       ) : (
         <>
-          <div className="create-wallet">
-            <input
-              type="text"
-              value={newWalletName}
-              onChange={(e) => setNewWalletName(e.target.value)}
-              placeholder="New wallet name"
-            />
-            <button onClick={createWallet}>Create Wallet</button>
+          <div className="balance-section">
+            <h3>Balance: {balance} sats</h3>
           </div>
 
-          {loading ? (
-            <p>Loading wallets...</p>
-          ) : wallets.length === 0 ? (
-            <p>No wallets found. Create one to get started!</p>
-          ) : (
-            <div className="wallets-list">
-              {wallets.map(wallet => (
-                <div 
-                  key={wallet.id} 
-                  className="wallet-item"
-                  onClick={() => setSelectedWallet(wallet)}
-                >
-                  <h3>{wallet.name}</h3>
-                  <p>Balance: {wallet.balance} sats</p>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="receive-section">
+            <h3>Receive</h3>
+            <input
+              type="text"
+              value={receiveToken}
+              onChange={(e) => setReceiveToken(e.target.value)}
+              placeholder="Paste Cashu token"
+            />
+            <button 
+              onClick={handleReceiveToken}
+              disabled={!receiveToken}
+            >
+              Receive
+            </button>
+          </div>
 
-          {selectedWallet && (
-            <div className="wallet-details">
-              <h3>{selectedWallet.name}</h3>
-              <p>Balance: {tokens.reduce((sum, t) => sum + t.amount, 0)} sats</p>
-              
-              <div className="send-tokens">
-                <h4>Send Tokens</h4>
-                <input
-                  type="number"
-                  value={sendAmount}
-                  onChange={(e) => setSendAmount(e.target.value)}
-                  placeholder="Amount (sats)"
-                />
-                <input
-                  type="text"
-                  value={recipientPubkey}
-                  onChange={(e) => setRecipientPubkey(e.target.value)}
-                  placeholder="Recipient pubkey"
-                />
-                <button onClick={sendTokens}>Send</button>
-              </div>
+          <div className="send-section">
+            <h3>Send</h3>
+            <input
+              type="number"
+              value={sendAmount}
+              onChange={(e) => setSendAmount(e.target.value)}
+              placeholder="Amount (sats)"
+            />
+            <input
+              type="text"
+              value={recipientPubkey}
+              onChange={(e) => setRecipientPubkey(e.target.value)}
+              placeholder="Recipient npub"
+            />
+            <button 
+              onClick={sendTokens}
+              disabled={!sendAmount || !recipientPubkey}
+            >
+              Send
+            </button>
+          </div>
 
-              <div className="transaction-history">
-                <h4>Transaction History</h4>
-                {transactions.map(tx => (
-                  <div key={tx.id} className="transaction-item">
-                    <span>{tx.type === 'in' ? '↓' : '↑'}</span>
-                    <span>{tx.amount} sats</span>
-                    <span>{new Date(tx.timestamp * 1000).toLocaleString()}</span>
-                  </div>
-                ))}
+          <div className="transaction-history">
+            <h3>Transaction History</h3>
+            {transactions.map(tx => (
+              <div key={tx.id} className="transaction-item">
+                <span>{tx.type === 'in' ? '↓' : '↑'}</span>
+                <span>{tx.amount} sats</span>
+                <span>{new Date(tx.timestamp * 1000).toLocaleString()}</span>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </>
       )}
     </div>

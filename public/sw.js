@@ -35,43 +35,31 @@ self.addEventListener('activate', (event) => {
 
 // Network-first strategy for dynamic content, cache-first for static assets
 self.addEventListener('fetch', (event) => {
-  // Handle different origins
+  // Skip non-GET requests and requests to different origins
   if (!event.request.url.startsWith(self.location.origin) || 
       event.request.method !== 'GET') {
-    return event.respondWith(fetch(event.request));
-  }
-
-  // Network-first strategy for HTML and API requests
-  if (event.request.headers.get('accept').includes('text/html') || 
-      event.request.url.includes('/api/')) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME)
-            .then(cache => cache.put(event.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
     return;
   }
 
-  // Cache-first strategy for static assets
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then(response => {
-        if (response) {
-          return response;
+        // Clone the response before caching
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME)
+          .then(cache => cache.put(event.request, responseToCache));
+        return response;
+      })
+      .catch(async () => {
+        // Try to get from cache if network request fails
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
         }
-        return fetch(event.request).then(response => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME)
-            .then(cache => cache.put(event.request, responseToCache));
-          return response;
+        // If no cache exists, return a basic error response
+        return new Response('Network error occurred', {
+          status: 408,
+          headers: { 'Content-Type': 'text/plain' },
         });
       })
   );
