@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { publishToNostr } from '../utils/nostr';
 
 export const RunTracker = () => {
   const [isRunning, setIsRunning] = useState(false);
@@ -12,6 +14,7 @@ export const RunTracker = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [lastRun, setLastRun] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const storedProfile = localStorage.getItem('nostrProfile');
@@ -107,9 +110,38 @@ export const RunTracker = () => {
     return converted.toFixed(2);
   };
 
-  const handlePostToNostr = (run) => {
-    // TODO: Implement Nostr posting logic
-    console.log('Posting to Nostr:', run);
+  const handlePostToNostr = async (run) => {
+    if (!window.nostr) {
+      const confirmLogin = window.confirm('Please login with Nostr to share your run');
+      if (confirmLogin) {
+        navigate('/login');
+      }
+      return;
+    }
+
+    try {
+      const content = `
+🏃‍♂️ Run Completed!
+⏱️ Duration: ${formatTime(run.duration)}
+📏 Distance: ${run.distance.toFixed(2)} km
+⚡️ Pace: ${run.duration > 0 ? ((run.duration / 60) / run.distance).toFixed(2) : '0'} min/km
+
+#Runstr #Running
+`;
+
+      const event = {
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [['t', 'Runstr'], ['t', 'Running']],
+        content: content,
+      };
+
+      await publishToNostr(event);
+      alert('Successfully posted to Nostr!');
+    } catch (error) {
+      console.error('Error posting to Nostr:', error);
+      alert('Failed to post to Nostr. Please try again.');
+    }
   };
 
   return (

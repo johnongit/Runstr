@@ -43,7 +43,16 @@ const signInWithNostr = () => {
   const encodedJson = encodeURIComponent(JSON.stringify(json));
   const callbackUrl = `${window.location.origin}/login?event=`;
   
-  window.location.href = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
+  // Add a small delay to ensure the app switch works properly on mobile
+  setTimeout(() => {
+    // Try to use universal links first
+    window.location.href = `https://amber.nostr.app/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
+    
+    // Fallback to custom scheme after a short delay if universal link doesn't work
+    setTimeout(() => {
+      window.location.href = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
+    }, 500);
+  }, 100);
 };
 
 export const handleNostrCallback = async (eventParam) => {

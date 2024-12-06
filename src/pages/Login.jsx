@@ -40,9 +40,45 @@ export const Login = () => {
     return () => document.removeEventListener('nlAuth', handleAuth);
   }, [location, navigate]);
 
-  const handleNostrLogin = () => {
-    // Launch nostr-login dialog
-    document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }));
+  const checkAmberInstalled = () => {
+    // Check if running on iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    // Check if running on Android
+    const isAndroid = /Android/.test(navigator.userAgent);
+    
+    if (isIOS || isAndroid) {
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve(false);
+        }, 2500);
+
+        window.addEventListener('blur', () => {
+          clearTimeout(timeout);
+          resolve(true);
+        }, { once: true });
+      });
+    }
+    return Promise.resolve(true);
+  };
+
+  const handleNostrLogin = async () => {
+    const hasAmber = await checkAmberInstalled();
+    
+    if (!hasAmber) {
+      const installAmber = window.confirm('Amber does not appear to be installed. Would you like to install it now?');
+      if (installAmber) {
+        window.location.href = 'https://amber.nostr.app';
+      }
+      return;
+    }
+    
+    try {
+      await signInWithNostr();
+    } catch (error) {
+      console.error('Nostr login error:', error);
+      alert('Failed to open Amber. Please try again.');
+    }
   };
 
   return (
