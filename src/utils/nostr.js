@@ -1,16 +1,18 @@
 import { SimplePool } from 'nostr-tools';
 
-let loggedInUser = null;
-const pool = new SimplePool();
-
-const RELAYS = [
-  'wss://purplepag.es',
-  'wss://relay.primal.net',
+export const RELAYS = [
+  'wss://relay.damus.io',
   'wss://nos.lol',
-  'wss://nostrelites.org',
-  'wss://wot.utxo.one'
+  'wss://nostr.wine',
+  'wss://purplepag.es',
+  'wss://relay.snort.social',
+  'wss://nostr.mom',
+  'wss://relay.nostr.bg'
 ];
 
+let loggedInUser = null;
+
+const pool = new SimplePool();
 
 export const publishToNostr = async (event) => {
   if (!event) return null;
@@ -32,7 +34,7 @@ export const publishToNostr = async (event) => {
   }
 };
 
-const signInWithNostr = () => {
+export const signInWithNostr = () => {
   const json = {
     kind: 1,
     created_at: Math.floor(Date.now() / 1000),
@@ -116,7 +118,7 @@ async function fetchUserProfile(pubkey) {
   }
 }
 
-export { loggedInUser, RELAYS, signInWithNostr, fetchUserProfile, checkAmberInstalled }; 
+export { loggedInUser, fetchUserProfile, checkAmberInstalled }; 
 
 const checkAmberInstalled = () => {
   // Check if running on iOS

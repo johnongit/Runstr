@@ -478,18 +478,50 @@ input, textarea {
   padding: 20px;
 }
 
+.music-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tab-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  background: #333;
+  color: white;
+  cursor: pointer;
+}
+
+.tab-button.active {
+  background: #646cff;
+}
+
+.wavlake-player {
+  margin: 20px 0;
+  padding: 20px;
+  background: #1a1a1a;
+  border-radius: 8px;
+}
+
 .playlist {
-  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .track-item {
   display: flex;
   align-items: center;
   padding: 15px;
-  margin: 10px 0;
   background: #1a1a1a;
   border-radius: 8px;
-  gap: 20px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.track-item:hover {
+  background: #2a2a2a;
 }
 
 .track-number {
@@ -1109,4 +1141,153 @@ input, textarea {
 .post-content {
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.library-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.library-container h1 {
+  margin-bottom: 30px;
+  color: white;
+}
+
+.playlists-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.playlist-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.playlist-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.playlist-artwork {
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+}
+
+.artwork-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  height: 100%;
+}
+
+.artwork-grid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlist-info {
+  padding: 15px;
+}
+
+.playlist-info h3 {
+  margin: 0;
+  color: white;
+  font-size: 1.1em;
+}
+
+.playlist-info p {
+  margin: 5px 0 0;
+  color: #888;
+  font-size: 0.9em;
+}
+
+.private-note {
+  color: #666;
+  font-size: 0.8em;
+  font-style: italic;
+}
+
+.post-actions {
+  display: flex;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid #333;
+  margin-top: 1rem;
+}
+
+.like-button, .comment-button {
+  background: none;
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #888;
+  transition: color 0.2s;
+}
+
+.like-button:hover, .comment-button:hover {
+  color: #646cff;
+}
+
+.like-button.liked {
+  color: #ff4646;
+}
+
+.comments-section {
+  margin-top: 1rem;
+  border-top: 1px solid #333;
+  padding-top: 1rem;
+}
+
+.comment-item {
+  display: flex;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.comment-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.comment-content {
+  flex: 1;
+}
+
+.comment-content strong {
+  color: #646cff;
+  margin-right: 0.5rem;
+}
+
+.comment-input {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.comment-input input {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #333;
+  background: #1a1a1a;
+  color: white;
+}
+
+.comment-input button {
+  padding: 0.5rem 1rem;
+  background: #646cff;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
 }
