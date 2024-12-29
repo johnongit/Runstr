@@ -1,12 +1,13 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { RunTracker } from './components/RunTracker';
-import { MenuBar } from './components/MenuBar';
-import { Login } from './pages/Login';
-import { RunHistory } from './pages/RunHistory';
-import { Achievements } from './pages/Achievements';
-import { RunClub } from './pages/RunClub';
-import { Wallet } from './pages/Wallet';
-import { Music } from './pages/Music';
+import { RunTracker } from './components/RunTracker.jsx';
+import { MenuBar } from './components/MenuBar.jsx';
+import { Login } from './pages/Login.jsx';
+import { RunHistory } from './pages/RunHistory.jsx';
+import { Achievements } from './pages/Achievements.jsx';
+import { RunClub } from './pages/RunClub.jsx';
+import { Wallet } from './pages/Wallet.jsx';
+import { Music } from './pages/Music.jsx';
+import { NWC } from './pages/NWC.jsx';
 import './App.css';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
         <Route path="/club/join/:teamId" element={<RunClub />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/music" element={<Music />} />
+        <Route path="/nwc" element={<NWC />} />
         <Route path="/" element={<RunTracker />} />
       </Routes>
     </BrowserRouter>

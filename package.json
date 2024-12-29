@@ -11,6 +11,7 @@
     "setup-icons": "node scripts/download-icon.js && node scripts/generate-icons.js"
   },
   "dependencies": {
+    "@getalby/sdk": "^3.8.2",
     "@nostr-dev-kit/ndk": "^2.10.7",
     "prop-types": "^15.8.1",
     "react": "^18.3.1",

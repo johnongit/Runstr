@@ -3,8 +3,6 @@ import { useState, useRef, useEffect } from 'react';
 import { getToken } from "nostr-tools/nip98";
 
 const WAVLAKE_API_BASE_URL = "https://api.wavlake.com/v1";
-// eslint-disable-next-line no-unused-vars
-const WAVLAKE_CATALOG_API_BASE_URL = "https://catalog.wavlake.com/v1";
 
 export const WavlakePlayer = ({ track }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -17,69 +15,72 @@ export const WavlakePlayer = ({ track }) => {
   useEffect(() => {
     const setupAudioStream = async () => {
       try {
+        setIsLoading(true);
+        setError(null);
+
+        if (!window.nostr) {
+          throw new Error('Nostr provider not found');
+        }
+
         const streamUrl = `${WAVLAKE_API_BASE_URL}/stream/track/${track.id}`;
         const token = await getToken(
           streamUrl,
           "get",
-          (event) => window.nostr.signEvent(event),
-          true
+          async (event) => {
+            try {
+              const signedEvent = await window.nostr.signEvent(event);
+              if (!signedEvent) throw new Error('Failed to sign event');
+              return signedEvent;
+            } catch (err) {
+              throw new Error(`Signing failed: ${err.message}`);
+            }
+          }
         );
 
-        setAudioUrl(`${streamUrl}.mp3?auth=${encodeURIComponent(token)}&format=mp3`);
+        setAudioUrl(`${streamUrl}?auth=${encodeURIComponent(token)}&format=mp3`);
       } catch (err) {
         console.error('Error setting up audio stream:', err);
-        setError('Failed to initialize audio stream');
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    setupAudioStream();
-  }, [track.id]);
+    if (track?.id) {
+      setupAudioStream();
+    }
+  }, [track?.id]);
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (audio) {
-      audio.addEventListener('timeupdate', updateProgress);
-      audio.addEventListener('loadstart', () => setIsLoading(true));
-      audio.addEventListener('canplay', () => setIsLoading(false));
-      audio.addEventListener('error', handleError);
-      
-      return () => {
-        audio.removeEventListener('timeupdate', updateProgress);
-        audio.removeEventListener('loadstart', () => setIsLoading(true));
-        audio.removeEventListener('canplay', () => setIsLoading(false));
-        audio.removeEventListener('error', handleError);
-      };
-    }
+    if (!audio) return;
+
+    const handleTimeUpdate = () => {
+      setProgress((audio.currentTime / audio.duration) * 100);
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', () => setIsPlaying(false));
+    
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', () => setIsPlaying(false));
+    };
   }, []);
 
-  const handleError = () => {
-    setError('Failed to load audio. Please try again.');
-    setIsPlaying(false);
-    setIsLoading(false);
-  };
-
-  const updateProgress = () => {
-    if (audioRef.current) {
-      const value = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-      setProgress(value);
-    }
-  };
-
   const togglePlay = async () => {
-    if (audioRef.current) {
-      try {
-        if (isPlaying) {
-          await audioRef.current.pause();
-        } else {
-          setError(null);
-          await audioRef.current.play();
-        }
-        setIsPlaying(!isPlaying);
-      } catch (err) {
-        console.error('Playback error:', err);
-        setError('Failed to play audio. Please try again.');
-        setIsPlaying(false);
+    if (!audioRef.current) return;
+
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        await audioRef.current.play();
       }
+      setIsPlaying(!isPlaying);
+    } catch (err) {
+      console.error('Playback error:', err);
+      setError('Playback failed');
     }
   };
 
@@ -90,7 +91,6 @@ export const WavlakePlayer = ({ track }) => {
           ref={audioRef}
           src={audioUrl}
           preload="auto"
-          onEnded={() => setIsPlaying(false)}
         />
       )}
       <div className="track-info">
