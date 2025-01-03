@@ -11,6 +11,8 @@
     "setup-icons": "node scripts/download-icon.js && node scripts/generate-icons.js"
   },
   "dependencies": {
+    "@getalby/bitcoin-connect": "^3.6.3",
+    "@getalby/bitcoin-connect-react": "^3.6.3",
     "@getalby/sdk": "^3.8.2",
     "@nostr-dev-kit/ndk": "^2.10.7",
     "prop-types": "^15.8.1",

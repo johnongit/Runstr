@@ -11,7 +11,7 @@ export const MenuBar = () => {
     { name: 'Achievements', path: '/achievements' },
     { name: 'Run Club', path: '/club' },
     { name: 'Music', path: '/music' },
-    { name: 'NWC', path: '/nwc' }
+    { name: 'Wallet', path: '/nwc' }
   ];
 
   const toggleMenu = () => {
