@@ -12,5 +12,16 @@ export default defineConfig({
         assetFileNames: 'assets/[name].[ext]'
       }
     }
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://api.wavlake.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+        secure: false,
+        timeout: 20000
+      }
+    }
   }
 })

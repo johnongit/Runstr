@@ -1,8 +1,8 @@
 import PropTypes from 'prop-types';
 import { useState, useRef, useEffect } from 'react';
-import { getToken } from "nostr-tools/nip98";
 
-const WAVLAKE_API_BASE_URL = "https://api.wavlake.com/v1";
+// Use proxy for local development
+const API_BASE_URL = '/api/v1';
 
 export const WavlakePlayer = ({ track }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -10,89 +10,151 @@ export const WavlakePlayer = ({ track }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const audioRef = useRef(null);
-  const [audioUrl, setAudioUrl] = useState(null);
+  const setupInProgressRef = useRef(false);
 
+  // Effect for audio event listeners
   useEffect(() => {
-    const setupAudioStream = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        if (!window.nostr) {
-          throw new Error('Nostr provider not found');
-        }
-
-        const streamUrl = `${WAVLAKE_API_BASE_URL}/stream/track/${track.id}`;
-        const token = await getToken(
-          streamUrl,
-          "get",
-          async (event) => {
-            try {
-              const signedEvent = await window.nostr.signEvent(event);
-              if (!signedEvent) throw new Error('Failed to sign event');
-              return signedEvent;
-            } catch (err) {
-              throw new Error(`Signing failed: ${err.message}`);
-            }
-          }
-        );
-
-        setAudioUrl(`${streamUrl}?auth=${encodeURIComponent(token)}&format=mp3`);
-      } catch (err) {
-        console.error('Error setting up audio stream:', err);
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (track?.id) {
-      setupAudioStream();
-    }
-  }, [track?.id]);
-
-  useEffect(() => {
+    if (!audioRef.current) return;
+    
     const audio = audioRef.current;
-    if (!audio) return;
-
+    
     const handleTimeUpdate = () => {
       setProgress((audio.currentTime / audio.duration) * 100);
     };
 
+    const handleEnded = () => {
+      setIsPlaying(false);
+    };
+
+    const handleError = (e) => {
+      if (audio.src) {
+        console.error('Audio playback error:', e);
+        console.error('Audio error details:', {
+          error: audio.error?.message || 'Unknown error',
+          code: audio.error?.code,
+          networkState: audio.networkState,
+          readyState: audio.readyState,
+          currentSrc: audio.currentSrc
+        });
+        setError('Playback failed: ' + (audio.error?.message || 'Unknown error'));
+        setIsPlaying(false);
+      }
+    };
+
     audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', () => setIsPlaying(false));
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
     
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', () => setIsPlaying(false));
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
     };
   }, []);
 
+  // Effect for track changes
+  useEffect(() => {
+    const setupAudio = async () => {
+      if (setupInProgressRef.current) {
+        console.log('Setup already in progress, skipping');
+        return;
+      }
+
+      try {
+        setupInProgressRef.current = true;
+        setIsLoading(true);
+        setError(null);
+        setIsPlaying(false);
+
+        // Create stream URL directly
+        const streamUrl = `${API_BASE_URL}/tracks/${track.id}/stream`;
+        console.log('Using stream URL:', streamUrl);
+
+        // Create a new Audio instance
+        const newAudio = new Audio();
+        newAudio.preload = 'auto';
+        newAudio.crossOrigin = 'anonymous';
+        
+        // Wait for audio to be ready with timeout
+        await Promise.race([
+          new Promise((resolve, reject) => {
+            const handleCanPlay = () => {
+              console.log('Audio can play');
+              resolve();
+            };
+            
+            const handleError = () => {
+              reject(new Error('Failed to load audio'));
+            };
+
+            newAudio.addEventListener('canplay', handleCanPlay, { once: true });
+            newAudio.addEventListener('error', handleError, { once: true });
+            
+            newAudio.src = streamUrl;
+            newAudio.load();
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Audio load timeout')), 15000)
+          )
+        ]);
+
+        audioRef.current = newAudio;
+        console.log('Audio setup complete');
+      } catch (err) {
+        console.error('Setup error:', {
+          message: err.message,
+          type: err.name,
+          trackId: track.id,
+          url: `${API_BASE_URL}/tracks/${track.id}/stream`
+        });
+        setError(err.message || 'Failed to setup audio');
+      } finally {
+        setIsLoading(false);
+        setupInProgressRef.current = false;
+      }
+    };
+
+    if (track?.id) {
+      setupAudio();
+    }
+
+    return () => {
+      const currentAudio = audioRef.current;
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = '';
+        currentAudio.load();
+        audioRef.current = null;
+      }
+      setIsPlaying(false);
+    };
+  }, [track]);
+
   const togglePlay = async () => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio?.src || isLoading) return;
 
     try {
       if (isPlaying) {
-        audioRef.current.pause();
+        audio.pause();
+        setIsPlaying(false);
       } else {
-        await audioRef.current.play();
+        setError(null);
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+          setIsPlaying(true);
+        }
       }
-      setIsPlaying(!isPlaying);
     } catch (err) {
       console.error('Playback error:', err);
-      setError('Playback failed');
+      setError('Playback failed: ' + (err.message || 'Unknown error'));
+      setIsPlaying(false);
     }
   };
 
   return (
     <div className="wavlake-player">
-      {audioUrl && (
-        <audio
-          ref={audioRef}
-          src={audioUrl}
-          preload="auto"
-        />
-      )}
       <div className="track-info">
         <h3>{track.title}</h3>
         <p>{track.artist}</p>
@@ -102,7 +164,7 @@ export const WavlakePlayer = ({ track }) => {
         <button 
           onClick={togglePlay} 
           className="play-button"
-          disabled={isLoading || !audioUrl}
+          disabled={isLoading || error || !audioRef.current?.src}
         >
           {isLoading ? '⌛' : isPlaying ? '⏸️' : '▶️'}
         </button>
