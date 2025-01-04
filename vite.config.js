@@ -15,12 +15,42 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': {
-        target: 'https://api.wavlake.com',
+      '/api/v1': {
+        target: 'https://wavlake.com',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
         secure: false,
-        timeout: 20000
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.log('proxy error', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req) => {
+            // For streaming requests
+            if (req.url.includes('/stream/')) {
+              // Prevent caching
+              proxyReq.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+              proxyReq.setHeader('Pragma', 'no-cache');
+              proxyReq.setHeader('Expires', '0');
+              // Allow range requests
+              proxyReq.setHeader('Accept-Ranges', 'bytes');
+            }
+            console.log('Sending Request to the Target:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req) => {
+            // For streaming responses
+            if (req.url.includes('/stream/')) {
+              // Prevent caching
+              proxyRes.headers['cache-control'] = 'no-cache, no-store, must-revalidate';
+              proxyRes.headers['pragma'] = 'no-cache';
+              proxyRes.headers['expires'] = '0';
+              // Allow range requests
+              proxyRes.headers['accept-ranges'] = 'bytes';
+              // Remove problematic headers
+              delete proxyRes.headers['content-length'];
+              delete proxyRes.headers['transfer-encoding'];
+            }
+            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+          });
+        }
       }
     }
   }

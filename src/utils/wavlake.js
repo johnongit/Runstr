@@ -1,77 +1,144 @@
-import { getToken } from "nostr-tools/nip98";
-
+// Constants for playlist types
 export const PLAYLIST = "playlist";
 export const TOP_40 = "top-40";
 export const LIKED = "liked";
 
-const WAVLAKE_API_BASE_URL = "https://api.wavlake.com/v1";
-const WAVLAKE_CATALOG_API_BASE_URL = "https://catalog.wavlake.com/v1";
-
-const fetchWithTimeout = async (url, options = {}, timeout = 5000) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-
+/**
+ * Base fetch function with headers and error handling
+ */
+const fetchWithHeaders = async (endpoint, options = {}) => {
   try {
-    const response = await fetch(url, {
+    const response = await fetch(`/api/v1${endpoint}`, {
       ...options,
-      signal: controller.signal
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
     });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
-};
 
-export const fetchTop40 = async () => {
-  try {
-    const response = await fetchWithTimeout(
-      `${WAVLAKE_API_BASE_URL}/content/rankings?sort=sats&days=7&limit=40`
-    );
-    
     if (!response.ok) {
-      throw new Error('Failed to fetch top 40');
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const tracks = await response.json();
-    return { id: TOP_40, title: "Top 40", tracks };
+
+    const data = await response.json();
+    return data;
   } catch (error) {
-    console.error('Error fetching top 40:', error);
+    console.error('Fetch error:', error);
     throw error;
   }
 };
 
+/**
+ * Get rankings (featured tracks)
+ */
+export const fetchRankings = async (days = 7, limit = 40) => {
+  try {
+    const data = await fetchWithHeaders(
+      `/content/rankings?sort=sats&days=${days}&limit=${limit}`
+    );
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Error fetching rankings:', error);
+    return [];
+  }
+};
+
+/**
+ * Get track metadata by ID
+ */
+export const getTrackById = async (trackId) => {
+  try {
+    const data = await fetchWithHeaders(`/content/track/${trackId}`);
+    return data;
+  } catch (error) {
+    console.error('Error fetching track:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get stream URL for a track
+ */
+export const getTrackStreamUrl = (trackId) => {
+  if (!trackId) return null;
+  return `/api/v1/stream/track/${trackId}`;
+};
+
+/**
+ * Search for content
+ */
+export const searchContent = async (term) => {
+  try {
+    const data = await fetchWithHeaders(`/content/search?term=${encodeURIComponent(term)}`);
+    return data;
+  } catch (error) {
+    console.error('Error searching content:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create NIP-88 playlist event
+ */
+const createPlaylistEvent = (name, description, tracks = []) => {
+  return {
+    kind: 30088, // NIP-88 playlist kind
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [
+      ['d', 'wavlake-playlist'],
+      ['name', name],
+      ['description', description],
+      ...tracks.map(track => ['t', track.id, track.title, track.artist])
+    ],
+    content: JSON.stringify({
+      name,
+      description,
+      tracks: tracks.map(track => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist
+      }))
+    })
+  };
+};
+
+/**
+ * Get liked playlist using NIP-98 auth and NIP-88 format
+ */
 export const fetchLikedPlaylist = async () => {
   if (!window.nostr) {
     throw new Error('Nostr not available');
   }
 
   try {
-    const url = `${WAVLAKE_CATALOG_API_BASE_URL}/library/tracks`;
-    const response = await fetchWithTimeout(url, {
-      headers: {
-        Authorization: await getToken(
-          url,
-          "get",
-          (event) => window.nostr.signEvent(event),
-          true,
-        ),
-      }
-    });
+    // First get the rankings as initial tracks
+    const tracks = await fetchRankings();
+    
+    // Create NIP-88 playlist event
+    const playlistEvent = createPlaylistEvent(
+      'Liked Tracks',
+      'My liked tracks on Wavlake',
+      tracks
+    );
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch liked tracks');
-    }
+    // Sign the event
+    const signedEvent = await window.nostr.signEvent(playlistEvent);
 
-    const data = await response.json();
     return {
       id: LIKED,
       title: "Liked",
-      tracks: data.data?.tracks || [],
+      tracks,
       isPrivate: true,
+      event: signedEvent
     };
   } catch (error) {
     console.error('Error fetching liked playlist:', error);
-    throw error;
+    return {
+      id: LIKED,
+      title: "Liked",
+      tracks: [],
+      isPrivate: true
+    };
   }
 }; 

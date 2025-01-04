@@ -1,180 +1,148 @@
 import PropTypes from 'prop-types';
 import { useState, useRef, useEffect } from 'react';
+import ReactPlayer from 'react-player';
+import { getTrackStreamUrl } from '../utils/wavlake';
 
-// Use proxy for local development
-const API_BASE_URL = '/api/v1';
-
-export const WavlakePlayer = ({ track }) => {
+export const WavlakePlayer = ({ track, onEnded }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const audioRef = useRef(null);
-  const setupInProgressRef = useRef(false);
+  const playerRef = useRef(null);
 
-  // Effect for audio event listeners
   useEffect(() => {
-    if (!audioRef.current) return;
-    
-    const audio = audioRef.current;
-    
-    const handleTimeUpdate = () => {
-      setProgress((audio.currentTime / audio.duration) * 100);
-    };
-
-    const handleEnded = () => {
-      setIsPlaying(false);
-    };
-
-    const handleError = (e) => {
-      if (audio.src) {
-        console.error('Audio playback error:', e);
-        console.error('Audio error details:', {
-          error: audio.error?.message || 'Unknown error',
-          code: audio.error?.code,
-          networkState: audio.networkState,
-          readyState: audio.readyState,
-          currentSrc: audio.currentSrc
-        });
-        setError('Playback failed: ' + (audio.error?.message || 'Unknown error'));
-        setIsPlaying(false);
-      }
-    };
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('error', handleError);
-    
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('error', handleError);
-    };
-  }, []);
-
-  // Effect for track changes
-  useEffect(() => {
-    const setupAudio = async () => {
-      if (setupInProgressRef.current) {
-        console.log('Setup already in progress, skipping');
-        return;
-      }
-
-      try {
-        setupInProgressRef.current = true;
-        setIsLoading(true);
-        setError(null);
-        setIsPlaying(false);
-
-        // Create stream URL directly
-        const streamUrl = `${API_BASE_URL}/tracks/${track.id}/stream`;
-        console.log('Using stream URL:', streamUrl);
-
-        // Create a new Audio instance
-        const newAudio = new Audio();
-        newAudio.preload = 'auto';
-        newAudio.crossOrigin = 'anonymous';
-        
-        // Wait for audio to be ready with timeout
-        await Promise.race([
-          new Promise((resolve, reject) => {
-            const handleCanPlay = () => {
-              console.log('Audio can play');
-              resolve();
-            };
-            
-            const handleError = () => {
-              reject(new Error('Failed to load audio'));
-            };
-
-            newAudio.addEventListener('canplay', handleCanPlay, { once: true });
-            newAudio.addEventListener('error', handleError, { once: true });
-            
-            newAudio.src = streamUrl;
-            newAudio.load();
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Audio load timeout')), 15000)
-          )
-        ]);
-
-        audioRef.current = newAudio;
-        console.log('Audio setup complete');
-      } catch (err) {
-        console.error('Setup error:', {
-          message: err.message,
-          type: err.name,
-          trackId: track.id,
-          url: `${API_BASE_URL}/tracks/${track.id}/stream`
-        });
-        setError(err.message || 'Failed to setup audio');
-      } finally {
-        setIsLoading(false);
-        setupInProgressRef.current = false;
-      }
-    };
-
     if (track?.id) {
-      setupAudio();
-    }
-
-    return () => {
-      const currentAudio = audioRef.current;
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.src = '';
-        currentAudio.load();
-        audioRef.current = null;
-      }
+      setIsLoading(true);
+      setError(null);
       setIsPlaying(false);
-    };
+      setProgress(0);
+      setDuration(0);
+    }
   }, [track]);
 
-  const togglePlay = async () => {
-    const audio = audioRef.current;
-    if (!audio?.src || isLoading) return;
+  const handlePlay = () => {
+    setIsPlaying(true);
+    setError(null);
+  };
 
-    try {
-      if (isPlaying) {
-        audio.pause();
-        setIsPlaying(false);
-      } else {
-        setError(null);
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          await playPromise;
-          setIsPlaying(true);
-        }
-      }
-    } catch (err) {
-      console.error('Playback error:', err);
-      setError('Playback failed: ' + (err.message || 'Unknown error'));
-      setIsPlaying(false);
+  const handlePause = () => {
+    setIsPlaying(false);
+  };
+
+  const handleError = (err) => {
+    console.error('Playback error:', err);
+    setError('Failed to play audio');
+    setIsPlaying(false);
+    setIsLoading(false);
+  };
+
+  const handleProgress = ({ playedSeconds }) => {
+    setProgress(playedSeconds);
+  };
+
+  const handleDuration = (duration) => {
+    setDuration(duration);
+    setIsLoading(false);
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    if (onEnded) onEnded();
+  };
+
+  const togglePlay = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleSeek = (value) => {
+    if (playerRef.current) {
+      playerRef.current.seekTo(value);
+      setProgress(value);
     }
   };
 
+  const streamUrl = track?.id ? getTrackStreamUrl(track.id) : null;
+
   return (
     <div className="wavlake-player">
+      {streamUrl && (
+        <ReactPlayer
+          ref={playerRef}
+          url={streamUrl}
+          playing={isPlaying}
+          controls={false}
+          width="0"
+          height="0"
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onError={handleError}
+          onProgress={handleProgress}
+          onDuration={handleDuration}
+          onEnded={handleEnded}
+          config={{
+            file: {
+              forceAudio: true,
+              attributes: {
+                crossOrigin: "anonymous",
+                preload: "auto"
+              },
+              forceHLS: false,
+              forceDASH: false,
+              hlsOptions: {
+                enableWorker: false,
+                debug: false
+              },
+              // Disable caching
+              cache: false,
+              // Enable range requests
+              range: true
+            }
+          }}
+        />
+      )}
+
       <div className="track-info">
-        <h3>{track.title}</h3>
-        <p>{track.artist}</p>
-        {error && <p className="error-message">{error}</p>}
+        <img 
+          src={track.artwork} 
+          alt={track.title} 
+          className="track-artwork"
+        />
+        <div className="track-details">
+          <h3>{track.title}</h3>
+          <p>{track.artist}</p>
+        </div>
       </div>
+
       <div className="player-controls">
         <button 
-          onClick={togglePlay} 
+          onClick={togglePlay}
+          disabled={isLoading || error || !streamUrl}
           className="play-button"
-          disabled={isLoading || error || !audioRef.current?.src}
         >
           {isLoading ? '⌛' : isPlaying ? '⏸️' : '▶️'}
         </button>
+
         <div className="progress-bar">
-          <div 
-            className="progress" 
-            style={{ width: `${progress}%` }}
+          <input
+            type="range"
+            min={0}
+            max={duration || 0}
+            value={progress}
+            onChange={(e) => handleSeek(Number(e.target.value))}
+            disabled={isLoading || error || !streamUrl}
           />
+          <div className="time">
+            {formatTime(progress)} / {formatTime(duration)}
+          </div>
         </div>
       </div>
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
     </div>
   );
 };
@@ -183,6 +151,15 @@ WavlakePlayer.propTypes = {
   track: PropTypes.shape({
     id: PropTypes.string.isRequired,
     title: PropTypes.string.isRequired,
-    artist: PropTypes.string.isRequired
-  }).isRequired
+    artist: PropTypes.string.isRequired,
+    artwork: PropTypes.string
+  }).isRequired,
+  onEnded: PropTypes.func
+};
+
+const formatTime = (seconds) => {
+  if (!seconds) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }; 
