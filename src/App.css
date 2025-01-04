@@ -1451,3 +1451,33 @@ input, textarea {
   border-radius: 3px;
   transition: width 0.1s linear;
 }
+
+.post-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.post-image {
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.post-image:hover {
+  transform: scale(1.02);
+}
+
+@media (max-width: 768px) {
+  .post-images {
+    grid-template-columns: 1fr;
+  }
+  
+  .post-image {
+    max-height: 300px;
+  }
+}

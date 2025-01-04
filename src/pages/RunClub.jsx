@@ -54,6 +54,33 @@ export const RunClub = () => {
         })
       );
 
+      // Fetch comments for all posts
+      const comments = await ndk.fetchEvents({
+        kinds: [1],
+        '#e': posts.map(post => post.id)
+      });
+
+      // Group comments by their parent post
+      const commentsByPost = new Map();
+      Array.from(comments).forEach(comment => {
+        const parentId = comment.tags.find(tag => tag[0] === 'e')?.[1];
+        if (parentId) {
+          if (!commentsByPost.has(parentId)) {
+            commentsByPost.set(parentId, []);
+          }
+          const profile = profileMap.get(comment.pubkey) || {};
+          commentsByPost.get(parentId).push({
+            id: comment.id,
+            content: comment.content,
+            created_at: comment.created_at,
+            author: {
+              pubkey: comment.pubkey,
+              profile: profile
+            }
+          });
+        }
+      });
+
       return posts
         .map(post => {
           const profile = profileMap.get(post.pubkey) || {};
@@ -66,7 +93,9 @@ export const RunClub = () => {
               profile: profile,
               lud16: profile.lud16,
               lud06: profile.lud06
-            }
+            },
+            comments: commentsByPost.get(post.id) || [],
+            showComments: false
           };
         })
         .sort((a, b) => b.created_at - a.created_at);
@@ -253,7 +282,7 @@ export const RunClub = () => {
         created_at: Math.floor(Date.now() / 1000),
         content: commentText,
         tags: [
-          ['e', postId],
+          ['e', postId, '', 'reply'],
           ['k', '1'],
         ],
         pubkey: await window.nostr.getPublicKey()
@@ -263,7 +292,7 @@ export const RunClub = () => {
       const signedEvent = await window.nostr.signEvent(commentEvent);
       
       // Create NDK Event and publish
-      const ndkEvent = ndk.getEvent(signedEvent);
+      const ndkEvent = new NDKEvent(ndk, signedEvent);
       await ndkEvent.publish();
 
       setCommentText('');
@@ -281,6 +310,11 @@ export const RunClub = () => {
         ? { ...post, showComments: !post.showComments }
         : post
     ));
+  };
+
+  const extractImagesFromContent = (content) => {
+    const urlRegex = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp))/gi;
+    return content.match(urlRegex) || [];
   };
 
   return (
@@ -310,6 +344,17 @@ export const RunClub = () => {
                 </div>
                 <div className="post-content">
                   {post.content}
+                  <div className="post-images">
+                    {extractImagesFromContent(post.content).map((imageUrl, index) => (
+                      <img 
+                        key={index}
+                        src={imageUrl}
+                        alt="Run activity"
+                        className="post-image"
+                        onClick={() => window.open(imageUrl, '_blank')}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <div className="post-actions">
                   <button 
