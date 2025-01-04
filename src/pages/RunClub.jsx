@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import NDK from '@nostr-dev-kit/ndk';
+import NDK, { NDKEvent } from '@nostr-dev-kit/ndk';
 import { RELAYS } from '../utils/nostr';
 
 export const RunClub = () => {
@@ -55,15 +55,20 @@ export const RunClub = () => {
       );
 
       return posts
-        .map(post => ({
-          id: post.id,
-          content: post.content,
-          created_at: post.created_at,
-          author: {
-            pubkey: post.pubkey,
-            profile: profileMap.get(post.pubkey) || {}
-          }
-        }))
+        .map(post => {
+          const profile = profileMap.get(post.pubkey) || {};
+          return {
+            id: post.id,
+            content: post.content,
+            created_at: post.created_at,
+            author: {
+              pubkey: post.pubkey,
+              profile: profile,
+              lud16: profile.lud16,
+              lud06: profile.lud06
+            }
+          };
+        })
         .sort((a, b) => b.created_at - a.created_at);
     } catch (err) {
       console.error('Error processing posts:', err);
@@ -146,31 +151,93 @@ export const RunClub = () => {
     };
   }, [ndk, fetchRunPosts]);
 
-  const handleLike = async (postId) => {
+  const handleZap = async (post) => {
     if (!window.nostr) {
-      alert('Please login to like posts');
+      alert('Please login to send zaps');
       return;
     }
 
     try {
-      const event = {
-        kind: 7, // NIP-25 Reactions
+      // Extract LNURL from the post author's profile
+      const lnurl = post.author.lud16 || post.author.lud06;
+      if (!lnurl) {
+        console.log('Author profile:', post.author);
+        alert('This user has not set up their Lightning address in their Nostr profile');
+        return;
+      }
+
+      // Create the zap event
+      const zapEvent = {
+        kind: 9734,
         created_at: Math.floor(Date.now() / 1000),
-        content: '+',
+        content: 'Zap for your run! ⚡️',
         tags: [
-          ['e', postId],
-          ['k', '1'], // Reference to the original post kind
+          ['p', post.author.pubkey],
+          ['e', post.id],
+          ['relays', ...RELAYS],
+          ['amount', '1000'], // 1000 sats
         ],
+        pubkey: await window.nostr.getPublicKey()
       };
 
-      await publishToNostr(event);
-      setPosts(posts.map(post => 
-        post.id === postId 
-          ? { ...post, liked: true, likeCount: (post.likeCount || 0) + 1 }
-          : post
-      ));
+      // Sign the event
+      const signedEvent = await window.nostr.signEvent(zapEvent);
+      
+      // Create and publish NDK Event
+      const ndkEvent = new NDKEvent(ndk, signedEvent);
+      await ndkEvent.publish();
+
+      // Parse the Lightning address and create the zap request URL
+      let zapEndpoint;
+      if (lnurl.includes('@')) {
+        // Handle Lightning address (lud16)
+        const [username, domain] = lnurl.split('@');
+        zapEndpoint = `https://${domain}/.well-known/lnurlp/${username}`;
+      } else {
+        // Handle raw LNURL (lud06)
+        zapEndpoint = lnurl;
+      }
+
+      // First get the LNURL-pay metadata
+      const response = await fetch(zapEndpoint);
+      const lnurlPayData = await response.json();
+
+      if (!lnurlPayData.callback) {
+        throw new Error('Invalid LNURL-pay response: missing callback URL');
+      }
+
+      // Amount in millisatoshis (1000 sats = 100000 millisats)
+      const amount = 1000 * 1000;
+
+      // Check if amount is within min/max bounds
+      if (amount < lnurlPayData.minSendable || amount > lnurlPayData.maxSendable) {
+        throw new Error(`Amount must be between ${lnurlPayData.minSendable} and ${lnurlPayData.maxSendable} millisats`);
+      }
+
+      // Construct the callback URL with amount
+      const callbackUrl = new URL(lnurlPayData.callback);
+      callbackUrl.searchParams.append('amount', amount);
+      
+      // If there's a nostr event, add it to the callback
+      callbackUrl.searchParams.append('nostr', JSON.stringify(signedEvent));
+
+      // Get the invoice
+      const invoiceResponse = await fetch(callbackUrl);
+      const invoiceData = await invoiceResponse.json();
+
+      if (!invoiceData.pr) {
+        throw new Error('Invalid LNURL-pay response: missing payment request');
+      }
+
+      // Use Bitcoin Connect to get the provider and pay
+      const { requestProvider } = await import('@getalby/bitcoin-connect');
+      const provider = await requestProvider();
+      await provider.sendPayment(invoiceData.pr);
+
+      alert('Zap sent successfully! ⚡️');
     } catch (error) {
-      console.error('Error liking post:', error);
+      console.error('Error sending zap:', error);
+      alert('Failed to send zap: ' + error.message);
     }
   };
 
@@ -181,7 +248,7 @@ export const RunClub = () => {
     }
 
     try {
-      const event = {
+      const commentEvent = {
         kind: 1,
         created_at: Math.floor(Date.now() / 1000),
         content: commentText,
@@ -189,14 +256,22 @@ export const RunClub = () => {
           ['e', postId],
           ['k', '1'],
         ],
+        pubkey: await window.nostr.getPublicKey()
       };
 
-      await publishToNostr(event);
+      // Sign the event
+      const signedEvent = await window.nostr.signEvent(commentEvent);
+      
+      // Create NDK Event and publish
+      const ndkEvent = ndk.getEvent(signedEvent);
+      await ndkEvent.publish();
+
       setCommentText('');
       // Refresh posts to show new comment
       fetchRunPosts();
     } catch (error) {
       console.error('Error posting comment:', error);
+      alert('Failed to post comment. Please try again.');
     }
   };
 
@@ -206,14 +281,6 @@ export const RunClub = () => {
         ? { ...post, showComments: !post.showComments }
         : post
     ));
-  };
-
-  const publishToNostr = async (event) => {
-    if (!window.nostr) throw new Error('Nostr not available');
-    event.pubkey = await window.nostr.getPublicKey();
-    event = await window.nostr.signEvent(event);
-    await ndk.publish(event);
-    return event;
   };
 
   return (
@@ -246,10 +313,10 @@ export const RunClub = () => {
                 </div>
                 <div className="post-actions">
                   <button 
-                    className={`like-button ${post.liked ? 'liked' : ''}`}
-                    onClick={() => handleLike(post.id)}
+                    className="zap-button"
+                    onClick={() => handleZap(post)}
                   >
-                    {post.liked ? '❤️' : '🤍'} {post.likeCount || 0}
+                    ⚡️ Zap
                   </button>
                   <button 
                     className="comment-button"
