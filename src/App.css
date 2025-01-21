@@ -106,6 +106,30 @@ input, textarea {
   margin: 5px 0;
 }
 
+/* Style distance display */
+.distance-display {
+  font-size: 2.5em;
+  font-weight: bold;
+  color: #4CAF50;
+  margin: 10px 0;
+}
+
+/* Style pace display */
+.pace-display {
+  font-size: 1.8em;
+  color: #2196F3;
+  margin: 10px 0;
+}
+
+/* Style error message */
+.error-message {
+  color: #f44336;
+  background-color: rgba(244, 67, 54, 0.1);
+  padding: 10px;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
 /* Improve run controls layout */
 .controls {
   position: fixed;

@@ -1,66 +1,103 @@
-const CACHE_NAME = 'runclub-cache-v1';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/sw.js',
-  '/vite.svg',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
-];
+const CACHE_NAME = 'nostr-run-club-v1';
 
-// Pre-cache assets during installation
+// Install Service Worker
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting()) // Ensure new service worker takes over
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll([
+        '/',
+        '/index.html',
+        '/manifest.json'
+      ]);
+    })
   );
 });
 
-// Clean up old caches
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim()) // Take control of all pages
-  );
-});
+// Store location data for sync
+let pendingLocations = [];
 
-// Network-first strategy for dynamic content, cache-first for static assets
-self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests and requests to different origins
-  if (!event.request.url.startsWith(self.location.origin) || 
-      event.request.method !== 'GET') {
-    return;
-  }
-
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        // Clone the response before caching
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME)
-          .then(cache => cache.put(event.request, responseToCache));
-        return response;
-      })
-      .catch(async () => {
-        // Try to get from cache if network request fails
-        const cachedResponse = await caches.match(event.request);
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        // If no cache exists, return a basic error response
-        return new Response('Network error occurred', {
-          status: 408,
-          headers: { 'Content-Type': 'text/plain' },
+function syncLocationData() {
+  return Promise.all(pendingLocations.map(location => 
+    self.clients.matchAll().then(clients => {
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'LOCATION_UPDATE',
+          position: location
         });
-      })
-  );
+      });
+    })
+  )).then(() => {
+    pendingLocations = [];
+  });
+}
+
+// Background Sync for Location Updates
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'syncLocation') {
+    event.waitUntil(syncLocationData());
+  }
+});
+
+// Handle Location Updates in Background
+let watchId = null;
+
+self.addEventListener('message', (event) => {
+  if (event.data.type === 'START_TRACKING') {
+    startLocationTracking();
+  } else if (event.data.type === 'STOP_TRACKING') {
+    stopLocationTracking();
+  }
+});
+
+function startLocationTracking() {
+  if (!watchId && 'geolocation' in self) {
+    watchId = self.registration.backgroundFetch.watchPosition(
+      (position) => {
+        // Store position for sync if clients are not available
+        pendingLocations.push(position);
+        // Send location update to all clients
+        self.clients.matchAll().then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({
+              type: 'LOCATION_UPDATE',
+              position: {
+                coords: {
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  accuracy: position.coords.accuracy,
+                  speed: position.coords.speed
+                },
+                timestamp: position.timestamp
+              }
+            });
+          });
+        });
+      },
+      (error) => {
+        console.error('Background location error:', error);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 5000
+      }
+    );
+  }
+}
+
+function stopLocationTracking() {
+  if (watchId) {
+    self.registration.backgroundFetch.clearWatch(watchId);
+    watchId = null;
+  }
+}
+
+// Keep alive
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'keep-alive') {
+    event.waitUntil(
+      // Perform minimal work to keep service worker alive
+      Promise.resolve()
+    );
+  }
 }); 

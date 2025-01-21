@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { publishToNostr } from '../utils/nostr';
+import { useLocation } from '../hooks/useLocation';
+import { storeRunLocally } from '../utils/offline';
 
 export const RunTracker = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [time, setTime] = useState(0);
-  const [distance, setDistance] = useState(0);
   const [runHistory, setRunHistory] = useState([]);
   const [distanceUnit, setDistanceUnit] = useState(() => 
     localStorage.getItem('distanceUnit') || 'km'
@@ -14,7 +15,15 @@ export const RunTracker = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [lastRun, setLastRun] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+  const [currentPace, setCurrentPace] = useState(0);
   const navigate = useNavigate();
+  const { 
+    error: locationError, 
+    positions,
+    totalDistance,
+    startTracking,
+    stopTracking 
+  } = useLocation();
 
   useEffect(() => {
     const storedProfile = localStorage.getItem('nostrProfile');
@@ -34,6 +43,14 @@ export const RunTracker = () => {
     return () => clearInterval(interval);
   }, [isRunning, isPaused]);
 
+  // Calculate current pace every 5 seconds
+  useEffect(() => {
+    if (isRunning && !isPaused && totalDistance > 0) {
+      const pace = (time / 60) / totalDistance; // minutes per km
+      setCurrentPace(pace);
+    }
+  }, [time, totalDistance, isRunning, isPaused]);
+
   const loadRunHistory = () => {
     const storedRuns = JSON.parse(localStorage.getItem('runHistory') || '[]');
     setRunHistory(storedRuns);
@@ -45,6 +62,7 @@ export const RunTracker = () => {
   const startRun = () => {
     setIsRunning(true);
     setIsPaused(false);
+    startTracking();
   };
 
   const pauseRun = () => {
@@ -55,30 +73,33 @@ export const RunTracker = () => {
     setIsPaused(false);
   };
 
-  const handleDistanceChange = (e) => {
-    const value = parseFloat(e.target.value) || 0;
-    const converted = distanceUnit === 'mi' ? convertDistance(value, 'mi', 'km') : value;
-    setDistance(converted);
-  };
-
   const stopRun = () => {
+    stopTracking();
+    
     const runData = {
       id: Date.now(),
       duration: time,
-      distance: distance,
+      distance: totalDistance,
       date: new Date().toLocaleDateString(),
+      gpsData: positions.map(pos => ({
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        timestamp: pos.timestamp
+      }))
     };
     
     const existingRuns = JSON.parse(localStorage.getItem('runHistory') || '[]');
     const updatedRuns = [...existingRuns, runData];
     localStorage.setItem('runHistory', JSON.stringify(updatedRuns));
     
+    // Store run locally for offline sync
+    storeRunLocally(runData);
+    
     setRunHistory([...runHistory, runData]);
     updateLastRun(runData);
     setIsRunning(false);
     setIsPaused(false);
     setTime(0);
-    setDistance(0);
   };
 
   const updateLastRun = (runData) => {
@@ -118,7 +139,7 @@ export const RunTracker = () => {
       }
       return;
     }
-
+    
     try {
       const content = `
 🏃‍♂️ Run Completed!
@@ -169,6 +190,22 @@ export const RunTracker = () => {
         {formatTime(time)}
       </div>
 
+      <div className="distance-display">
+        {displayDistance(totalDistance)} {distanceUnit}
+      </div>
+
+      {isRunning && !isPaused && (
+        <div className="pace-display">
+          Current Pace: {currentPace.toFixed(2)} min/km
+        </div>
+      )}
+
+      {locationError && (
+        <div className="error-message">
+          GPS Error: {locationError}
+        </div>
+      )}
+
       <div className="controls-top">
         {!isRunning ? (
           <button className="primary-btn" onClick={startRun}>Start Run</button>
@@ -197,16 +234,6 @@ export const RunTracker = () => {
         >
           MI
         </button>
-      </div>
-
-      <div className="distance-input">
-        <input
-          type="number"
-          value={displayDistance(distance)}
-          onChange={handleDistanceChange}
-          placeholder={`Distance (${distanceUnit})`}
-          step="0.01"
-        />
       </div>
 
       {lastRun && (
@@ -254,15 +281,9 @@ export const RunTracker = () => {
                 </div>
               ))}
             </div>
-            <button 
-              className="close-modal-btn"
-              onClick={() => setShowHistoryModal(false)}
-            >
-              Close
-            </button>
           </div>
         </div>
       )}
     </div>
   );
-} 
+}; 
