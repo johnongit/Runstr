@@ -20,7 +20,9 @@ export const RunTracker = () => {
     error: locationError, 
     stats,
     startTracking,
-    stopTracking 
+    stopTracking,
+    pauseTracking,
+    resumeTracking
   } = useLocation();
 
   useEffect(() => {
@@ -57,10 +59,12 @@ export const RunTracker = () => {
 
   const pauseRun = () => {
     setIsPaused(true);
+    pauseTracking();
   };
 
   const resumeRun = () => {
     setIsPaused(false);
+    resumeTracking();
   };
 
   const stopRun = () => {

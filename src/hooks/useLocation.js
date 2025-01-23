@@ -5,6 +5,7 @@ export const useLocation = (options = {}) => {
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [positions, setPositions] = useState([]);
   const [stats, setStats] = useState({
     distance: 0,
@@ -12,14 +13,24 @@ export const useLocation = (options = {}) => {
     pace: 0,
     splits: []
   });
+  const [startTime, setStartTime] = useState(null);
+  const [pausedDuration, setPausedDuration] = useState(0);
+  const [lastPauseTime, setLastPauseTime] = useState(null);
 
-  // Update stats whenever positions change
+  // Update stats whenever positions change or pause state changes
   useEffect(() => {
-    if (positions.length > 0) {
+    if (positions.length > 0 && startTime) {
+      const currentTime = Date.now();
+      const totalPausedTime = pausedDuration + (lastPauseTime ? currentTime - lastPauseTime : 0);
+      const effectiveDuration = (currentTime - startTime - totalPausedTime) / 1000;
+      
       const newStats = calculateStats(positions);
-      setStats(newStats);
+      setStats({
+        ...newStats,
+        duration: effectiveDuration
+      });
     }
-  }, [positions]);
+  }, [positions, isPaused, startTime, pausedDuration, lastPauseTime]);
 
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -28,8 +39,12 @@ export const useLocation = (options = {}) => {
     }
 
     setIsTracking(true);
+    setIsPaused(false);
     setPositions([]);
     setError(null);
+    setStartTime(Date.now());
+    setPausedDuration(0);
+    setLastPauseTime(null);
 
     // Request wake lock to prevent device sleep
     try {
@@ -40,8 +55,10 @@ export const useLocation = (options = {}) => {
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        setLocation(position);
-        setPositions(prev => [...prev, position]);
+        if (!isPaused) {
+          setLocation(position);
+          setPositions(prev => [...prev, position]);
+        }
       },
       (error) => {
         setError(error.message);
@@ -59,19 +76,39 @@ export const useLocation = (options = {}) => {
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [options]);
+  }, [options, isPaused]);
+
+  const pauseTracking = useCallback(() => {
+    setIsPaused(true);
+    setLastPauseTime(Date.now());
+  }, []);
+
+  const resumeTracking = useCallback(() => {
+    if (lastPauseTime) {
+      setPausedDuration(prev => prev + (Date.now() - lastPauseTime));
+    }
+    setLastPauseTime(null);
+    setIsPaused(false);
+  }, [lastPauseTime]);
 
   const stopTracking = useCallback(() => {
     setIsTracking(false);
-  }, []);
+    setIsPaused(false);
+    if (lastPauseTime) {
+      setPausedDuration(prev => prev + (Date.now() - lastPauseTime));
+    }
+  }, [lastPauseTime]);
 
   return {
     location,
     error,
     isTracking,
+    isPaused,
     positions,
     stats,
     startTracking,
-    stopTracking
+    stopTracking,
+    pauseTracking,
+    resumeTracking
   };
 }; 
