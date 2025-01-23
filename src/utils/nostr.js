@@ -14,6 +14,28 @@ let loggedInUser = null;
 
 const pool = new SimplePool();
 
+export const checkAmberInstalled = () => {
+  // Check if running on iOS
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  
+  // Check if running on Android
+  const isAndroid = /Android/.test(navigator.userAgent);
+  
+  if (isIOS || isAndroid) {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve(false);
+      }, 2500);
+
+      window.addEventListener('blur', () => {
+        clearTimeout(timeout);
+        resolve(true);
+      }, { once: true });
+    });
+  }
+  return Promise.resolve(true);
+};
+
 export const publishToNostr = async (event) => {
   if (!event) return null;
   
@@ -165,26 +187,4 @@ async function fetchUserProfile(pubkey) {
   }
 }
 
-export { loggedInUser, fetchUserProfile, checkAmberInstalled }; 
-
-const checkAmberInstalled = () => {
-  // Check if running on iOS
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  
-  // Check if running on Android
-  const isAndroid = /Android/.test(navigator.userAgent);
-  
-  if (isIOS || isAndroid) {
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        resolve(false);
-      }, 2500);
-
-      window.addEventListener('blur', () => {
-        clearTimeout(timeout);
-        resolve(true);
-      }, { once: true });
-    });
-  }
-  return Promise.resolve(true);
-}; 
+export { loggedInUser, fetchUserProfile }; 
