@@ -10,7 +10,8 @@ export const RELAYS = [
   'wss://relay.nostr.bg'
 ];
 
-let loggedInUser = null;
+// Export loggedInUser as a let variable
+export let loggedInUser = null;
 
 const pool = new SimplePool();
 
@@ -34,6 +35,42 @@ export const checkAmberInstalled = () => {
     });
   }
   return Promise.resolve(true);
+};
+
+// Export fetchUserProfile as a const
+export const fetchUserProfile = async (pubkey) => {
+  try {
+    const response = await fetch(`https://api.nostr.band/v0/profiles/${pubkey}`);
+    const data = await response.json();
+    
+    if (data && data.profiles && data.profiles.length > 0) {
+      const profile = data.profiles[0];
+      return {
+        pubkey,
+        name: profile.name || 'Unknown',
+        about: profile.about || '',
+        banner: profile.banner || '',
+        picture: profile.picture || '',
+      };
+    }
+    
+    return {
+      pubkey,
+      name: 'Unknown',
+      about: '',
+      banner: '',
+      picture: '',
+    };
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    return {
+      pubkey,
+      name: 'Unknown',
+      about: '',
+      banner: '',
+      picture: '',
+    };
+  }
 };
 
 export const publishToNostr = async (event) => {
@@ -150,41 +187,4 @@ export const handleNostrCallback = async (eventParam) => {
     console.error('Error parsing Nostr event:', error);
     return null;
   }
-};
-
-async function fetchUserProfile(pubkey) {
-  try {
-    const response = await fetch(`https://api.nostr.band/v0/profiles/${pubkey}`);
-    const data = await response.json();
-    
-    if (data && data.profiles && data.profiles.length > 0) {
-      const profile = data.profiles[0];
-      return {
-        pubkey,
-        name: profile.name || 'Unknown',
-        about: profile.about || '',
-        banner: profile.banner || '',
-        picture: profile.picture || '',
-      };
-    }
-    
-    return {
-      pubkey,
-      name: 'Unknown',
-      about: '',
-      banner: '',
-      picture: '',
-    };
-  } catch (error) {
-    console.error('Error fetching profile:', error);
-    return {
-      pubkey,
-      name: 'Unknown',
-      about: '',
-      banner: '',
-      picture: '',
-    };
-  }
-}
-
-export { loggedInUser, fetchUserProfile }; 
+}; 
