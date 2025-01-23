@@ -7,7 +7,6 @@ import { storeRunLocally } from '../utils/offline';
 export const RunTracker = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [time, setTime] = useState(0);
   const [runHistory, setRunHistory] = useState([]);
   const [distanceUnit, setDistanceUnit] = useState(() => 
     localStorage.getItem('distanceUnit') || 'km'
@@ -15,12 +14,11 @@ export const RunTracker = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [lastRun, setLastRun] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
-  const [currentPace, setCurrentPace] = useState(0);
   const navigate = useNavigate();
+
   const { 
     error: locationError, 
-    positions,
-    totalDistance,
+    stats,
     startTracking,
     stopTracking 
   } = useLocation();
@@ -37,19 +35,11 @@ export const RunTracker = () => {
     let interval;
     if (isRunning && !isPaused) {
       interval = setInterval(() => {
-        setTime((prevTime) => prevTime + 1);
+        // Keep the interval for UI updates
       }, 1000);
     }
     return () => clearInterval(interval);
   }, [isRunning, isPaused]);
-
-  // Calculate current pace every 5 seconds
-  useEffect(() => {
-    if (isRunning && !isPaused && totalDistance > 0) {
-      const pace = (time / 60) / totalDistance; // minutes per km
-      setCurrentPace(pace);
-    }
-  }, [time, totalDistance, isRunning, isPaused]);
 
   const loadRunHistory = () => {
     const storedRuns = JSON.parse(localStorage.getItem('runHistory') || '[]');
@@ -78,14 +68,12 @@ export const RunTracker = () => {
     
     const runData = {
       id: Date.now(),
-      duration: time,
-      distance: totalDistance,
+      duration: stats.duration,
+      distance: stats.distance / 1000, // Convert to kilometers
       date: new Date().toLocaleDateString(),
-      gpsData: positions.map(pos => ({
-        lat: pos.coords.latitude,
-        lon: pos.coords.longitude,
-        timestamp: pos.timestamp
-      }))
+      pace: stats.pace,
+      splits: stats.splits,
+      gpsData: stats.positions
     };
     
     const existingRuns = JSON.parse(localStorage.getItem('runHistory') || '[]');
@@ -99,7 +87,6 @@ export const RunTracker = () => {
     updateLastRun(runData);
     setIsRunning(false);
     setIsPaused(false);
-    setTime(0);
   };
 
   const updateLastRun = (runData) => {
@@ -131,6 +118,13 @@ export const RunTracker = () => {
     return converted.toFixed(2);
   };
 
+  const formatPace = (pace) => {
+    if (!pace) return '--:--';
+    const minutes = Math.floor(pace);
+    const seconds = Math.round((pace - minutes) * 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   const handlePostToNostr = async (run) => {
     if (!window.nostr) {
       const confirmLogin = window.confirm('Please login with Nostr to share your run');
@@ -144,8 +138,11 @@ export const RunTracker = () => {
       const content = `
 🏃‍♂️ Run Completed!
 ⏱️ Duration: ${formatTime(run.duration)}
-📏 Distance: ${run.distance.toFixed(2)} km
-⚡️ Pace: ${run.duration > 0 ? ((run.duration / 60) / run.distance).toFixed(2) : '0'} min/km
+📏 Distance: ${displayDistance(run.distance)} ${distanceUnit}
+⚡️ Pace: ${formatPace(run.pace)} min/km
+${run.splits.length > 0 ? '\nSplits:\n' + run.splits.map((split, i) => 
+  `Km ${i + 1}: ${formatPace(split.pace)}`
+).join('\n') : ''}
 
 #Runstr #Running
 `;
@@ -187,16 +184,27 @@ export const RunTracker = () => {
       <h2 className="page-title">Dashboard</h2>
       
       <div className="time-display">
-        {formatTime(time)}
+        {formatTime(stats.duration)}
       </div>
 
       <div className="distance-display">
-        {displayDistance(totalDistance)} {distanceUnit}
+        {displayDistance(stats.distance / 1000)} {distanceUnit}
       </div>
 
       {isRunning && !isPaused && (
         <div className="pace-display">
-          Current Pace: {currentPace.toFixed(2)} min/km
+          Current Pace: {formatPace(stats.pace)} min/km
+        </div>
+      )}
+
+      {stats.splits.length > 0 && (
+        <div className="splits-display">
+          <h3>Splits</h3>
+          {stats.splits.map((split, i) => (
+            <div key={i} className="split-item">
+              Km {i + 1}: {formatPace(split.pace)}
+            </div>
+          ))}
         </div>
       )}
 
@@ -243,6 +251,7 @@ export const RunTracker = () => {
             <span>Date: {lastRun.date}</span>
             <span>Duration: {formatTime(lastRun.duration)}</span>
             <span>Distance: {displayDistance(lastRun.distance)} {distanceUnit}</span>
+            <span>Pace: {formatPace(lastRun.pace)} min/km</span>
           </div>
           <div className="run-actions">
             <button 
@@ -272,11 +281,7 @@ export const RunTracker = () => {
                   <div className="run-details">
                     <span>Duration: {formatTime(run.duration)}</span>
                     <span>Distance: {displayDistance(run.distance)} {distanceUnit}</span>
-                    <span>
-                      Pace: {run.duration > 0 ? 
-                        ((run.duration / 60) / run.distance).toFixed(2) : '0'
-                      } min/km
-                    </span>
+                    <span>Pace: {formatPace(run.pace)} min/km</span>
                   </div>
                 </div>
               ))}

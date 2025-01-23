@@ -34,7 +34,7 @@ export const publishToNostr = async (event) => {
   }
 };
 
-export const signInWithNostr = () => {
+export const signInWithNostr = async () => {
   const json = {
     kind: 1,
     created_at: Math.floor(Date.now() / 1000),
@@ -43,28 +43,75 @@ export const signInWithNostr = () => {
   };
 
   const encodedJson = encodeURIComponent(JSON.stringify(json));
-  const callbackUrl = `${window.location.origin}/login?event=`;
+  const callbackUrl = encodeURIComponent(`${window.location.origin}/login?event=`);
   
-  // Check if running on iOS or Android
+  // Check device type
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isAndroid = /Android/.test(navigator.userAgent);
+  const isMobile = isIOS || isAndroid;
   
-  if (isIOS || isAndroid) {
-    // Try custom scheme first for mobile
-    window.location.href = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
-    
-    // Fallback to universal link after a short delay
-    setTimeout(() => {
-      window.location.href = `https://amber.nostr.app/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
-    }, 500);
-  } else {
-    // For desktop browsers, use universal link first
-    window.location.href = `https://amber.nostr.app/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
-    
-    // Fallback to custom scheme
-    setTimeout(() => {
-      window.location.href = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
-    }, 500);
+  // URLs for different protocols
+  const customSchemeUrl = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
+  const universalLinkUrl = `https://amber.nostr.app/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
+
+  // Track if app was opened
+  let appOpened = false;
+  
+  try {
+    if (isMobile) {
+      // Try custom scheme first on mobile
+      window.location.href = customSchemeUrl;
+      
+      // Set up visibility change detection
+      const visibilityHandler = () => {
+        if (document.hidden) {
+          appOpened = true;
+        }
+      };
+      
+      document.addEventListener('visibilitychange', visibilityHandler);
+      
+      // Wait for app to open or timeout
+      await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          document.removeEventListener('visibilitychange', visibilityHandler);
+          if (!appOpened) {
+            // Try universal link as fallback
+            window.location.href = universalLinkUrl;
+            // Give universal link some time to work
+            setTimeout(resolve, 1000);
+          } else {
+            resolve();
+          }
+        }, 1500);
+        
+        // If app opens before timeout, resolve immediately
+        const earlyResolve = () => {
+          if (appOpened) {
+            clearTimeout(timeout);
+            document.removeEventListener('visibilitychange', visibilityHandler);
+            resolve();
+          }
+        };
+        document.addEventListener('visibilitychange', earlyResolve);
+      });
+    } else {
+      // On desktop, try universal link first
+      window.location.href = universalLinkUrl;
+      
+      // Fallback to custom scheme after a delay
+      await new Promise(resolve => {
+        setTimeout(() => {
+          if (!document.hidden) {
+            window.location.href = customSchemeUrl;
+          }
+          resolve();
+        }, 1500);
+      });
+    }
+  } catch (error) {
+    console.error('Error during Nostr login:', error);
+    throw new Error('Failed to open Amber. Please make sure it is installed.');
   }
 };
 

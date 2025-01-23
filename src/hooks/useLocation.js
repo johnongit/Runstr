@@ -1,56 +1,29 @@
 import { useState, useEffect, useCallback } from 'react';
+import { calculateStats } from '../utils/runCalculations';
 
 export const useLocation = (options = {}) => {
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
   const [isTracking, setIsTracking] = useState(false);
   const [positions, setPositions] = useState([]);
+  const [stats, setStats] = useState({
+    distance: 0,
+    duration: 0,
+    pace: 0,
+    splits: []
+  });
 
-  // Listen for location updates from service worker
+  // Update stats whenever positions change
   useEffect(() => {
-    const handleLocationUpdate = (event) => {
-      if (event.data.type === 'LOCATION_UPDATE') {
-        setLocation(event.data.position);
-        setPositions(prev => [...prev, event.data.position]);
-      }
-    };
-
-    navigator.serviceWorker?.addEventListener('message', handleLocationUpdate);
-    return () => {
-      navigator.serviceWorker?.removeEventListener('message', handleLocationUpdate);
-    };
-  }, []);
-
-  const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  }, []);
-
-  const calculateTotalDistance = useCallback(() => {
-    let total = 0;
-    for (let i = 1; i < positions.length; i++) {
-      const prev = positions[i - 1];
-      const curr = positions[i];
-      total += calculateDistance(
-        prev.coords.latitude,
-        prev.coords.longitude,
-        curr.coords.latitude,
-        curr.coords.longitude
-      );
+    if (positions.length > 0) {
+      const newStats = calculateStats(positions);
+      setStats(newStats);
     }
-    return total;
-  }, [positions, calculateDistance]);
+  }, [positions]);
 
   const startTracking = useCallback(() => {
-    if (!navigator.serviceWorker?.controller) {
-      setError('Service Worker not available');
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
       return;
     }
 
@@ -65,43 +38,39 @@ export const useLocation = (options = {}) => {
       console.warn('Wake Lock not available:', err);
     }
 
-    // Start background tracking via service worker
-    navigator.serviceWorker.controller.postMessage({
-      type: 'START_TRACKING',
-      options: options
-    });
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setLocation(position);
+        setPositions(prev => [...prev, position]);
+      },
+      (error) => {
+        setError(error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 5000,
+        ...options
+      }
+    );
 
-    // Register for background sync
-    navigator.serviceWorker.ready.then(registration => {
-      registration.sync.register('syncLocation').catch(err => {
-        console.warn('Background sync registration failed:', err);
-      });
-    });
+    return () => {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
   }, [options]);
 
   const stopTracking = useCallback(() => {
-    if (navigator.serviceWorker?.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'STOP_TRACKING'
-      });
-    }
     setIsTracking(false);
   }, []);
-
-  useEffect(() => {
-    return () => {
-      if (isTracking) {
-        stopTracking();
-      }
-    };
-  }, [isTracking, stopTracking]);
 
   return {
     location,
     error,
     isTracking,
     positions,
-    totalDistance: calculateTotalDistance(),
+    stats,
     startTracking,
     stopTracking
   };
