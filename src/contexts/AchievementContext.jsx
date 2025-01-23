@@ -8,6 +8,9 @@ import {
 } from '../utils/achievements';
 import { AchievementContext } from './achievementContext';
 
+// Re-export the context
+export { AchievementContext };
+
 export function AchievementProvider({ children }) {
   const [unlockedAchievements, setUnlockedAchievements] = useState(() => {
     const saved = localStorage.getItem('unlockedAchievements');
