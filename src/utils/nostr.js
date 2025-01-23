@@ -1,5 +1,8 @@
 import { SimplePool } from 'nostr-tools';
 
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
 export const RELAYS = [
   'wss://relay.damus.io',
   'wss://nos.lol',
@@ -13,14 +16,21 @@ export const RELAYS = [
 // Export loggedInUser as a let variable
 export let loggedInUser = null;
 
-const pool = new SimplePool();
+// Only create pool in browser environment
+const pool = isBrowser ? new SimplePool() : null;
+
+// Helper to check user agent
+const getUserAgent = () => {
+  if (!isBrowser) return '';
+  return navigator.userAgent || '';
+};
 
 export const checkAmberInstalled = () => {
-  // Check if running on iOS
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  
-  // Check if running on Android
-  const isAndroid = /Android/.test(navigator.userAgent);
+  if (!isBrowser) return Promise.resolve(false);
+
+  const userAgent = getUserAgent();
+  const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+  const isAndroid = /Android/.test(userAgent);
   
   if (isIOS || isAndroid) {
     return new Promise((resolve) => {
@@ -39,8 +49,14 @@ export const checkAmberInstalled = () => {
 
 // Export fetchUserProfile as a const
 export const fetchUserProfile = async (pubkey) => {
+  if (!pubkey) return null;
+  
   try {
     const response = await fetch(`https://api.nostr.band/v0/profiles/${pubkey}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch profile');
+    }
+    
     const data = await response.json();
     
     if (data && data.profiles && data.profiles.length > 0) {
@@ -74,9 +90,14 @@ export const fetchUserProfile = async (pubkey) => {
 };
 
 export const publishToNostr = async (event) => {
-  if (!event) return null;
+  if (!isBrowser) return null;
+  if (!event || !pool) return null;
   
   try {
+    if (!window.nostr) {
+      throw new Error('Nostr provider not found');
+    }
+
     const signedEvent = await window.nostr.signEvent(event);
     const pubs = pool.publish(RELAYS, signedEvent);
     
@@ -94,6 +115,8 @@ export const publishToNostr = async (event) => {
 };
 
 export const signInWithNostr = async () => {
+  if (!isBrowser) return;
+
   const json = {
     kind: 1,
     created_at: Math.floor(Date.now() / 1000),
@@ -104,24 +127,20 @@ export const signInWithNostr = async () => {
   const encodedJson = encodeURIComponent(JSON.stringify(json));
   const callbackUrl = encodeURIComponent(`${window.location.origin}/login?event=`);
   
-  // Check device type
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const isAndroid = /Android/.test(navigator.userAgent);
+  const userAgent = getUserAgent();
+  const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+  const isAndroid = /Android/.test(userAgent);
   const isMobile = isIOS || isAndroid;
   
-  // URLs for different protocols
   const customSchemeUrl = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
   const universalLinkUrl = `https://amber.nostr.app/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
 
-  // Track if app was opened
   let appOpened = false;
   
   try {
     if (isMobile) {
-      // Try custom scheme first on mobile
       window.location.href = customSchemeUrl;
       
-      // Set up visibility change detection
       const visibilityHandler = () => {
         if (document.hidden) {
           appOpened = true;
@@ -130,21 +149,17 @@ export const signInWithNostr = async () => {
       
       document.addEventListener('visibilitychange', visibilityHandler);
       
-      // Wait for app to open or timeout
       await new Promise((resolve) => {
         const timeout = setTimeout(() => {
           document.removeEventListener('visibilitychange', visibilityHandler);
           if (!appOpened) {
-            // Try universal link as fallback
             window.location.href = universalLinkUrl;
-            // Give universal link some time to work
             setTimeout(resolve, 1000);
           } else {
             resolve();
           }
         }, 1500);
         
-        // If app opens before timeout, resolve immediately
         const earlyResolve = () => {
           if (appOpened) {
             clearTimeout(timeout);
@@ -155,10 +170,8 @@ export const signInWithNostr = async () => {
         document.addEventListener('visibilitychange', earlyResolve);
       });
     } else {
-      // On desktop, try universal link first
       window.location.href = universalLinkUrl;
       
-      // Fallback to custom scheme after a delay
       await new Promise(resolve => {
         setTimeout(() => {
           if (!document.hidden) {
@@ -175,12 +188,15 @@ export const signInWithNostr = async () => {
 };
 
 export const handleNostrCallback = async (eventParam) => {
-  if (!eventParam) return null;
+  if (!isBrowser || !eventParam) return null;
+  
   try {
     const event = JSON.parse(decodeURIComponent(eventParam));
-    loggedInUser = event.pubkey;
+    if (!event || !event.pubkey) {
+      throw new Error('Invalid event data');
+    }
     
-    // Fetch user profile after successful login
+    loggedInUser = event.pubkey;
     const profile = await fetchUserProfile(event.pubkey);
     return { event, profile };
   } catch (error) {
