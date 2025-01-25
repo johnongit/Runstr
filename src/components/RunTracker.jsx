@@ -34,13 +34,14 @@ export const RunTracker = () => {
   }, []);
 
   useEffect(() => {
-    let interval;
     if (isRunning && !isPaused) {
-      interval = setInterval(() => {
-        // Keep the interval for UI updates
-      }, 1000);
+      // Request wake lock to prevent device sleep
+      try {
+        navigator.wakeLock?.request('screen');
+      } catch (err) {
+        console.warn('Wake Lock not available:', err);
+      }
     }
-    return () => clearInterval(interval);
   }, [isRunning, isPaused]);
 
   const loadRunHistory = () => {
@@ -98,12 +99,19 @@ export const RunTracker = () => {
   };
 
   const formatTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes
-      .toString()
-      .padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    // Ensure we have a positive integer
+    const totalSeconds = Math.max(0, Math.floor(seconds));
+    
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const remainingSeconds = totalSeconds % 60;
+    
+    // Format with leading zeros
+    const formattedHours = hours.toString().padStart(2, '0');
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+    const formattedSeconds = remainingSeconds.toString().padStart(2, '0');
+    
+    return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
   };
 
   const toggleDistanceUnit = () => {
@@ -123,9 +131,20 @@ export const RunTracker = () => {
   };
 
   const formatPace = (pace) => {
-    if (!pace) return '--:--';
-    const minutes = Math.floor(pace);
-    const seconds = Math.round((pace - minutes) * 60);
+    if (!pace || pace <= 0) return '--:--';
+    
+    // Round to 2 decimal places first
+    const roundedPace = Math.round(pace * 100) / 100;
+    
+    // Extract minutes and seconds
+    const minutes = Math.floor(roundedPace);
+    const seconds = Math.round((roundedPace - minutes) * 60);
+    
+    // Handle case where seconds round to 60
+    if (seconds === 60) {
+      return `${minutes + 1}:00`;
+    }
+    
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 

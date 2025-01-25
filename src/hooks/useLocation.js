@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { calculateStats } from '../utils/runCalculations';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { calculateStats, calculateDistance } from '../utils/runCalculations';
 
 export const useLocation = (options = {}) => {
   const [location, setLocation] = useState(null);
@@ -11,26 +11,83 @@ export const useLocation = (options = {}) => {
     distance: 0,
     duration: 0,
     pace: 0,
-    splits: []
+    splits: [],
+    positions: []
   });
-  const [startTime, setStartTime] = useState(null);
-  const [pausedDuration, setPausedDuration] = useState(0);
-  const [lastPauseTime, setLastPauseTime] = useState(null);
 
-  // Update stats whenever positions change or pause state changes
+  const startTimeRef = useRef(null);
+  const pausedDurationRef = useRef(0);
+  const lastPauseTimeRef = useRef(null);
+  const watchIdRef = useRef(null);
+  const lastPositionRef = useRef(null);
+  const lastStatsUpdateRef = useRef(0);
+
+  // Update stats with proper timing
   useEffect(() => {
-    if (positions.length > 0 && startTime) {
-      const currentTime = Date.now();
-      const totalPausedTime = pausedDuration + (lastPauseTime ? currentTime - lastPauseTime : 0);
-      const effectiveDuration = (currentTime - startTime - totalPausedTime) / 1000;
-      
-      const newStats = calculateStats(positions);
-      setStats({
-        ...newStats,
-        duration: effectiveDuration
-      });
+    let intervalId;
+    
+    if (isTracking && startTimeRef.current) {
+      intervalId = setInterval(() => {
+        const currentTime = Date.now();
+        
+        // Only update if we have new data since last update
+        if (currentTime - lastStatsUpdateRef.current >= 1000) {
+          const totalPausedTime = pausedDurationRef.current + 
+            (lastPauseTimeRef.current ? currentTime - lastPauseTimeRef.current : 0);
+          const effectiveDuration = (currentTime - startTimeRef.current - totalPausedTime) / 1000;
+          
+          const newStats = calculateStats(positions, Math.max(0, Math.floor(effectiveDuration)));
+          setStats({
+            ...newStats,
+            duration: Math.max(0, Math.floor(effectiveDuration))
+          });
+          
+          lastStatsUpdateRef.current = currentTime;
+        }
+      }, 1000); // Update every second
     }
-  }, [positions, isPaused, startTime, pausedDuration, lastPauseTime]);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isTracking, isPaused, positions]);
+
+  // Filter and add new positions
+  const addPosition = useCallback((position) => {
+    if (!lastPositionRef.current) {
+      lastPositionRef.current = position;
+      setPositions(prev => [...prev, position]);
+      return;
+    }
+
+    // Calculate time and distance since last position
+    const timeDiff = (position.timestamp - lastPositionRef.current.timestamp) / 1000;
+    
+    // Only process if we have a reasonable time difference (> 0 and < 30 seconds)
+    if (timeDiff <= 0 || timeDiff > 30) {
+      return;
+    }
+
+    const distance = calculateDistance(
+      lastPositionRef.current.coords.latitude,
+      lastPositionRef.current.coords.longitude,
+      position.coords.latitude,
+      position.coords.longitude
+    );
+
+    // Filter out erroneous readings:
+    // 1. Must have moved some distance (> 1 meter)
+    // 2. Speed must be reasonable (< 45 km/h or 12.5 m/s)
+    // 3. Must have reasonable accuracy (< 20 meters)
+    if (distance > 1 && 
+        distance < (timeDiff * 12.5) && 
+        position.coords.accuracy < 20) {
+      lastPositionRef.current = position;
+      setPositions(prev => [...prev, position]);
+    }
+  }, []);
 
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -42,9 +99,11 @@ export const useLocation = (options = {}) => {
     setIsPaused(false);
     setPositions([]);
     setError(null);
-    setStartTime(Date.now());
-    setPausedDuration(0);
-    setLastPauseTime(null);
+    startTimeRef.current = Date.now();
+    pausedDurationRef.current = 0;
+    lastPauseTimeRef.current = null;
+    lastPositionRef.current = null;
+    lastStatsUpdateRef.current = 0;
 
     // Request wake lock to prevent device sleep
     try {
@@ -53,11 +112,14 @@ export const useLocation = (options = {}) => {
       console.warn('Wake Lock not available:', err);
     }
 
-    const watchId = navigator.geolocation.watchPosition(
+    watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         if (!isPaused) {
           setLocation(position);
-          setPositions(prev => [...prev, position]);
+          addPosition({
+            ...position,
+            timestamp: Date.now() // Use current time instead of GPS time
+          });
         }
       },
       (error) => {
@@ -72,32 +134,36 @@ export const useLocation = (options = {}) => {
     );
 
     return () => {
-      if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
+      if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, [options, isPaused]);
+  }, [options, isPaused, addPosition]);
 
   const pauseTracking = useCallback(() => {
     setIsPaused(true);
-    setLastPauseTime(Date.now());
+    lastPauseTimeRef.current = Date.now();
   }, []);
 
   const resumeTracking = useCallback(() => {
-    if (lastPauseTime) {
-      setPausedDuration(prev => prev + (Date.now() - lastPauseTime));
+    if (lastPauseTimeRef.current) {
+      pausedDurationRef.current += Date.now() - lastPauseTimeRef.current;
     }
-    setLastPauseTime(null);
+    lastPauseTimeRef.current = null;
+    lastPositionRef.current = null; // Reset last position to avoid jumps
     setIsPaused(false);
-  }, [lastPauseTime]);
+  }, []);
 
   const stopTracking = useCallback(() => {
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
+    if (lastPauseTimeRef.current) {
+      pausedDurationRef.current += Date.now() - lastPauseTimeRef.current;
+    }
     setIsTracking(false);
     setIsPaused(false);
-    if (lastPauseTime) {
-      setPausedDuration(prev => prev + (Date.now() - lastPauseTime));
-    }
-  }, [lastPauseTime]);
+  }, []);
 
   return {
     location,

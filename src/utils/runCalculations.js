@@ -2,6 +2,7 @@
 const MINIMUM_ACCURACY = 20; // meters
 const SPEED_THRESHOLD = 12.5; // meters/second (~45 km/h)
 const DISTANCE_FILTER = 10; // meters
+const PACE_WINDOW = 60; // Calculate pace over the last 60 seconds
 
 /**
  * Calculate distance between two coordinates using Haversine formula
@@ -59,22 +60,72 @@ export function filterLocation(location, lastLocation) {
 
 /**
  * Calculate current pace in minutes per kilometer
+ * Uses a moving window to smooth out fluctuations
  */
-export function calculatePace(distance, duration) {
+export function calculatePace(distance, duration, positions = []) {
   if (distance <= 0 || duration <= 0) return 0;
+
+  // If we have positions, calculate pace over recent window
+  if (positions.length > 1) {
+    const now = positions[positions.length - 1].timestamp;
+    const windowStart = now - (PACE_WINDOW * 1000); // Look at last PACE_WINDOW seconds
+    
+    // Find positions within our window
+    const recentPositions = positions.filter(pos => pos.timestamp >= windowStart);
+    
+    if (recentPositions.length > 1) {
+      let recentDistance = 0;
+      
+      // Calculate distance in the recent window
+      for (let i = 1; i < recentPositions.length; i++) {
+        const segmentDistance = calculateDistance(
+          recentPositions[i-1].coords.latitude,
+          recentPositions[i-1].coords.longitude,
+          recentPositions[i].coords.latitude,
+          recentPositions[i].coords.longitude
+        );
+        
+        // Only include reasonable distances
+        if (segmentDistance > 0 && segmentDistance < SPEED_THRESHOLD) {
+          recentDistance += segmentDistance;
+        }
+      }
+      
+      const recentDuration = (recentPositions[recentPositions.length - 1].timestamp - 
+                            recentPositions[0].timestamp) / 1000;
+      
+      if (recentDuration > 0 && recentDistance > 0) {
+        // Convert to minutes per kilometer
+        const speedKmH = (recentDistance / 1000) / (recentDuration / 3600);
+        const pace = speedKmH > 0 ? 60 / speedKmH : 0;
+        
+        // Return reasonable pace or fallback to overall pace
+        if (pace > 0 && pace < 30) { // Paces between 0 and 30 min/km
+          return pace;
+        }
+      }
+    }
+  }
+  
+  // Fallback to overall pace if we can't calculate recent pace
   const speedKmH = (distance / 1000) / (duration / 3600);
-  return speedKmH > 0 ? 60 / speedKmH : 0;
+  const overallPace = speedKmH > 0 ? 60 / speedKmH : 0;
+  
+  // Only return reasonable paces
+  return overallPace > 0 && overallPace < 30 ? overallPace : 0;
 }
 
 /**
  * Calculate split times for each kilometer
  */
 export function calculateSplits(positions) {
+  if (!positions.length) return [];
+  
   const splits = [];
   let currentSplit = {
     distance: 0,
     duration: 0,
-    startTime: positions[0]?.timestamp || 0
+    startTime: positions[0].timestamp
   };
 
   for (let i = 1; i < positions.length; i++) {
@@ -104,19 +155,32 @@ export function calculateSplits(positions) {
     }
   }
 
+  // Add current incomplete split if we've covered some distance
+  if (currentSplit.distance > 0) {
+    splits.push({
+      pace: calculatePace(currentSplit.distance, currentSplit.duration),
+      duration: currentSplit.duration,
+      distance: currentSplit.distance,
+      incomplete: true
+    });
+  }
+
   return splits;
 }
 
 /**
  * Calculate workout statistics
+ * @param {Array} positions - Array of GPS positions
+ * @param {number} elapsedTime - Actual elapsed time in seconds (excluding pauses)
  */
-export function calculateStats(positions) {
+export function calculateStats(positions, elapsedTime = null) {
   if (!positions.length) {
     return {
       distance: 0,
       duration: 0,
       pace: 0,
-      splits: []
+      splits: [],
+      positions: []
     };
   }
 
@@ -135,13 +199,16 @@ export function calculateStats(positions) {
     );
   }
 
-  const duration = (filteredPositions[filteredPositions.length - 1].timestamp - 
-                   filteredPositions[0].timestamp) / 1000;
+  // Use provided elapsed time if available, otherwise calculate from timestamps
+  const duration = elapsedTime !== null ? elapsedTime :
+    (filteredPositions[filteredPositions.length - 1].timestamp - 
+     filteredPositions[0].timestamp) / 1000;
 
   return {
     distance: totalDistance,
     duration: duration,
-    pace: calculatePace(totalDistance, duration),
-    splits: calculateSplits(filteredPositions)
+    pace: calculatePace(totalDistance, duration, filteredPositions),
+    splits: calculateSplits(filteredPositions),
+    positions: filteredPositions
   };
 } 
