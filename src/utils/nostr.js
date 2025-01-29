@@ -17,7 +17,20 @@ export const RELAYS = [
 export let loggedInUser = null;
 
 // Only create pool in browser environment
-const pool = isBrowser ? new SimplePool() : null;
+export const pool = isBrowser ? new SimplePool() : null;
+
+// Initialize pool connections
+if (pool) {
+  console.log('Initializing Nostr pool connections...');
+  RELAYS.forEach(async (relay) => {
+    try {
+      await pool.ensureRelay(relay);
+      console.log(`Connected to relay: ${relay}`);
+    } catch (err) {
+      console.warn(`Failed to connect to relay ${relay}:`, err);
+    }
+  });
+}
 
 // Helper to check user agent
 const getUserAgent = () => {
@@ -90,23 +103,49 @@ export const fetchUserProfile = async (pubkey) => {
 };
 
 export const publishToNostr = async (event) => {
-  if (!isBrowser) return null;
-  if (!event || !pool) return null;
+  if (!isBrowser) {
+    console.error('Not in browser environment');
+    return null;
+  }
+  
+  if (!event) {
+    console.error('No event provided');
+    return null;
+  }
+  
+  if (!pool) {
+    console.error('Nostr pool not initialized');
+    return null;
+  }
   
   try {
     if (!window.nostr) {
+      console.error('Nostr provider not found. Please ensure you are logged in.');
       throw new Error('Nostr provider not found');
     }
 
+    console.log('Publishing event:', event);
     const signedEvent = await window.nostr.signEvent(event);
-    const pubs = pool.publish(RELAYS, signedEvent);
+    console.log('Event signed:', signedEvent);
+
+    const connectedRelays = Array.from(pool.relays.values())
+      .filter(relay => relay.status === 1)
+      .map(relay => relay.url);
     
-    // Wait for at least 3 relays to confirm publication
+    if (connectedRelays.length === 0) {
+      throw new Error('No relays connected. Please try again.');
+    }
+
+    console.log('Publishing to relays:', connectedRelays);
+    const pubs = pool.publish(connectedRelays, signedEvent);
+    
+    // Wait for at least 2 relays to confirm publication
     const pub = await Promise.any([
-      Promise.all(pubs.slice(0, 3)),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+      Promise.all(pubs.slice(0, 2)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Publication timeout')), 10000))
     ]);
     
+    console.log('Publication successful:', pub);
     return pub;
   } catch (error) {
     console.error('Error publishing to Nostr:', error);
@@ -121,7 +160,7 @@ export const signInWithNostr = async () => {
     kind: 1,
     created_at: Math.floor(Date.now() / 1000),
     content: "Login to Running App",
-    tags: []
+    tags: [['client', 'Nostr Run Club']]
   };
 
   const encodedJson = encodeURIComponent(JSON.stringify(json));
@@ -131,60 +170,140 @@ export const signInWithNostr = async () => {
   const isIOS = /iPad|iPhone|iPod/.test(userAgent);
   const isAndroid = /Android/.test(userAgent);
   const isMobile = isIOS || isAndroid;
-  
-  const customSchemeUrl = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
-  const universalLinkUrl = `https://amber.nostr.app/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
 
-  let appOpened = false;
+  // URLs for different signing methods
+  const amberSchemeUrl = `nostrsigner:${encodedJson}?compressionType=none&returnType=signature&type=sign_event&callbackUrl=${callbackUrl}`;
+  const amberUniversalUrl = `https://amber.nostr.app/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
+  const snortUrl = `https://snort.social/sign?json=${encodedJson}&callbackUrl=${callbackUrl}`;
   
-  try {
-    if (isMobile) {
-      window.location.href = customSchemeUrl;
-      
-      const visibilityHandler = () => {
-        if (document.hidden) {
-          appOpened = true;
-        }
-      };
-      
-      document.addEventListener('visibilitychange', visibilityHandler);
-      
-      await new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-          document.removeEventListener('visibilitychange', visibilityHandler);
-          if (!appOpened) {
-            window.location.href = universalLinkUrl;
-            setTimeout(resolve, 1000);
-          } else {
-            resolve();
-          }
-        }, 1500);
-        
-        const earlyResolve = () => {
-          if (appOpened) {
-            clearTimeout(timeout);
-            document.removeEventListener('visibilitychange', visibilityHandler);
-            resolve();
-          }
-        };
-        document.addEventListener('visibilitychange', earlyResolve);
-      });
-    } else {
-      window.location.href = universalLinkUrl;
-      
-      await new Promise(resolve => {
-        setTimeout(() => {
-          if (!document.hidden) {
-            window.location.href = customSchemeUrl;
-          }
-          resolve();
-        }, 1500);
-      });
+  // Check if NIP-07 extension is available
+  if (window.nostr) {
+    try {
+      const pubkey = await window.nostr.getPublicKey();
+      if (pubkey) {
+        console.log('NIP-07 extension found and working');
+        return { pubkey };
+      }
+    } catch (err) {
+      console.warn('NIP-07 extension found but not working:', err);
     }
-  } catch (error) {
-    console.error('Error during Nostr login:', error);
-    throw new Error('Failed to open Amber. Please make sure it is installed.');
   }
+
+  // Try to detect installed signers
+  const hasAmber = await checkAmberInstalled();
+  console.log('Amber signer detected:', hasAmber);
+
+  let signerAttempted = false;
+
+  if (isMobile) {
+    if (hasAmber) {
+      signerAttempted = true;
+      try {
+        // Try Amber custom scheme first
+        window.location.href = amberSchemeUrl;
+        
+        // Wait to see if app opens
+        await new Promise((resolve) => {
+          const timeout = setTimeout(() => {
+            if (!document.hidden) {
+              // If app didn't open, try universal link
+              window.location.href = amberUniversalUrl;
+            }
+            resolve();
+          }, 1500);
+
+          // If page is hidden, app probably opened
+          const visibilityHandler = () => {
+            if (document.hidden) {
+              clearTimeout(timeout);
+              resolve();
+            }
+          };
+          document.addEventListener('visibilitychange', visibilityHandler, { once: true });
+        });
+      } catch (err) {
+        console.warn('Amber signer attempt failed:', err);
+      }
+    }
+
+    // If Amber didn't work or isn't installed, try Snort
+    if (!signerAttempted || document.visibilityState !== 'hidden') {
+      window.location.href = snortUrl;
+    }
+  } else {
+    // For desktop, show options dialog
+    const signerChoice = await showSignerDialog();
+    switch (signerChoice) {
+      case 'extension':
+        window.open('https://getalby.com', '_blank');
+        break;
+      case 'amber':
+        window.location.href = amberUniversalUrl;
+        break;
+      case 'snort':
+        window.location.href = snortUrl;
+        break;
+      default:
+        throw new Error('Please select a signing method');
+    }
+  }
+};
+
+// Helper function to show signer options dialog
+const showSignerDialog = () => {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+    `;
+    
+    dialog.innerHTML = `
+      <h3 style="margin-top: 0;">Choose Your Nostr Signer</h3>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button onclick="this.parentElement.dataset.choice='extension'" style="padding: 10px;">
+          Install Browser Extension (recommended)
+        </button>
+        <button onclick="this.parentElement.dataset.choice='amber'" style="padding: 10px;">
+          Use Amber Web Signer
+        </button>
+        <button onclick="this.parentElement.dataset.choice='snort'" style="padding: 10px;">
+          Use Snort Web Signer
+        </button>
+      </div>
+    `;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(dialog);
+
+    const buttons = dialog.getElementsByTagName('button');
+    Array.from(buttons).forEach(button => {
+      button.addEventListener('click', (e) => {
+        const choice = e.target.parentElement.dataset.choice;
+        document.body.removeChild(dialog);
+        document.body.removeChild(overlay);
+        resolve(choice);
+      });
+    });
+  });
 };
 
 export const handleNostrCallback = async (eventParam) => {

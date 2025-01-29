@@ -156,32 +156,65 @@ export const RunTracker = () => {
       }
       return;
     }
-    
+
     try {
+      // Verify we can get the public key first
+      const pubkey = await window.nostr.getPublicKey();
+      if (!pubkey) {
+        throw new Error('Could not get Nostr public key');
+      }
+
+      // Format the content with emojis and proper spacing
       const content = `
 🏃‍♂️ Run Completed!
 ⏱️ Duration: ${formatTime(run.duration)}
 📏 Distance: ${displayDistance(run.distance)} ${distanceUnit}
 ⚡️ Pace: ${formatPace(run.pace)} min/km
-${run.splits.length > 0 ? '\nSplits:\n' + run.splits.map((split, i) => 
+${run.splits.length > 0 ? '\n📊 Splits:\n' + run.splits.map((split, i) => 
   `Km ${i + 1}: ${formatPace(split.pace)}`
 ).join('\n') : ''}
 
 #Runstr #Running
-`;
+`.trim();
 
       const event = {
         kind: 1,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [['t', 'Runstr'], ['t', 'Running']],
+        tags: [
+          ['t', 'Runstr'],
+          ['t', 'Running'],
+          ['t', 'run']
+        ],
         content: content,
+        pubkey: pubkey
       };
 
-      await publishToNostr(event);
-      alert('Successfully posted to Nostr!');
+      console.log('Attempting to publish run to Nostr:', event);
+      
+      // Show loading state
+      const loadingToast = alert('Publishing your run...');
+      
+      try {
+        await publishToNostr(event);
+        alert('Successfully posted your run to Nostr! 🎉');
+      } catch (error) {
+        console.error('Failed to publish to Nostr:', error);
+        if (error.message.includes('timeout')) {
+          alert('Publication is taking longer than expected. Your run may still be published.');
+        } else if (error.message.includes('No relays connected')) {
+          alert('Could not connect to Nostr relays. Please check your connection and try again.');
+        } else {
+          alert('Failed to post to Nostr. Please try again.');
+        }
+      }
     } catch (error) {
-      console.error('Error posting to Nostr:', error);
-      alert('Failed to post to Nostr. Please try again.');
+      console.error('Error in handlePostToNostr:', error);
+      if (error.message.includes('public key')) {
+        alert('Could not access your Nostr account. Please try logging in again.');
+        navigate('/login');
+      } else {
+        alert('An unexpected error occurred. Please try again.');
+      }
     }
   };
 

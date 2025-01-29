@@ -12,22 +12,17 @@ export const RunClub = () => {
     console.log('Initializing NDK...');
     const ndkInstance = new NDK({ 
       explicitRelayUrls: RELAYS,
-      enableOutboxModel: false,
-      timeout: 30000,
-      minRelayCount: 2
+      enableOutboxModel: true,
+      debug: true
     });
     
     (async () => {
       try {
         await ndkInstance.connect();
-        const connectedRelays = ndkInstance.pool?.relays?.size || 0;
-        console.log(`Connected to ${connectedRelays} relays`);
-        if (connectedRelays < 2) {
-          console.warn('Connected to fewer than 2 relays');
-        }
+        console.log('NDK connected successfully');
       } catch (err) {
         console.error('NDK connection error:', err);
-        setError('Failed to connect to relays');
+        setError('Failed to connect to relays. Please try refreshing the page.');
       }
     })();
     
