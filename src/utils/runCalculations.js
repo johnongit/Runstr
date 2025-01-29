@@ -1,8 +1,25 @@
 // Constants for accuracy thresholds
-const MINIMUM_ACCURACY = 20; // meters
-const SPEED_THRESHOLD = 12.5; // meters/second (~45 km/h)
-const DISTANCE_FILTER = 10; // meters
-const PACE_WINDOW = 60; // Calculate pace over the last 60 seconds
+const MINIMUM_ACCURACY = 30; // meters - increased to be less strict
+const SPEED_THRESHOLD = 15; // meters/second (~54 km/h) - increased to allow sprints
+const MINIMUM_DISTANCE = 0.1; // meters - minimum distance between points
+const PACE_WINDOW = 30; // Calculate pace over the last 30 seconds - reduced for more sensitivity
+const ELEVATION_SMOOTHING = 3; // Reduced for more responsive elevation changes
+
+/**
+ * Calculate a moving average for elevation data
+ */
+function smoothElevation(positions, windowSize = ELEVATION_SMOOTHING) {
+  if (positions.length < windowSize) return null;
+  
+  const recentPositions = positions.slice(-windowSize);
+  const validElevations = recentPositions
+    .map(pos => pos.coords.altitude)
+    .filter(alt => alt !== null && !isNaN(alt));
+    
+  if (validElevations.length < windowSize / 2) return null;
+  
+  return validElevations.reduce((sum, alt) => sum + alt, 0) / validElevations.length;
+}
 
 /**
  * Calculate distance between two coordinates using Haversine formula
@@ -43,15 +60,21 @@ export function filterLocation(location, lastLocation) {
     location.coords.longitude
   );
   const timeDiff = (location.timestamp - lastLocation.timestamp) / 1000;
+  
+  // Don't filter out very small time differences
+  if (timeDiff <= 0) {
+    return false;
+  }
+  
   const speed = distance / timeDiff;
 
-  // Filter out unrealistic speeds
+  // Filter out only clearly unrealistic speeds
   if (speed > SPEED_THRESHOLD) {
     return false;
   }
 
-  // Filter out points that are too close
-  if (distance < DISTANCE_FILTER) {
+  // Allow closer points for better accuracy
+  if (distance < MINIMUM_DISTANCE) { // Only filter extremely close points
     return false;
   }
 
@@ -60,7 +83,7 @@ export function filterLocation(location, lastLocation) {
 
 /**
  * Calculate current pace in minutes per kilometer
- * Uses a moving window to smooth out fluctuations
+ * More sensitive to variations
  */
 export function calculatePace(distance, duration, positions = []) {
   if (distance <= 0 || duration <= 0) return 0;
@@ -68,27 +91,31 @@ export function calculatePace(distance, duration, positions = []) {
   // If we have positions, calculate pace over recent window
   if (positions.length > 1) {
     const now = positions[positions.length - 1].timestamp;
-    const windowStart = now - (PACE_WINDOW * 1000); // Look at last PACE_WINDOW seconds
+    const windowStart = now - (PACE_WINDOW * 1000);
     
     // Find positions within our window
     const recentPositions = positions.filter(pos => pos.timestamp >= windowStart);
     
     if (recentPositions.length > 1) {
       let recentDistance = 0;
+      let lastValidPosition = null;
       
       // Calculate distance in the recent window
-      for (let i = 1; i < recentPositions.length; i++) {
-        const segmentDistance = calculateDistance(
-          recentPositions[i-1].coords.latitude,
-          recentPositions[i-1].coords.longitude,
-          recentPositions[i].coords.latitude,
-          recentPositions[i].coords.longitude
-        );
-        
-        // Only include reasonable distances
-        if (segmentDistance > 0 && segmentDistance < SPEED_THRESHOLD) {
-          recentDistance += segmentDistance;
+      for (const position of recentPositions) {
+        if (lastValidPosition) {
+          const segmentDistance = calculateDistance(
+            lastValidPosition.coords.latitude,
+            lastValidPosition.coords.longitude,
+            position.coords.latitude,
+            position.coords.longitude
+          );
+          
+          const timeDiff = (position.timestamp - lastValidPosition.timestamp) / 1000;
+          if (timeDiff > 0) {
+            recentDistance += segmentDistance;
+          }
         }
+        lastValidPosition = position;
       }
       
       const recentDuration = (recentPositions[recentPositions.length - 1].timestamp - 
@@ -97,22 +124,14 @@ export function calculatePace(distance, duration, positions = []) {
       if (recentDuration > 0 && recentDistance > 0) {
         // Convert to minutes per kilometer
         const speedKmH = (recentDistance / 1000) / (recentDuration / 3600);
-        const pace = speedKmH > 0 ? 60 / speedKmH : 0;
-        
-        // Return reasonable pace or fallback to overall pace
-        if (pace > 0 && pace < 30) { // Paces between 0 and 30 min/km
-          return pace;
-        }
+        return speedKmH > 0 ? 60 / speedKmH : 0;
       }
     }
   }
   
-  // Fallback to overall pace if we can't calculate recent pace
+  // Fallback to overall pace
   const speedKmH = (distance / 1000) / (duration / 3600);
-  const overallPace = speedKmH > 0 ? 60 / speedKmH : 0;
-  
-  // Only return reasonable paces
-  return overallPace > 0 && overallPace < 30 ? overallPace : 0;
+  return speedKmH > 0 ? 60 / speedKmH : 0;
 }
 
 /**
@@ -170,8 +189,6 @@ export function calculateSplits(positions) {
 
 /**
  * Calculate workout statistics
- * @param {Array} positions - Array of GPS positions
- * @param {number} elapsedTime - Actual elapsed time in seconds (excluding pauses)
  */
 export function calculateStats(positions, elapsedTime = null) {
   if (!positions.length) {
@@ -180,7 +197,12 @@ export function calculateStats(positions, elapsedTime = null) {
       duration: 0,
       pace: 0,
       splits: [],
-      positions: []
+      positions: [],
+      elevation: {
+        current: null,
+        gain: 0,
+        loss: 0
+      }
     };
   }
 
@@ -189,14 +211,23 @@ export function calculateStats(positions, elapsedTime = null) {
     i === 0 || filterLocation(pos, positions[i-1])
   );
 
-  // Calculate total distance
-  for (let i = 1; i < filteredPositions.length; i++) {
-    totalDistance += calculateDistance(
-      filteredPositions[i-1].coords.latitude,
-      filteredPositions[i-1].coords.longitude,
-      filteredPositions[i].coords.latitude,
-      filteredPositions[i].coords.longitude
-    );
+  // Calculate total distance with improved accuracy
+  let lastValidPosition = null;
+  for (const position of filteredPositions) {
+    if (lastValidPosition) {
+      const distance = calculateDistance(
+        lastValidPosition.coords.latitude,
+        lastValidPosition.coords.longitude,
+        position.coords.latitude,
+        position.coords.longitude
+      );
+      
+      // Only add reasonable distances
+      if (distance > 0 && distance < SPEED_THRESHOLD) {
+        totalDistance += distance;
+      }
+    }
+    lastValidPosition = position;
   }
 
   // Use provided elapsed time if available, otherwise calculate from timestamps
@@ -204,11 +235,19 @@ export function calculateStats(positions, elapsedTime = null) {
     (filteredPositions[filteredPositions.length - 1].timestamp - 
      filteredPositions[0].timestamp) / 1000;
 
+  // Calculate current elevation (smoothed)
+  const currentElevation = smoothElevation(filteredPositions);
+
   return {
     distance: totalDistance,
     duration: duration,
     pace: calculatePace(totalDistance, duration, filteredPositions),
     splits: calculateSplits(filteredPositions),
-    positions: filteredPositions
+    positions: filteredPositions,
+    elevation: {
+      current: currentElevation,
+      gain: 0, // This will be updated by the useLocation hook
+      loss: 0  // This will be updated by the useLocation hook
+    }
   };
 } 

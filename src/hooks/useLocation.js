@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { calculateStats, calculateDistance } from '../utils/runCalculations';
+import { KalmanFilter } from '../utils/kalmanFilter';
 
 export const useLocation = (options = {}) => {
   const [location, setLocation] = useState(null);
@@ -7,12 +8,22 @@ export const useLocation = (options = {}) => {
   const [isTracking, setIsTracking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [positions, setPositions] = useState([]);
+  const [gpsQuality, setGpsQuality] = useState({
+    accuracy: null,
+    satellites: null,
+    signalStrength: 'unknown' // 'poor', 'moderate', 'good'
+  });
   const [stats, setStats] = useState({
     distance: 0,
     duration: 0,
     pace: 0,
     splits: [],
-    positions: []
+    positions: [],
+    elevation: {
+      gain: 0,
+      loss: 0,
+      current: null
+    }
   });
 
   const startTimeRef = useRef(null);
@@ -21,6 +32,102 @@ export const useLocation = (options = {}) => {
   const watchIdRef = useRef(null);
   const lastPositionRef = useRef(null);
   const lastStatsUpdateRef = useRef(0);
+  const kalmanFilterRef = useRef(new KalmanFilter());
+  const elevationRef = useRef({
+    lastAltitude: null,
+    gain: 0,
+    loss: 0
+  });
+
+  // Update GPS quality
+  const updateGpsQuality = useCallback((accuracy) => {
+    let signalStrength = 'poor';
+    if (accuracy <= 5) {
+      signalStrength = 'good';
+    } else if (accuracy <= 15) {
+      signalStrength = 'moderate';
+    }
+
+    setGpsQuality(prev => ({
+      ...prev,
+      accuracy,
+      signalStrength
+    }));
+  }, []);
+
+  // Calculate elevation changes
+  const updateElevation = useCallback((altitude) => {
+    if (elevationRef.current.lastAltitude !== null) {
+      const diff = altitude - elevationRef.current.lastAltitude;
+      // Filter out small fluctuations (less than 1 meter)
+      if (Math.abs(diff) >= 1) {
+        if (diff > 0) {
+          elevationRef.current.gain += diff;
+        } else {
+          elevationRef.current.loss += Math.abs(diff);
+        }
+      }
+    }
+    elevationRef.current.lastAltitude = altitude;
+  }, []);
+
+  // Filter and add new positions with Kalman filtering
+  const addPosition = useCallback((position) => {
+    if (!lastPositionRef.current) {
+      lastPositionRef.current = position;
+      kalmanFilterRef.current.reset();
+      setPositions(prev => [...prev, position]);
+      return;
+    }
+
+    // Calculate time difference
+    const timeDiff = (position.timestamp - lastPositionRef.current.timestamp) / 1000;
+    
+    // Only filter out negative time differences
+    if (timeDiff < 0) {
+      return;
+    }
+
+    // Apply Kalman filter with reduced smoothing
+    const filtered = kalmanFilterRef.current.update(
+      position.coords.latitude,
+      position.coords.longitude,
+      position.coords.accuracy
+    );
+
+    // Create filtered position object
+    const filteredPosition = {
+      ...position,
+      coords: {
+        ...position.coords,
+        latitude: filtered.lat,
+        longitude: filtered.lng,
+        accuracy: filtered.accuracy
+      }
+    };
+
+    // Calculate distance with filtered coordinates
+    const distance = calculateDistance(
+      lastPositionRef.current.coords.latitude,
+      lastPositionRef.current.coords.longitude,
+      filteredPosition.coords.latitude,
+      filteredPosition.coords.longitude
+    );
+
+    // Update GPS quality indicator
+    updateGpsQuality(position.coords.accuracy);
+
+    // Update elevation if available
+    if (position.coords.altitude !== null) {
+      updateElevation(position.coords.altitude);
+    }
+
+    // Less strict filtering criteria - allow any movement >= 0.1m with reasonable accuracy
+    if (distance >= 0.1 && position.coords.accuracy < 30) {
+      lastPositionRef.current = filteredPosition;
+      setPositions(prev => [...prev, filteredPosition]);
+    }
+  }, [updateGpsQuality, updateElevation]);
 
   // Update stats with proper timing
   useEffect(() => {
@@ -30,7 +137,6 @@ export const useLocation = (options = {}) => {
       intervalId = setInterval(() => {
         const currentTime = Date.now();
         
-        // Only update if we have new data since last update
         if (currentTime - lastStatsUpdateRef.current >= 1000) {
           const totalPausedTime = pausedDurationRef.current + 
             (lastPauseTimeRef.current ? currentTime - lastPauseTimeRef.current : 0);
@@ -39,12 +145,17 @@ export const useLocation = (options = {}) => {
           const newStats = calculateStats(positions, Math.max(0, Math.floor(effectiveDuration)));
           setStats({
             ...newStats,
-            duration: Math.max(0, Math.floor(effectiveDuration))
+            duration: Math.max(0, Math.floor(effectiveDuration)),
+            elevation: {
+              gain: elevationRef.current.gain,
+              loss: elevationRef.current.loss,
+              current: elevationRef.current.lastAltitude
+            }
           });
           
           lastStatsUpdateRef.current = currentTime;
         }
-      }, 1000); // Update every second
+      }, 1000);
     }
 
     return () => {
@@ -53,41 +164,6 @@ export const useLocation = (options = {}) => {
       }
     };
   }, [isTracking, isPaused, positions]);
-
-  // Filter and add new positions
-  const addPosition = useCallback((position) => {
-    if (!lastPositionRef.current) {
-      lastPositionRef.current = position;
-      setPositions(prev => [...prev, position]);
-      return;
-    }
-
-    // Calculate time and distance since last position
-    const timeDiff = (position.timestamp - lastPositionRef.current.timestamp) / 1000;
-    
-    // Only process if we have a reasonable time difference (> 0 and < 30 seconds)
-    if (timeDiff <= 0 || timeDiff > 30) {
-      return;
-    }
-
-    const distance = calculateDistance(
-      lastPositionRef.current.coords.latitude,
-      lastPositionRef.current.coords.longitude,
-      position.coords.latitude,
-      position.coords.longitude
-    );
-
-    // Filter out erroneous readings:
-    // 1. Must have moved some distance (> 1 meter)
-    // 2. Speed must be reasonable (< 45 km/h or 12.5 m/s)
-    // 3. Must have reasonable accuracy (< 20 meters)
-    if (distance > 1 && 
-        distance < (timeDiff * 12.5) && 
-        position.coords.accuracy < 20) {
-      lastPositionRef.current = position;
-      setPositions(prev => [...prev, position]);
-    }
-  }, []);
 
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -172,6 +248,7 @@ export const useLocation = (options = {}) => {
     isPaused,
     positions,
     stats,
+    gpsQuality,
     startTracking,
     stopTracking,
     pauseTracking,
