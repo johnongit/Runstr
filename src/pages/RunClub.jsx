@@ -1,32 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import NDK, { NDKEvent } from '@nostr-dev-kit/ndk';
-import { RELAYS } from '../utils/nostr';
+import { useState, useEffect, useCallback } from 'react';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { RELAYS, ndk, initializeNostr } from '../utils/nostr';
 
 export const RunClub = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [commentText, setCommentText] = useState('');
-
-  const ndk = useMemo(() => {
-    console.log('Initializing NDK...');
-    const ndkInstance = new NDK({ 
-      explicitRelayUrls: RELAYS,
-      enableOutboxModel: true
-    });
-    
-    (async () => {
-      try {
-        await ndkInstance.connect();
-        console.log('NDK connected successfully');
-      } catch (err) {
-        console.error('NDK connection error:', err);
-        setError('Failed to connect to relays. Please try refreshing the page.');
-      }
-    })();
-    
-    return ndkInstance;
-  }, []);
 
   const processAndUpdatePosts = useCallback(async (posts) => {
     try {
@@ -97,7 +77,7 @@ export const RunClub = () => {
       console.error('Error processing posts:', err);
       return posts.sort((a, b) => b.created_at - a.created_at);
     }
-  }, [ndk]);
+  }, []);
 
   const fetchRunPosts = useCallback(async () => {
     try {
@@ -106,16 +86,17 @@ export const RunClub = () => {
         throw new Error('Please login to view running posts');
       }
 
-      let attempts = 0;
-      while ((ndk.pool?.relays?.size || 0) === 0 && attempts < 10) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        attempts++;
+      // Ensure NDK is connected
+      if (!ndk.pool?.relays?.size) {
+        console.log('NDK not connected, connecting...');
+        const connected = await initializeNostr();
+        if (!connected) {
+          throw new Error('Could not connect to relays');
+        }
       }
 
-      if ((ndk.pool?.relays?.size || 0) === 0) {
-        throw new Error('No relays connected');
-      }
-
+      console.log('NDK ready state:', ndk.pool?.relays?.size || 0, 'relays connected');
+      
       const filter = {
         kinds: [1],
         '#t': ['Runstr', 'Running', 'run', 'running'],
@@ -123,7 +104,6 @@ export const RunClub = () => {
         limit: 100
       };
 
-      console.log('NDK ready state:', ndk.pool?.relays?.size || 0, 'relays connected');
       console.log('Fetching events with filter:', filter);
       
       const events = await ndk.fetchEvents(filter);
@@ -143,10 +123,10 @@ export const RunClub = () => {
       setError(err.message);
       setLoading(false);
     }
-  }, [ndk, processAndUpdatePosts]);
+  }, [processAndUpdatePosts]);
 
   useEffect(() => {
-    let sub;
+    let mounted = true;
     
     const init = async () => {
       try {
@@ -157,22 +137,24 @@ export const RunClub = () => {
         }
 
         console.log('NDK initialized, fetching posts...');
-        sub = await fetchRunPosts();
+        if (mounted) {
+          await fetchRunPosts();
+        }
       } catch (err) {
         console.error('Error in init:', err);
-        setError('Failed to fetch posts: ' + err.message);
-        setLoading(false);
+        if (mounted) {
+          setError('Failed to fetch posts: ' + err.message);
+          setLoading(false);
+        }
       }
     };
 
     init();
 
     return () => {
-      if (sub) {
-        sub.unsub();
-      }
+      mounted = false;
     };
-  }, [ndk, fetchRunPosts]);
+  }, [fetchRunPosts]);
 
   const handleZap = async (post) => {
     if (!window.nostr) {
