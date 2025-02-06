@@ -12,8 +12,7 @@ export const RunClub = () => {
     console.log('Initializing NDK...');
     const ndkInstance = new NDK({ 
       explicitRelayUrls: RELAYS,
-      enableOutboxModel: true,
-      debug: true
+      enableOutboxModel: true
     });
     
     (async () => {
