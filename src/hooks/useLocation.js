@@ -193,7 +193,7 @@ export const useLocation = (options = {}) => {
         if (!isPaused) {
           setLocation(position);
           addPosition({
-            ...position,
+            ...position.toJSON(),
             timestamp: Date.now() // Use current time instead of GPS time
           });
         }
