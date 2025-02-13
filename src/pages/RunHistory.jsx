@@ -7,8 +7,8 @@ export const RunHistory = () => {
   const [additionalContent, setAdditionalContent] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
-  const [distanceUnit] = useState(() => 
-    localStorage.getItem('distanceUnit') || 'km'
+  const [distanceUnit] = useState(
+    () => localStorage.getItem('distanceUnit') || 'km'
   );
   const [stats, setStats] = useState({
     totalDistance: 0,
@@ -23,8 +23,8 @@ export const RunHistory = () => {
     personalBests: {
       '5k': Infinity,
       '10k': Infinity,
-      'halfMarathon': Infinity,
-      'marathon': Infinity
+      halfMarathon: Infinity,
+      marathon: Infinity
     }
   });
 
@@ -46,8 +46,8 @@ export const RunHistory = () => {
       personalBests: {
         '5k': Infinity,
         '10k': Infinity,
-        'halfMarathon': Infinity,
-        'marathon': Infinity
+        halfMarathon: Infinity,
+        marathon: Infinity
       }
     };
 
@@ -57,15 +57,21 @@ export const RunHistory = () => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Sort runs by date for streak calculation
-    const sortedRuns = [...runHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
-    
+    const sortedRuns = [...runHistory].sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
+
     // Calculate current streak
     let streak = 0;
-    let currentDate = sortedRuns.length > 0 ? new Date(sortedRuns[0].date) : null;
-    
+    let currentDate =
+      sortedRuns.length > 0 ? new Date(sortedRuns[0].date) : null;
+
     for (let i = 0; i < sortedRuns.length; i++) {
       const runDate = new Date(sortedRuns[i].date);
-      if (i === 0 || Math.floor((currentDate - runDate) / (1000 * 60 * 60 * 24)) === 1) {
+      if (
+        i === 0 ||
+        Math.floor((currentDate - runDate) / (1000 * 60 * 60 * 24)) === 1
+      ) {
         streak++;
         currentDate = runDate;
       } else {
@@ -75,7 +81,7 @@ export const RunHistory = () => {
     newStats.currentStreak = streak;
 
     // Process each run
-    runHistory.forEach(run => {
+    runHistory.forEach((run) => {
       // Total distance
       newStats.totalDistance += run.distance;
 
@@ -85,7 +91,7 @@ export const RunHistory = () => {
       }
 
       // Pace calculations
-      const pace = (run.duration / 60) / run.distance;
+      const pace = run.duration / 60 / run.distance;
       totalPace += pace;
       if (pace < newStats.fastestPace) {
         newStats.fastestPace = pace;
@@ -102,25 +108,25 @@ export const RunHistory = () => {
 
       // Personal bests for standard distances
       if (run.distance >= 5) {
-        const pace5k = (run.duration / 60) / 5;
+        const pace5k = run.duration / 60 / 5;
         if (pace5k < newStats.personalBests['5k']) {
           newStats.personalBests['5k'] = pace5k;
         }
       }
       if (run.distance >= 10) {
-        const pace10k = (run.duration / 60) / 10;
+        const pace10k = run.duration / 60 / 10;
         if (pace10k < newStats.personalBests['10k']) {
           newStats.personalBests['10k'] = pace10k;
         }
       }
       if (run.distance >= 21.1) {
-        const paceHalf = (run.duration / 60) / 21.1;
+        const paceHalf = run.duration / 60 / 21.1;
         if (paceHalf < newStats.personalBests['halfMarathon']) {
           newStats.personalBests['halfMarathon'] = paceHalf;
         }
       }
       if (run.distance >= 42.2) {
-        const paceMarathon = (run.duration / 60) / 42.2;
+        const paceMarathon = run.duration / 60 / 42.2;
         if (paceMarathon < newStats.personalBests['marathon']) {
           newStats.personalBests['marathon'] = paceMarathon;
         }
@@ -146,7 +152,7 @@ export const RunHistory = () => {
 
   const handleDeleteRun = (runId) => {
     if (window.confirm('Are you sure you want to delete this run?')) {
-      const updatedRuns = runHistory.filter(run => run.id !== runId);
+      const updatedRuns = runHistory.filter((run) => run.id !== runId);
       localStorage.setItem('runHistory', JSON.stringify(updatedRuns));
       setRunHistory(updatedRuns);
     }
@@ -158,7 +164,7 @@ export const RunHistory = () => {
   };
 
   const handlePostSubmit = async () => {
-    // todo: handle signing 
+    // todo: handle signing
 
     setIsPosting(true);
 
@@ -166,7 +172,7 @@ export const RunHistory = () => {
 🏃‍♂️ Run Completed!
 ⏱️ Duration: ${formatTime(selectedRun.duration)}
 📏 Distance: ${selectedRun.distance.toFixed(2)} km
-⚡️ Pace: ${selectedRun.duration > 0 ? ((selectedRun.duration / 60) / selectedRun.distance).toFixed(2) : '0'} min/km
+⚡️ Pace: ${selectedRun.duration > 0 ? (selectedRun.duration / 60 / selectedRun.distance).toFixed(2) : '0'} min/km
 
 ${additionalContent}
 
@@ -176,8 +182,11 @@ ${additionalContent}
     const event = {
       kind: 1,
       created_at: Math.floor(Date.now() / 1000),
-      tags: [['t', 'Runstr'], ['t', 'Running']],
-      content: content,
+      tags: [
+        ['t', 'Runstr'],
+        ['t', 'Running']
+      ],
+      content: content
     };
 
     try {
@@ -230,7 +239,12 @@ ${additionalContent}
           </div>
           <div className="stat-card">
             <h3>Fastest Pace</h3>
-            <p>{stats.fastestPace === Infinity ? '-' : stats.fastestPace.toFixed(2)} min/km</p>
+            <p>
+              {stats.fastestPace === Infinity
+                ? '-'
+                : stats.fastestPace.toFixed(2)}{' '}
+              min/km
+            </p>
           </div>
           <div className="stat-card">
             <h3>Longest Run</h3>
@@ -257,19 +271,39 @@ ${additionalContent}
           <div className="stats-grid">
             <div className="stat-card">
               <h4>5K</h4>
-              <p>{stats.personalBests['5k'] === Infinity ? '-' : stats.personalBests['5k'].toFixed(2)} min/km</p>
+              <p>
+                {stats.personalBests['5k'] === Infinity
+                  ? '-'
+                  : stats.personalBests['5k'].toFixed(2)}{' '}
+                min/km
+              </p>
             </div>
             <div className="stat-card">
               <h4>10K</h4>
-              <p>{stats.personalBests['10k'] === Infinity ? '-' : stats.personalBests['10k'].toFixed(2)} min/km</p>
+              <p>
+                {stats.personalBests['10k'] === Infinity
+                  ? '-'
+                  : stats.personalBests['10k'].toFixed(2)}{' '}
+                min/km
+              </p>
             </div>
             <div className="stat-card">
               <h4>Half Marathon</h4>
-              <p>{stats.personalBests['halfMarathon'] === Infinity ? '-' : stats.personalBests['halfMarathon'].toFixed(2)} min/km</p>
+              <p>
+                {stats.personalBests['halfMarathon'] === Infinity
+                  ? '-'
+                  : stats.personalBests['halfMarathon'].toFixed(2)}{' '}
+                min/km
+              </p>
             </div>
             <div className="stat-card">
               <h4>Marathon</h4>
-              <p>{stats.personalBests['marathon'] === Infinity ? '-' : stats.personalBests['marathon'].toFixed(2)} min/km</p>
+              <p>
+                {stats.personalBests['marathon'] === Infinity
+                  ? '-'
+                  : stats.personalBests['marathon'].toFixed(2)}{' '}
+                min/km
+              </p>
             </div>
           </div>
         </div>
@@ -286,16 +320,22 @@ ${additionalContent}
               <div className="run-details">
                 <span>Duration: {formatTime(run.duration)}</span>
                 <span>Distance: {displayDistance(run.distance)}</span>
-                <span>Pace: {run.duration > 0 ? ((run.duration / 60) / run.distance).toFixed(2) : '0'} min/km</span>
+                <span>
+                  Pace:{' '}
+                  {run.duration > 0
+                    ? (run.duration / 60 / run.distance).toFixed(2)
+                    : '0'}{' '}
+                  min/km
+                </span>
               </div>
               <div className="run-actions">
-                <button 
+                <button
                   onClick={() => handlePostToNostr(run)}
                   className="share-btn"
                 >
                   Share to Nostr
                 </button>
-                <button 
+                <button
                   onClick={() => handleDeleteRun(run.id)}
                   className="delete-btn"
                 >
@@ -319,16 +359,10 @@ ${additionalContent}
               disabled={isPosting}
             />
             <div className="modal-buttons">
-              <button 
-                onClick={handlePostSubmit} 
-                disabled={isPosting}
-              >
+              <button onClick={handlePostSubmit} disabled={isPosting}>
                 {isPosting ? 'Posting...' : 'Post'}
               </button>
-              <button 
-                onClick={() => setShowModal(false)}
-                disabled={isPosting}
-              >
+              <button onClick={() => setShowModal(false)} disabled={isPosting}>
                 Cancel
               </button>
             </div>
@@ -337,4 +371,4 @@ ${additionalContent}
       )}
     </div>
   );
-}; 
+};

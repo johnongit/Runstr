@@ -20,4 +20,4 @@ export const AppRoutes = () => {
       <Route path="/" element={<RunTracker />} />
     </Routes>
   );
-}; 
+};

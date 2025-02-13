@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { 
-  checkAchievements, 
-  calculateTotalXP, 
-  calculateLevel, 
-  xpForNextLevel 
+import {
+  checkAchievements,
+  calculateTotalXP,
+  calculateLevel,
+  xpForNextLevel
 } from '../utils/achievements';
 import { AchievementContext } from './achievementContext';
 
@@ -26,7 +26,10 @@ export function AchievementProvider({ children }) {
   const [recentAchievements, setRecentAchievements] = useState([]);
 
   useEffect(() => {
-    localStorage.setItem('unlockedAchievements', JSON.stringify(unlockedAchievements));
+    localStorage.setItem(
+      'unlockedAchievements',
+      JSON.stringify(unlockedAchievements)
+    );
     const newTotalXP = calculateTotalXP(unlockedAchievements);
     setTotalXP(newTotalXP);
     setLevel(calculateLevel(newTotalXP));
@@ -36,7 +39,10 @@ export function AchievementProvider({ children }) {
   const checkForAchievements = (stats) => {
     const newAchievements = checkAchievements(stats, unlockedAchievements);
     if (newAchievements.length > 0) {
-      setUnlockedAchievements(prev => [...prev, ...newAchievements.map(a => a.id)]);
+      setUnlockedAchievements((prev) => [
+        ...prev,
+        ...newAchievements.map((a) => a.id)
+      ]);
       setRecentAchievements(newAchievements);
       return newAchievements;
     }
@@ -66,4 +72,4 @@ export function AchievementProvider({ children }) {
 
 AchievementProvider.propTypes = {
   children: PropTypes.node.isRequired
-}; 
+};

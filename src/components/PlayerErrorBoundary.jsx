@@ -33,4 +33,4 @@ export class PlayerErrorBoundary extends Component {
 
 PlayerErrorBoundary.propTypes = {
   children: PropTypes.node.isRequired
-}; 
+};

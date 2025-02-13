@@ -14,4 +14,4 @@ export const syncOfflineRuns = () => {
     // Sync with server when implemented
     localStorage.removeItem('offlineRuns');
   }
-}; 
+};

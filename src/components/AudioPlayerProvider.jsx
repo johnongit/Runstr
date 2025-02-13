@@ -18,7 +18,7 @@ export function AudioPlayerProvider({ children }) {
 
   useEffect(() => {
     audioRef.current = createAudioInstance();
-    
+
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -27,26 +27,32 @@ export function AudioPlayerProvider({ children }) {
     };
   }, []);
 
-  const playTrack = useCallback(async (track) => {
-    if (!audioRef.current) return;
+  const playTrack = useCallback(
+    async (track) => {
+      if (!audioRef.current) return;
 
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const streamData = await wavlakeApi.getStreamUrl(track.id);
-      
-      audioRef.current.src = streamData.url;
-      audioRef.current.volume = state.volume;
-      
-      dispatch({ type: 'SET_TRACK', payload: track });
-      audioRef.current.play()
-        .then(() => dispatch({ type: 'PLAY' }))
-        .catch(error => dispatch({ type: 'SET_ERROR', payload: error.message }));
-    } catch (error) {
-      dispatch({ type: 'SET_ERROR', payload: error.message });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  }, [state.volume]);
+      try {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        const streamData = await wavlakeApi.getStreamUrl(track.id);
+
+        audioRef.current.src = streamData.url;
+        audioRef.current.volume = state.volume;
+
+        dispatch({ type: 'SET_TRACK', payload: track });
+        audioRef.current
+          .play()
+          .then(() => dispatch({ type: 'PLAY' }))
+          .catch((error) =>
+            dispatch({ type: 'SET_ERROR', payload: error.message })
+          );
+      } catch (error) {
+        dispatch({ type: 'SET_ERROR', payload: error.message });
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    },
+    [state.volume]
+  );
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !state.currentTrack) return;
@@ -55,9 +61,12 @@ export function AudioPlayerProvider({ children }) {
       audioRef.current.pause();
       dispatch({ type: 'PAUSE' });
     } else {
-      audioRef.current.play()
+      audioRef.current
+        .play()
         .then(() => dispatch({ type: 'PLAY' }))
-        .catch(error => dispatch({ type: 'SET_ERROR', payload: error.message }));
+        .catch((error) =>
+          dispatch({ type: 'SET_ERROR', payload: error.message })
+        );
     }
   }, [state.isPlaying, state.currentTrack]);
 
@@ -77,25 +86,27 @@ export function AudioPlayerProvider({ children }) {
     if (!audioRef.current) return;
 
     const handleTimeUpdate = () => {
-      dispatch({ 
-        type: 'SET_PROGRESS', 
-        payload: audioRef.current.currentTime 
+      dispatch({
+        type: 'SET_PROGRESS',
+        payload: audioRef.current.currentTime
       });
-      
+
       // Report progress to Wavlake API
       if (state.currentTrack) {
-        wavlakeApi.reportProgress(
-          state.currentTrack.id,
-          audioRef.current.currentTime,
-          audioRef.current.duration
-        ).catch(console.error);
+        wavlakeApi
+          .reportProgress(
+            state.currentTrack.id,
+            audioRef.current.currentTime,
+            audioRef.current.duration
+          )
+          .catch(console.error);
       }
     };
 
     const handleLoadedMetadata = () => {
-      dispatch({ 
-        type: 'SET_DURATION', 
-        payload: audioRef.current.duration 
+      dispatch({
+        type: 'SET_DURATION',
+        payload: audioRef.current.duration
       });
     };
 
@@ -115,7 +126,10 @@ export function AudioPlayerProvider({ children }) {
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        audioRef.current.removeEventListener(
+          'loadedmetadata',
+          handleLoadedMetadata
+        );
         audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
@@ -131,12 +145,10 @@ export function AudioPlayerProvider({ children }) {
   };
 
   return (
-    <AudioContext.Provider value={value}>
-      {children}
-    </AudioContext.Provider>
+    <AudioContext.Provider value={value}>{children}</AudioContext.Provider>
   );
 }
 
 AudioPlayerProvider.propTypes = {
-  children: PropTypes.node.isRequired,
-}; 
+  children: PropTypes.node.isRequired
+};

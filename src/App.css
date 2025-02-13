@@ -12,7 +12,11 @@ body {
   padding-top: 60px;
   background-color: var(--bg-darker);
   color: var(--text-light);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 .container {
@@ -36,7 +40,8 @@ button:hover {
   background-color: var(--primary-hover);
 }
 
-input, textarea {
+input,
+textarea {
   background-color: var(--bg-dark);
   border: 1px solid var(--border-color);
   color: var(--text-light);
@@ -50,7 +55,7 @@ input, textarea {
   .menuList {
     gap: 0.5rem;
   }
-  
+
   .link {
     padding: 0.4rem 0.6rem;
     font-size: 0.85rem;
@@ -77,7 +82,9 @@ input, textarea {
 }
 
 /* Add bottom spacing for mobile navigation */
-.run-tracker, .run-history, .run-club-container {
+.run-tracker,
+.run-history,
+.run-club-container {
   padding-bottom: 80px;
 }
 
@@ -92,7 +99,8 @@ button {
 }
 
 /* Improve input accessibility */
-input, textarea {
+input,
+textarea {
   font-size: 16px;
   padding: 12px;
   margin: 5px 0;
@@ -110,14 +118,14 @@ input, textarea {
 .distance-display {
   font-size: 2.5em;
   font-weight: bold;
-  color: #4CAF50;
+  color: #4caf50;
   margin: 10px 0;
 }
 
 /* Style pace display */
 .pace-display {
   font-size: 1.8em;
-  color: #2196F3;
+  color: #2196f3;
   margin: 10px 0;
 }
 
@@ -138,7 +146,7 @@ input, textarea {
   right: 0;
   background: #1a1a1a;
   padding: 15px;
-  box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
   z-index: 100;
 }
 
@@ -156,11 +164,12 @@ input, textarea {
 }
 
 /* Make cards more touch-friendly */
-.teammate-card, .history-item {
+.teammate-card,
+.history-item {
   padding: 20px;
   margin: 10px 0;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .logo {
@@ -614,7 +623,7 @@ input, textarea {
   .app-title {
     font-size: 1.5em;
   }
-  
+
   .user-avatar {
     top: 0.8rem;
   }
@@ -819,7 +828,7 @@ input, textarea {
   background-color: var(--bg-dark);
   z-index: 1000;
   transition: left 0.3s ease;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar-nav.open {
@@ -877,7 +886,7 @@ input, textarea {
   border-radius: 12px;
   margin: 10px auto;
   max-width: 500px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .last-run h3 {
@@ -961,7 +970,7 @@ input, textarea {
   .user-avatar {
     top: 0.8rem;
   }
-  
+
   .user-avatar img {
     width: 35px;
     height: 35px;
@@ -995,7 +1004,7 @@ input, textarea {
   .nl-container {
     top: 0.8rem !important;
   }
-  
+
   .nl-container button,
   .nl-container img {
     width: 35px !important;
@@ -1117,7 +1126,7 @@ input, textarea {
   .achievements-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .achievement-card {
     margin-bottom: 15px;
   }
@@ -1249,7 +1258,8 @@ input, textarea {
   margin-top: 1rem;
 }
 
-.like-button, .comment-button {
+.like-button,
+.comment-button {
   background: none;
   border: none;
   padding: 0.5rem 1rem;
@@ -1261,7 +1271,8 @@ input, textarea {
   transition: color 0.2s;
 }
 
-.like-button:hover, .comment-button:hover {
+.like-button:hover,
+.comment-button:hover {
   color: #646cff;
 }
 
@@ -1378,7 +1389,7 @@ input, textarea {
 }
 
 .connect-button {
-  background-color: #4CAF50;
+  background-color: #4caf50;
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -1415,7 +1426,7 @@ input, textarea {
 }
 
 .nwc-input:focus {
-  border-color: #4CAF50;
+  border-color: #4caf50;
   outline: none;
 }
 
@@ -1500,7 +1511,7 @@ input, textarea {
   .post-images {
     grid-template-columns: 1fr;
   }
-  
+
   .post-image {
     max-height: 300px;
   }
@@ -1534,7 +1545,8 @@ input, textarea {
   transform: translateY(-2px);
 }
 
-.stat-card h3, .stat-card h4 {
+.stat-card h3,
+.stat-card h4 {
   margin: 0 0 10px 0;
   color: var(--primary-color);
   font-size: 1.1em;
@@ -1546,11 +1558,13 @@ input, textarea {
   font-weight: bold;
 }
 
-.recent-stats, .personal-bests {
+.recent-stats,
+.personal-bests {
   margin-top: 30px;
 }
 
-.recent-stats h3, .personal-bests h3 {
+.recent-stats h3,
+.personal-bests h3 {
   color: var(--text-light);
   margin-bottom: 15px;
 }
@@ -1598,7 +1612,8 @@ input, textarea {
     padding: 10px;
   }
 
-  .stat-card h3, .stat-card h4 {
+  .stat-card h3,
+  .stat-card h4 {
     font-size: 1em;
   }
 
@@ -1620,7 +1635,11 @@ input, textarea {
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
+  background: linear-gradient(
+    90deg,
+    var(--primary-color),
+    var(--primary-hover)
+  );
   opacity: 0;
   transition: opacity 0.3s;
 }

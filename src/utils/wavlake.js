@@ -1,7 +1,7 @@
 // Constants for playlist types
-export const PLAYLIST = "playlist";
-export const TOP_40 = "top-40";
-export const LIKED = "liked";
+export const PLAYLIST = 'playlist';
+export const TOP_40 = 'top-40';
+export const LIKED = 'liked';
 
 /**
  * Base fetch function with headers and error handling
@@ -11,7 +11,7 @@ const fetchWithHeaders = async (endpoint, options = {}) => {
     const response = await fetch(`/api/v1${endpoint}`, {
       ...options,
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
         'Content-Type': 'application/json',
         ...options.headers
       }
@@ -70,7 +70,9 @@ export const getTrackStreamUrl = (trackId) => {
  */
 export const searchContent = async (term) => {
   try {
-    const data = await fetchWithHeaders(`/content/search?term=${encodeURIComponent(term)}`);
+    const data = await fetchWithHeaders(
+      `/content/search?term=${encodeURIComponent(term)}`
+    );
     return data;
   } catch (error) {
     console.error('Error searching content:', error);
@@ -89,12 +91,12 @@ const createPlaylistEvent = (name, description, tracks = []) => {
       ['d', 'wavlake-playlist'],
       ['name', name],
       ['description', description],
-      ...tracks.map(track => ['t', track.id, track.title, track.artist])
+      ...tracks.map((track) => ['t', track.id, track.title, track.artist])
     ],
     content: JSON.stringify({
       name,
       description,
-      tracks: tracks.map(track => ({
+      tracks: tracks.map((track) => ({
         id: track.id,
         title: track.title,
         artist: track.artist
@@ -114,7 +116,7 @@ export const fetchLikedPlaylist = async () => {
   try {
     // First get the rankings as initial tracks
     const tracks = await fetchRankings();
-    
+
     // Create NIP-88 playlist event
     const playlistEvent = createPlaylistEvent(
       'Liked Tracks',
@@ -127,7 +129,7 @@ export const fetchLikedPlaylist = async () => {
 
     return {
       id: LIKED,
-      title: "Liked",
+      title: 'Liked',
       tracks,
       isPrivate: true,
       event: signedEvent
@@ -136,9 +138,9 @@ export const fetchLikedPlaylist = async () => {
     console.error('Error fetching liked playlist:', error);
     return {
       id: LIKED,
-      title: "Liked",
+      title: 'Liked',
       tracks: [],
       isPrivate: true
     };
   }
-}; 
+};
