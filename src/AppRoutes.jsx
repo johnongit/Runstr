@@ -1,6 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
 import { RunTracker } from './components/RunTracker';
-import { Login } from './pages/Login';
 import { RunHistory } from './pages/RunHistory';
 import { Achievements } from './pages/Achievements';
 import { RunClub } from './pages/RunClub';
@@ -11,7 +10,6 @@ import { NWC } from './pages/NWC';
 export const AppRoutes = () => {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
       <Route path="/history" element={<RunHistory />} />
       <Route path="/achievements" element={<Achievements />} />
       <Route path="/club" element={<RunClub />} />
