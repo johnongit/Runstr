@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { SimplePool } from 'nostr-tools';
-import { signInWithNostr, publishToNostr, RELAYS } from '../utils/nostr';
+import { publishToNostr, RELAYS } from '../utils/nostr';
 
 export const Wallet = () => {
   const pool = useRef(new SimplePool());
@@ -139,7 +139,7 @@ export const Wallet = () => {
       <h2>Cashu Wallet</h2>
       
       {!window.nostr ? (
-        <button onClick={signInWithNostr}>Connect Nostr to Access Wallet</button>
+        <button>Connect Nostr to Access Wallet</button>
       ) : loading ? (
         <p>Loading wallet...</p>
       ) : (

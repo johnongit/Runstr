@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { signInWithNostr, publishToNostr } from '../utils/nostr';
+import { publishToNostr } from '../utils/nostr';
 
 export const RunHistory = () => {
   const [runHistory, setRunHistory] = useState([]);
@@ -158,10 +158,7 @@ export const RunHistory = () => {
   };
 
   const handlePostSubmit = async () => {
-    if (!window.nostr) {
-      signInWithNostr();
-      return;
-    }
+    // todo: handle signing 
 
     setIsPosting(true);
 

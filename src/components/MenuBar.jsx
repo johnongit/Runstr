@@ -6,7 +6,6 @@ export const MenuBar = () => {
   
   const menuItems = [
     { name: 'Dashboard', path: '/' },
-    { name: 'Login', path: '/login' },
     { name: 'Run History', path: '/history' },
     { name: 'Achievements', path: '/achievements' },
     { name: 'Run Club', path: '/club' },
