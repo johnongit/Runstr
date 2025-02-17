@@ -12,5 +12,8 @@
       "stopOnTerminate": false,
       "startForeground": true
     }
+  },
+  "android": {
+    "useLegacyBridge": true
   }
 }
