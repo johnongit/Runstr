@@ -1,4 +1,4 @@
-name: Build and Sign APK
+name: Build and Release Debug Apk
 
 on:
   push:
@@ -10,23 +10,20 @@ on:
 
 jobs:
   build:
-    name: Build and Sign APK
+    name: Build and Release Debug Apk
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v3
 
-      # Setup Node.js (use the version specified in your project)
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
 
-      # Install project dependencies
       - name: Install dependencies
-        run: npm npm ci
+        run: npm ci
 
       # Build the React app
       - name: Build React app
