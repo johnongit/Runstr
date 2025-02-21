@@ -29,5 +29,5 @@ export function NostrProvider({ children }) {
 }
 
 NostrProvider.propTypes = {
-  children: PropTypes.node.isRequired,
-}; 
+  children: PropTypes.node.isRequired
+};

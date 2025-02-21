@@ -6,16 +6,21 @@ export const Achievements = () => {
 
   // Group achievements by category
   const achievementCategories = {
-    'Distance': Object.values(ACHIEVEMENTS).filter(a => a.id.includes('DISTANCE_') || a.id.includes('TOTAL_')),
-    'Streaks': Object.values(ACHIEVEMENTS).filter(a => a.id.includes('STREAK_')),
-    'Speed': Object.values(ACHIEVEMENTS).filter(a => a.id.includes('SPEED_')),
-    'Social': Object.values(ACHIEVEMENTS).filter(a => a.id.includes('SHARE')),
-    'Special': Object.values(ACHIEVEMENTS).filter(a => 
-      !a.id.includes('DISTANCE_') && 
-      !a.id.includes('STREAK_') && 
-      !a.id.includes('SPEED_') && 
-      !a.id.includes('SHARE') &&
-      !a.id.includes('TOTAL_')
+    Distance: Object.values(ACHIEVEMENTS).filter(
+      (a) => a.id.includes('DISTANCE_') || a.id.includes('TOTAL_')
+    ),
+    Streaks: Object.values(ACHIEVEMENTS).filter((a) =>
+      a.id.includes('STREAK_')
+    ),
+    Speed: Object.values(ACHIEVEMENTS).filter((a) => a.id.includes('SPEED_')),
+    Social: Object.values(ACHIEVEMENTS).filter((a) => a.id.includes('SHARE')),
+    Special: Object.values(ACHIEVEMENTS).filter(
+      (a) =>
+        !a.id.includes('DISTANCE_') &&
+        !a.id.includes('STREAK_') &&
+        !a.id.includes('SPEED_') &&
+        !a.id.includes('SHARE') &&
+        !a.id.includes('TOTAL_')
     )
   };
 
@@ -30,11 +35,11 @@ export const Achievements = () => {
             <span>{xpToNext} XP to next level</span>
           </div>
           <div className="progress-bar">
-            <div 
-              className="progress" 
-              style={{ 
+            <div
+              className="progress"
+              style={{
                 width: `${(totalXP % 1000) / 10}%`
-              }} 
+              }}
             />
           </div>
         </div>
@@ -46,7 +51,7 @@ export const Achievements = () => {
           <h3 className="achievement-level">{category} Achievements</h3>
           <div className="achievements-grid">
             {achievements.map((achievement) => (
-              <div 
+              <div
                 key={achievement.id}
                 className={`achievement-card ${unlockedAchievements.includes(achievement.id) ? 'completed' : ''}`}
               >
@@ -64,4 +69,4 @@ export const Achievements = () => {
       ))}
     </div>
   );
-}; 
+};

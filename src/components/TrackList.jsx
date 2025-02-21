@@ -2,7 +2,12 @@ import PropTypes from 'prop-types';
 import { useContext } from 'react';
 import { AudioContext } from '../contexts/audioContext';
 
-export function TrackList({ tracks, currentTrack, onTrackClick, onAddToQueue }) {
+export function TrackList({
+  tracks,
+  currentTrack,
+  onTrackClick,
+  onAddToQueue
+}) {
   const { isPlaying } = useContext(AudioContext);
 
   return (
@@ -20,7 +25,9 @@ export function TrackList({ tracks, currentTrack, onTrackClick, onAddToQueue }) 
             <button
               className="play-button"
               onClick={() => onTrackClick(track)}
-              aria-label={currentTrack?.id === track.id && isPlaying ? 'Pause' : 'Play'}
+              aria-label={
+                currentTrack?.id === track.id && isPlaying ? 'Pause' : 'Play'
+              }
             >
               {currentTrack?.id === track.id && isPlaying ? '⏸️' : '▶️'}
             </button>
@@ -43,14 +50,14 @@ TrackList.propTypes = {
     PropTypes.shape({
       id: PropTypes.string.isRequired,
       title: PropTypes.string.isRequired,
-      artist: PropTypes.string.isRequired,
+      artist: PropTypes.string.isRequired
     })
   ).isRequired,
   currentTrack: PropTypes.shape({
     id: PropTypes.string.isRequired,
     title: PropTypes.string.isRequired,
-    artist: PropTypes.string.isRequired,
+    artist: PropTypes.string.isRequired
   }),
   onTrackClick: PropTypes.func.isRequired,
-  onAddToQueue: PropTypes.func.isRequired,
-}; 
+  onAddToQueue: PropTypes.func.isRequired
+};

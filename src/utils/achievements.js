@@ -1,5 +1,8 @@
 // Experience points required for each level (increases by 1000 each level)
-export const LEVEL_THRESHOLDS = Array.from({ length: 100 }, (_, i) => (i + 1) * 1000);
+export const LEVEL_THRESHOLDS = Array.from(
+  { length: 100 },
+  (_, i) => (i + 1) * 1000
+);
 
 // Achievement definitions
 export const ACHIEVEMENTS = {
@@ -136,7 +139,7 @@ export const ACHIEVEMENTS = {
 
 // Calculate current level based on XP
 export function calculateLevel(xp) {
-  return LEVEL_THRESHOLDS.findIndex(threshold => xp < threshold) + 1;
+  return LEVEL_THRESHOLDS.findIndex((threshold) => xp < threshold) + 1;
 }
 
 // Calculate XP needed for next level
@@ -148,13 +151,16 @@ export function xpForNextLevel(currentXp) {
 // Check for newly unlocked achievements
 export function checkAchievements(stats, unlockedAchievements) {
   const newAchievements = [];
-  
-  Object.values(ACHIEVEMENTS).forEach(achievement => {
-    if (!unlockedAchievements.includes(achievement.id) && achievement.check(stats)) {
+
+  Object.values(ACHIEVEMENTS).forEach((achievement) => {
+    if (
+      !unlockedAchievements.includes(achievement.id) &&
+      achievement.check(stats)
+    ) {
       newAchievements.push(achievement);
     }
   });
-  
+
   return newAchievements;
 }
 
@@ -167,11 +173,11 @@ export function calculateTotalXP(unlockedAchievements) {
 
 // Get achievement progress
 export function getAchievementProgress(stats) {
-  return Object.values(ACHIEVEMENTS).map(achievement => {
+  return Object.values(ACHIEVEMENTS).map((achievement) => {
     const completed = achievement.check(stats);
     return {
       ...achievement,
       completed
     };
   });
-} 
+}

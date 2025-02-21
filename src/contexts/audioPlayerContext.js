@@ -8,7 +8,7 @@ export const initialState = {
   volume: 1,
   progress: 0,
   duration: 0,
-  queue: [],
+  queue: []
 };
 
 export function audioReducer(state, action) {
@@ -30,11 +30,11 @@ export function audioReducer(state, action) {
     case 'REMOVE_FROM_QUEUE':
       return {
         ...state,
-        queue: state.queue.filter(track => track.id !== action.payload)
+        queue: state.queue.filter((track) => track.id !== action.payload)
       };
     case 'CLEAR_QUEUE':
       return { ...state, queue: [] };
     default:
       return state;
   }
-} 
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { SimplePool } from 'nostr-tools';
-import { signInWithNostr, publishToNostr, RELAYS } from '../utils/nostr';
+import { publishToNostr, RELAYS } from '../utils/nostr';
 
 export const Wallet = () => {
   const pool = useRef(new SimplePool());
@@ -10,36 +10,45 @@ export const Wallet = () => {
   const [recipientPubkey, setRecipientPubkey] = useState('');
   const [balance, setBalance] = useState(0);
   const [receiveToken, setReceiveToken] = useState('');
-  const mintUrl = 'https://legend.lnbits.com/cashu/api/v1/4gr9Xcmz3XEkUNwiBiQGoL';
+  const mintUrl =
+    'https://legend.lnbits.com/cashu/api/v1/4gr9Xcmz3XEkUNwiBiQGoL';
 
   const initializeWallet = useCallback(async () => {
     try {
       const pubkey = await window.nostr.getPublicKey();
-      
+
       const handleTokenEvent = (data) => {
-        setTransactions(prev => [...prev, {
-          id: Date.now(),
-          type: 'in',
-          amount: data.amount || 0,
-          timestamp: Math.floor(Date.now() / 1000)
-        }]);
-        setBalance(prev => prev + (data.amount || 0));
+        setTransactions((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            type: 'in',
+            amount: data.amount || 0,
+            timestamp: Math.floor(Date.now() / 1000)
+          }
+        ]);
+        setBalance((prev) => prev + (data.amount || 0));
       };
 
       const handleTransactionEvent = (data) => {
-        setTransactions(prev => [...prev, {
-          id: Date.now(),
-          type: 'out',
-          amount: data.amount || 0,
-          timestamp: Math.floor(Date.now() / 1000)
-        }]);
-        setBalance(prev => prev - (data.amount || 0));
+        setTransactions((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            type: 'out',
+            amount: data.amount || 0,
+            timestamp: Math.floor(Date.now() / 1000)
+          }
+        ]);
+        setBalance((prev) => prev - (data.amount || 0));
       };
 
-      const sub = pool.current.sub(RELAYS, [{
-        kinds: [7375, 7376],
-        authors: [pubkey]
-      }]);
+      const sub = pool.current.sub(RELAYS, [
+        {
+          kinds: [7375, 7376],
+          authors: [pubkey]
+        }
+      ]);
 
       const handleWalletEvent = async (event) => {
         try {
@@ -47,9 +56,9 @@ export const Wallet = () => {
             event.pubkey,
             event.content
           );
-          
+
           const data = JSON.parse(decryptedContent);
-          
+
           if (event.kind === 7375) {
             handleTokenEvent(data);
           } else if (event.kind === 7376) {
@@ -109,7 +118,7 @@ export const Wallet = () => {
 
   const sendTokens = async () => {
     if (!sendAmount || !recipientPubkey) return;
-    
+
     try {
       const amount = parseInt(sendAmount);
       const event = {
@@ -137,9 +146,9 @@ export const Wallet = () => {
   return (
     <div className="wallet-container">
       <h2>Cashu Wallet</h2>
-      
+
       {!window.nostr ? (
-        <button onClick={signInWithNostr}>Connect Nostr to Access Wallet</button>
+        <button>Connect Nostr to Access Wallet</button>
       ) : loading ? (
         <p>Loading wallet...</p>
       ) : (
@@ -156,10 +165,7 @@ export const Wallet = () => {
               onChange={(e) => setReceiveToken(e.target.value)}
               placeholder="Paste Cashu token"
             />
-            <button 
-              onClick={handleReceiveToken}
-              disabled={!receiveToken}
-            >
+            <button onClick={handleReceiveToken} disabled={!receiveToken}>
               Receive
             </button>
           </div>
@@ -178,7 +184,7 @@ export const Wallet = () => {
               onChange={(e) => setRecipientPubkey(e.target.value)}
               placeholder="Recipient npub"
             />
-            <button 
+            <button
               onClick={sendTokens}
               disabled={!sendAmount || !recipientPubkey}
             >
@@ -188,7 +194,7 @@ export const Wallet = () => {
 
           <div className="transaction-history">
             <h3>Transaction History</h3>
-            {transactions.map(tx => (
+            {transactions.map((tx) => (
               <div key={tx.id} className="transaction-item">
                 <span>{tx.type === 'in' ? '↓' : '↑'}</span>
                 <span>{tx.amount} sats</span>
@@ -200,4 +206,4 @@ export const Wallet = () => {
       )}
     </div>
   );
-}; 
+};

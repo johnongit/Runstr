@@ -84,8 +84,8 @@ export const WavlakePlayer = ({ track, onEnded }) => {
             file: {
               forceAudio: true,
               attributes: {
-                crossOrigin: "anonymous",
-                preload: "auto"
+                crossOrigin: 'anonymous',
+                preload: 'auto'
               },
               forceHLS: false,
               forceDASH: false,
@@ -103,11 +103,7 @@ export const WavlakePlayer = ({ track, onEnded }) => {
       )}
 
       <div className="track-info">
-        <img 
-          src={track.artwork} 
-          alt={track.title} 
-          className="track-artwork"
-        />
+        <img src={track.artwork} alt={track.title} className="track-artwork" />
         <div className="track-details">
           <h3>{track.title}</h3>
           <p>{track.artist}</p>
@@ -115,7 +111,7 @@ export const WavlakePlayer = ({ track, onEnded }) => {
       </div>
 
       <div className="player-controls">
-        <button 
+        <button
           onClick={togglePlay}
           disabled={isLoading || error || !streamUrl}
           className="play-button"
@@ -138,11 +134,7 @@ export const WavlakePlayer = ({ track, onEnded }) => {
         </div>
       </div>
 
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
+      {error && <div className="error-message">{error}</div>}
     </div>
   );
 };
@@ -162,4 +154,4 @@ const formatTime = (seconds) => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
-}; 
+};

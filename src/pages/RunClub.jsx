@@ -11,14 +11,14 @@ export const RunClub = () => {
   const processAndUpdatePosts = useCallback(async (posts) => {
     try {
       console.log('Processing posts:', posts);
-      const authors = [...new Set(posts.map(post => post.pubkey))];
+      const authors = [...new Set(posts.map((post) => post.pubkey))];
       const profileEvents = await ndk.fetchEvents({
         kinds: [0],
         authors
       });
-      
+
       const profileMap = new Map(
-        Array.from(profileEvents).map(profile => {
+        Array.from(profileEvents).map((profile) => {
           try {
             return [profile.pubkey, JSON.parse(profile.content)];
           } catch (err) {
@@ -31,13 +31,13 @@ export const RunClub = () => {
       // Fetch comments for all posts
       const comments = await ndk.fetchEvents({
         kinds: [1],
-        '#e': posts.map(post => post.id)
+        '#e': posts.map((post) => post.id)
       });
 
       // Group comments by their parent post
       const commentsByPost = new Map();
-      Array.from(comments).forEach(comment => {
-        const parentId = comment.tags.find(tag => tag[0] === 'e')?.[1];
+      Array.from(comments).forEach((comment) => {
+        const parentId = comment.tags.find((tag) => tag[0] === 'e')?.[1];
         if (parentId) {
           if (!commentsByPost.has(parentId)) {
             commentsByPost.set(parentId, []);
@@ -56,7 +56,7 @@ export const RunClub = () => {
       });
 
       return posts
-        .map(post => {
+        .map((post) => {
           const profile = profileMap.get(post.pubkey) || {};
           return {
             id: post.id,
@@ -95,8 +95,12 @@ export const RunClub = () => {
         }
       }
 
-      console.log('NDK ready state:', ndk.pool?.relays?.size || 0, 'relays connected');
-      
+      console.log(
+        'NDK ready state:',
+        ndk.pool?.relays?.size || 0,
+        'relays connected'
+      );
+
       const filter = {
         kinds: [1],
         '#t': ['Runstr', 'Running', 'run', 'running'],
@@ -105,18 +109,18 @@ export const RunClub = () => {
       };
 
       console.log('Fetching events with filter:', filter);
-      
+
       const events = await ndk.fetchEvents(filter);
       const eventArray = Array.from(events);
       console.log('Number of events:', eventArray.length);
-      
+
       if (eventArray.length > 0) {
         const processedPosts = await processAndUpdatePosts(eventArray);
         setPosts(processedPosts);
       } else {
         console.log('No events found');
       }
-      
+
       setLoading(false);
     } catch (err) {
       console.error('Error in fetchRunPosts:', err);
@@ -127,7 +131,7 @@ export const RunClub = () => {
 
   useEffect(() => {
     let mounted = true;
-    
+
     const init = async () => {
       try {
         if (!window.nostr) {
@@ -167,7 +171,9 @@ export const RunClub = () => {
       const lnurl = post.author.lud16 || post.author.lud06;
       if (!lnurl) {
         console.log('Author profile:', post.author);
-        alert('This user has not set up their Lightning address in their Nostr profile');
+        alert(
+          'This user has not set up their Lightning address in their Nostr profile'
+        );
         return;
       }
 
@@ -180,14 +186,14 @@ export const RunClub = () => {
           ['p', post.author.pubkey],
           ['e', post.id],
           ['relays', ...RELAYS],
-          ['amount', '1000'], // 1000 sats
+          ['amount', '1000'] // 1000 sats
         ],
         pubkey: await window.nostr.getPublicKey()
       };
 
       // Sign the event
       const signedEvent = await window.nostr.signEvent(zapEvent);
-      
+
       // Create and publish NDK Event
       const ndkEvent = new NDKEvent(ndk, signedEvent);
       await ndkEvent.publish();
@@ -215,14 +221,19 @@ export const RunClub = () => {
       const amount = 1000 * 1000;
 
       // Check if amount is within min/max bounds
-      if (amount < lnurlPayData.minSendable || amount > lnurlPayData.maxSendable) {
-        throw new Error(`Amount must be between ${lnurlPayData.minSendable} and ${lnurlPayData.maxSendable} millisats`);
+      if (
+        amount < lnurlPayData.minSendable ||
+        amount > lnurlPayData.maxSendable
+      ) {
+        throw new Error(
+          `Amount must be between ${lnurlPayData.minSendable} and ${lnurlPayData.maxSendable} millisats`
+        );
       }
 
       // Construct the callback URL with amount
       const callbackUrl = new URL(lnurlPayData.callback);
       callbackUrl.searchParams.append('amount', amount);
-      
+
       // If there's a nostr event, add it to the callback
       callbackUrl.searchParams.append('nostr', JSON.stringify(signedEvent));
 
@@ -259,14 +270,14 @@ export const RunClub = () => {
         content: commentText,
         tags: [
           ['e', postId, '', 'reply'],
-          ['k', '1'],
+          ['k', '1']
         ],
         pubkey: await window.nostr.getPublicKey()
       };
 
       // Sign the event
       const signedEvent = await window.nostr.signEvent(commentEvent);
-      
+
       // Create NDK Event and publish
       const ndkEvent = new NDKEvent(ndk, signedEvent);
       await ndkEvent.publish();
@@ -281,11 +292,13 @@ export const RunClub = () => {
   };
 
   const handleCommentClick = (postId) => {
-    setPosts(posts.map(post => 
-      post.id === postId 
-        ? { ...post, showComments: !post.showComments }
-        : post
-    ));
+    setPosts(
+      posts.map((post) =>
+        post.id === postId
+          ? { ...post, showComments: !post.showComments }
+          : post
+      )
+    );
   };
 
   const extractImagesFromContent = (content) => {
@@ -303,43 +316,49 @@ export const RunClub = () => {
       ) : (
         <div className="posts-list">
           {posts.length === 0 ? (
-            <p>No running posts found. Follow some runners or post your own runs!</p>
+            <p>
+              No running posts found. Follow some runners or post your own runs!
+            </p>
           ) : (
-            posts.map(post => (
+            posts.map((post) => (
               <div key={post.id} className="post-item">
                 <div className="post-header">
-                  <img 
-                    src={post.author.profile.picture || '/default-avatar.png'} 
-                    alt={post.author.profile.name || 'Anonymous'} 
+                  <img
+                    src={post.author.profile.picture || '/default-avatar.png'}
+                    alt={post.author.profile.name || 'Anonymous'}
                     className="author-avatar"
                   />
                   <div className="author-info">
                     <h4>{post.author.profile.name || 'Anonymous Runner'}</h4>
-                    <span>{new Date(post.created_at * 1000).toLocaleString()}</span>
+                    <span>
+                      {new Date(post.created_at * 1000).toLocaleString()}
+                    </span>
                   </div>
                 </div>
                 <div className="post-content">
                   {post.content}
                   <div className="post-images">
-                    {extractImagesFromContent(post.content).map((imageUrl, index) => (
-                      <img 
-                        key={index}
-                        src={imageUrl}
-                        alt="Run activity"
-                        className="post-image"
-                        onClick={() => window.open(imageUrl, '_blank')}
-                      />
-                    ))}
+                    {extractImagesFromContent(post.content).map(
+                      (imageUrl, index) => (
+                        <img
+                          key={index}
+                          src={imageUrl}
+                          alt="Run activity"
+                          className="post-image"
+                          onClick={() => window.open(imageUrl, '_blank')}
+                        />
+                      )
+                    )}
                   </div>
                 </div>
                 <div className="post-actions">
-                  <button 
+                  <button
                     className="zap-button"
                     onClick={() => handleZap(post)}
                   >
                     ⚡️ Zap
                   </button>
-                  <button 
+                  <button
                     className="comment-button"
                     onClick={() => handleCommentClick(post.id)}
                   >
@@ -349,15 +368,20 @@ export const RunClub = () => {
                 {post.showComments && (
                   <div className="comments-section">
                     <div className="comments-list">
-                      {post.comments?.map(comment => (
+                      {post.comments?.map((comment) => (
                         <div key={comment.id} className="comment-item">
-                          <img 
-                            src={comment.author.profile.picture || '/default-avatar.png'} 
-                            alt={comment.author.profile.name} 
+                          <img
+                            src={
+                              comment.author.profile.picture ||
+                              '/default-avatar.png'
+                            }
+                            alt={comment.author.profile.name}
                             className="comment-avatar"
                           />
                           <div className="comment-content">
-                            <strong>{comment.author.profile.name || 'Anonymous'}</strong>
+                            <strong>
+                              {comment.author.profile.name || 'Anonymous'}
+                            </strong>
                             <p>{comment.content}</p>
                           </div>
                         </div>
@@ -369,9 +393,13 @@ export const RunClub = () => {
                         placeholder="Add a comment..."
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleComment(post.id)}
+                        onKeyPress={(e) =>
+                          e.key === 'Enter' && handleComment(post.id)
+                        }
                       />
-                      <button onClick={() => handleComment(post.id)}>Post</button>
+                      <button onClick={() => handleComment(post.id)}>
+                        Post
+                      </button>
                     </div>
                   </div>
                 )}
@@ -382,4 +410,4 @@ export const RunClub = () => {
       )}
     </div>
   );
-}; 
+};

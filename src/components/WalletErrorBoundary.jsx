@@ -21,7 +21,7 @@ export class WalletErrorBoundary extends Component {
         <div className="error-container">
           <h2>Something went wrong with the wallet</h2>
           <p>{this.state.error?.message || 'Unknown error occurred'}</p>
-          <button 
+          <button
             onClick={() => this.setState({ hasError: false, error: null })}
           >
             Try Again
@@ -36,4 +36,4 @@ export class WalletErrorBoundary extends Component {
 
 WalletErrorBoundary.propTypes = {
   children: PropTypes.node.isRequired
-}; 
+};

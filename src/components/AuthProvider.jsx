@@ -11,12 +11,14 @@ export const AuthProvider = ({ children }) => {
   const [wallet, setWallet] = useState(null);
 
   return (
-    <AuthContext.Provider value={{ 
-      profile, 
-      setProfile,
-      wallet,
-      setWallet
-    }}>
+    <AuthContext.Provider
+      value={{
+        profile,
+        setProfile,
+        wallet,
+        setWallet
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -24,4 +26,4 @@ export const AuthProvider = ({ children }) => {
 
 AuthProvider.propTypes = {
   children: PropTypes.node.isRequired
-}; 
+};

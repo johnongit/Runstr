@@ -14,14 +14,14 @@ export class NWCWallet {
   async connect(connectionString) {
     try {
       const url = new URL(connectionString);
-      
+
       if (url.protocol !== 'nostr+walletconnect:') {
         throw new Error('Invalid NWC URL protocol');
       }
 
       this.secretKey = secp256k1.utils.randomPrivateKey();
       this.pubKey = getPublicKey(this.secretKey);
-      
+
       const params = new URLSearchParams(url.pathname);
       this.relayUrl = params.get('relay');
       this.walletPubKey = params.get('pubkey');
@@ -32,7 +32,7 @@ export class NWCWallet {
 
       // Initialize WebLN provider
       this.provider = new webln.NostrWebLNProvider({
-        nostrWalletConnectUrl: connectionString,
+        nostrWalletConnectUrl: connectionString
       });
 
       await this.provider.enable();
@@ -85,7 +85,7 @@ export class NWCWallet {
           ['amount', amount.toString()],
           ['relays', ...RELAYS]
         ],
-        created_at: Math.floor(Date.now() / 1000),
+        created_at: Math.floor(Date.now() / 1000)
       };
 
       const signedZapRequest = await window.nostr.signEvent(zapRequest);
@@ -119,4 +119,4 @@ export class NWCWallet {
       throw error;
     }
   }
-} 
+}

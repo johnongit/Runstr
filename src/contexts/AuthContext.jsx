@@ -5,4 +5,4 @@ export const AuthContext = createContext({
   setProfile: () => {},
   wallet: null,
   setWallet: () => {}
-}); 
+});

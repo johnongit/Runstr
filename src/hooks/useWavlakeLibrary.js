@@ -47,4 +47,4 @@ export function useWavlakeLibrary(npub) {
     loadTrendingTracks,
     handleSearch
   };
-} 
+}

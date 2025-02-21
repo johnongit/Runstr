@@ -7,4 +7,4 @@ export const NWC = () => {
       <WalletConnect />
     </div>
   );
-}; 
+};

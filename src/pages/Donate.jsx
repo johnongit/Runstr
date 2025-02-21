@@ -5,4 +5,4 @@ export const Donate = () => {
       <p>Support the running community</p>
     </div>
   );
-}; 
+};
