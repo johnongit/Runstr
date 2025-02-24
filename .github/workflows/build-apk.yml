@@ -25,6 +25,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Extract version from package.json
+      - name: Get Version from package.json
+        id: package_version
+        run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
+
+      # Generate timestamp for uniqueness
+      - name: Generate Timestamp
+        id: timestamp
+        run: echo "DATE=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
+
+      # Generate release tag dynamically
+      - name: Generate Release Tag
+        id: release_tag
+        run: echo "RELEASE_TAG=v${{ env.VERSION }}-${{ env.DATE }}" >> $GITHUB_ENV
+
       # Build the React app
       - name: Build React app
         run: npm run build
@@ -63,8 +78,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v1.0.0 # You can dynamically generate this tag if needed
-          release_name: Release v1.0.0
+          tag_name: ${{ env.RELEASE_TAG }}
+          release_name: 'Release ${{ env.RELEASE_TAG }}'
           draft: false
           prerelease: false
 
