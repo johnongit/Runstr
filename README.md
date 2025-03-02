@@ -1,54 +1,53 @@
-# Nostr Run Club
+# RUNSTR
 
-[Nostr Run Club](https://nostr-run-club.vercel.app/) is a simple running app built on the Nostr protocol.
+[Nostr Run Club](https://nostr-run-club.vercel.app/) is a running app built on the Nostr protocol.
 
 ## About
 
-I created Nostr Run Club because I was using Nike Run app and wanted to be more "nostr only." When I didn't see a run tracking app on nostr, I decided to build one myself. It's pretty basic right now, but it works!
+I created Nostr Run Club because I was using Nike Run app and wanted to be more "nostr only." When I didn't see a run tracking app on nostr, I decided to build one myself.
 
 ## Features
 
 ### Current
 
-- Login with Nostr
-- Track your runs
-- Post runs to Nostr
-- Interact with global running feed
+- Nostr Login
+- Run Tracker
+- Global Running Feed
+- Wavlake Music 
 
 ### Coming Soon
 
-- Wavlake integration
-- E-cash features
-- Level system
+- Stats
+- Goals
+- Clubs
 
 ### Future Roadmap
 
-- Team features
-- Virtual races
-- Merch store
+- Events
+- Gear
 - Custom themes
-- Nostr banner integration
+- Design Overhaul
 - Standardized run data format
 
 ## Development Stages
 
 ### Stage 1: Core Functionality
 
-- Bug fixes
+- Core Features
 - Performance optimization
-- Code cleanup
+- Bug Fixes
 
-### Stage 2: Feature Enhancement
+### Stage 2: Design
 
-- Wavlake integration
-- Level system
-- Reward system
+- Design Overhaul
+- Performance Optimization 
+- Bug Fixes 
 
-### Stage 3: Community Features
+### Stage 3: Release
 
-- Nostr group integration
-- Merchandise
-- Virtual races
+- Zap.store release
+- Promotion 
+- Bug Fixes/Performance optimization
 
 ## Tech Stack
 
@@ -79,6 +78,12 @@ npx cap open android
 
 ```
 
+## Team 
+
+- TheWildHustle
+- Nostr Dev Team
+- Pleblab
+
 ## Contributing
 
 Contributions are welcome! While current focus is on core functionality and bug fixes, feel free to:
@@ -91,14 +96,13 @@ Contributions are welcome! While current focus is on core functionality and bug 
 
 The ultimate goal is to create a seamless running experience where users can:
 
-- Connect with running teams on nostr
+- Join a nostr based running club
 - Stream Wavlake playlists during runs
-- Participate in virtual training sessions
-- Compete in virtual 5k events
-- Earn rewards and experience points
+- Participate in racing events
+- Earn rewards 
 - Share achievements easily
-- Purchase NRC merchandise
-- Interact with the running community
+- Purchase running gear
+- Interact with the nostr running community
 
 ## License
 
@@ -106,4 +110,6 @@ MIT License
 
 ## Contact
 
-Nostr - TheWildHustle@primal.net
+Nostr - Runstr@nostrcheck.com
+Email - Runstr@proton.me 
+Website - [RUNSTR](https://www.runstr.club/) 
