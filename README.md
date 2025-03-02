@@ -1,5 +1,8 @@
 # RUNSTR
 
+![image](https://github.com/user-attachments/assets/f4b92c6b-f3dd-4f77-9772-19669092e776)
+
+
 [Nostr Run Club](https://nostr-run-club.vercel.app/) is a running app built on the Nostr protocol.
 
 ## About
@@ -104,12 +107,14 @@ The ultimate goal is to create a seamless running experience where users can:
 - Purchase running gear
 - Interact with the nostr running community
 
+
 ## License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
 
 ## Contact
 
 Nostr - Runstr@nostrcheck.com
 Email - Runstr@proton.me 
 Website - [RUNSTR](https://www.runstr.club/) 
+Pitch Deck - [Pitch Deck](https://nostr-run-club-the--nm03p65.gamma.site/)
