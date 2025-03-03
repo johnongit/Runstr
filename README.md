@@ -3,11 +3,11 @@
 ![image](https://github.com/user-attachments/assets/f4b92c6b-f3dd-4f77-9772-19669092e776)
 
 
-[Nostr Run Club](https://nostr-run-club.vercel.app/) is a running app built on the Nostr protocol.
+[RUNSTR](https://nostr-run-club.vercel.app/) is a running app built on the Nostr protocol.
 
 ## About
 
-I created Nostr Run Club because I was using Nike Run app and wanted to be more "nostr only." When I didn't see a run tracking app on nostr, I decided to build one myself.
+I created RUNSTR because I was using Nike Run app and wanted to be more "nostr only." When I didn't see a run tracking app on nostr, I decided to build one myself.
 
 ## Features
 
