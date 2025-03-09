@@ -1,4 +1,4 @@
-import { useReducer, useState, useEffect } from 'react';
+import { useReducer, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { AudioPlayerContext, initialState, audioReducer } from './audioPlayerContext';
 import { fetchPlaylist } from '../utils/wavlake';
@@ -32,35 +32,52 @@ export const AudioPlayerProvider = ({ children }) => {
   useEffect(() => {
     if (playlist && playlist.tracks && playlist.tracks.length > 0) {
       dispatch({ type: 'SET_TRACK', payload: playlist.tracks[currentTrackIndex] });
+      // If we're not on the first track, and a track is already playing, 
+      // keep playing when we change tracks
+      if (state.isPlaying) {
+        // Small timeout to ensure the new track is loaded before playing
+        setTimeout(() => {
+          audioPlayerRef?.audio?.current?.play().catch(e => console.log('Auto-play prevented:', e));
+        }, 100);
+      }
     }
-  }, [currentTrackIndex, playlist]);
+  }, [currentTrackIndex, playlist, state.isPlaying, audioPlayerRef]);
 
   // Play next track
-  const playNext = () => {
+  const playNext = useCallback(() => {
     if (playlist && playlist.tracks) {
       setCurrentTrackIndex((current) =>
         current < playlist.tracks.length - 1 ? current + 1 : 0
       );
     }
-  };
+  }, [playlist]);
 
   // Play previous track
-  const playPrevious = () => {
+  const playPrevious = useCallback(() => {
     if (playlist && playlist.tracks) {
       setCurrentTrackIndex((current) => (current > 0 ? current - 1 : 0));
     }
-  };
+  }, [playlist]);
 
   // Play/pause toggle
-  const togglePlayPause = () => {
+  const togglePlayPause = useCallback(() => {
     if (state.isPlaying) {
       dispatch({ type: 'PAUSE' });
       audioPlayerRef?.audio?.current?.pause();
     } else {
       dispatch({ type: 'PLAY' });
-      audioPlayerRef?.audio?.current?.play();
+      audioPlayerRef?.audio?.current?.play().catch(e => console.log('Play prevented:', e));
     }
-  };
+  }, [state.isPlaying, audioPlayerRef, dispatch]);
+
+  // Handle track ended event
+  const handleTrackEnded = useCallback(() => {
+    // Set a small timeout to ensure state updates properly
+    setTimeout(() => {
+      playNext();
+      dispatch({ type: 'PLAY' });
+    }, 50);
+  }, [playNext, dispatch]);
 
   return (
     <AudioPlayerContext.Provider
@@ -85,7 +102,7 @@ export const AudioPlayerProvider = ({ children }) => {
             src={state.currentTrack.mediaUrl}
             onClickNext={playNext}
             onClickPrevious={playPrevious}
-            onEnded={playNext}
+            onEnded={handleTrackEnded}
             onPlay={() => dispatch({ type: 'PLAY' })}
             onPause={() => dispatch({ type: 'PAUSE' })}
             showJumpControls={false}
