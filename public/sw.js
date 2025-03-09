@@ -11,93 +11,61 @@ self.addEventListener('install', (event) => {
       ]);
     })
   );
+  // Skip waiting to activate immediately
+  self.skipWaiting();
 });
 
-// Store location data for sync
-let pendingLocations = [];
-
-function syncLocationData() {
-  return Promise.all(pendingLocations.map(location => 
-    self.clients.matchAll().then(clients => {
-      clients.forEach(client => {
-        client.postMessage({
-          type: 'LOCATION_UPDATE',
-          position: location
-        });
-      });
+// Activate and claim clients
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      );
+    }).then(() => {
+      return self.clients.claim();
     })
-  )).then(() => {
-    pendingLocations = [];
-  });
-}
-
-// Background Sync for Location Updates
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'syncLocation') {
-    event.waitUntil(syncLocationData());
-  }
+  );
 });
 
-// Handle Location Updates in Background
-let watchId = null;
-
+// Handle messages from clients
 self.addEventListener('message', (event) => {
   if (event.data.type === 'START_TRACKING') {
-    startLocationTracking();
+    // Do not try to start tracking in background - handled by Capacitor plugin
+    // Just acknowledge the message
+    if (event.source && event.source.postMessage) {
+      event.source.postMessage({ type: 'TRACKING_ACKNOWLEDGEMENT' });
+    }
   } else if (event.data.type === 'STOP_TRACKING') {
-    stopLocationTracking();
+    // Do not try to stop tracking in background - handled by Capacitor plugin
   }
 });
 
-function startLocationTracking() {
-  if (!watchId && 'geolocation' in self) {
-    watchId = self.registration.backgroundFetch.watchPosition(
-      (position) => {
-        // Store position for sync if clients are not available
-        pendingLocations.push(position);
-        // Send location update to all clients
-        self.clients.matchAll().then((clients) => {
-          clients.forEach((client) => {
-            client.postMessage({
-              type: 'LOCATION_UPDATE',
-              position: {
-                coords: {
-                  latitude: position.coords.latitude,
-                  longitude: position.coords.longitude,
-                  accuracy: position.coords.accuracy,
-                  speed: position.coords.speed
-                },
-                timestamp: position.timestamp
-              }
-            });
-          });
-        });
-      },
-      (error) => {
-        console.error('Background location error:', error);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 5000
-      }
-    );
+// Basic fetch handler with network-first strategy
+self.addEventListener('fetch', (event) => {
+  // Handle Vite HMR pings differently to prevent connection errors
+  const url = new URL(event.request.url);
+  
+  // If this is a Vite HMR ping request, return a mock success response
+  // This prevents the continuous ping errors in the console
+  if (url.hostname === 'localhost' && 
+      url.port === '5173' && 
+      event.request.headers.get('Accept') === 'text/x-vite-ping') {
+    event.respondWith(new Response('pong', { status: 200 }));
+    return;
   }
-}
-
-function stopLocationTracking() {
-  if (watchId) {
-    self.registration.backgroundFetch.clearWatch(watchId);
-    watchId = null;
+  
+  // Skip other cross-origin requests
+  if (!event.request.url.startsWith(self.location.origin)) {
+    return;
   }
-}
-
-// Keep alive
-self.addEventListener('periodicsync', (event) => {
-  if (event.tag === 'keep-alive') {
-    event.waitUntil(
-      // Perform minimal work to keep service worker alive
-      Promise.resolve()
-    );
-  }
+  
+  // Network-first strategy
+  event.respondWith(
+    fetch(event.request)
+      .catch(() => {
+        return caches.match(event.request);
+      })
+  );
 }); 

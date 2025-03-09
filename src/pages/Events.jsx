@@ -215,9 +215,20 @@ export const Events = () => {
   useEffect(() => {
     const setup = async () => {
       try {
-        const connected = await initializeNostr();
+        // Set a timeout to prevent hanging if connection fails
+        let connected = false;
+        try {
+          connected = await Promise.race([
+            initializeNostr(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 5000))
+          ]);
+        } catch (err) {
+          console.warn('Connection warning:', err.message);
+          // Continue anyway - we'll use local storage as fallback
+        }
+        
         if (!connected) {
-          throw new Error('Failed to connect to Nostr relays');
+          console.warn('Failed to connect to Nostr relays, continuing in local mode');
         }
         
         // Check if user is logged in to Nostr
@@ -227,10 +238,32 @@ export const Events = () => {
           console.log('User not authenticated, viewing in public mode');
         }
         
-        await Promise.all([
-          loadLeaderboards(),
-          loadUserEvents()
-        ]);
+        // Load stored events from localStorage even if network fails
+        const storedEvents = localStorage.getItem('userEvents');
+        if (storedEvents) {
+          try {
+            setUserEvents(JSON.parse(storedEvents));
+          } catch (err) {
+            console.error('Error parsing stored events:', err);
+          }
+        }
+        
+        try {
+          // Try to load from network, but don't block UI if it fails
+          await Promise.all([
+            loadLeaderboards().catch(err => {
+              console.error('Error loading leaderboards:', err);
+              return []; // Return empty leaderboards on failure
+            }),
+            loadUserEvents().catch(err => {
+              console.error('Error loading user events:', err);
+              return []; // Return empty user events on failure
+            })
+          ]);
+        } catch (err) {
+          console.error('Error loading data:', err);
+          // Continue anyway - we've already loaded local data
+        }
         
         setLoading(false);
       } catch (err) {
@@ -269,7 +302,8 @@ export const Events = () => {
       const eventData = events.find(e => e.id === eventId);
       event.content = JSON.stringify({
         action: 'join',
-        eventName: eventData.name
+        eventName: eventData.name,
+        joinedAt: Math.floor(Date.now() / 1000)
       });
       
       // Add event reference
@@ -279,18 +313,88 @@ export const Events = () => {
       event.tags.push(['t', 'runstr', 'event-join']);
       
       // Sign and publish event
-      await event.publish();
-      
-      // Close modal and show success message
-      setShowEventModal(false);
-      setJoinSuccess(true);
-      
-      // Reset success message after 3 seconds
-      setTimeout(() => setJoinSuccess(false), 3000);
-      
-      // Reload user events
-      await loadUserEvents();
-      
+      try {
+        // Make sure NDK is connected
+        if (!ndk.pool?.relays?.size) {
+          await initializeNostr();
+        }
+        
+        // Ensure the NDK instance has a signer
+        if (!ndk.signer && window.nostr) {
+          try {
+            // Explicitly set the signer with the window.nostr extension
+            const signerPublicKey = await window.nostr.getPublicKey();
+            
+            // Create a signer adapter for NDK
+            ndk.signer = {
+              user: { npub: '', pubkey: signerPublicKey },
+              signEvent: async (event) => {
+                try {
+                  return await window.nostr.signEvent(event);
+                } catch (err) {
+                  console.error('Error signing event:', err);
+                  throw err;
+                }
+              },
+              getPublicKey: async () => {
+                return signerPublicKey;
+              }
+            };
+          } catch (signerError) {
+            console.error('Failed to create signer:', signerError);
+            throw new Error('Failed to access Nostr extension for signing');
+          }
+        }
+        
+        await event.publish();
+        console.log('Successfully joined event:', eventId);
+        
+        // Store the event join data locally as a fallback
+        const newUserEvent = {
+          eventId,
+          joinedAt: Math.floor(Date.now() / 1000)
+        };
+        
+        // Update local state directly as a fallback
+        setUserEvents(prev => [...prev, newUserEvent]);
+        
+        // Close modal and show success message
+        setShowEventModal(false);
+        setJoinSuccess(true);
+        
+        // Reset success message after 3 seconds
+        setTimeout(() => setJoinSuccess(false), 3000);
+        
+      } catch (publishError) {
+        console.error('Error publishing event join:', publishError);
+        
+        // Handle the case where NDK fails but we still want to join the event
+        const newUserEvent = {
+          eventId,
+          joinedAt: Math.floor(Date.now() / 1000)
+        };
+        
+        // Update local state directly
+        setUserEvents(prev => [...prev, newUserEvent]);
+        
+        // Save to localStorage as fallback
+        try {
+          const storedEvents = JSON.parse(localStorage.getItem('userEvents') || '[]');
+          storedEvents.push(newUserEvent);
+          localStorage.setItem('userEvents', JSON.stringify(storedEvents));
+          
+          // Close modal and show success message
+          setShowEventModal(false);
+          setJoinSuccess(true);
+          
+          // Reset success message after 3 seconds
+          setTimeout(() => setJoinSuccess(false), 3000);
+          
+        } catch (localStorageError) {
+          console.error('Error saving to localStorage:', localStorageError);
+          throw new Error('Failed to join event: Could not save locally');
+        }
+      }
     } catch (err) {
       console.error('Error joining event:', err);
       setError('Failed to join event. Please try again later.');
