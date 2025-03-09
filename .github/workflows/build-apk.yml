@@ -1,9 +1,10 @@
-name: Build and Release Debug Apk
+name: Build and Release Simple-updates Debug Apk
 
 on:
   push:
     branches:
-      - main
+      - Simple-updates
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
   build:
@@ -35,7 +36,7 @@ jobs:
       # Generate release tag dynamically
       - name: Generate Release Tag
         id: release_tag
-        run: echo "RELEASE_TAG=v${{ env.VERSION }}-${{ env.DATE }}" >> $GITHUB_ENV
+        run: echo "RELEASE_TAG=simple-updates-${{ env.VERSION }}-${{ env.DATE }}" >> $GITHUB_ENV
 
       # Build the React app
       - name: Build React app
@@ -76,12 +77,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          release_name: 'Release ${{ env.RELEASE_TAG }}'
+          release_name: 'Simple-updates ${{ env.RELEASE_TAG }}'
           draft: false
-          prerelease: false
+          prerelease: true
 
       # Upload Debug APK to Release
-      - name: Upload Debug APK to Release
+      - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
