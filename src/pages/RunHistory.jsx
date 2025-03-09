@@ -6,10 +6,25 @@ export const RunHistory = () => {
   const [selectedRun, setSelectedRun] = useState(null);
   const [additionalContent, setAdditionalContent] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [distanceUnit] = useState(
     () => localStorage.getItem('distanceUnit') || 'km'
   );
+  const [userProfile, setUserProfile] = useState(() => {
+    const storedProfile = localStorage.getItem('userProfile');
+    return storedProfile
+      ? JSON.parse(storedProfile)
+      : {
+          weight: 70, // default weight in kg
+          heightFeet: 5, // default height in feet
+          heightInches: 7, // default height in inches
+          heightCm: 170, // store equivalent in cm for calculations
+          gender: 'male', // default gender
+          age: 30, // default age
+          fitnessLevel: 'intermediate' // default fitness level
+        };
+  });
   const [stats, setStats] = useState({
     totalDistance: 0,
     totalRuns: 0,
@@ -20,6 +35,8 @@ export const RunHistory = () => {
     bestStreak: 0,
     thisWeekDistance: 0,
     thisMonthDistance: 0,
+    totalCaloriesBurned: 0,
+    averageCaloriesPerKm: 0,
     personalBests: {
       '5k': Infinity,
       '10k': Infinity,
@@ -30,6 +47,63 @@ export const RunHistory = () => {
 
   useEffect(() => {
     loadRunHistory();
+  }, []);
+
+  // Calculate calories burned based on user profile and run data
+  const calculateCaloriesBurned = useCallback((distance, duration, userProfile) => {
+    // MET (Metabolic Equivalent of Task) values for running at different intensities
+    // The higher the pace, the higher the MET value
+    const getPaceMET = (paceMinPerKm) => {
+      if (paceMinPerKm < 4) return 11.5; // Very fast
+      if (paceMinPerKm < 5) return 10.0; // Fast
+      if (paceMinPerKm < 6) return 9.0; // Moderate to fast
+      if (paceMinPerKm < 7) return 8.0; // Moderate
+      if (paceMinPerKm < 8) return 7.0; // Moderate to slow
+      return 6.0; // Slow
+    };
+
+    // Adjustments based on fitness level
+    const fitnessAdjustment = {
+      beginner: 1.0,
+      intermediate: 0.95,
+      advanced: 0.9
+    };
+
+    // Adjustments based on gender (due to different body compositions)
+    const genderAdjustment = {
+      male: 1.0,
+      female: 0.9
+    };
+
+    // Age adjustment (generally, calorie burn decreases with age)
+    const getAgeAdjustment = (age) => {
+      if (age < 20) return 1.10;
+      if (age < 30) return 1.05;
+      if (age < 40) return 1.0;
+      if (age < 50) return 0.95;
+      if (age < 60) return 0.90;
+      return 0.85;
+    };
+
+    // Calculate pace in minutes per km
+    const pace = duration / 60 / distance;
+    
+    // Get MET value based on pace
+    const met = getPaceMET(pace);
+    
+    // Calculate base calories
+    // Formula: MET * weight in kg * duration in hours
+    const durationHours = duration / 3600;
+    const baseCalories = met * userProfile.weight * durationHours;
+    
+    // Apply adjustments
+    const adjustedCalories = 
+      baseCalories * 
+      fitnessAdjustment[userProfile.fitnessLevel] * 
+      genderAdjustment[userProfile.gender] * 
+      getAgeAdjustment(userProfile.age);
+    
+    return Math.round(adjustedCalories);
   }, []);
 
   const calculateStats = useCallback(() => {
@@ -43,6 +117,8 @@ export const RunHistory = () => {
       bestStreak: 0,
       thisWeekDistance: 0,
       thisMonthDistance: 0,
+      totalCaloriesBurned: 0,
+      averageCaloriesPerKm: 0,
       personalBests: {
         '5k': Infinity,
         '10k': Infinity,
@@ -52,6 +128,7 @@ export const RunHistory = () => {
     };
 
     let totalPace = 0;
+    let totalCalories = 0;
     const now = new Date();
     const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -97,6 +174,10 @@ export const RunHistory = () => {
         newStats.fastestPace = pace;
       }
 
+      // Calculate calories burned for this run
+      const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration, userProfile);
+      totalCalories += caloriesBurned;
+
       // This week and month distances
       const runDate = new Date(run.date);
       if (runDate >= weekStart) {
@@ -135,9 +216,15 @@ export const RunHistory = () => {
 
     // Calculate average pace
     newStats.averagePace = totalPace / runHistory.length || 0;
+    
+    // Set total calories burned
+    newStats.totalCaloriesBurned = totalCalories;
+    
+    // Calculate average calories per km
+    newStats.averageCaloriesPerKm = totalCalories / newStats.totalDistance || 0;
 
     setStats(newStats);
-  }, [runHistory]);
+  }, [runHistory, calculateCaloriesBurned, userProfile]);
 
   useEffect(() => {
     calculateStats();
@@ -216,10 +303,54 @@ ${additionalContent}
     return `${converted.toFixed(2)} ${distanceUnit}`;
   };
 
+  const handleProfileSubmit = () => {
+    // Convert feet and inches to cm for storage and calculations
+    const heightCm = (userProfile.heightFeet * 30.48) + (userProfile.heightInches * 2.54);
+    
+    const updatedProfile = {
+      ...userProfile,
+      heightCm: Math.round(heightCm)
+    };
+    
+    localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+    setUserProfile(updatedProfile);
+    setShowProfileModal(false);
+    // Recalculate stats with new profile data
+    calculateStats();
+  };
+
+  const handleProfileChange = (field, value) => {
+    console.log(`Updating ${field} to ${value}`); // Add logging for debugging
+    
+    setUserProfile((prev) => {
+      const updated = {
+        ...prev,
+        [field]: value
+      };
+      
+      // If feet or inches are updated, also update the cm value
+      if (field === 'heightFeet' || field === 'heightInches') {
+        const feet = field === 'heightFeet' ? value : prev.heightFeet;
+        const inches = field === 'heightInches' ? value : prev.heightInches;
+        updated.heightCm = Math.round((feet * 30.48) + (inches * 2.54));
+      }
+      
+      console.log('Updated profile:', updated); // Log the updated profile
+      return updated;
+    });
+  };
+
   return (
     <div className="run-history">
       <div className="stats-overview">
         <h2>STATS</h2>
+        <button 
+          className="profile-btn" 
+          onClick={() => setShowProfileModal(true)}
+          title="Update your profile for accurate calorie calculations"
+        >
+          Update Profile
+        </button>
         <div className="stats-grid">
           <div className="stat-card">
             <h3>Total Distance</h3>
@@ -249,6 +380,20 @@ ${additionalContent}
           <div className="stat-card">
             <h3>Longest Run</h3>
             <p>{displayDistance(stats.longestRun)}</p>
+          </div>
+        </div>
+
+        <div className="calorie-stats">
+          <h3>Calorie Tracking</h3>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <h4>Total Calories Burned</h4>
+              <p>{stats.totalCaloriesBurned.toLocaleString()} kcal</p>
+            </div>
+            <div className="stat-card">
+              <h4>Avg. Calories per KM</h4>
+              <p>{Math.round(stats.averageCaloriesPerKm)} kcal</p>
+            </div>
           </div>
         </div>
 
@@ -314,36 +459,40 @@ ${additionalContent}
         <p>No runs recorded yet</p>
       ) : (
         <ul className="history-list">
-          {runHistory.map((run) => (
-            <li key={run.id} className="history-item">
-              <div className="run-date">{run.date}</div>
-              <div className="run-details">
-                <span>Duration: {formatTime(run.duration)}</span>
-                <span>Distance: {displayDistance(run.distance)}</span>
-                <span>
-                  Pace:{' '}
-                  {run.duration > 0
-                    ? (run.duration / 60 / run.distance).toFixed(2)
-                    : '0'}{' '}
-                  min/km
-                </span>
-              </div>
-              <div className="run-actions">
-                <button
-                  onClick={() => handlePostToNostr(run)}
-                  className="share-btn"
-                >
-                  Share to Nostr
-                </button>
-                <button
-                  onClick={() => handleDeleteRun(run.id)}
-                  className="delete-btn"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
+          {runHistory.map((run) => {
+            const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration, userProfile);
+            return (
+              <li key={run.id} className="history-item">
+                <div className="run-date">{run.date}</div>
+                <div className="run-details">
+                  <span>Duration: {formatTime(run.duration)}</span>
+                  <span>Distance: {displayDistance(run.distance)}</span>
+                  <span>
+                    Pace:{' '}
+                    {run.duration > 0
+                      ? (run.duration / 60 / run.distance).toFixed(2)
+                      : '0'}{' '}
+                    min/km
+                  </span>
+                  <span>Calories: {caloriesBurned} kcal</span>
+                </div>
+                <div className="run-actions">
+                  <button
+                    onClick={() => handlePostToNostr(run)}
+                    className="share-btn"
+                  >
+                    Share to Nostr
+                  </button>
+                  <button
+                    onClick={() => handleDeleteRun(run.id)}
+                    className="delete-btn"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -365,6 +514,86 @@ ${additionalContent}
               <button onClick={() => setShowModal(false)} disabled={isPosting}>
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showProfileModal && (
+        <div className="modal-overlay">
+          <div className="modal-content profile-modal">
+            <h3>User Profile</h3>
+            <div className="form-group">
+              <label htmlFor="weight">Weight (kg)</label>
+              <input
+                id="weight"
+                type="number"
+                value={userProfile.weight}
+                onChange={(e) => handleProfileChange('weight', Number(e.target.value))}
+              />
+            </div>
+            <div className="form-group height-inputs">
+              <label>Height</label>
+              <div className="height-fields">
+                <div className="height-field">
+                  <input
+                    id="heightFeet"
+                    type="number"
+                    min="0"
+                    max="8"
+                    value={userProfile.heightFeet}
+                    onChange={(e) => handleProfileChange('heightFeet', Number(e.target.value))}
+                  />
+                  <label htmlFor="heightFeet">ft</label>
+                </div>
+                <div className="height-field">
+                  <input
+                    id="heightInches"
+                    type="number"
+                    min="0"
+                    max="11"
+                    value={userProfile.heightInches}
+                    onChange={(e) => handleProfileChange('heightInches', Number(e.target.value))}
+                  />
+                  <label htmlFor="heightInches">in</label>
+                </div>
+              </div>
+            </div>
+            <div className="form-group">
+              <label htmlFor="gender">Gender</label>
+              <select
+                id="gender"
+                value={userProfile.gender}
+                onChange={(e) => handleProfileChange('gender', e.target.value)}
+              >
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="age">Age</label>
+              <input
+                id="age"
+                type="number"
+                value={userProfile.age}
+                onChange={(e) => handleProfileChange('age', Number(e.target.value))}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="fitnessLevel">Fitness Level</label>
+              <select
+                id="fitnessLevel"
+                value={userProfile.fitnessLevel}
+                onChange={(e) => handleProfileChange('fitnessLevel', e.target.value)}
+              >
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+            <div className="modal-buttons">
+              <button onClick={handleProfileSubmit}>Save</button>
+              <button onClick={() => setShowProfileModal(false)}>Cancel</button>
             </div>
           </div>
         </div>
