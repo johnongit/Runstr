@@ -59,6 +59,14 @@ export const AudioPlayerProvider = ({ children }) => {
     }
   }, [playlist]);
 
+  // Skip to a specific track by index
+  const skipToTrack = useCallback((trackIndex) => {
+    if (playlist && playlist.tracks && trackIndex >= 0 && trackIndex < playlist.tracks.length) {
+      setCurrentTrackIndex(trackIndex);
+      dispatch({ type: 'PLAY' });
+    }
+  }, [playlist, dispatch]);
+
   // Play/pause toggle
   const togglePlayPause = useCallback(() => {
     if (state.isPlaying) {
@@ -87,6 +95,7 @@ export const AudioPlayerProvider = ({ children }) => {
         loadPlaylist,
         playNext,
         playPrevious,
+        skipToTrack,
         togglePlayPause,
         playlist,
         currentTrackIndex,

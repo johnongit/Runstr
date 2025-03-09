@@ -7,7 +7,8 @@ export function MusicPlayer() {
     isPlaying, 
     togglePlayPause, 
     playNext, 
-    playPrevious, 
+    playPrevious,
+    skipToTrack,
     playlist,
     currentTrackIndex
   } = useAudioPlayer();
@@ -27,7 +28,8 @@ export function MusicPlayer() {
       if (nextIndex !== currentTrackIndex) { // Avoid adding current track if playlist has only one track
         upcomingTracks.push({
           ...playlist.tracks[nextIndex],
-          position: nextIndex + 1 // 1-based position for display
+          position: nextIndex + 1, // 1-based position for display
+          index: nextIndex // Actual index in the playlist for skipping
         });
       }
     }
@@ -36,6 +38,11 @@ export function MusicPlayer() {
   };
   
   const upcomingTracks = getUpcomingTracks();
+
+  // Handle click on an upcoming track
+  const handleTrackClick = (trackIndex) => {
+    skipToTrack(trackIndex);
+  };
 
   return (
     <div className={styles.container}>
@@ -64,10 +71,15 @@ export function MusicPlayer() {
           <h3>Coming Up Next:</h3>
           <ul className={styles.tracksList}>
             {upcomingTracks.map((track, index) => (
-              <li key={index} className={styles.trackItem}>
+              <li 
+                key={index} 
+                className={styles.trackItem}
+                onClick={() => handleTrackClick(track.index)}
+              >
                 <span className={styles.trackNumber}>{track.position}.</span>
                 <span className={styles.trackTitle}>{track.title}</span>
                 <span className={styles.trackArtist}>{track.artist || 'Unknown Artist'}</span>
+                <span className={styles.playIcon}>▶️</span>
               </li>
             ))}
           </ul>

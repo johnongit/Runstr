@@ -1783,3 +1783,67 @@ textarea {
   position: absolute;
   pointer-events: none;
 }
+
+/* Styles for upcoming tracks in floating player */
+.upcoming-tracks-toggle {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.toggle-button {
+  background: none;
+  border: 1px solid #646cff;
+  color: #646cff;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-button:hover {
+  background-color: rgba(100, 108, 255, 0.1);
+}
+
+.upcoming-tracks-list {
+  margin-top: 10px;
+  max-height: 150px;
+  overflow-y: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 8px;
+}
+
+.upcoming-tracks-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.upcoming-track-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.upcoming-track-item:hover {
+  background-color: rgba(100, 108, 255, 0.1);
+}
+
+.track-position {
+  width: 20px;
+  margin-right: 8px;
+  color: #a0a0a0;
+  font-size: 0.9em;
+}
+
+.track-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  font-size: 0.9em;
+}
