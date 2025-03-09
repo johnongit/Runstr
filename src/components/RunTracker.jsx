@@ -124,7 +124,8 @@ export const RunTracker = () => {
     // User has acknowledged the permission requirements
     localStorage.setItem('permissionsGranted', 'true');
     setShowPermissionDialog(false);
-    startRun();
+    // Don't automatically start the run after permissions are granted
+    // startRun();
   };
 
   const handlePermissionCancel = () => {
@@ -359,7 +360,9 @@ ${
           <h3>Splits</h3>
           {splits.map((split, i) => (
             <div key={i} className="split-item">
-              {distanceUnit === 'km' ? `Km ${split.km}` : `Mile ${(split.km * 0.621371).toFixed(1)}`}: {formatPace(split.pace, distanceUnit)}
+              {distanceUnit === 'km' 
+                ? `Km ${split.km}` 
+                : `Mile ${split.km}`}: {formatPace(split.pace, distanceUnit)}
             </div>
           ))}
         </div>
