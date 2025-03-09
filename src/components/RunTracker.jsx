@@ -52,7 +52,7 @@ export const RunTracker = () => {
     runTracker.on('elevationChange', setElevation);
     runTracker.on('stopped', (finalResults) => {
       const runData = {
-        id: Date.now(),
+        id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
         date: new Date().toLocaleDateString(),
         splits: JSON.parse(JSON.stringify(finalResults.splits)), // clone splits obj
         duration: finalResults.duration,

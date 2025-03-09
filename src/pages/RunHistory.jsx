@@ -233,7 +233,29 @@ export const RunHistory = () => {
   const loadRunHistory = () => {
     const storedRuns = localStorage.getItem('runHistory');
     if (storedRuns) {
-      setRunHistory(JSON.parse(storedRuns));
+      // Parse stored runs
+      const parsedRuns = JSON.parse(storedRuns);
+      
+      // Create a set to track seen IDs and detect duplicates
+      const seenIds = new Set();
+      const fixedRuns = parsedRuns.map(run => {
+        // If ID is already seen or not present, generate a new unique ID
+        if (!run.id || seenIds.has(run.id)) {
+          const newId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          return { ...run, id: newId };
+        }
+        
+        // Otherwise, keep the existing ID
+        seenIds.add(run.id);
+        return run;
+      });
+      
+      // Save the fixed runs back to localStorage if changes were made
+      if (fixedRuns.some((run, i) => run.id !== parsedRuns[i].id)) {
+        localStorage.setItem('runHistory', JSON.stringify(fixedRuns));
+      }
+      
+      setRunHistory(fixedRuns);
     }
   };
 
