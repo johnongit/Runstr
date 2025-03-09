@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { NostrContext } from '../contexts/NostrContext';
 
@@ -30,10 +30,10 @@ export const PermissionDialog = ({ onContinue, onCancel }) => {
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setIsVisible(false);
     if (onCancel) onCancel();
-  };
+  }, [onCancel]);
 
   // Handle ESC key press
   useEffect(() => {
@@ -45,7 +45,7 @@ export const PermissionDialog = ({ onContinue, onCancel }) => {
     return () => {
       window.removeEventListener('keydown', handleEsc);
     };
-  }, []);
+  }, [handleCancel]);
 
   if (!isVisible) return null;
 
@@ -54,9 +54,9 @@ export const PermissionDialog = ({ onContinue, onCancel }) => {
       <div className="modal-content permission-dialog">
         <h3>Welcome to Runstr!</h3>
         
-        <p>This is a privacy-focused running app. We believe your data belongs to you.</p>
+        <p>This privacy-focused app keeps your data private and under your control.</p>
         
-        <p>To get the best experience, we need two important permissions:</p>
+        <p>To use the app, we need these permissions:</p>
         
         <div className="permission-item">
           <h4>1. Location Access</h4>
@@ -65,7 +65,7 @@ export const PermissionDialog = ({ onContinue, onCancel }) => {
         
         <div className="permission-item">
           <h4>2. Amber Signer Trust</h4>
-          <p>For the app to function properly, please accept ALL permissions in the Amber Signer when prompted. This secure connection lets you safely share your runs on Nostr only when YOU choose to do so.</p>
+          <p>The app requires basic permission in Amber Signer when prompted. This secure connection lets you safely share your runs on Nostr only when YOU choose to do so. Only minimal permissions are needed - you don&apos;t need to grant full trust.</p>
         </div>
         
         <p>We do not harvest or sell your data. Your privacy is our priority - all tracking information remains on your device unless you explicitly choose to share it.</p>

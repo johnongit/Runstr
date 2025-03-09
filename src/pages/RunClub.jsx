@@ -9,6 +9,8 @@ export const RunClub = () => {
   const [error, setError] = useState(null);
   const [commentText, setCommentText] = useState('');
   const { defaultZapAmount } = useContext(NostrContext);
+  const [userLikes, setUserLikes] = useState(new Set());
+  const [userReposts, setUserReposts] = useState(new Set());
 
   const processAndUpdatePosts = useCallback(async (posts) => {
     try {
@@ -35,6 +37,72 @@ export const RunClub = () => {
         kinds: [1],
         '#e': posts.map((post) => post.id)
       });
+
+      // Fetch likes for posts (kind 7)
+      const likes = await ndk.fetchEvents({
+        kinds: [7],
+        '#e': posts.map((post) => post.id)
+      });
+
+      // Fetch reposts for posts (kind 6)
+      const reposts = await ndk.fetchEvents({
+        kinds: [6],
+        '#e': posts.map((post) => post.id)
+      });
+
+      // Get current user's pubkey
+      let userPubkey = '';
+      try {
+        if (window.nostr) {
+          userPubkey = await window.nostr.getPublicKey();
+        }
+      } catch (err) {
+        console.error('Error getting user pubkey:', err);
+      }
+
+      // Track which posts the current user has liked and reposted
+      const newUserLikes = new Set();
+      const newUserReposts = new Set();
+
+      // Count likes and reposts per post
+      const likesByPost = new Map();
+      const repostsByPost = new Map();
+
+      // Process likes
+      Array.from(likes).forEach(like => {
+        const postId = like.tags.find(tag => tag[0] === 'e')?.[1];
+        if (postId) {
+          if (!likesByPost.has(postId)) {
+            likesByPost.set(postId, 0);
+          }
+          likesByPost.set(postId, likesByPost.get(postId) + 1);
+
+          // Check if current user liked this post
+          if (like.pubkey === userPubkey) {
+            newUserLikes.add(postId);
+          }
+        }
+      });
+
+      // Process reposts
+      Array.from(reposts).forEach(repost => {
+        const postId = repost.tags.find(tag => tag[0] === 'e')?.[1];
+        if (postId) {
+          if (!repostsByPost.has(postId)) {
+            repostsByPost.set(postId, 0);
+          }
+          repostsByPost.set(postId, repostsByPost.get(postId) + 1);
+
+          // Check if current user reposted this post
+          if (repost.pubkey === userPubkey) {
+            newUserReposts.add(postId);
+          }
+        }
+      });
+
+      // Update likes and reposts state
+      setUserLikes(newUserLikes);
+      setUserReposts(newUserReposts);
 
       // Group comments by their parent post
       const commentsByPost = new Map();
@@ -71,7 +139,9 @@ export const RunClub = () => {
               lud06: profile.lud06
             },
             comments: commentsByPost.get(post.id) || [],
-            showComments: false
+            showComments: false,
+            likes: likesByPost.get(post.id) || 0,
+            reposts: repostsByPost.get(post.id) || 0
           };
         })
         .sort((a, b) => b.created_at - a.created_at);
@@ -235,15 +305,24 @@ export const RunClub = () => {
       // Construct the callback URL with amount
       const callbackUrl = new URL(lnurlPayData.callback);
       callbackUrl.searchParams.append('amount', amount);
-
+      
+      // Convert the signed event to a string before appending
+      const serializedEvent = JSON.stringify(signedEvent);
+      
       // If there's a nostr event, add it to the callback
-      callbackUrl.searchParams.append('nostr', JSON.stringify(signedEvent));
+      callbackUrl.searchParams.append('nostr', serializedEvent);
+      
+      // Add comment parameter if supported by the endpoint
+      if (lnurlPayData.commentAllowed) {
+        callbackUrl.searchParams.append('comment', 'Zap for your run! ⚡️');
+      }
 
       // Get the invoice
       const invoiceResponse = await fetch(callbackUrl);
       const invoiceData = await invoiceResponse.json();
 
       if (!invoiceData.pr) {
+        console.error('Invalid LNURL-pay response:', invoiceData);
         throw new Error('Invalid LNURL-pay response: missing payment request');
       }
 
@@ -255,7 +334,15 @@ export const RunClub = () => {
       alert('Zap sent successfully! ⚡️');
     } catch (error) {
       console.error('Error sending zap:', error);
-      alert('Failed to send zap: ' + error.message);
+      
+      // Provide more specific error messages for common issues
+      if (error.message.includes('LNURL')) {
+        alert('Failed to send zap: There was an issue with the Lightning address. The receiver might need to update their LNURL configuration.');
+      } else if (error.message.includes('provider')) {
+        alert('Failed to send zap: Could not connect to your Lightning wallet. Please make sure you have a Lightning wallet installed and configured.');
+      } else {
+        alert('Failed to send zap: ' + error.message);
+      }
     }
   };
 
@@ -301,6 +388,87 @@ export const RunClub = () => {
           : post
       )
     );
+  };
+
+  const handleLike = async (post) => {
+    if (!window.nostr) {
+      alert('Please login to like posts');
+      return;
+    }
+
+    try {
+      // Create a like event (kind 7)
+      const likeEvent = {
+        kind: 7,
+        created_at: Math.floor(Date.now() / 1000),
+        content: '+',
+        tags: [
+          ['e', post.id],
+          ['p', post.author.pubkey]
+        ],
+        pubkey: await window.nostr.getPublicKey()
+      };
+
+      // Sign the event
+      const signedEvent = await window.nostr.signEvent(likeEvent);
+
+      // Create and publish NDK Event
+      const ndkEvent = new NDKEvent(ndk, signedEvent);
+      await ndkEvent.publish();
+
+      // Update local state to show the post as liked
+      setUserLikes(prev => {
+        const newLikes = new Set(prev);
+        newLikes.add(post.id);
+        return newLikes;
+      });
+
+      console.log('Post liked successfully');
+    } catch (error) {
+      console.error('Error liking post:', error);
+      alert('Failed to like post: ' + error.message);
+    }
+  };
+
+  const handleRepost = async (post) => {
+    if (!window.nostr) {
+      alert('Please login to repost');
+      return;
+    }
+
+    try {
+      // Create a repost event (kind 6)
+      const repostEvent = {
+        kind: 6,
+        created_at: Math.floor(Date.now() / 1000),
+        content: '',
+        tags: [
+          ['e', post.id, '', 'mention'],
+          ['p', post.author.pubkey]
+        ],
+        pubkey: await window.nostr.getPublicKey()
+      };
+
+      // Sign the event
+      const signedEvent = await window.nostr.signEvent(repostEvent);
+
+      // Create and publish NDK Event
+      const ndkEvent = new NDKEvent(ndk, signedEvent);
+      await ndkEvent.publish();
+
+      // Update local state to show the post as reposted
+      setUserReposts(prev => {
+        const newReposts = new Set(prev);
+        newReposts.add(post.id);
+        return newReposts;
+      });
+
+      console.log('Post reposted successfully');
+      alert('Post reposted successfully!');
+    } catch (error) {
+      console.error('Error reposting:', error);
+      alert('Failed to repost: ' + error.message);
+    }
   };
 
   const extractImagesFromContent = (content) => {
@@ -359,6 +527,18 @@ export const RunClub = () => {
                     onClick={() => handleZap(post)}
                   >
                     ⚡️ Zap
+                  </button>
+                  <button
+                    className={`like-button ${userLikes.has(post.id) ? 'liked' : ''}`}
+                    onClick={() => handleLike(post)}
+                  >
+                    {userLikes.has(post.id) ? '❤️' : '🤍'} {post.likes > 0 ? post.likes : ''}
+                  </button>
+                  <button
+                    className={`repost-button ${userReposts.has(post.id) ? 'reposted' : ''}`}
+                    onClick={() => handleRepost(post)}
+                  >
+                    {userReposts.has(post.id) ? '🔁' : '🔄'} {post.reposts > 0 ? post.reposts : ''}
                   </button>
                   <button
                     className="comment-button"
