@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { publishToNostr } from '../utils/nostr';
 import { storeRunLocally } from '../utils/offline';
 import { runTracker } from '../services/RunTracker';
-import { convertDistance, formatPace, formatTime } from '../utils/formatters';
+import { convertDistance, formatPace, formatPaceWithUnit, formatTime } from '../utils/formatters';
 import { PermissionDialog } from './PermissionDialog';
 
 export const RunTracker = () => {
@@ -17,12 +17,21 @@ export const RunTracker = () => {
   const [lastRun, setLastRun] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [countdown, setCountdown] = useState(0); // Countdown timer value
+  const [isCountingDown, setIsCountingDown] = useState(false); // Flag to indicate countdown is in progress
+  const [countdownType, setCountdownType] = useState(''); // 'start' or 'stop'
   const navigate = useNavigate();
 
   const [distance, setDistance] = useState(0);
   const [duration, setDuration] = useState(0);
   const [pace, setPace] = useState(0);
   const [splits, setSplits] = useState([]);
+  // Add state for elevation data
+  const [elevation, setElevation] = useState({
+    current: null,
+    gain: 0,
+    loss: 0
+  });
 
   // Check if permissions have been granted on component mount
   useEffect(() => {
@@ -39,6 +48,8 @@ export const RunTracker = () => {
     runTracker.on('durationChange', setDuration);
     runTracker.on('paceChange', setPace);
     runTracker.on('splitRecorded', setSplits);
+    // Add listener for elevation changes
+    runTracker.on('elevationChange', setElevation);
     runTracker.on('stopped', (finalResults) => {
       const runData = {
         id: Date.now(),
@@ -46,7 +57,12 @@ export const RunTracker = () => {
         splits: JSON.parse(JSON.stringify(finalResults.splits)), // clone splits obj
         duration: finalResults.duration,
         distance: finalResults.distance,
-        pace: finalResults.pace
+        pace: finalResults.pace,
+        // Include elevation data in saved run
+        elevation: finalResults.elevation || {
+          gain: 0,
+          loss: 0
+        }
       };
 
       // todo: move this to utils
@@ -116,10 +132,41 @@ export const RunTracker = () => {
     setShowPermissionDialog(false);
   };
 
+  const startCountdown = (type) => {
+    setCountdownType(type);
+    setIsCountingDown(true);
+    setCountdown(5);
+    
+    const countdownInterval = setInterval(() => {
+      setCountdown((prevCount) => {
+        if (prevCount <= 1) {
+          clearInterval(countdownInterval);
+          
+          // Add small delay before hiding overlay for better UX
+          setTimeout(() => {
+            setIsCountingDown(false);
+            
+            // Execute the appropriate action after countdown finishes
+            if (type === 'start') {
+              setIsRunning(true);
+              setIsPaused(false);
+              runTracker.start();
+            } else if (type === 'stop') {
+              runTracker.stop();
+              setIsRunning(false);
+              setIsPaused(false);
+            }
+          }, 200);
+          
+          return 0;
+        }
+        return prevCount - 1;
+      });
+    }, 1000);
+  };
+
   const startRun = () => {
-    setIsRunning(true);
-    setIsPaused(false);
-    runTracker.start();
+    startCountdown('start');
   };
 
   const pauseRun = () => {
@@ -133,9 +180,7 @@ export const RunTracker = () => {
   };
 
   const stopRun = () => {
-    runTracker.stop();
-    setIsRunning(false);
-    setIsPaused(false);
+    startCountdown('stop');
   };
 
   const updateLastRun = (runData) => {
@@ -146,6 +191,18 @@ export const RunTracker = () => {
     const newUnit = distanceUnit === 'km' ? 'mi' : 'km';
     setDistanceUnit(newUnit);
     localStorage.setItem('distanceUnit', newUnit);
+  };
+
+  // Format elevation for display
+  const formatElevation = (meters) => {
+    if (meters === null || isNaN(meters)) return '--';
+    
+    if (distanceUnit === 'mi') {
+      // Convert to feet (1 meter = 3.28084 feet)
+      return `${Math.round(meters * 3.28084)} ft`;
+    } else {
+      return `${Math.round(meters)} m`;
+    }
   };
 
   const handlePostToNostr = async (run) => {
@@ -168,15 +225,17 @@ export const RunTracker = () => {
 
       // Format the content with emojis and proper spacing
       const content = `
-🏃‍♂️ Run Completed!
+Just completed a run with Runstr! 🏃‍♂️💨
+
 ⏱️ Duration: ${formatTime(run.duration)}
 📏 Distance: ${convertDistance(run.distance, distanceUnit)} ${distanceUnit}
-⚡️ Pace: ${formatPace(run.pace)} min/km
+⚡ Pace: ${formatPaceWithUnit(run.pace, distanceUnit)}
+${run.elevation ? `🏔️ Elevation Gain: ${formatElevation(run.elevation.gain)}\n📉 Elevation Loss: ${formatElevation(run.elevation.loss)}` : ''}
 ${
   run.splits.length > 0
     ? '\n📊 Splits:\n' +
       run.splits
-        .map((split) => `Km ${split.km}: ${formatPace(split.pace)}`)
+        .map((split) => `${distanceUnit === 'km' ? `Km ${split.km}` : `Mile ${(split.km * 0.621371).toFixed(1)}`}: ${formatPace(split.pace, distanceUnit)}`)
         .join('\n')
     : ''
 }
@@ -259,6 +318,17 @@ ${
 
       <h2 className="page-title">DASHBOARD</h2>
 
+      {isCountingDown && (
+        <div className="countdown-overlay">
+          <div className="countdown-container">
+            <div className="countdown-text">
+              {countdownType === 'start' ? 'Starting in' : 'Stopping in'}
+            </div>
+            <div className="countdown-number">{countdown}</div>
+          </div>
+        </div>
+      )}
+
       <div className="time-display">{formatTime(duration)}</div>
 
       <div className="distance-display">
@@ -267,7 +337,20 @@ ${
 
       {isRunning && !isPaused && (
         <div className="pace-display">
-          Current Pace: {formatPace(pace)} min/km
+          Current Pace: {formatPaceWithUnit(pace, distanceUnit)}
+        </div>
+      )}
+
+      {/* Add elevation display */}
+      {isRunning && (
+        <div className="elevation-display">
+          <div className="elevation-current">
+            Current: {formatElevation(elevation.current)}
+          </div>
+          <div className="elevation-stats">
+            <div className="elevation-gain">↗️ {formatElevation(elevation.gain)}</div>
+            <div className="elevation-loss">↘️ {formatElevation(elevation.loss)}</div>
+          </div>
         </div>
       )}
 
@@ -276,7 +359,7 @@ ${
           <h3>Splits</h3>
           {splits.map((split, i) => (
             <div key={i} className="split-item">
-              Km {split.km}: {formatPace(split.pace)}
+              {distanceUnit === 'km' ? `Km ${split.km}` : `Mile ${(split.km * 0.621371).toFixed(1)}`}: {formatPace(split.pace, distanceUnit)}
             </div>
           ))}
         </div>

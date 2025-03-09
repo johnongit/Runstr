@@ -5,6 +5,18 @@ import { NostrContext } from './NostrContext';
 export function NostrProvider({ children }) {
   const [publicKey, setPublicKey] = useState(null);
   const [isNostrReady, setIsNostrReady] = useState(false);
+  const [defaultZapAmount, setDefaultZapAmount] = useState(() => {
+    const stored = localStorage.getItem('defaultZapAmount');
+    return stored ? parseInt(stored, 10) : 1000; // Default to 1000 sats if not set
+  });
+
+  const updateDefaultZapAmount = useCallback((amount) => {
+    const numAmount = parseInt(amount, 10);
+    if (!isNaN(numAmount) && numAmount > 0) {
+      setDefaultZapAmount(numAmount);
+      localStorage.setItem('defaultZapAmount', numAmount.toString());
+    }
+  }, []);
 
   const requestNostrPermissions = useCallback(async () => {
     // If window.nostr exists, request permissions
@@ -48,7 +60,9 @@ export function NostrProvider({ children }) {
     <NostrContext.Provider value={{ 
       publicKey, 
       isNostrReady,
-      requestNostrPermissions 
+      requestNostrPermissions,
+      defaultZapAmount,
+      updateDefaultZapAmount 
     }}>
       {children}
     </NostrContext.Provider>

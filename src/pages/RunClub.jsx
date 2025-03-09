@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { RELAYS, ndk, initializeNostr } from '../utils/nostr';
+import { NostrContext } from '../contexts/NostrContext';
 
 export const RunClub = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [commentText, setCommentText] = useState('');
+  const { defaultZapAmount } = useContext(NostrContext);
 
   const processAndUpdatePosts = useCallback(async (posts) => {
     try {
@@ -186,7 +188,7 @@ export const RunClub = () => {
           ['p', post.author.pubkey],
           ['e', post.id],
           ['relays', ...RELAYS],
-          ['amount', '1000'] // 1000 sats
+          ['amount', defaultZapAmount.toString()] // Use default zap amount from context
         ],
         pubkey: await window.nostr.getPublicKey()
       };
@@ -217,8 +219,8 @@ export const RunClub = () => {
         throw new Error('Invalid LNURL-pay response: missing callback URL');
       }
 
-      // Amount in millisatoshis (1000 sats = 100000 millisats)
-      const amount = 1000 * 1000;
+      // Amount in millisatoshis (convert sats to millisats)
+      const amount = defaultZapAmount * 1000;
 
       // Check if amount is within min/max bounds
       if (
@@ -226,7 +228,7 @@ export const RunClub = () => {
         amount > lnurlPayData.maxSendable
       ) {
         throw new Error(
-          `Amount must be between ${lnurlPayData.minSendable} and ${lnurlPayData.maxSendable} millisats`
+          `Amount must be between ${lnurlPayData.minSendable / 1000} and ${lnurlPayData.maxSendable / 1000} sats`
         );
       }
 

@@ -247,45 +247,51 @@ export const RunHistory = () => {
 
   const handlePostToNostr = (run) => {
     setSelectedRun(run);
+    setAdditionalContent('');
     setShowModal(true);
   };
 
   const handlePostSubmit = async () => {
-    // todo: handle signing
-
+    if (!selectedRun) return;
+    
     setIsPosting(true);
-
-    const content = `
-🏃‍♂️ Run Completed!
-⏱️ Duration: ${formatTime(selectedRun.duration)}
-📏 Distance: ${selectedRun.distance.toFixed(2)} km
-⚡️ Pace: ${selectedRun.duration > 0 ? (selectedRun.duration / 60 / selectedRun.distance).toFixed(2) : '0'} min/km
-
-${additionalContent}
-
-#Runstr #Running
-`;
-
-    const event = {
-      kind: 1,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [
-        ['t', 'Runstr'],
-        ['t', 'Running']
-      ],
-      content: content
-    };
-
+    
     try {
+      const run = selectedRun;
+      const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration, userProfile);
+      
+      const content = `
+Just completed a run with Runstr! 🏃‍♂️💨
+
+⏱️ Duration: ${formatTime(run.duration)}
+📏 Distance: ${displayDistance(run.distance)}
+⚡ Pace: ${(run.duration / 60 / run.distance).toFixed(2)} min/${distanceUnit}
+🔥 Calories: ${caloriesBurned} kcal
+${run.elevation ? `\n🏔️ Elevation Gain: ${formatElevation(run.elevation.gain)}\n📉 Elevation Loss: ${formatElevation(run.elevation.loss)}` : ''}
+${additionalContent ? `\n${additionalContent}` : ''}
+#Runstr #Running
+`.trim();
+
+      const event = {
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['t', 'Runstr'],
+          ['t', 'Running']
+        ],
+        content: content
+      };
+
       await publishToNostr(event);
       setShowModal(false);
       setAdditionalContent('');
       alert('Successfully posted to Nostr!');
     } catch (error) {
-      alert('Failed to post to Nostr. Please try again.');
       console.error('Error posting to Nostr:', error);
+      alert('Failed to post to Nostr: ' + error.message);
     } finally {
       setIsPosting(false);
+      setShowModal(false);
     }
   };
 
@@ -338,6 +344,18 @@ ${additionalContent}
       console.log('Updated profile:', updated); // Log the updated profile
       return updated;
     });
+  };
+
+  // Add a function to format elevation display
+  const formatElevation = (meters) => {
+    if (!meters || meters === null || isNaN(meters)) return '-- ';
+    
+    if (distanceUnit === 'mi') {
+      // Convert to feet (1 meter = 3.28084 feet)
+      return `${Math.round(meters * 3.28084)} ft`;
+    } else {
+      return `${Math.round(meters)} m`;
+    }
   };
 
   return (
@@ -452,6 +470,29 @@ ${additionalContent}
             </div>
           </div>
         </div>
+
+        {/* Add elevation stats to overview */}
+        <div className="elevation-stats-overview">
+          <h3>Elevation Data</h3>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <h4>Total Elevation Gain</h4>
+              <p>
+                {formatElevation(
+                  runHistory.reduce((sum, run) => sum + (run.elevation?.gain || 0), 0)
+                )}
+              </p>
+            </div>
+            <div className="stat-card">
+              <h4>Total Elevation Loss</h4>
+              <p>
+                {formatElevation(
+                  runHistory.reduce((sum, run) => sum + (run.elevation?.loss || 0), 0)
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <h2>Run History</h2>
@@ -472,9 +513,20 @@ ${additionalContent}
                     {run.duration > 0
                       ? (run.duration / 60 / run.distance).toFixed(2)
                       : '0'}{' '}
-                    min/km
+                    min/{distanceUnit}
                   </span>
                   <span>Calories: {caloriesBurned} kcal</span>
+                  {/* Add elevation data */}
+                  {run.elevation && (
+                    <>
+                      <span>
+                        Elevation Gain: {formatElevation(run.elevation.gain)}
+                      </span>
+                      <span>
+                        Elevation Loss: {formatElevation(run.elevation.loss)}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className="run-actions">
                   <button

@@ -12,6 +12,15 @@ class RunTracker extends EventEmitter {
     this.pace = 0; // in seconds per meter
     this.splits = []; // Array to store split objects { km, time, pace }
     this.positions = [];
+    this.distanceUnit = localStorage.getItem('distanceUnit') || 'km'; // Get user's preferred unit
+    
+    // Add elevation tracking data
+    this.elevation = {
+      current: null,
+      gain: 0,
+      loss: 0,
+      lastAltitude: null
+    };
 
     this.isTracking = false;
     this.isPaused = false;
@@ -54,6 +63,34 @@ class RunTracker extends EventEmitter {
     return duration / distance; // Pace in seconds per meter
   }
 
+  updateElevation(altitude) {
+    if (altitude === null || altitude === undefined || isNaN(altitude)) {
+      return;
+    }
+    
+    // Set current elevation
+    this.elevation.current = altitude;
+    
+    // Calculate gain and loss if we have a previous altitude reading
+    if (this.elevation.lastAltitude !== null) {
+      const diff = altitude - this.elevation.lastAltitude;
+      
+      // Filter out small fluctuations (less than 1 meter)
+      if (Math.abs(diff) >= 1) {
+        if (diff > 0) {
+          this.elevation.gain += diff;
+        } else {
+          this.elevation.loss += Math.abs(diff);
+        }
+      }
+    }
+    
+    this.elevation.lastAltitude = altitude;
+    
+    // Emit elevation change
+    this.emit('elevationChange', {...this.elevation});
+  }
+
   addPosition(newPosition) {
     if (this.positions.length > 0) {
       const lastPosition = this.positions[this.positions.length - 1];
@@ -67,13 +104,21 @@ class RunTracker extends EventEmitter {
 
       this.emit('distanceChange', this.distance); // Emit distance change
 
-      // Check if a new full kilometer has been completed
+      // Check for altitude data and update elevation
+      if (newPosition.altitude !== undefined && newPosition.altitude !== null) {
+        this.updateElevation(newPosition.altitude);
+      }
+
+      // Define the split distance in meters based on selected unit
+      const splitDistance = this.distanceUnit === 'km' ? 1000 : 1609.344; // 1km or 1mile in meters
+      
+      // Check if a new full unit (km or mile) has been completed
       if (
-        Math.floor(this.distance / 1000) >
-        Math.floor(this.lastSplitDistance / 1000)
+        Math.floor(this.distance / splitDistance) >
+        Math.floor(this.lastSplitDistance / splitDistance)
       ) {
-        // Calculate the current km split (e.g., 1, 2, 3, ...)
-        const currentKm = Math.floor(this.distance / 1000);
+        // Calculate the current split number (e.g., 1, 2, 3, ...)
+        const currentSplit = Math.floor(this.distance / splitDistance);
 
         // Determine the elapsed time at the previous split (or 0 at start)
         const previousSplitTime = this.splits.length
@@ -81,12 +126,12 @@ class RunTracker extends EventEmitter {
           : 0;
         // Calculate the duration for this split (time difference)
         const splitDuration = this.duration - previousSplitTime;
-        // For a full km, the split pace is simply the split duration divided by 1000 meters
-        const splitPace = this.calculatePace(1000, splitDuration); // seconds per km
+        // Calculate pace for this split
+        const splitPace = this.calculatePace(splitDistance, splitDuration); // seconds per unit
 
-        // Record the split with the km count, cumulative time, and split pace
+        // Record the split with the unit count, cumulative time, and split pace
         this.splits.push({
-          km: currentKm,
+          km: currentSplit, // We keep the field name as 'km' for backward compatibility
           time: this.duration,
           pace: splitPace
         });
@@ -161,6 +206,9 @@ class RunTracker extends EventEmitter {
   async start() {
     if (this.isTracking && !this.isPaused) return;
 
+    // Update distanceUnit from localStorage in case it changed
+    this.distanceUnit = localStorage.getItem('distanceUnit') || 'km';
+    
     this.isTracking = true;
     this.isPaused = false;
     this.startTime = Date.now();
@@ -171,6 +219,14 @@ class RunTracker extends EventEmitter {
     this.pace = 0;
     this.splits = [];
     this.lastSplitDistance = 0;
+    
+    // Reset elevation data
+    this.elevation = {
+      current: null,
+      gain: 0,
+      loss: 0,
+      lastAltitude: null
+    };
 
     this.startTracking();
     this.startTimer(); // Start the timer
@@ -211,6 +267,9 @@ class RunTracker extends EventEmitter {
     clearInterval(this.timerInterval); // Stop the timer
     clearInterval(this.paceInterval); // Stop the pace calculator
 
+    // Define the split distance based on selected unit
+    const splitDistance = this.distanceUnit === 'km' ? 1000 : 1609.344; // 1km or 1mile in meters
+    
     // If there's an incomplete split (current split distance > 0), calculate its pace.
     const incompleteSplitDistance = this.distance - this.lastSplitDistance;
     if (incompleteSplitDistance > 0) {
@@ -223,10 +282,10 @@ class RunTracker extends EventEmitter {
         incompleteSplitTime
       );
 
-      const currentKm = Math.ceil(this.distance / 1000);
+      const currentSplit = Math.ceil(this.distance / splitDistance);
 
       this.splits.push({
-        km: currentKm,
+        km: currentSplit,
         time: this.duration,
         pace: incompleteSplitPace
       });
@@ -237,11 +296,13 @@ class RunTracker extends EventEmitter {
     this.emit('durationChange', this.duration);
     this.emit('paceChange', this.pace);
     this.emit('splitRecorded', this.splits);
+    this.emit('elevationChange', {...this.elevation}); // Emit final elevation data
     this.emit('stopped', {
       distance: this.distance,
       duration: this.duration,
       pace: this.pace,
-      splits: this.splits
+      splits: this.splits,
+      elevation: {...this.elevation} // Include elevation data in stopped event
     });
   }
 }

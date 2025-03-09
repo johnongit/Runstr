@@ -71,10 +71,17 @@ export class NWCWallet {
     }
   }
 
-  async generateZapInvoice(pubkey, amount, content = '') {
+  async generateZapInvoice(pubkey, amount = null, content = '') {
     try {
       if (!this.provider) {
         throw new Error('Wallet not connected');
+      }
+
+      // Use provided amount or get default from localStorage
+      let zapAmount = amount;
+      if (!zapAmount) {
+        const storedAmount = localStorage.getItem('defaultZapAmount');
+        zapAmount = storedAmount ? parseInt(storedAmount, 10) : 1000;
       }
 
       const zapRequest = {
@@ -82,7 +89,7 @@ export class NWCWallet {
         content: content,
         tags: [
           ['p', pubkey],
-          ['amount', amount.toString()],
+          ['amount', zapAmount.toString()],
           ['relays', ...RELAYS]
         ],
         created_at: Math.floor(Date.now() / 1000)
@@ -92,7 +99,7 @@ export class NWCWallet {
       const encodedZapRequest = btoa(JSON.stringify(signedZapRequest));
 
       const invoice = await this.provider.makeInvoice({
-        amount,
+        amount: zapAmount,
         defaultMemo: `Zap for ${pubkey}`,
         zapRequest: encodedZapRequest
       });

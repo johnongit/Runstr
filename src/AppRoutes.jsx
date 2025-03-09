@@ -6,6 +6,7 @@ import { RunClub } from './pages/RunClub';
 import { Wallet } from './pages/Wallet';
 import { Music } from './pages/Music';
 import { NWC } from './pages/NWC';
+import { Goals } from './pages/Goals';
 
 export const AppRoutes = () => {
   return (
@@ -17,6 +18,7 @@ export const AppRoutes = () => {
       <Route path="/wallet" element={<Wallet />} />
       <Route path="/music" element={<Music />} />
       <Route path="/nwc" element={<NWC />} />
+      <Route path="/goals" element={<Goals />} />
       <Route path="/" element={<RunTracker />} />
     </Routes>
   );

@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { SimplePool } from 'nostr-tools';
 import { publishToNostr, RELAYS } from '../utils/nostr';
+import { NostrContext } from '../contexts/NostrContext';
 
 export const Wallet = () => {
   const pool = useRef(new SimplePool());
@@ -10,8 +11,21 @@ export const Wallet = () => {
   const [recipientPubkey, setRecipientPubkey] = useState('');
   const [balance, setBalance] = useState(0);
   const [receiveToken, setReceiveToken] = useState('');
+  const { defaultZapAmount, updateDefaultZapAmount } = useContext(NostrContext);
+  const [zapAmountInput, setZapAmountInput] = useState(defaultZapAmount.toString());
   const mintUrl =
     'https://legend.lnbits.com/cashu/api/v1/4gr9Xcmz3XEkUNwiBiQGoL';
+
+  // Set the zapAmountInput whenever defaultZapAmount changes
+  useEffect(() => {
+    setZapAmountInput(defaultZapAmount.toString());
+  }, [defaultZapAmount]);
+
+  const handleUpdateZapAmount = () => {
+    if (zapAmountInput && parseInt(zapAmountInput, 10) > 0) {
+      updateDefaultZapAmount(parseInt(zapAmountInput, 10));
+    }
+  };
 
   const initializeWallet = useCallback(async () => {
     try {
@@ -190,6 +204,28 @@ export const Wallet = () => {
             >
               Send
             </button>
+          </div>
+
+          <div className="zap-settings-section">
+            <h3>Zap Settings</h3>
+            <div className="zap-amount-setting">
+              <label htmlFor="defaultZapAmount">Default Zap Amount (sats):</label>
+              <input
+                id="defaultZapAmount"
+                type="number"
+                min="1"
+                value={zapAmountInput}
+                onChange={(e) => setZapAmountInput(e.target.value)}
+                placeholder="Default zap amount in sats"
+              />
+              <button 
+                onClick={handleUpdateZapAmount} 
+                disabled={!zapAmountInput || parseInt(zapAmountInput, 10) <= 0}
+              >
+                Save
+              </button>
+            </div>
+            <p className="current-setting">Current default: {defaultZapAmount} sats</p>
           </div>
 
           <div className="transaction-history">

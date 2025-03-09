@@ -2159,3 +2159,620 @@ input[type="number"]::-webkit-outer-spin-button {
 .permission-dialog .secondary-btn:disabled:hover {
   background-color: transparent;
 }
+
+.zap-settings-section {
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.zap-amount-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.zap-amount-setting label {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 10px;
+}
+
+.input-with-button input {
+  flex-grow: 1;
+  padding: 8px;
+  background-color: #242424;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.input-with-button .save-button {
+  padding: 8px 16px;
+  background-color: #646cff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.input-with-button .save-button:hover {
+  background-color: #535bf2;
+}
+
+.input-with-button .save-button:disabled {
+  background-color: #444;
+  cursor: not-allowed;
+}
+
+.success-message {
+  color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.1);
+  padding: 8px;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.current-setting {
+  margin-top: 10px;
+  font-style: italic;
+  color: #999;
+}
+
+/* Media query for mobile devices */
+@media (max-width: 768px) {
+  .input-with-button {
+    flex-direction: column;
+  }
+  
+  .input-with-button .save-button {
+    width: 100%;
+  }
+}
+
+/* Donation section styles */
+.donation-section {
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.donation-section h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #fff;
+}
+
+.donation-section p {
+  margin-bottom: 20px;
+  color: #ccc;
+}
+
+.donation-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.donate-button {
+  padding: 12px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donate-button:active {
+  transform: scale(0.98);
+}
+
+.donate-button.runstr {
+  background-color: #646cff;
+  color: white;
+}
+
+.donate-button.runstr:hover {
+  background-color: #535bf2;
+}
+
+.donate-button.opensats {
+  background-color: #f9a826;
+  color: #1a1a1a;
+}
+
+.donate-button.opensats:hover {
+  background-color: #e09a22;
+}
+
+.donate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.donation-status {
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.donation-status.success {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+}
+
+.donation-status.error {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #f44336;
+}
+
+.donation-note {
+  font-size: 14px;
+  font-style: italic;
+  color: #999;
+  margin-top: 10px;
+}
+
+/* Media query for mobile devices */
+@media (max-width: 768px) {
+  .donation-buttons {
+    flex-direction: column;
+  }
+}
+
+/* Goals page styles */
+.goals-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.goals-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.goal-card {
+  background-color: #1a1a1a;
+  border-radius: 8px;
+  padding: 20px;
+  border-left: 4px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.goal-card.active {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.goal-card.inactive {
+  opacity: 0.7;
+}
+
+/* Status colors */
+.goal-card.starting {
+  border-left-color: #646cff;
+}
+
+.goal-card.halfway {
+  border-left-color: #f9a826;
+}
+
+.goal-card.almost {
+  border-left-color: #4caf50;
+}
+
+.goal-card.complete {
+  border-left-color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+.goal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.goal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #fff;
+}
+
+/* Toggle switch styles */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #333;
+  border-radius: 34px;
+  transition: 0.4s;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: 0.4s;
+}
+
+input:checked + .toggle-slider {
+  background-color: #646cff;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(26px);
+}
+
+.goal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.goal-target {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.edit-button {
+  background-color: transparent;
+  color: #646cff;
+  border: 1px solid #646cff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.edit-button:hover {
+  background-color: rgba(100, 108, 255, 0.1);
+}
+
+.goal-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-bar {
+  height: 12px;
+  background-color: #333;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #646cff;
+  border-radius: 6px;
+  transition: width 0.5s ease-in-out;
+}
+
+.progress-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #ccc;
+}
+
+.details-button {
+  background-color: transparent;
+  color: #ccc;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  text-align: left;
+  margin-top: 8px;
+}
+
+.details-button:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.goal-details {
+  background-color: #242424;
+  padding: 16px;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.goal-details h4 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #fff;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #ccc;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #333;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+/* Goal form styles */
+.goal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: bold;
+  color: #ccc;
+}
+
+.input-unit-group {
+  display: flex;
+  gap: 8px;
+}
+
+.input-unit-group input {
+  flex: 1;
+  padding: 8px;
+  background-color: #242424;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.input-unit-group select {
+  width: 70px;
+  padding: 8px;
+  background-color: #242424;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.save-button {
+  background-color: #646cff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.save-button:hover {
+  background-color: #535bf2;
+}
+
+.cancel-button {
+  background-color: transparent;
+  color: #ccc;
+  border: 1px solid #444;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cancel-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 768px) {
+  .goal-target,
+  .progress-stats {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .form-buttons {
+    flex-direction: column;
+  }
+  
+  .input-unit-group {
+    flex-direction: column;
+  }
+  
+  .input-unit-group select {
+    width: 100%;
+  }
+}
+
+/* Countdown overlay styles */
+.countdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.countdown-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-darker);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: pulse 1s infinite alternate;
+}
+
+.countdown-text {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: var(--text-light);
+}
+
+.countdown-number {
+  font-size: 6rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  animation: scale-in 0.5s ease-out;
+}
+
+@keyframes pulse {
+  from {
+    transform: scale(0.98);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  0% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Ensure the countdown is visible on mobile devices */
+@media (max-width: 768px) {
+  .countdown-container {
+    padding: 1.5rem;
+  }
+  
+  .countdown-text {
+    font-size: 1.2rem;
+  }
+  
+  .countdown-number {
+    font-size: 4rem;
+  }
+}
+
+/* Elevation display styles */
+.elevation-display {
+  background-color: var(--bg-darker);
+  border-radius: 8px;
+  padding: 10px 15px;
+  margin: 15px auto;
+  max-width: 320px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.elevation-current {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-light);
+}
+
+.elevation-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 5px;
+}
+
+.elevation-gain, .elevation-loss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.elevation-gain {
+  color: #4caf50;
+}
+
+.elevation-loss {
+  color: #f44336;
+}
+
+@media (max-width: 768px) {
+  .elevation-display {
+    margin: 10px auto;
+    padding: 8px 12px;
+  }
+  
+  .elevation-current {
+    font-size: 1rem;
+  }
+}
