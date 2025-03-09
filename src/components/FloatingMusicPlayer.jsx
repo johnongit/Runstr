@@ -8,48 +8,14 @@ export function FloatingMusicPlayer() {
     isPlaying, 
     togglePlayPause, 
     playNext, 
-    playPrevious,
-    skipToTrack,
-    playlist,
-    currentTrackIndex
+    playPrevious
   } = useAudioPlayer();
   
   const [expanded, setExpanded] = useState(false);
-  const [showUpcomingTracks, setShowUpcomingTracks] = useState(false);
   const navigate = useNavigate();
   
   if (!currentTrack) return null;
 
-  // Calculate upcoming tracks (next 3 tracks after current one)
-  const getUpcomingTracks = () => {
-    if (!playlist || !playlist.tracks) return [];
-    
-    const upcomingTracks = [];
-    const totalTracks = playlist.tracks.length;
-    
-    // Get up to 3 upcoming tracks
-    for (let i = 1; i <= 3; i++) {
-      const nextIndex = (currentTrackIndex + i) % totalTracks;
-      if (nextIndex !== currentTrackIndex) { // Avoid adding current track if playlist has only one track
-        upcomingTracks.push({
-          ...playlist.tracks[nextIndex],
-          position: i, // Position relative to current
-          index: nextIndex // Actual index in the playlist
-        });
-      }
-    }
-    
-    return upcomingTracks;
-  };
-  
-  const upcomingTracks = getUpcomingTracks();
-
-  // Handle click on an upcoming track
-  const handleTrackClick = (trackIndex) => {
-    skipToTrack(trackIndex);
-    setShowUpcomingTracks(false);
-  };
-  
   return (
     <div className={`floating-player ${expanded ? 'expanded' : 'collapsed'}`}>
       {expanded ? (
@@ -77,36 +43,6 @@ export function FloatingMusicPlayer() {
               ⏭️
             </button>
           </div>
-
-          {/* Toggle for upcoming tracks */}
-          {upcomingTracks.length > 0 && (
-            <div className="upcoming-tracks-toggle">
-              <button 
-                onClick={() => setShowUpcomingTracks(!showUpcomingTracks)} 
-                className="toggle-button"
-              >
-                {showUpcomingTracks ? 'Hide upcoming' : 'Show upcoming'}
-              </button>
-            </div>
-          )}
-
-          {/* Upcoming tracks section */}
-          {showUpcomingTracks && upcomingTracks.length > 0 && (
-            <div className="upcoming-tracks-list">
-              <ul>
-                {upcomingTracks.map((track, index) => (
-                  <li 
-                    key={index} 
-                    className="upcoming-track-item"
-                    onClick={() => handleTrackClick(track.index)}
-                  >
-                    <span className="track-position">{track.position}.</span>
-                    <span className="track-name">{track.title}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       ) : (
         <div className="floating-player-collapsed" onClick={() => setExpanded(true)}>
