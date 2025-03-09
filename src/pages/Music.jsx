@@ -7,10 +7,12 @@ import {
   fetchTrendingRock
 } from '../utils/wavlake';
 import { PlaylistSection } from '../components/PlaylistSection';
-import { AudioPlayer } from '../components/AudioPlayer';
+import { MusicPlayer } from '../components/MusicPlayer';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
 
 export function Music() {
   const hasMounted = useRef(false);
+  const { loadPlaylist, currentTrack } = useAudioPlayer();
 
   const [pubkey, setPubkey] = useState(null);
 
@@ -20,8 +22,6 @@ export function Music() {
 
   const [libraryPlaylists, setLibraryPlaylists] = useState();
   const [likedPlaylist, setLikedPlaylist] = useState();
-
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState();
 
   useEffect(() => {
     window.nostr
@@ -105,7 +105,7 @@ export function Music() {
   }, [pubkey]);
 
   const handleSelectPlaylist = (playlistId) => {
-    setSelectedPlaylistId(playlistId);
+    loadPlaylist(playlistId);
   };
 
   const trendingPlaylists = useMemo(
@@ -128,7 +128,7 @@ export function Music() {
     <div className="container text-center py-12">
       <h1 className="text-2xl font-bold mb-4">WAVLAKE</h1>
       <div className="bg-gray-100 rounded-lg p-8 max-w-md mx-auto">
-        {selectedPlaylistId && <AudioPlayer playlistId={selectedPlaylistId} />}
+        {currentTrack && <MusicPlayer />}
 
         <PlaylistSection
           title="Trending"

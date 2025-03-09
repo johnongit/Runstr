@@ -1,12 +1,12 @@
 import { useContext } from 'react';
-import { AudioContext } from '../contexts/audioContext';
+import { AudioPlayerContext } from '../contexts/audioPlayerContext';
 
-export function useAudioPlayer() {
-  const context = useContext(AudioContext);
+export const useAudioPlayer = () => {
+  const context = useContext(AudioPlayerContext);
+  
   if (!context) {
-    throw new Error(
-      'useAudioPlayer must be used within an AudioPlayerProvider'
-    );
+    throw new Error('useAudioPlayer must be used within an AudioPlayerProvider');
   }
+  
   return context;
-}
+};
