@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useContext } from 'react';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
-import { RELAYS, ndk, initializeNostr } from '../utils/nostr';
+import { ndk, initializeNostr } from '../utils/nostr';
 import { NostrContext } from '../contexts/NostrContext';
+import { useAuth } from '../hooks/useAuth';
 
 export const RunClub = () => {
   const [posts, setPosts] = useState([]);
@@ -11,6 +12,7 @@ export const RunClub = () => {
   const { defaultZapAmount } = useContext(NostrContext);
   const [userLikes, setUserLikes] = useState(new Set());
   const [userReposts, setUserReposts] = useState(new Set());
+  const { wallet } = useAuth();
 
   const processAndUpdatePosts = useCallback(async (posts) => {
     try {
@@ -50,6 +52,12 @@ export const RunClub = () => {
         '#e': posts.map((post) => post.id)
       });
 
+      // Fetch zap receipts for posts (kind 9735)
+      const zapReceipts = await ndk.fetchEvents({
+        kinds: [9735],
+        '#e': posts.map((post) => post.id)
+      });
+
       // Get current user's pubkey
       let userPubkey = '';
       try {
@@ -67,6 +75,8 @@ export const RunClub = () => {
       // Count likes and reposts per post
       const likesByPost = new Map();
       const repostsByPost = new Map();
+      // Track zap amounts by post
+      const newZapsByPost = new Map();
 
       // Process likes
       Array.from(likes).forEach(like => {
@@ -100,9 +110,42 @@ export const RunClub = () => {
         }
       });
 
-      // Update likes and reposts state
-      setUserLikes(newUserLikes);
-      setUserReposts(newUserReposts);
+      // Process zap receipts
+      Array.from(zapReceipts).forEach(zapReceipt => {
+        try {
+          const postId = zapReceipt.tags.find(tag => tag[0] === 'e')?.[1];
+          if (postId) {
+            // Get the zap amount from the bolt11 or amount tag
+            let zapAmount = 0;
+            
+            // First check for a direct amount tag
+            const amountTag = zapReceipt.tags.find(tag => tag[0] === 'amount');
+            if (amountTag && amountTag[1]) {
+              // Amount is in millisatoshis, convert to sats
+              zapAmount = parseInt(amountTag[1], 10) / 1000;
+            } else {
+              // If no amount tag, try to get from bolt11 description
+              const bolt11Tag = zapReceipt.tags.find(tag => tag[0] === 'bolt11');
+              if (bolt11Tag && bolt11Tag[1]) {
+                // For simplicity, we're just counting the zap events - would need lightning 
+                // invoice decoding library to get actual amounts from bolt11
+                zapAmount = 1; // Count as 1 zap
+              }
+            }
+            
+            // Add to post's total zaps
+            if (!newZapsByPost.has(postId)) {
+              newZapsByPost.set(postId, { count: 0, amount: 0 });
+            }
+            const postZaps = newZapsByPost.get(postId);
+            postZaps.count += 1;
+            postZaps.amount += zapAmount;
+            newZapsByPost.set(postId, postZaps);
+          }
+        } catch (err) {
+          console.error('Error processing zap receipt:', err);
+        }
+      });
 
       // Group comments by their parent post
       const commentsByPost = new Map();
@@ -128,6 +171,8 @@ export const RunClub = () => {
       return posts
         .map((post) => {
           const profile = profileMap.get(post.pubkey) || {};
+          const postZaps = newZapsByPost.get(post.id) || { count: 0, amount: 0 };
+          
           return {
             id: post.id,
             content: post.content,
@@ -141,7 +186,9 @@ export const RunClub = () => {
             comments: commentsByPost.get(post.id) || [],
             showComments: false,
             likes: likesByPost.get(post.id) || 0,
-            reposts: repostsByPost.get(post.id) || 0
+            reposts: repostsByPost.get(post.id) || 0,
+            zaps: postZaps.count,
+            zapAmount: postZaps.amount
           };
         })
         .sort((a, b) => b.created_at - a.created_at);
@@ -238,111 +285,186 @@ export const RunClub = () => {
       return;
     }
 
+    if (!wallet) {
+      alert('Please connect a Bitcoin wallet to send zaps');
+      return;
+    }
+
     try {
-      // Extract LNURL from the post author's profile
-      const lnurl = post.author.lud16 || post.author.lud06;
-      if (!lnurl) {
+      // Log profile info for debugging
+      console.log('Author profile details:', {
+        name: post.author.profile.name,
+        pubkey: post.author.pubkey,
+        lud16: post.author.lud16,
+        lud06: post.author.lud06,
+      });
+
+      // Check if the author has a Lightning address
+      if (!post.author.lud16 && !post.author.lud06) {
         console.log('Author profile:', post.author);
-        alert(
-          'This user has not set up their Lightning address in their Nostr profile'
-        );
+        alert('This user has not set up their Lightning address in their Nostr profile');
         return;
       }
 
-      // Create the zap event
+      // First attempt: Try using NDK zap method
+      try {
+        console.log(`Attempting to zap ${defaultZapAmount} sats using NDK...`);
+        
+        // Create an NDK event object from the post data
+        const ndkEvent = new NDKEvent(ndk);
+        ndkEvent.id = post.id;
+        ndkEvent.pubkey = post.author.pubkey;
+        
+        // Check NDK version and if zap method exists
+        if (!ndkEvent.zap) {
+          console.warn('NDK zap method not available. Your NDK version may be outdated.');
+          throw new Error('NDK zap method not available');
+        }
+        
+        // Create zap request with detailed error handling
+        const zapResult = await ndkEvent.zap(
+          defaultZapAmount, // amount in sats
+          async (invoice) => {
+            console.log('Paying invoice with wallet:', invoice.substring(0, 30) + '...');
+            return await wallet.makePayment(invoice);
+          },
+          'Zap for your run! ⚡️' // optional comment
+        );
+        
+        console.log('NDK Zap successful! Result:', zapResult);
+        
+        // Update the UI to show the new zap
+        setPosts(currentPosts => 
+          currentPosts.map(p => {
+            if (p.id === post.id) {
+              return {
+                ...p,
+                zaps: (p.zaps || 0) + 1,
+                zapAmount: (p.zapAmount || 0) + defaultZapAmount
+              };
+            }
+            return p;
+          })
+        );
+
+        alert('Zap sent successfully! ⚡️');
+        return; // Exit early on success
+      } catch (ndkZapError) {
+        // Log detailed NDK zap error information
+        console.error('NDK zap error:', ndkZapError);
+        console.warn('NDK zap failed, falling back to manual approach');
+        
+        // Continue to fallback implementation
+      }
+      
+      // Fallback implementation: Manual LNURL processing
+      console.log('Using fallback manual zap implementation...');
+      
+      // Extract LNURL from the post author's profile
+      const lnurl = post.author.lud16 || post.author.lud06;
+      
+      // Create zap event manually
       const zapEvent = {
-        kind: 9734,
+        kind: 9734, // Zap request
         created_at: Math.floor(Date.now() / 1000),
         content: 'Zap for your run! ⚡️',
         tags: [
           ['p', post.author.pubkey],
           ['e', post.id],
-          ['relays', ...RELAYS],
-          ['amount', defaultZapAmount.toString()] // Use default zap amount from context
+          ['amount', (defaultZapAmount * 1000).toString()], // millisats
         ],
         pubkey: await window.nostr.getPublicKey()
       };
-
+      
       // Sign the event
       const signedEvent = await window.nostr.signEvent(zapEvent);
-
-      // Create and publish NDK Event
+      
+      // Create and publish the NDK Event
       const ndkEvent = new NDKEvent(ndk, signedEvent);
       await ndkEvent.publish();
-
-      // Parse the Lightning address and create the zap request URL
+      console.log('Published zap request event:', ndkEvent);
+      
+      // Parse the Lightning address
       let zapEndpoint;
       if (lnurl.includes('@')) {
         // Handle Lightning address (lud16)
         const [username, domain] = lnurl.split('@');
         zapEndpoint = `https://${domain}/.well-known/lnurlp/${username}`;
+        console.log('Using lud16 Lightning address:', lnurl);
       } else {
         // Handle raw LNURL (lud06)
         zapEndpoint = lnurl;
+        console.log('Using lud06 LNURL:', lnurl);
       }
-
-      // First get the LNURL-pay metadata
+      
+      // Get LNURL-pay metadata
+      console.log('Fetching LNURL-pay metadata from:', zapEndpoint);
       const response = await fetch(zapEndpoint);
       const lnurlPayData = await response.json();
-
+      console.log('LNURL-pay metadata:', lnurlPayData);
+      
       if (!lnurlPayData.callback) {
         throw new Error('Invalid LNURL-pay response: missing callback URL');
       }
-
-      // Amount in millisatoshis (convert sats to millisats)
+      
+      // Amount in millisatoshis
       const amount = defaultZapAmount * 1000;
-
-      // Check if amount is within min/max bounds
-      if (
-        amount < lnurlPayData.minSendable ||
-        amount > lnurlPayData.maxSendable
-      ) {
-        throw new Error(
-          `Amount must be between ${lnurlPayData.minSendable / 1000} and ${lnurlPayData.maxSendable / 1000} sats`
-        );
-      }
-
-      // Construct the callback URL with amount
+      
+      // Construct callback URL
       const callbackUrl = new URL(lnurlPayData.callback);
       callbackUrl.searchParams.append('amount', amount);
+      callbackUrl.searchParams.append('nostr', JSON.stringify(signedEvent));
       
-      // Convert the signed event to a string before appending
-      const serializedEvent = JSON.stringify(signedEvent);
-      
-      // If there's a nostr event, add it to the callback
-      callbackUrl.searchParams.append('nostr', serializedEvent);
-      
-      // Add comment parameter if supported by the endpoint
       if (lnurlPayData.commentAllowed) {
         callbackUrl.searchParams.append('comment', 'Zap for your run! ⚡️');
       }
-
-      // Get the invoice
+      
+      // Get invoice
+      console.log('Requesting invoice from:', callbackUrl.toString());
       const invoiceResponse = await fetch(callbackUrl);
       const invoiceData = await invoiceResponse.json();
-
+      console.log('Invoice response:', invoiceData);
+      
       if (!invoiceData.pr) {
-        console.error('Invalid LNURL-pay response:', invoiceData);
         throw new Error('Invalid LNURL-pay response: missing payment request');
       }
-
-      // Use Bitcoin Connect to get the provider and pay
-      const { requestProvider } = await import('@getalby/bitcoin-connect');
-      const provider = await requestProvider();
-      await provider.sendPayment(invoiceData.pr);
-
+      
+      // Pay invoice using wallet
+      console.log('Paying invoice with wallet...');
+      await wallet.makePayment(invoiceData.pr);
+      
+      // Update UI
+      setPosts(currentPosts => 
+        currentPosts.map(p => {
+          if (p.id === post.id) {
+            return {
+              ...p,
+              zaps: (p.zaps || 0) + 1,
+              zapAmount: (p.zapAmount || 0) + defaultZapAmount
+            };
+          }
+          return p;
+        })
+      );
+      
       alert('Zap sent successfully! ⚡️');
     } catch (error) {
       console.error('Error sending zap:', error);
       
-      // Provide more specific error messages for common issues
-      if (error.message.includes('LNURL')) {
-        alert('Failed to send zap: There was an issue with the Lightning address. The receiver might need to update their LNURL configuration.');
-      } else if (error.message.includes('provider')) {
-        alert('Failed to send zap: Could not connect to your Lightning wallet. Please make sure you have a Lightning wallet installed and configured.');
+      // Provide detailed error message to user
+      let errorMessage = 'Failed to send zap: ';
+      
+      if (error.message.includes('LNURL') || error.message.includes('Lightning')) {
+        errorMessage += 'There was an issue with the Lightning address. The receiver might need to update their LNURL configuration.';
+      } else if (error.message.includes('wallet') || error.message.includes('provider')) {
+        errorMessage += 'Could not connect to your Lightning wallet. Please make sure you have a Lightning wallet installed and configured.';
+      } else if (error.message.includes('fetch') || error.message.includes('network')) {
+        errorMessage += `Network error: ${error.message}. This could be due to CORS issues or the service being unavailable.`;
       } else {
-        alert('Failed to send zap: ' + error.message);
+        errorMessage += error.message;
       }
+      
+      alert(errorMessage);
     }
   };
 
@@ -526,7 +648,7 @@ export const RunClub = () => {
                     className="zap-button"
                     onClick={() => handleZap(post)}
                   >
-                    ⚡️ Zap
+                    ⚡️ Zap {post.zaps > 0 ? `(${post.zaps} zaps | ${Math.round(post.zapAmount)} sats)` : ''}
                   </button>
                   <button
                     className={`like-button ${userLikes.has(post.id) ? 'liked' : ''}`}

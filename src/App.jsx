@@ -1,6 +1,6 @@
 import { BrowserRouter as Router } from 'react-router-dom';
 import { NostrProvider } from './contexts/NostrProvider';
-import { AchievementProvider } from './contexts/AchievementContext.jsx';
+import { AuthProvider } from './components/AuthProvider';
 import { AudioPlayerProvider } from './contexts/AudioPlayerProvider';
 import { AppRoutes } from './AppRoutes';
 import { MenuBar } from './components/MenuBar';
@@ -11,7 +11,7 @@ const App = () => {
   return (
     <Router>
       <NostrProvider>
-        <AchievementProvider>
+        <AuthProvider>
           <AudioPlayerProvider>
             <div className="app">
               <MenuBar />
@@ -19,7 +19,7 @@ const App = () => {
               <FloatingMusicPlayer />
             </div>
           </AudioPlayerProvider>
-        </AchievementProvider>
+        </AuthProvider>
       </NostrProvider>
     </Router>
   );

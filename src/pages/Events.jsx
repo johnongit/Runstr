@@ -4,7 +4,7 @@ import { ndk, initializeNostr } from '../utils/nostr';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 
 export const Events = () => {
-  const { pubkey } = useContext(NostrContext);
+  const { publicKey, isNostrReady } = useContext(NostrContext);
   
   // State variables
   const [loading, setLoading] = useState(true);
@@ -170,12 +170,12 @@ export const Events = () => {
   // Load user's events
   const loadUserEvents = useCallback(async () => {
     try {
-      if (!pubkey) return;
+      if (!publicKey) return;
       
       // Fetch user's event participations
       const eventParticipations = await ndk.fetchEvents({
         kinds: [30001], // Custom kind for event participation
-        authors: [pubkey]
+        authors: [publicKey]
       });
       
       // Process events
@@ -209,7 +209,7 @@ export const Events = () => {
     } catch (err) {
       console.error('Error loading user events:', err);
     }
-  }, [pubkey, events]);
+  }, [publicKey, events]);
   
   // Initialize connection and load data
   useEffect(() => {
@@ -218,6 +218,13 @@ export const Events = () => {
         const connected = await initializeNostr();
         if (!connected) {
           throw new Error('Failed to connect to Nostr relays');
+        }
+        
+        // Check if user is logged in to Nostr
+        if (isNostrReady && publicKey) {
+          console.log('User authenticated with pubkey:', publicKey);
+        } else {
+          console.log('User not authenticated, viewing in public mode');
         }
         
         await Promise.all([
@@ -234,12 +241,12 @@ export const Events = () => {
     };
     
     setup();
-  }, [loadLeaderboards, loadUserEvents]);
+  }, [loadLeaderboards, loadUserEvents, isNostrReady, publicKey]);
   
   // Join an event
   const joinEvent = async (eventId) => {
     try {
-      if (!pubkey) {
+      if (!publicKey || !isNostrReady) {
         setError('You must be logged in to join events.');
         return;
       }
@@ -309,7 +316,7 @@ export const Events = () => {
   // Render leaderboard entry
   const renderLeaderboardEntry = (entry) => {
     const profile = profiles.get(entry.pubkey) || {};
-    const isCurrentUser = entry.pubkey === pubkey;
+    const isCurrentUser = entry.pubkey === publicKey;
     
     return (
       <div 
@@ -334,19 +341,17 @@ export const Events = () => {
   // Render event modal
   const renderEventModal = () => {
     if (!selectedEvent) return null;
-    
+
+    const participating = isParticipating(selectedEvent.id);
+
     return (
-      <div className="modal-overlay" onClick={() => setShowEventModal(false)}>
-        <div className="modal-content event-modal" onClick={e => e.stopPropagation()}>
-          <button 
-            className="close-modal-btn" 
-            onClick={() => setShowEventModal(false)}
-          >
-            &times;
-          </button>
+      <div className="modal-overlay">
+        <div className="modal-content event-modal">
+          <h3>{selectedEvent.name}</h3>
           
-          <h2>{selectedEvent.name}</h2>
-          <p className="event-description">{selectedEvent.description}</p>
+          <div className="event-description">
+            <p>{selectedEvent.description}</p>
+          </div>
           
           <div className="event-details">
             <div className="event-detail">
@@ -358,7 +363,7 @@ export const Events = () => {
           </div>
           
           <div className="event-rules">
-            <h3>Rules</h3>
+            <h3>Event Rules</h3>
             <ul>
               {selectedEvent.rules.map((rule, index) => (
                 <li key={index}>{rule}</li>
@@ -366,14 +371,24 @@ export const Events = () => {
             </ul>
           </div>
           
-          <div className="modal-buttons">
+          {!isNostrReady || !publicKey ? (
+            <div className="auth-warning">
+              <p>You need to be logged in with Nostr to join this event.</p>
+              <p>Please make sure you have granted permissions in Amber Signer.</p>
+            </div>
+          ) : (
             <button 
-              className={`join-event-btn ${isParticipating(selectedEvent.id) ? 'joined' : ''}`}
+              className={`join-event-btn ${participating ? 'joined' : ''}`}
               onClick={() => joinEvent(selectedEvent.id)}
+              disabled={participating}
             >
-              {isParticipating(selectedEvent.id) ? 'Already Joined' : 'Join Event'}
+              {participating ? 'Already Joined!' : 'Join Event'}
             </button>
-          </div>
+          )}
+          
+          <button className="close-btn" onClick={() => setShowEventModal(false)}>
+            Close
+          </button>
         </div>
       </div>
     );
