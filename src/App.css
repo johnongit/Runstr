@@ -2066,3 +2066,96 @@ input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* Permission Dialog Styles */
+.permission-dialog {
+  max-width: 550px;
+  text-align: left;
+  color: #f0f0f0;
+  background-color: #242424;
+}
+
+.permission-dialog h3 {
+  text-align: center;
+  color: #646cff;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+}
+
+.permission-dialog p {
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.permission-item {
+  margin-bottom: 18px;
+  background-color: #1a1a1a;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #646cff;
+}
+
+.permission-item h4 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  color: #646cff;
+}
+
+.permission-footer {
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-top: 24px;
+  margin-bottom: 24px;
+  color: #646cff;
+}
+
+.permission-dialog .modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.permission-dialog .primary-btn {
+  background-color: #646cff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.permission-dialog .primary-btn:hover {
+  background-color: #535bf2;
+}
+
+.permission-dialog .secondary-btn {
+  background-color: transparent;
+  color: #f0f0f0;
+  border: 1px solid #646cff;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.permission-dialog .secondary-btn:hover {
+  background-color: rgba(100, 108, 255, 0.1);
+}
+
+.permission-dialog .primary-btn:disabled,
+.permission-dialog .secondary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.permission-dialog .primary-btn:disabled:hover {
+  background-color: #646cff;
+}
+
+.permission-dialog .secondary-btn:disabled:hover {
+  background-color: transparent;
+}

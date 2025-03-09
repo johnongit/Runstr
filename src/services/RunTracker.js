@@ -122,17 +122,22 @@ class RunTracker extends EventEmitter {
 
   async startTracking() {
     try {
+      // Check if the user has already seen and accepted our custom permission dialog
+      const permissionsGranted = localStorage.getItem('permissionsGranted') === 'true';
+      
       this.watchId = await BackgroundGeolocation.addWatcher(
         {
           backgroundMessage: 'Tracking your run...',
           backgroundTitle: 'Runstr',
-          requestPermissions: true,
+          // Only request permissions automatically if the user has already accepted our custom dialog
+          requestPermissions: permissionsGranted, 
           distanceFilter: 10
         },
         (location, error) => {
           if (error) {
             if (error.code === 'NOT_AUTHORIZED') {
-              if (
+              // Only show this fallback dialog if we haven't shown our custom one
+              if (!permissionsGranted && 
                 window.confirm(
                   'This app needs your location, ' +
                     'but does not have permission.\n\n' +

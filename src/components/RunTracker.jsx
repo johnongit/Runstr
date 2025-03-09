@@ -4,6 +4,7 @@ import { publishToNostr } from '../utils/nostr';
 import { storeRunLocally } from '../utils/offline';
 import { runTracker } from '../services/RunTracker';
 import { convertDistance, formatPace, formatTime } from '../utils/formatters';
+import { PermissionDialog } from './PermissionDialog';
 
 export const RunTracker = () => {
   const [isRunning, setIsRunning] = useState(false);
@@ -15,12 +16,23 @@ export const RunTracker = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [lastRun, setLastRun] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const navigate = useNavigate();
 
   const [distance, setDistance] = useState(0);
   const [duration, setDuration] = useState(0);
   const [pace, setPace] = useState(0);
   const [splits, setSplits] = useState([]);
+
+  // Check if permissions have been granted on component mount
+  useEffect(() => {
+    const permissionsGranted = localStorage.getItem('permissionsGranted') === 'true';
+    
+    // If this is the first time the user opens the app, show the permission dialog
+    if (!permissionsGranted) {
+      setShowPermissionDialog(true);
+    }
+  }, []);
 
   useEffect(() => {
     runTracker.on('distanceChange', setDistance);
@@ -77,6 +89,31 @@ export const RunTracker = () => {
     if (storedRuns.length > 0) {
       setLastRun(storedRuns[storedRuns.length - 1]);
     }
+  };
+
+  const initiateRun = () => {
+    // Check if the user has already granted permissions
+    const permissionsGranted = localStorage.getItem('permissionsGranted');
+    
+    if (permissionsGranted === 'true') {
+      // If permissions already granted, start the run immediately
+      startRun();
+    } else {
+      // Show the permission dialog first
+      setShowPermissionDialog(true);
+    }
+  };
+
+  const handlePermissionContinue = () => {
+    // User has acknowledged the permission requirements
+    localStorage.setItem('permissionsGranted', 'true');
+    setShowPermissionDialog(false);
+    startRun();
+  };
+
+  const handlePermissionCancel = () => {
+    // User declined to proceed
+    setShowPermissionDialog(false);
   };
 
   const startRun = () => {
@@ -196,6 +233,13 @@ ${
 
   return (
     <div className="run-tracker">
+      {showPermissionDialog && (
+        <PermissionDialog 
+          onContinue={handlePermissionContinue}
+          onCancel={handlePermissionCancel}
+        />
+      )}
+
       {userProfile?.banner && (
         <div className="dashboard-banner">
           <img
@@ -244,7 +288,7 @@ ${
 
       <div className="controls-top">
         {!isRunning ? (
-          <button className="primary-btn" onClick={startRun}>
+          <button className="primary-btn" onClick={initiateRun}>
             Start Run
           </button>
         ) : (

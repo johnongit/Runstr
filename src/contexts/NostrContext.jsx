@@ -1,17 +1,41 @@
-import { createContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
 export const NostrContext = createContext(null);
 
 export function NostrProvider({ children }) {
   const [publicKey, setPublicKey] = useState(null);
+  const [isNostrReady, setIsNostrReady] = useState(false);
+
+  const requestNostrPermissions = useCallback(async () => {
+    // If window.nostr exists, request permissions
+    if (window.nostr) {
+      try {
+        // This will trigger the Amber Signer permission dialog
+        const pubkey = await window.nostr.getPublicKey();
+        setPublicKey(pubkey);
+        setIsNostrReady(true);
+        return true;
+      } catch (error) {
+        console.error('Error getting Nostr public key:', error);
+        return false;
+      }
+    } else {
+      console.warn('Nostr extension not found');
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     const initNostr = async () => {
-      if (window.nostr) {
+      // Only auto-initialize if permissions were already granted
+      const permissionsGranted = localStorage.getItem('permissionsGranted') === 'true';
+      
+      if (window.nostr && permissionsGranted) {
         try {
           const pubkey = await window.nostr.getPublicKey();
           setPublicKey(pubkey);
+          setIsNostrReady(true);
         } catch (error) {
           console.error('Error getting Nostr public key:', error);
         }
@@ -22,7 +46,11 @@ export function NostrProvider({ children }) {
   }, []);
 
   return (
-    <NostrContext.Provider value={{ publicKey }}>
+    <NostrContext.Provider value={{ 
+      publicKey, 
+      isNostrReady,
+      requestNostrPermissions 
+    }}>
       {children}
     </NostrContext.Provider>
   );
