@@ -213,7 +213,7 @@ ${
         </div>
       )}
 
-      <h2 className="page-title">Dashboard</h2>
+      <h2 className="page-title">DASHBOARD</h2>
 
       <div className="time-display">{formatTime(duration)}</div>
 

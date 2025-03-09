@@ -219,7 +219,7 @@ ${additionalContent}
   return (
     <div className="run-history">
       <div className="stats-overview">
-        <h2>Running Statistics</h2>
+        <h2>STATS</h2>
         <div className="stats-grid">
           <div className="stat-card">
             <h3>Total Distance</h3>

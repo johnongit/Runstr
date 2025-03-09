@@ -126,7 +126,7 @@ export function Music() {
 
   return (
     <div className="container text-center py-12">
-      <h1 className="text-2xl font-bold mb-4">Music</h1>
+      <h1 className="text-2xl font-bold mb-4">WAVLAKE</h1>
       <div className="bg-gray-100 rounded-lg p-8 max-w-md mx-auto">
         {selectedPlaylistId && <AudioPlayer playlistId={selectedPlaylistId} />}
 

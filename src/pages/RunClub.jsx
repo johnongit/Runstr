@@ -308,7 +308,7 @@ export const RunClub = () => {
 
   return (
     <div className="run-club-container">
-      <h2>Running Feed</h2>
+      <h2>RUNSTR FEED</h2>
       {loading ? (
         <div>Loading posts...</div>
       ) : error ? (
