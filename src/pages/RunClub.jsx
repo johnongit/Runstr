@@ -13,15 +13,45 @@ export const RunClub = () => {
   const [userLikes, setUserLikes] = useState(new Set());
   const [userReposts, setUserReposts] = useState(new Set());
   const { wallet } = useAuth();
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  const processAndUpdatePosts = useCallback(async (posts) => {
+  const processAndUpdatePosts = useCallback(async (newPosts, append = false) => {
     try {
-      console.log('Processing posts:', posts);
-      const authors = [...new Set(posts.map((post) => post.pubkey))];
-      const profileEvents = await ndk.fetchEvents({
-        kinds: [0],
-        authors
-      });
+      if (!newPosts || newPosts.length === 0) {
+        if (!append) {
+          setPosts([]);
+        }
+        return;
+      }
+
+      console.log('Processing posts:', newPosts);
+      const authors = [...new Set(newPosts.map((post) => post.pubkey))];
+      
+      // Fetch all required data in parallel to speed up loading
+      const [profileEvents, comments, likes, reposts, zapReceipts] = await Promise.all([
+        ndk.fetchEvents({
+          kinds: [0],
+          authors
+        }),
+        ndk.fetchEvents({
+          kinds: [1],
+          '#e': newPosts.map((post) => post.id)
+        }),
+        ndk.fetchEvents({
+          kinds: [7],
+          '#e': newPosts.map((post) => post.id)
+        }),
+        ndk.fetchEvents({
+          kinds: [6],
+          '#e': newPosts.map((post) => post.id)
+        }),
+        ndk.fetchEvents({
+          kinds: [9735],
+          '#e': newPosts.map((post) => post.id)
+        })
+      ]);
 
       const profileMap = new Map(
         Array.from(profileEvents).map((profile) => {
@@ -33,30 +63,6 @@ export const RunClub = () => {
           }
         })
       );
-
-      // Fetch comments for all posts
-      const comments = await ndk.fetchEvents({
-        kinds: [1],
-        '#e': posts.map((post) => post.id)
-      });
-
-      // Fetch likes for posts (kind 7)
-      const likes = await ndk.fetchEvents({
-        kinds: [7],
-        '#e': posts.map((post) => post.id)
-      });
-
-      // Fetch reposts for posts (kind 6)
-      const reposts = await ndk.fetchEvents({
-        kinds: [6],
-        '#e': posts.map((post) => post.id)
-      });
-
-      // Fetch zap receipts for posts (kind 9735)
-      const zapReceipts = await ndk.fetchEvents({
-        kinds: [9735],
-        '#e': posts.map((post) => post.id)
-      });
 
       // Get current user's pubkey
       let userPubkey = '';
@@ -168,7 +174,7 @@ export const RunClub = () => {
         }
       });
 
-      return posts
+      return newPosts
         .map((post) => {
           const profile = profileMap.get(post.pubkey) || {};
           const postZaps = newZapsByPost.get(post.id) || { count: 0, amount: 0 };
@@ -194,90 +200,90 @@ export const RunClub = () => {
         .sort((a, b) => b.created_at - a.created_at);
     } catch (err) {
       console.error('Error processing posts:', err);
-      return posts.sort((a, b) => b.created_at - a.created_at);
+      return newPosts.sort((a, b) => b.created_at - a.created_at);
     }
   }, []);
 
   const fetchRunPosts = useCallback(async () => {
     try {
-      console.log('Fetching run posts...');
-      if (!window.nostr) {
-        throw new Error('Please login to view running posts');
+      setLoading(true);
+      setError(null);
+
+      await initializeNostr();
+
+      const limit = 10; // Load 10 posts per page
+      const since = page > 1 ? Date.now() - (page * 7 * 24 * 60 * 60 * 1000) : undefined; // For paginated loading
+  
+      // Search for posts with running-related hashtags
+      const runPosts = await ndk.fetchEvents({
+        kinds: [1], // Regular posts
+        limit,
+        since,
+        "#t": ["running", "run", "runner", "runstr", "5k", "10k", "marathon", "jog"]
+      });
+
+      const postsArray = Array.from(runPosts).sort((a, b) => b.created_at - a.created_at);
+      
+      if (postsArray.length < limit) {
+        setHasMore(false);
       }
-
-      // Ensure NDK is connected
-      if (!ndk.pool?.relays?.size) {
-        console.log('NDK not connected, connecting...');
-        const connected = await initializeNostr();
-        if (!connected) {
-          throw new Error('Could not connect to relays');
-        }
-      }
-
-      console.log(
-        'NDK ready state:',
-        ndk.pool?.relays?.size || 0,
-        'relays connected'
-      );
-
-      const filter = {
-        kinds: [1],
-        '#t': ['Runstr', 'Running', 'run', 'running'],
-        since: Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60,
-        limit: 100
-      };
-
-      console.log('Fetching events with filter:', filter);
-
-      const events = await ndk.fetchEvents(filter);
-      const eventArray = Array.from(events);
-      console.log('Number of events:', eventArray.length);
-
-      if (eventArray.length > 0) {
-        const processedPosts = await processAndUpdatePosts(eventArray);
+      
+      const processedPosts = await processAndUpdatePosts(postsArray, page > 1);
+      
+      if (page === 1) {
         setPosts(processedPosts);
       } else {
-        console.log('No events found');
+        setPosts(prevPosts => [...prevPosts, ...processedPosts]);
       }
-
-      setLoading(false);
+      
+      setInitialLoadComplete(true);
     } catch (err) {
-      console.error('Error in fetchRunPosts:', err);
-      setError(err.message);
+      console.error('Error fetching run posts:', err);
+      setError('Failed to load posts. Please try again later.');
+    } finally {
       setLoading(false);
     }
-  }, [processAndUpdatePosts]);
+  }, [page, processAndUpdatePosts]);
+
+  // Load more posts when user scrolls to bottom
+  const loadMorePosts = useCallback(() => {
+    if (!loading && hasMore) {
+      setPage(prevPage => prevPage + 1);
+    }
+  }, [loading, hasMore]);
 
   useEffect(() => {
     let mounted = true;
-
+    
     const init = async () => {
-      try {
-        if (!window.nostr) {
-          setError('Please login to view running posts');
-          setLoading(false);
-          return;
-        }
-
-        console.log('NDK initialized, fetching posts...');
-        if (mounted) {
-          await fetchRunPosts();
-        }
-      } catch (err) {
-        console.error('Error in init:', err);
-        if (mounted) {
-          setError('Failed to fetch posts: ' + err.message);
-          setLoading(false);
-        }
+      // Only fetch if this is the first page or initialLoadComplete is true
+      // This prevents duplicate loading during initial render
+      if ((page === 1 || initialLoadComplete) && mounted) {
+        await fetchRunPosts();
       }
     };
-
+    
     init();
 
     return () => {
       mounted = false;
     };
-  }, [fetchRunPosts]);
+  }, [fetchRunPosts, page, initialLoadComplete]);
+
+  // Add scroll event listener for infinite scrolling
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop >=
+        document.documentElement.offsetHeight - 300
+      ) {
+        loadMorePosts();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loadMorePosts]);
 
   const handleZap = async (post) => {
     if (!window.nostr) {

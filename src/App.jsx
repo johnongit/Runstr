@@ -1,11 +1,19 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { NostrProvider } from './contexts/NostrProvider';
 import { AuthProvider } from './components/AuthProvider';
 import { AudioPlayerProvider } from './contexts/AudioPlayerProvider';
-import { AppRoutes } from './AppRoutes';
 import { MenuBar } from './components/MenuBar';
-import { FloatingMusicPlayer } from './components/FloatingMusicPlayer';
 import './App.css';
+
+// Lazy load components
+const AppRoutes = lazy(() => import('./AppRoutes').then(module => ({ default: module.AppRoutes })));
+const FloatingMusicPlayer = lazy(() => import('./components/FloatingMusicPlayer').then(module => ({ default: module.FloatingMusicPlayer })));
+
+// Loading fallback
+const LoadingFallback = () => (
+  <div className="loading-spinner"></div>
+);
 
 const App = () => {
   return (
@@ -15,8 +23,12 @@ const App = () => {
           <AudioPlayerProvider>
             <div className="app">
               <MenuBar />
-              <AppRoutes />
-              <FloatingMusicPlayer />
+              <Suspense fallback={<LoadingFallback />}>
+                <AppRoutes />
+              </Suspense>
+              <Suspense fallback={null}>
+                <FloatingMusicPlayer />
+              </Suspense>
             </div>
           </AudioPlayerProvider>
         </AuthProvider>

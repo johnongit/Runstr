@@ -12,7 +12,55 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>Running App</title>
+    
+    <!-- DNS Prefetch and Preconnect -->
+    <link rel="dns-prefetch" href="https://nostr.band">
+    <link rel="preconnect" href="https://nostr.band" crossorigin>
+    <link rel="dns-prefetch" href="https://wavlake.com">
+    <link rel="preconnect" href="https://wavlake.com" crossorigin>
+    
+    <!-- Preload critical assets -->
+    <link rel="preload" href="/src/App.css" as="style">
+    <link rel="preload" href="/src/index.css" as="style">
+    
+    <!-- Critical CSS for initial render -->
+    <style>
+      /* Inline critical CSS for faster initial render */
+      body {
+        margin: 0;
+        background-color: #242424;
+        color: white;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      }
+      #root {
+        max-width: 100%;
+        margin: 0 auto;
+        height: 100%;
+      }
+      .loading-spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100%;
+      }
+      .loading-spinner::after {
+        content: "";
+        width: 40px;
+        height: 40px;
+        border: 5px solid #646cff;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+    
     <script 
+      defer
       src='https://www.unpkg.com/nostr-login@latest/dist/unpkg.js' 
       data-perms="get_public_key,sign_event:0" 
       data-theme="purple"
@@ -21,7 +69,9 @@
     ></script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="loading-spinner"></div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
       if ('serviceWorker' in navigator) {

@@ -1,9 +1,14 @@
-import { useReducer, useState, useEffect, useCallback } from 'react';
+import { useReducer, useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import PropTypes from 'prop-types';
 import { AudioPlayerContext, initialState, audioReducer } from './audioPlayerContext';
 import { fetchPlaylist } from '../utils/wavlake';
-import ReactAudioPlayer from 'react-h5-audio-player';
-import 'react-h5-audio-player/lib/styles.css';
+
+// Lazy load the audio player to improve initial page load time
+const ReactAudioPlayer = lazy(() => import('react-h5-audio-player').then(module => {
+  // Also import the CSS only when the component is loaded
+  import('react-h5-audio-player/lib/styles.css');
+  return module;
+}));
 
 export const AudioPlayerProvider = ({ children }) => {
   const [state, dispatch] = useReducer(audioReducer, initialState);
@@ -12,8 +17,9 @@ export const AudioPlayerProvider = ({ children }) => {
   const [playlist, setPlaylist] = useState(null);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [audioPlayerRef, setAudioPlayerRef] = useState(null);
+  const [audioPlayerLoaded, setAudioPlayerLoaded] = useState(false);
 
-  // Load playlist when playlist ID changes
+  // Load playlist when playlist ID changes, but don't auto-play to improve performance
   const loadPlaylist = async (playlistId) => {
     try {
       const fetchedPlaylist = await fetchPlaylist(playlistId);
@@ -21,8 +27,11 @@ export const AudioPlayerProvider = ({ children }) => {
       setCurrentTrackIndex(0);
       if (fetchedPlaylist.tracks && fetchedPlaylist.tracks.length > 0) {
         dispatch({ type: 'SET_TRACK', payload: fetchedPlaylist.tracks[0] });
-        dispatch({ type: 'PLAY' });
+        // Don't auto-play to improve performance
+        // dispatch({ type: 'PLAY' });
       }
+      // Now we can load the audio player component if it's not already loaded
+      setAudioPlayerLoaded(true);
     } catch (error) {
       console.error('Error loading playlist:', error);
     }
@@ -34,10 +43,10 @@ export const AudioPlayerProvider = ({ children }) => {
       dispatch({ type: 'SET_TRACK', payload: playlist.tracks[currentTrackIndex] });
       // If we're not on the first track, and a track is already playing, 
       // keep playing when we change tracks
-      if (state.isPlaying) {
+      if (state.isPlaying && audioPlayerRef?.audio?.current) {
         // Small timeout to ensure the new track is loaded before playing
         setTimeout(() => {
-          audioPlayerRef?.audio?.current?.play().catch(e => console.log('Auto-play prevented:', e));
+          audioPlayerRef.audio.current?.play().catch(e => console.log('Auto-play prevented:', e));
         }, 100);
       }
     }
@@ -69,6 +78,18 @@ export const AudioPlayerProvider = ({ children }) => {
 
   // Play/pause toggle
   const togglePlayPause = useCallback(() => {
+    if (!audioPlayerLoaded) {
+      setAudioPlayerLoaded(true);
+      // Wait for the component to load
+      setTimeout(() => {
+        dispatch({ type: 'PLAY' });
+        setTimeout(() => {
+          audioPlayerRef?.audio?.current?.play().catch(e => console.log('Play prevented:', e));
+        }, 100);
+      }, 200);
+      return;
+    }
+
     if (state.isPlaying) {
       dispatch({ type: 'PAUSE' });
       audioPlayerRef?.audio?.current?.pause();
@@ -76,7 +97,7 @@ export const AudioPlayerProvider = ({ children }) => {
       dispatch({ type: 'PLAY' });
       audioPlayerRef?.audio?.current?.play().catch(e => console.log('Play prevented:', e));
     }
-  }, [state.isPlaying, audioPlayerRef, dispatch]);
+  }, [state.isPlaying, audioPlayerRef, dispatch, audioPlayerLoaded]);
 
   // Handle track ended event
   const handleTrackEnded = useCallback(() => {
@@ -103,20 +124,22 @@ export const AudioPlayerProvider = ({ children }) => {
       }}
     >
       {children}
-      {state.currentTrack && (
+      {state.currentTrack && audioPlayerLoaded && (
         <div className="global-audio-player" style={{ display: 'none' }}>
-          <ReactAudioPlayer
-            ref={setAudioPlayerRef}
-            autoPlay={state.isPlaying}
-            src={state.currentTrack.mediaUrl}
-            onClickNext={playNext}
-            onClickPrevious={playPrevious}
-            onEnded={handleTrackEnded}
-            onPlay={() => dispatch({ type: 'PLAY' })}
-            onPause={() => dispatch({ type: 'PAUSE' })}
-            showJumpControls={false}
-            showSkipControls
-          />
+          <Suspense fallback={<div>Loading player...</div>}>
+            <ReactAudioPlayer
+              ref={setAudioPlayerRef}
+              autoPlay={state.isPlaying}
+              src={state.currentTrack.mediaUrl}
+              onClickNext={playNext}
+              onClickPrevious={playPrevious}
+              onEnded={handleTrackEnded}
+              onPlay={() => dispatch({ type: 'PLAY' })}
+              onPause={() => dispatch({ type: 'PAUSE' })}
+              showJumpControls={false}
+              showSkipControls
+            />
+          </Suspense>
         </div>
       )}
     </AudioPlayerContext.Provider>
