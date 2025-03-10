@@ -1,6 +1,9 @@
 import { useState, useContext, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { NostrContext } from '../contexts/NostrContext';
+import { registerPlugin } from '@capacitor/core';
+
+const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
 export const PermissionDialog = ({ onContinue, onCancel }) => {
   const [isVisible, setIsVisible] = useState(true);
@@ -19,8 +22,36 @@ export const PermissionDialog = ({ onContinue, onCancel }) => {
         }
       }
       
-      // Mark dialog as completed regardless of Nostr result
-      // Location permissions will be requested by the BackgroundGeolocation plugin
+      // Request location permissions immediately after Amber permissions
+      try {
+        // Request location permissions using BackgroundGeolocation
+        await BackgroundGeolocation.addWatcher(
+          {
+            backgroundMessage: 'Tracking your runs',
+            backgroundTitle: 'Runstr',
+            requestPermissions: true,
+            distanceFilter: 10,
+            highAccuracy: true,
+            staleLocationThreshold: 30000
+          },
+          (location, error) => {
+            if (error) {
+              console.warn('Location permission error:', error);
+              return;
+            }
+            
+            // Successfully got location, clean up this temporary watcher
+            BackgroundGeolocation.removeWatcher({
+              id: 'initialPermissionRequest'
+            });
+          }
+        );
+      } catch (locationError) {
+        console.warn('Error requesting location permissions:', locationError);
+      }
+      
+      // Mark dialog as completed regardless of results
+      localStorage.setItem('permissionsGranted', 'true');
       setIsVisible(false);
       if (onContinue) onContinue();
     } catch (error) {

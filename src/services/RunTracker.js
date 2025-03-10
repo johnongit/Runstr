@@ -100,9 +100,17 @@ class RunTracker extends EventEmitter {
         newPosition.latitude,
         newPosition.longitude
       );
-      this.distance += distanceIncrement;
-
-      this.emit('distanceChange', this.distance); // Emit distance change
+      
+      // Add a minimum threshold to filter out GPS noise (e.g., 3 meters)
+      // Only count movement if it's above the threshold
+      const MOVEMENT_THRESHOLD = 3; // 3 meters
+      if (distanceIncrement >= MOVEMENT_THRESHOLD) {
+        this.distance += distanceIncrement;
+        this.emit('distanceChange', this.distance); // Emit distance change
+      } else {
+        // GPS noise detected, not adding to distance
+        console.log(`Filtered out small movement: ${distanceIncrement.toFixed(2)}m`);
+      }
 
       // Check for altitude data and update elevation
       if (newPosition.altitude !== undefined && newPosition.altitude !== null) {
@@ -167,30 +175,33 @@ class RunTracker extends EventEmitter {
 
   async startTracking() {
     try {
-      // Check if the user has already seen and accepted our custom permission dialog
+      // We should have already requested permissions by this point
       const permissionsGranted = localStorage.getItem('permissionsGranted') === 'true';
+      
+      if (!permissionsGranted) {
+        console.warn('Attempting to start tracking without permissions. This should not happen.');
+        return;
+      }
       
       this.watchId = await BackgroundGeolocation.addWatcher(
         {
           backgroundMessage: 'Tracking your run...',
           backgroundTitle: 'Runstr',
-          // Only request permissions automatically if the user has already accepted our custom dialog
-          requestPermissions: permissionsGranted, 
-          distanceFilter: 10
+          // Never request permissions here - we've already done it in the permission dialog
+          requestPermissions: false, 
+          distanceFilter: 10,
+          // Add high accuracy mode for better GPS precision
+          highAccuracy: true,
+          // Increase stale location threshold to get fresher GPS data
+          staleLocationThreshold: 30000 // 30 seconds
         },
         (location, error) => {
           if (error) {
             if (error.code === 'NOT_AUTHORIZED') {
-              // Only show this fallback dialog if we haven't shown our custom one
-              if (!permissionsGranted && 
-                window.confirm(
-                  'This app needs your location, ' +
-                    'but does not have permission.\n\n' +
-                    'Open settings now?'
-                )
-              ) {
-                BackgroundGeolocation.openSettings();
-              }
+              // Permissions were revoked after being initially granted
+              localStorage.setItem('permissionsGranted', 'false');
+              alert('Location permission is required for tracking. Please enable it in your device settings.');
+              BackgroundGeolocation.openSettings();
             }
             return console.error(error);
           }

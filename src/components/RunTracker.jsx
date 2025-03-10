@@ -115,8 +115,10 @@ export const RunTracker = () => {
       // If permissions already granted, start the run immediately
       startRun();
     } else {
-      // Show the permission dialog first
-      setShowPermissionDialog(true);
+      // If permissions haven't been granted yet, show a message
+      alert('Location permission is required for tracking runs. Please restart the app to grant permissions.');
+      // Set the flag to show permission dialog next time the app starts
+      localStorage.removeItem('permissionsGranted');
     }
   };
 
