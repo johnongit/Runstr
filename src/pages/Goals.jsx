@@ -68,6 +68,16 @@ export const Goals = () => {
       
       const runHistory = JSON.parse(storedHistory);
       
+      // Skip calculations if no runs
+      if (!runHistory || runHistory.length === 0) {
+        setGoals(prevGoals => ({
+          weekly: { ...prevGoals.weekly, progress: 0 },
+          monthly: { ...prevGoals.monthly, progress: 0 },
+          yearly: { ...prevGoals.yearly, progress: 0 }
+        }));
+        return;
+      }
+      
       // Calculate current period boundaries
       const now = new Date();
       const startOfWeek = new Date(now);
@@ -75,16 +85,39 @@ export const Goals = () => {
       startOfWeek.setHours(0, 0, 0, 0);
       
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      
       const startOfYear = new Date(now.getFullYear(), 0, 1);
+      startOfYear.setHours(0, 0, 0, 0);
       
       // Calculate progress for each time period
       let weeklyDistance = 0;
       let monthlyDistance = 0;
       let yearlyDistance = 0;
       
+      // Create a Map to detect duplicates by date and distance
+      const processedRuns = new Map();
+      
       runHistory.forEach(run => {
+        // Skip invalid runs
+        if (!run.date || isNaN(run.distance) || run.distance <= 0) {
+          return;
+        }
+        
+        // Create a signature for the run to detect potential duplicates
         const runDate = new Date(run.date);
-        const runDistance = run.distance;
+        const dateStr = runDate.toDateString();
+        const runSignature = `${dateStr}-${run.distance.toFixed(1)}`;
+        
+        // Skip if we've already counted a run with this signature
+        if (processedRuns.has(runSignature)) {
+          return;
+        }
+        
+        // Mark this run as processed
+        processedRuns.set(runSignature, true);
+        
+        const runDistance = parseFloat(run.distance);
         
         if (runDate >= startOfWeek) {
           weeklyDistance += runDistance;

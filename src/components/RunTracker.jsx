@@ -69,14 +69,30 @@ export const RunTracker = () => {
       const existingRuns = JSON.parse(
         localStorage.getItem('runHistory') || '[]'
       );
-      const updatedRuns = [...existingRuns, runData];
-      localStorage.setItem('runHistory', JSON.stringify(updatedRuns));
-
-      // Store run locally for offline sync
-      storeRunLocally(runData);
-
-      setRunHistory((prev) => [...prev, runData]);
-      updateLastRun(runData);
+      
+      // Check for potential duplicates before adding
+      const isDuplicate = existingRuns.some(run => {
+        // Check if there's already a run with the same date, distance, and duration
+        // within a small margin of error (0.1km and 5 seconds)
+        return run.date === runData.date && 
+               Math.abs(run.distance - runData.distance) < 0.1 &&
+               Math.abs(run.duration - runData.duration) < 5;
+      });
+      
+      // Only add the run if it's not a duplicate
+      if (!isDuplicate) {
+        const updatedRuns = [...existingRuns, runData];
+        localStorage.setItem('runHistory', JSON.stringify(updatedRuns));
+        
+        // Store run locally for offline sync
+        storeRunLocally(runData);
+        
+        setRunHistory((prev) => [...prev, runData]);
+        updateLastRun(runData);
+      } else {
+        console.log('Duplicate run detected - not adding to history');
+      }
+      
       setIsRunning(false);
       setIsPaused(false);
 

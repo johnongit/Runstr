@@ -107,6 +107,30 @@ export const RunHistory = () => {
   }, []);
 
   const calculateStats = useCallback(() => {
+    // Skip calculation if there are no runs
+    if (runHistory.length === 0) {
+      setStats({
+        totalDistance: 0,
+        totalRuns: 0,
+        averagePace: 0,
+        fastestPace: Infinity,
+        longestRun: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        thisWeekDistance: 0,
+        thisMonthDistance: 0,
+        totalCaloriesBurned: 0,
+        averageCaloriesPerKm: 0,
+        personalBests: {
+          '5k': Infinity,
+          '10k': Infinity,
+          halfMarathon: Infinity,
+          marathon: Infinity
+        }
+      });
+      return;
+    }
+    
     const newStats = {
       totalDistance: 0,
       totalRuns: runHistory.length,
@@ -130,35 +154,63 @@ export const RunHistory = () => {
     let totalPace = 0;
     let totalCalories = 0;
     const now = new Date();
-    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
 
-    // Sort runs by date for streak calculation
-    const sortedRuns = [...runHistory].sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
+    // Create date objects for all runs (once)
+    const runsWithDates = runHistory.map(run => ({
+      ...run,
+      dateObj: new Date(run.date)
+    }));
+    
+    // Sort runs by date (newest first) for streak calculation
+    const sortedRuns = [...runsWithDates].sort(
+      (a, b) => b.dateObj - a.dateObj
     );
 
-    // Calculate current streak
+    // Calculate current streak - consecutive days of running from the most recent
     let streak = 0;
-    let currentDate =
-      sortedRuns.length > 0 ? new Date(sortedRuns[0].date) : null;
-
-    for (let i = 0; i < sortedRuns.length; i++) {
-      const runDate = new Date(sortedRuns[i].date);
-      if (
-        i === 0 ||
-        Math.floor((currentDate - runDate) / (1000 * 60 * 60 * 24)) === 1
-      ) {
+    let currentDate = sortedRuns.length > 0 ? sortedRuns[0].dateObj : null;
+    
+    // Map to track which days have runs
+    const runDays = new Map();
+    
+    // First mark all days that have runs
+    sortedRuns.forEach(run => {
+      const dateStr = run.dateObj.toDateString();
+      runDays.set(dateStr, true);
+    });
+    
+    // Now calculate streak by checking consecutive days
+    if (currentDate) {
+      // Initialize with the first day
+      streak = 1;
+      
+      // Start checking from yesterday
+      let checkDate = new Date(currentDate);
+      checkDate.setDate(checkDate.getDate() - 1);
+      
+      // Check consecutive days backwards
+      while (runDays.has(checkDate.toDateString())) {
         streak++;
-        currentDate = runDate;
-      } else {
-        break;
+        checkDate.setDate(checkDate.getDate() - 1);
       }
     }
+    
     newStats.currentStreak = streak;
 
-    // Process each run
+    // Process each run for other stats
     runHistory.forEach((run) => {
+      // Skip runs with invalid data
+      if (isNaN(run.distance) || run.distance <= 0 || 
+          isNaN(run.duration) || run.duration <= 0) {
+        return;
+      }
+      
       // Total distance
       newStats.totalDistance += run.distance;
 
@@ -169,14 +221,18 @@ export const RunHistory = () => {
 
       // Pace calculations
       const pace = run.duration / 60 / run.distance;
-      totalPace += pace;
-      if (pace < newStats.fastestPace) {
-        newStats.fastestPace = pace;
+      if (!isNaN(pace) && pace > 0) {
+        totalPace += pace;
+        if (pace < newStats.fastestPace) {
+          newStats.fastestPace = pace;
+        }
       }
 
       // Calculate calories burned for this run
       const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration, userProfile);
-      totalCalories += caloriesBurned;
+      if (!isNaN(caloriesBurned)) {
+        totalCalories += caloriesBurned;
+      }
 
       // This week and month distances
       const runDate = new Date(run.date);
@@ -214,14 +270,28 @@ export const RunHistory = () => {
       }
     });
 
-    // Calculate average pace
-    newStats.averagePace = totalPace / runHistory.length || 0;
+    // Calculate average pace - only if we have valid runs with pace
+    const validRunCount = runHistory.filter(run => 
+      !isNaN(run.distance) && run.distance > 0 && 
+      !isNaN(run.duration) && run.duration > 0
+    ).length;
+    
+    newStats.averagePace = validRunCount > 0 ? totalPace / validRunCount : 0;
     
     // Set total calories burned
-    newStats.totalCaloriesBurned = totalCalories;
+    newStats.totalCaloriesBurned = Math.round(totalCalories);
     
     // Calculate average calories per km
-    newStats.averageCaloriesPerKm = totalCalories / newStats.totalDistance || 0;
+    newStats.averageCaloriesPerKm = newStats.totalDistance > 0 
+      ? totalCalories / newStats.totalDistance 
+      : 0;
+    
+    // Fix Infinity values for personal bests
+    Object.keys(newStats.personalBests).forEach(key => {
+      if (newStats.personalBests[key] === Infinity) {
+        newStats.personalBests[key] = 0;
+      }
+    });
 
     setStats(newStats);
   }, [runHistory, calculateCaloriesBurned, userProfile]);
@@ -233,29 +303,56 @@ export const RunHistory = () => {
   const loadRunHistory = () => {
     const storedRuns = localStorage.getItem('runHistory');
     if (storedRuns) {
-      // Parse stored runs
-      const parsedRuns = JSON.parse(storedRuns);
-      
-      // Create a set to track seen IDs and detect duplicates
-      const seenIds = new Set();
-      const fixedRuns = parsedRuns.map(run => {
-        // If ID is already seen or not present, generate a new unique ID
-        if (!run.id || seenIds.has(run.id)) {
-          const newId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-          return { ...run, id: newId };
+      try {
+        // Parse stored runs
+        const parsedRuns = JSON.parse(storedRuns);
+        
+        // Create a map to store unique runs by their date and metrics
+        // This will help identify and remove complete duplicates
+        const uniqueRunsMap = new Map();
+        const seenIds = new Set();
+        
+        // First pass: identify unique runs and fix missing IDs
+        const fixedRuns = parsedRuns.reduce((acc, run) => {
+          // Create a signature for each run based on key properties
+          const runSignature = `${run.date}-${run.distance}-${run.duration}`;
+          
+          // If this is a duplicate entry (same date, distance, duration)
+          // and we've already seen it, skip it
+          if (uniqueRunsMap.has(runSignature)) {
+            return acc;
+          }
+          
+          // Ensure run has a valid ID
+          let runWithId = { ...run };
+          if (!run.id || seenIds.has(run.id)) {
+            runWithId.id = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          }
+          
+          // Mark this ID as seen
+          seenIds.add(runWithId.id);
+          
+          // Mark this run signature as seen
+          uniqueRunsMap.set(runSignature, true);
+          
+          // Add to our accumulator
+          acc.push(runWithId);
+          return acc;
+        }, []);
+        
+        // Save the fixed runs back to localStorage
+        if (fixedRuns.length !== parsedRuns.length || 
+            fixedRuns.some((run, i) => run.id !== parsedRuns[i]?.id)) {
+          localStorage.setItem('runHistory', JSON.stringify(fixedRuns));
+          console.log(`Fixed run history: Removed ${parsedRuns.length - fixedRuns.length} duplicates`);
         }
         
-        // Otherwise, keep the existing ID
-        seenIds.add(run.id);
-        return run;
-      });
-      
-      // Save the fixed runs back to localStorage if changes were made
-      if (fixedRuns.some((run, i) => run.id !== parsedRuns[i].id)) {
-        localStorage.setItem('runHistory', JSON.stringify(fixedRuns));
+        setRunHistory(fixedRuns);
+      } catch (error) {
+        console.error('Error loading run history:', error);
+        // If there's an error, try to recover with an empty array
+        setRunHistory([]);
       }
-      
-      setRunHistory(fixedRuns);
     }
   };
 

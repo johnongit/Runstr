@@ -1834,14 +1834,14 @@ textarea {
 
 .post-actions {
   display: flex;
-  gap: 1rem;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.5rem 0;
   border-top: 1px solid #333;
   margin-top: 1rem;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
 }
 
 .like-button,
@@ -1850,18 +1850,19 @@ textarea {
 .repost-button {
   background: none;
   border: none;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
   color: #888;
   transition: color 0.2s;
+  font-size: 0.9rem;
+  width: 24%;
 }
 
 .like-button:hover,
 .comment-button:hover,
-.zap-button:hover,
 .repost-button:hover {
   color: #646cff;
 }
@@ -1872,6 +1873,10 @@ textarea {
 
 .repost-button.reposted {
   color: #4caf50;
+}
+
+.zap-button {
+  color: #888;
 }
 
 .zap-button:hover {

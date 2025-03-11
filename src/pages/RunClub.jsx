@@ -654,7 +654,7 @@ export const RunClub = () => {
                     className="zap-button"
                     onClick={() => handleZap(post)}
                   >
-                    ⚡️ Zap {post.zaps > 0 ? `(${post.zaps} zaps | ${Math.round(post.zapAmount)} sats)` : ''}
+                    ⚡️ {post.zaps > 0 ? post.zaps : ''}
                   </button>
                   <button
                     className={`like-button ${userLikes.has(post.id) ? 'liked' : ''}`}
