@@ -49,6 +49,29 @@ export const RunHistory = () => {
     loadRunHistory();
   }, []);
 
+  // Format date to a consistent readable format
+  const formatDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return new Date().toLocaleDateString();
+      }
+      
+      // Check if date is in the future (use current date instead)
+      const now = new Date();
+      if (date > now) {
+        return now.toLocaleDateString();
+      }
+      
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return new Date().toLocaleDateString();
+    }
+  };
+
   // Calculate calories burned based on user profile and run data
   const calculateCaloriesBurned = useCallback((distance, duration, userProfile) => {
     // MET (Metabolic Equivalent of Task) values for running at different intensities
@@ -219,21 +242,35 @@ export const RunHistory = () => {
         newStats.longestRun = run.distance;
       }
 
-      // Pace calculations
+      // Pace calculations - apply reasonable limits
+      // Most elite runners do 2-3 min/km, normal range 4-10 min/km
+      // 1 min/km would be 60 km/h which is impossible running speed
       const pace = run.duration / 60 / run.distance;
-      if (!isNaN(pace) && pace > 0) {
+      
+      // Minimum valid pace is 2 min/km, maximum is 20 min/km
+      const validPace = !isNaN(pace) && pace >= 2 && pace <= 20;
+      
+      if (validPace) {
         totalPace += pace;
         if (pace < newStats.fastestPace) {
           newStats.fastestPace = pace;
         }
+        
+        // Personal bests by distance
+        if (run.distance >= 5 && pace < newStats.personalBests['5k']) {
+          newStats.personalBests['5k'] = pace;
+        }
+        if (run.distance >= 10 && pace < newStats.personalBests['10k']) {
+          newStats.personalBests['10k'] = pace;
+        }
+        if (run.distance >= 21.0975 && pace < newStats.personalBests['halfMarathon']) {
+          newStats.personalBests['halfMarathon'] = pace;
+        }
+        if (run.distance >= 42.195 && pace < newStats.personalBests['marathon']) {
+          newStats.personalBests['marathon'] = pace;
+        }
       }
-
-      // Calculate calories burned for this run
-      const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration, userProfile);
-      if (!isNaN(caloriesBurned)) {
-        totalCalories += caloriesBurned;
-      }
-
+      
       // This week and month distances
       const runDate = new Date(run.date);
       if (runDate >= weekStart) {
@@ -242,42 +279,35 @@ export const RunHistory = () => {
       if (runDate >= monthStart) {
         newStats.thisMonthDistance += run.distance;
       }
-
-      // Personal bests for standard distances
-      if (run.distance >= 5) {
-        const pace5k = run.duration / 60 / 5;
-        if (pace5k < newStats.personalBests['5k']) {
-          newStats.personalBests['5k'] = pace5k;
-        }
-      }
-      if (run.distance >= 10) {
-        const pace10k = run.duration / 60 / 10;
-        if (pace10k < newStats.personalBests['10k']) {
-          newStats.personalBests['10k'] = pace10k;
-        }
-      }
-      if (run.distance >= 21.1) {
-        const paceHalf = run.duration / 60 / 21.1;
-        if (paceHalf < newStats.personalBests['halfMarathon']) {
-          newStats.personalBests['halfMarathon'] = paceHalf;
-        }
-      }
-      if (run.distance >= 42.2) {
-        const paceMarathon = run.duration / 60 / 42.2;
-        if (paceMarathon < newStats.personalBests['marathon']) {
-          newStats.personalBests['marathon'] = paceMarathon;
-        }
+      
+      // Calories
+      const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration, userProfile);
+      if (!isNaN(caloriesBurned)) {
+        totalCalories += caloriesBurned;
       }
     });
 
-    // Calculate average pace - only if we have valid runs with pace
+    // Calculate average pace only if there's at least one valid run
     const validRunCount = runHistory.filter(run => 
       !isNaN(run.distance) && run.distance > 0 && 
-      !isNaN(run.duration) && run.duration > 0
+      !isNaN(run.duration) && run.duration > 0 &&
+      run.duration / 60 / run.distance >= 2 && run.duration / 60 / run.distance <= 20
     ).length;
     
     newStats.averagePace = validRunCount > 0 ? totalPace / validRunCount : 0;
     
+    // If fastestPace is still Infinity, set it to 0
+    if (newStats.fastestPace === Infinity) {
+      newStats.fastestPace = 0;
+    }
+
+    // Set personal bests to 0 if they remain at Infinity
+    Object.keys(newStats.personalBests).forEach(key => {
+      if (newStats.personalBests[key] === Infinity) {
+        newStats.personalBests[key] = 0;
+      }
+    });
+
     // Set total calories burned
     newStats.totalCaloriesBurned = Math.round(totalCalories);
     
@@ -285,13 +315,6 @@ export const RunHistory = () => {
     newStats.averageCaloriesPerKm = newStats.totalDistance > 0 
       ? totalCalories / newStats.totalDistance 
       : 0;
-    
-    // Fix Infinity values for personal bests
-    Object.keys(newStats.personalBests).forEach(key => {
-      if (newStats.personalBests[key] === Infinity) {
-        newStats.personalBests[key] = 0;
-      }
-    });
 
     setStats(newStats);
   }, [runHistory, calculateCaloriesBurned, userProfile]);
@@ -311,9 +334,33 @@ export const RunHistory = () => {
         // This will help identify and remove complete duplicates
         const uniqueRunsMap = new Map();
         const seenIds = new Set();
+        const now = new Date();
         
-        // First pass: identify unique runs and fix missing IDs
+        // First pass: identify unique runs and fix missing IDs, future dates, and unrealistic values
         const fixedRuns = parsedRuns.reduce((acc, run) => {
+          // Fix future dates - replace with current date
+          let runDate = new Date(run.date);
+          if (isNaN(runDate.getTime()) || runDate > now) {
+            run.date = now.toLocaleDateString();
+          }
+          
+          // Fix unrealistic distance values (>100 km is extremely unlikely for normal runs)
+          // World record for 24-hour run is ~300 km, so 100 km is already very generous
+          const MAX_REALISTIC_DISTANCE = 100; // in km
+          if (isNaN(run.distance) || run.distance <= 0) {
+            run.distance = 5; // Default to 5 km for invalid distances
+          } else if (run.distance > MAX_REALISTIC_DISTANCE) {
+            run.distance = Math.min(run.distance, MAX_REALISTIC_DISTANCE);
+          }
+          
+          // Fix unrealistic durations (>24 hours is extremely unlikely)
+          const MAX_DURATION = 24 * 60 * 60; // 24 hours in seconds
+          if (isNaN(run.duration) || run.duration <= 0) {
+            run.duration = 30 * 60; // Default to 30 minutes for invalid durations
+          } else if (run.duration > MAX_DURATION) {
+            run.duration = Math.min(run.duration, MAX_DURATION);
+          }
+          
           // Create a signature for each run based on key properties
           const runSignature = `${run.date}-${run.distance}-${run.duration}`;
           
@@ -342,9 +389,14 @@ export const RunHistory = () => {
         
         // Save the fixed runs back to localStorage
         if (fixedRuns.length !== parsedRuns.length || 
-            fixedRuns.some((run, i) => run.id !== parsedRuns[i]?.id)) {
+            fixedRuns.some((run, i) => 
+              run.id !== parsedRuns[i]?.id || 
+              run.date !== parsedRuns[i]?.date ||
+              run.distance !== parsedRuns[i]?.distance ||
+              run.duration !== parsedRuns[i]?.duration
+            )) {
           localStorage.setItem('runHistory', JSON.stringify(fixedRuns));
-          console.log(`Fixed run history: Removed ${parsedRuns.length - fixedRuns.length} duplicates`);
+          console.log(`Fixed run history: Removed duplicates and fixed dates, distances, and durations`);
         }
         
         setRunHistory(fixedRuns);
@@ -415,16 +467,29 @@ ${additionalContent ? `\n${additionalContent}` : ''}
   };
 
   const formatTime = (seconds) => {
+    // Round to 2 decimal places to avoid excessive precision
+    seconds = Math.round(seconds * 100) / 100;
+    
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
+    const remainingSeconds = Math.floor(seconds % 60);
+    
     return `${hours.toString().padStart(2, '0')}:${minutes
       .toString()
       .padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   const displayDistance = (value) => {
-    const converted = distanceUnit === 'mi' ? value * 0.621371 : value;
+    // Ensure value is a number and not too small
+    const numValue = Number(value);
+    if (isNaN(numValue) || numValue < 0.01) {
+      return `0.00 ${distanceUnit}`;
+    }
+    
+    // Convert from kilometers to miles if needed
+    const converted = distanceUnit === 'mi' ? numValue * 0.621371 : numValue;
+    
+    // Format to 2 decimal places
     return `${converted.toFixed(2)} ${distanceUnit}`;
   };
 
@@ -503,15 +568,15 @@ ${additionalContent ? `\n${additionalContent}` : ''}
           </div>
           <div className="stat-card">
             <h3>Average Pace</h3>
-            <p>{stats.averagePace.toFixed(2)} min/km</p>
+            <p>{stats.averagePace.toFixed(2)} min/{distanceUnit}</p>
           </div>
           <div className="stat-card">
             <h3>Fastest Pace</h3>
             <p>
-              {stats.fastestPace === Infinity
+              {stats.fastestPace === Infinity || stats.fastestPace === 0
                 ? '-'
                 : stats.fastestPace.toFixed(2)}{' '}
-              min/km
+              min/{distanceUnit}
             </p>
           </div>
           <div className="stat-card">
@@ -554,37 +619,37 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             <div className="stat-card">
               <h4>5K</h4>
               <p>
-                {stats.personalBests['5k'] === Infinity
+                {stats.personalBests['5k'] === Infinity || stats.personalBests['5k'] === 0
                   ? '-'
                   : stats.personalBests['5k'].toFixed(2)}{' '}
-                min/km
+                min/{distanceUnit}
               </p>
             </div>
             <div className="stat-card">
               <h4>10K</h4>
               <p>
-                {stats.personalBests['10k'] === Infinity
+                {stats.personalBests['10k'] === Infinity || stats.personalBests['10k'] === 0
                   ? '-'
                   : stats.personalBests['10k'].toFixed(2)}{' '}
-                min/km
+                min/{distanceUnit}
               </p>
             </div>
             <div className="stat-card">
               <h4>Half Marathon</h4>
               <p>
-                {stats.personalBests['halfMarathon'] === Infinity
+                {stats.personalBests['halfMarathon'] === Infinity || stats.personalBests['halfMarathon'] === 0
                   ? '-'
                   : stats.personalBests['halfMarathon'].toFixed(2)}{' '}
-                min/km
+                min/{distanceUnit}
               </p>
             </div>
             <div className="stat-card">
               <h4>Marathon</h4>
               <p>
-                {stats.personalBests['marathon'] === Infinity
+                {stats.personalBests['marathon'] === Infinity || stats.personalBests['marathon'] === 0
                   ? '-'
                   : stats.personalBests['marathon'].toFixed(2)}{' '}
-                min/km
+                min/{distanceUnit}
               </p>
             </div>
           </div>
@@ -621,18 +686,20 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         <ul className="history-list">
           {runHistory.map((run) => {
             const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration, userProfile);
+            
+            // Calculate pace with proper validation
+            const pace = run.distance > 0.01 
+              ? (run.duration / 60 / run.distance).toFixed(2) 
+              : '0.00';
+            
             return (
               <li key={run.id} className="history-item">
-                <div className="run-date">{run.date}</div>
+                <div className="run-date">{formatDate(run.date)}</div>
                 <div className="run-details">
                   <span>Duration: {formatTime(run.duration)}</span>
                   <span>Distance: {displayDistance(run.distance)}</span>
                   <span>
-                    Pace:{' '}
-                    {run.duration > 0
-                      ? (run.duration / 60 / run.distance).toFixed(2)
-                      : '0'}{' '}
-                    min/{distanceUnit}
+                    Pace: {pace} min/{distanceUnit}
                   </span>
                   <span>Calories: {caloriesBurned} kcal</span>
                   {/* Add elevation data */}
