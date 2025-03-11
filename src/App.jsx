@@ -23,9 +23,11 @@ const App = () => {
           <AudioPlayerProvider>
             <div className="app">
               <MenuBar />
-              <Suspense fallback={<LoadingFallback />}>
-                <AppRoutes />
-              </Suspense>
+              <main className="main-content">
+                <Suspense fallback={<LoadingFallback />}>
+                  <AppRoutes />
+                </Suspense>
+              </main>
               <Suspense fallback={null}>
                 <FloatingMusicPlayer />
               </Suspense>

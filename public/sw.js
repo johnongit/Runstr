@@ -1,14 +1,19 @@
-const CACHE_NAME = 'nostr-run-club-v1';
+const CACHE_NAME = 'nostr-run-club-v2';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/src/App.css',
+  '/src/index.css',
+  '/vite.svg',
+  '/icons/icon-192x192.png'
+];
 
 // Install Service Worker
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        '/',
-        '/index.html',
-        '/manifest.json'
-      ]);
+      return cache.addAll(STATIC_ASSETS);
     })
   );
   // Skip waiting to activate immediately
@@ -39,10 +44,12 @@ self.addEventListener('message', (event) => {
     }
   } else if (event.data.type === 'STOP_TRACKING') {
     // Do not try to stop tracking in background - handled by Capacitor plugin
+  } else if (event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
 
-// Basic fetch handler with network-first strategy
+// Improved fetch handler with cache strategies
 self.addEventListener('fetch', (event) => {
   // Handle Vite HMR pings differently to prevent connection errors
   const url = new URL(event.request.url);
@@ -61,7 +68,38 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Network-first strategy
+  // Cache-first for CSS files to ensure consistent UI
+  if (event.request.url.endsWith('.css')) {
+    event.respondWith(
+      caches.match(event.request)
+        .then(cachedResponse => {
+          if (cachedResponse) {
+            // Return cached response but update cache in background
+            fetch(event.request).then(networkResponse => {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+            }).catch(error => {
+              console.log('Failed to update cached CSS:', error);
+            });
+            return cachedResponse;
+          }
+          
+          // If not in cache, fetch from network and cache
+          return fetch(event.request).then(response => {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+            return response;
+          });
+        })
+    );
+    return;
+  }
+  
+  // Network-first strategy for other requests
   event.respondWith(
     fetch(event.request)
       .catch(() => {

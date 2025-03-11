@@ -17,10 +17,18 @@ export const MenuBar = () => {
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
+    // Prevent body scrolling when menu is open
+    document.body.style.overflow = isOpen ? 'auto' : 'hidden';
+  };
+
+  // Ensure body scrolling is restored when component unmounts
+  const closeMenu = () => {
+    setIsOpen(false);
+    document.body.style.overflow = 'auto';
   };
 
   return (
-    <>
+    <header className="menu-header">
       <h1 className="app-title">RUNSTR</h1>
 
       <button
@@ -37,7 +45,7 @@ export const MenuBar = () => {
         <ul className="menu-list">
           {menuItems.map((item) => (
             <li key={item.name} className="menu-item">
-              <Link to={item.path} onClick={() => setIsOpen(false)}>
+              <Link to={item.path} onClick={closeMenu}>
                 {item.name}
               </Link>
             </li>
@@ -45,7 +53,7 @@ export const MenuBar = () => {
         </ul>
       </nav>
 
-      {isOpen && <div className="overlay" onClick={toggleMenu}></div>}
-    </>
+      {isOpen && <div className="overlay" onClick={closeMenu}></div>}
+    </header>
   );
 };
