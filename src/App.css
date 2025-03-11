@@ -557,6 +557,9 @@ textarea {
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .music-tabs {
@@ -751,31 +754,31 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 20px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .track-item {
   display: flex;
   align-items: center;
   padding: 15px;
-  background: var(--bg-dark);
+  background: #1a1a1a;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid var(--border-color);
-  gap: 10px;
+  transition: background-color 0.2s;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .track-item:hover {
   background: #2a2a2a;
-  transform: translateX(5px);
-  border-color: var(--primary-color);
 }
 
 .track-number {
   font-size: 1.2em;
   font-weight: bold;
-  color: var(--primary-color);
+  color: #646cff;
   min-width: 30px;
 }
 
@@ -1150,6 +1153,9 @@ textarea {
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .music-tabs {
@@ -1175,6 +1181,8 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .track-item {
@@ -1185,6 +1193,9 @@ textarea {
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.2s;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .track-item:hover {
@@ -1749,6 +1760,8 @@ textarea {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  width: 100%;
 }
 
 .library-container h1 {
@@ -1760,6 +1773,8 @@ textarea {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 20px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .playlist-card {
@@ -1768,6 +1783,8 @@ textarea {
   overflow: hidden;
   cursor: pointer;
   transition: background-color 0.2s;
+  width: 100%;
+  max-width: 100%;
 }
 
 .playlist-card:hover {
@@ -4532,5 +4549,148 @@ input:checked + .toggle-slider:before {
 @media (max-width: 768px) {
   .main-content {
     padding-top: 60px; /* Smaller padding for mobile */
+  }
+}
+
+/* Custom Player Control Icons */
+.icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* Play icon - triangle pointing right */
+.icon-play {
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 16px solid white;
+  margin-left: 4px; /* Center the triangle visually */
+}
+
+/* Pause icon - two vertical bars */
+.icon-pause {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.icon-pause::before,
+.icon-pause::after {
+  content: '';
+  display: block;
+  width: 5px;
+  height: 18px;
+  background-color: white;
+  border-radius: 1px;
+}
+
+/* Previous icon - triangle pointing left with bar */
+.icon-prev {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.icon-prev::before {
+  content: '';
+  display: block;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 14px solid white;
+}
+
+.icon-prev::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 3px;
+  height: 16px;
+  background-color: white;
+  border-radius: 1px;
+}
+
+/* Next icon - triangle pointing right with bar */
+.icon-next {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.icon-next::before {
+  content: '';
+  display: block;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 14px solid white;
+}
+
+.icon-next::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  width: 3px;
+  height: 16px;
+  background-color: white;
+  border-radius: 1px;
+}
+
+/* Mini player icons for collapsed state */
+.mini-icon-play {
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 12px solid var(--primary-color);
+}
+
+.mini-icon-pause {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.mini-icon-pause::before,
+.mini-icon-pause::after {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 12px;
+  background-color: var(--primary-color);
+  border-radius: 1px;
+}
+
+/* Floating player collapsed icon colors */
+.now-playing-indicator .icon-container {
+  width: 18px;
+  height: 18px;
+}
+
+/* Add responsive styling for playlists */
+@media (max-width: 768px) {
+  .playlists-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  
+  .playlist-card {
+    width: 100%;
+  }
+  
+  .playlist-info h3 {
+    font-size: 1rem;
+  }
+  
+  .playlist-info p {
+    font-size: 0.8rem;
   }
 }

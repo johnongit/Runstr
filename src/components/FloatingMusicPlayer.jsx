@@ -34,19 +34,29 @@ export function FloatingMusicPlayer() {
           </div>
           <div className="player-controls">
             <button onClick={playPrevious} className="control-button">
-              ⏮️
+              <div className="icon-container">
+                <div className="icon-prev"></div>
+              </div>
             </button>
             <button onClick={togglePlayPause} className="control-button play-pause">
-              {isPlaying ? '⏸️' : '▶️'}
+              <div className="icon-container">
+                {isPlaying ? <div className="icon-pause"></div> : <div className="icon-play"></div>}
+              </div>
             </button>
             <button onClick={playNext} className="control-button">
-              ⏭️
+              <div className="icon-container">
+                <div className="icon-next"></div>
+              </div>
             </button>
           </div>
         </div>
       ) : (
         <div className="floating-player-collapsed" onClick={() => setExpanded(true)}>
-          <span className="now-playing-indicator">{isPlaying ? '▶️' : '⏸️'}</span>
+          <span className="now-playing-indicator">
+            <div className="icon-container">
+              {isPlaying ? <div className="mini-icon-pause"></div> : <div className="mini-icon-play"></div>}
+            </div>
+          </span>
           <span className="track-title-small">{currentTrack.title}</span>
         </div>
       )}

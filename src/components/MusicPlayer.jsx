@@ -52,13 +52,30 @@ export function MusicPlayer() {
       </div>
       <div className={styles.controls}>
         <button onClick={playPrevious} className={styles.controlButton}>
-          ⏮️ Previous
+          <div className="icon-container">
+            <div className="icon-prev"></div>
+            <span className={styles.buttonText}>Previous</span>
+          </div>
         </button>
         <button onClick={togglePlayPause} className={styles.controlButton}>
-          {isPlaying ? '⏸️ Pause' : '▶️ Play'}
+          <div className="icon-container">
+            {isPlaying ? 
+              <>
+                <div className="icon-pause"></div>
+                <span className={styles.buttonText}>Pause</span>
+              </> : 
+              <>
+                <div className="icon-play"></div>
+                <span className={styles.buttonText}>Play</span>
+              </>
+            }
+          </div>
         </button>
         <button onClick={playNext} className={styles.controlButton}>
-          ⏭️ Next
+          <div className="icon-container">
+            <div className="icon-next"></div>
+            <span className={styles.buttonText}>Next</span>
+          </div>
         </button>
       </div>
       <div className={styles.nowPlaying}>
@@ -79,7 +96,9 @@ export function MusicPlayer() {
                 <span className={styles.trackNumber}>{track.position}.</span>
                 <span className={styles.trackTitle}>{track.title}</span>
                 <span className={styles.trackArtist}>{track.artist || 'Unknown Artist'}</span>
-                <span className={styles.playIcon}>▶️</span>
+                <span className={styles.playIcon}>
+                  <div className="mini-icon-play"></div>
+                </span>
               </li>
             ))}
           </ul>

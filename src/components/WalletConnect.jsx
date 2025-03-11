@@ -10,7 +10,6 @@ init({
 
 // RUNSTR and OpenSats Lightning addresses
 const RUNSTR_LIGHTNING = 'runstr@geyser.fund';
-const OPENSATS_LIGHTNING = 'opensats@vlt.ge';
 
 export const WalletConnect = () => {
   const { setWallet } = useAuth();
@@ -173,8 +172,8 @@ export const WalletConnect = () => {
       </div>
 
       <div className="donation-section">
-        <h3>Support RUNSTR & Open Source</h3>
-        <p>Donate to help these projects continue building awesome software!</p>
+        <h3>Support RUNSTR</h3>
+        <p>Donate to help the project continue building awesome software!</p>
         
         <div className="donation-buttons">
           <button 
@@ -182,13 +181,6 @@ export const WalletConnect = () => {
             onClick={() => handleDonate(RUNSTR_LIGHTNING, 'RUNSTR')}
           >
             ⚡️ Zap RUNSTR ({defaultZapAmount} sats)
-          </button>
-          
-          <button 
-            className="donate-button opensats"
-            onClick={() => handleDonate(OPENSATS_LIGHTNING, 'OpenSats')}
-          >
-            ⚡️ Zap OpenSats ({defaultZapAmount} sats)
           </button>
         </div>
         
