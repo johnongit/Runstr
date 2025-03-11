@@ -486,8 +486,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       return `0.00 ${distanceUnit}`;
     }
     
-    // Convert from kilometers to miles if needed
-    const converted = distanceUnit === 'mi' ? numValue * 0.621371 : numValue;
+    // Convert from meters to km or miles as needed
+    const converted = distanceUnit === 'mi' ? numValue / 1609.344 : numValue / 1000;
     
     // Format to 2 decimal places
     return `${converted.toFixed(2)} ${distanceUnit}`;
