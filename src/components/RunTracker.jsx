@@ -438,7 +438,7 @@ ${
               Distance: {convertDistance(lastRun.distance, distanceUnit)}{' '}
               {distanceUnit}
             </span>
-            <span>Pace: {formatPace(lastRun.pace)} min/km</span>
+            <span>Pace: {formatPace(lastRun.pace, distanceUnit)} min/{distanceUnit}</span>
           </div>
           <div className="run-actions">
             <button
@@ -474,7 +474,7 @@ ${
                       Distance: {convertDistance(run.distance, distanceUnit)}{' '}
                       {distanceUnit}
                     </span>
-                    <span>Pace: {formatPace(run.pace)} min/km</span>
+                    <span>Pace: {formatPace(run.pace, distanceUnit)} min/{distanceUnit}</span>
                   </div>
                 </div>
               ))}

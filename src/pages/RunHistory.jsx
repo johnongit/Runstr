@@ -8,7 +8,7 @@ export const RunHistory = () => {
   const [showModal, setShowModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
-  const [distanceUnit] = useState(
+  const [distanceUnit, setDistanceUnit] = useState(
     () => localStorage.getItem('distanceUnit') || 'km'
   );
   const [userProfile, setUserProfile] = useState(() => {
@@ -48,6 +48,34 @@ export const RunHistory = () => {
   useEffect(() => {
     loadRunHistory();
   }, []);
+
+  // Listen for changes to the distance unit in localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newUnit = localStorage.getItem('distanceUnit') || 'km';
+      setDistanceUnit(newUnit);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Check for changes frequently
+    const checkInterval = setInterval(() => {
+      const currentUnit = localStorage.getItem('distanceUnit') || 'km';
+      if (currentUnit !== distanceUnit) {
+        setDistanceUnit(currentUnit);
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(checkInterval);
+    };
+  }, [distanceUnit]);
+
+  // Recalculate stats when distance unit changes
+  useEffect(() => {
+    calculateStats();
+  }, [distanceUnit, calculateStats]);
 
   // Format date to a consistent readable format
   const formatDate = (dateString) => {
@@ -136,7 +164,7 @@ export const RunHistory = () => {
         totalDistance: 0,
         totalRuns: 0,
         averagePace: 0,
-        fastestPace: Infinity,
+        fastestPace: 0, // Changed from Infinity to 0
         longestRun: 0,
         currentStreak: 0,
         bestStreak: 0,
@@ -145,10 +173,10 @@ export const RunHistory = () => {
         totalCaloriesBurned: 0,
         averageCaloriesPerKm: 0,
         personalBests: {
-          '5k': Infinity,
-          '10k': Infinity,
-          halfMarathon: Infinity,
-          marathon: Infinity
+          '5k': 0, // Changed from Infinity to 0
+          '10k': 0, // Changed from Infinity to 0
+          halfMarathon: 0, // Changed from Infinity to 0
+          marathon: 0 // Changed from Infinity to 0
         }
       });
       return;
@@ -175,6 +203,7 @@ export const RunHistory = () => {
     };
 
     let totalPace = 0;
+    let validPaceCount = 0; // Added counter for valid paces
     let totalCalories = 0;
     const now = new Date();
     const weekStart = new Date(now);
@@ -210,17 +239,25 @@ export const RunHistory = () => {
     
     // Now calculate streak by checking consecutive days
     if (currentDate) {
-      // Initialize with the first day
-      streak = 1;
+      // Check if the most recent run is from today or yesterday
+      const todayStr = new Date().toDateString();
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterdayStr = yesterdayDate.toDateString();
       
-      // Start checking from yesterday
-      let checkDate = new Date(currentDate);
-      checkDate.setDate(checkDate.getDate() - 1);
-      
-      // Check consecutive days backwards
-      while (runDays.has(checkDate.toDateString())) {
-        streak++;
+      if (runDays.has(todayStr) || runDays.has(yesterdayStr)) {
+        // Initialize with the first day
+        streak = 1;
+        
+        // Start checking from yesterday or the day before
+        let checkDate = runDays.has(todayStr) ? yesterdayDate : new Date(yesterdayDate);
         checkDate.setDate(checkDate.getDate() - 1);
+        
+        // Check consecutive days backwards
+        while (runDays.has(checkDate.toDateString())) {
+          streak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        }
       }
     }
     
@@ -231,6 +268,7 @@ export const RunHistory = () => {
       // Skip runs with invalid data
       if (isNaN(run.distance) || run.distance <= 0 || 
           isNaN(run.duration) || run.duration <= 0) {
+        console.warn('Skipping invalid run data:', run);
         return;
       }
       
@@ -252,6 +290,8 @@ export const RunHistory = () => {
       
       if (validPace) {
         totalPace += pace;
+        validPaceCount++; // Increment valid pace counter
+        
         if (pace < newStats.fastestPace) {
           newStats.fastestPace = pace;
         }
@@ -288,13 +328,7 @@ export const RunHistory = () => {
     });
 
     // Calculate average pace only if there's at least one valid run
-    const validRunCount = runHistory.filter(run => 
-      !isNaN(run.distance) && run.distance > 0 && 
-      !isNaN(run.duration) && run.duration > 0 &&
-      run.duration / 60 / run.distance >= 2 && run.duration / 60 / run.distance <= 20
-    ).length;
-    
-    newStats.averagePace = validRunCount > 0 ? totalPace / validRunCount : 0;
+    newStats.averagePace = validPaceCount > 0 ? totalPace / validPaceCount : 0;
     
     // If fastestPace is still Infinity, set it to 0
     if (newStats.fastestPace === Infinity) {
@@ -317,6 +351,7 @@ export const RunHistory = () => {
       : 0;
 
     setStats(newStats);
+    console.log('Stats recalculated:', newStats);
   }, [runHistory, calculateCaloriesBurned, userProfile]);
 
   useEffect(() => {
@@ -542,10 +577,31 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     }
   };
 
+  // Add a toggle function for distance unit
+  const toggleDistanceUnit = () => {
+    const newUnit = distanceUnit === 'km' ? 'mi' : 'km';
+    setDistanceUnit(newUnit);
+    localStorage.setItem('distanceUnit', newUnit);
+  };
+
   return (
     <div className="run-history">
       <div className="stats-overview">
         <h2>STATS</h2>
+        <div className="unit-toggle-container">
+          <button 
+            className={`unit-toggle ${distanceUnit === 'km' ? 'active' : ''}`}
+            onClick={toggleDistanceUnit}
+          >
+            KM
+          </button>
+          <button 
+            className={`unit-toggle ${distanceUnit === 'mi' ? 'active' : ''}`}
+            onClick={toggleDistanceUnit}
+          >
+            MI
+          </button>
+        </div>
         <button 
           className="profile-btn" 
           onClick={() => setShowProfileModal(true)}
