@@ -72,10 +72,19 @@ export const RunHistory = () => {
     };
   }, [distanceUnit]);
 
-  // Recalculate stats when any of its dependencies change
+  // Recalculate stats when distanceUnit changes
   useEffect(() => {
-    calculateStats();
-  }, [calculateStats, distanceUnit, runHistory, userProfile]);
+    if (runHistory.length > 0) {
+      calculateStats();
+    }
+  }, [distanceUnit]);
+
+  // Recalculate stats when run history or user profile changes
+  useEffect(() => {
+    if (runHistory.length > 0) {
+      calculateStats();
+    }
+  }, [runHistory, userProfile]);
 
   // Format date to a consistent readable format
   const formatDate = (dateString) => {
@@ -157,7 +166,7 @@ export const RunHistory = () => {
     return Math.round(adjustedCalories);
   }, []);
 
-  const calculateStats = useCallback(() => {
+  const calculateStats = () => {
     // Skip calculation if there are no runs
     if (runHistory.length === 0) {
       setStats({
@@ -352,7 +361,7 @@ export const RunHistory = () => {
 
     setStats(newStats);
     console.log('Stats recalculated:', newStats);
-  }, [runHistory, calculateCaloriesBurned, userProfile]);
+  };
 
   const loadRunHistory = () => {
     const storedRuns = localStorage.getItem('runHistory');
@@ -431,6 +440,12 @@ export const RunHistory = () => {
         }
         
         setRunHistory(fixedRuns);
+        // Calculate stats immediately after loading run history
+        setTimeout(() => {
+          if (fixedRuns.length > 0) {
+            calculateStats();
+          }
+        }, 0);
       } catch (error) {
         console.error('Error loading run history:', error);
         // If there's an error, try to recover with an empty array
