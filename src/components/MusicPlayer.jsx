@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import styles from '../assets/styles/AudioPlayer.module.css';
 
@@ -12,6 +13,34 @@ export function MusicPlayer() {
     playlist,
     currentTrackIndex
   } = useAudioPlayer();
+  
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showErrorMessage, setShowErrorMessage] = useState(false);
+
+  // Reset error when track changes
+  useEffect(() => {
+    setErrorMessage('');
+    setShowErrorMessage(false);
+  }, [currentTrack]);
+
+  // Error handling function
+  const handlePlaybackError = (error) => {
+    console.error('Playback error:', error);
+    const message = typeof error === 'string' ? error : 'Error playing track';
+    setErrorMessage(message);
+    setShowErrorMessage(true);
+    // Hide error after 5 seconds
+    setTimeout(() => setShowErrorMessage(false), 5000);
+  };
+
+  // Attempt to play and catch errors
+  const safeTogglePlay = () => {
+    try {
+      togglePlayPause();
+    } catch (error) {
+      handlePlaybackError(error);
+    }
+  };
 
   if (!currentTrack) return null;
 
@@ -46,6 +75,12 @@ export function MusicPlayer() {
 
   return (
     <div className={styles.container}>
+      {/* Error message display */}
+      {showErrorMessage && errorMessage && (
+        <div className={styles.errorMessage}>
+          {errorMessage}
+        </div>
+      )}
       <div className={styles.title}>
         <p>Selected Playlist: {playlist?.title || 'Unknown'}</p>
         <p>Selected Track: {currentTrack.title}</p>
@@ -57,7 +92,7 @@ export function MusicPlayer() {
             <span className={styles.buttonText}>Previous</span>
           </div>
         </button>
-        <button onClick={togglePlayPause} className={styles.controlButton}>
+        <button onClick={safeTogglePlay} className={styles.controlButton}>
           <div className="icon-container">
             {isPlaying ? 
               <>

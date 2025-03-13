@@ -22,18 +22,47 @@ export const AudioPlayerProvider = ({ children }) => {
   // Load playlist when playlist ID changes, but don't auto-play to improve performance
   const loadPlaylist = async (playlistId) => {
     try {
+      console.log(`Loading playlist: ${playlistId}`);
       const fetchedPlaylist = await fetchPlaylist(playlistId);
+      
+      // Validate playlist structure
+      if (!fetchedPlaylist) {
+        console.error(`Playlist not found: ${playlistId}`);
+        alert(`Could not load playlist: Playlist not found`);
+        return;
+      }
+      
+      if (!fetchedPlaylist.tracks || !Array.isArray(fetchedPlaylist.tracks)) {
+        console.error(`Invalid playlist format: ${playlistId}`, fetchedPlaylist);
+        alert(`Could not load playlist: Invalid playlist format`);
+        return;
+      }
+      
+      if (fetchedPlaylist.tracks.length === 0) {
+        console.warn(`Playlist is empty: ${playlistId}`);
+        alert(`This playlist is empty`);
+        return;
+      }
+      
+      console.log(`Playlist loaded: ${fetchedPlaylist.title} (${fetchedPlaylist.tracks.length} tracks)`);
+      
       setPlaylist(fetchedPlaylist);
       setCurrentTrackIndex(0);
-      if (fetchedPlaylist.tracks && fetchedPlaylist.tracks.length > 0) {
-        dispatch({ type: 'SET_TRACK', payload: fetchedPlaylist.tracks[0] });
-        // Don't auto-play to improve performance
-        // dispatch({ type: 'PLAY' });
+      
+      // Validate first track
+      const firstTrack = fetchedPlaylist.tracks[0];
+      if (!firstTrack.mediaUrl) {
+        console.error(`Track missing media URL:`, firstTrack);
+        alert(`Error: Track missing media URL`);
+        return;
       }
+      
+      dispatch({ type: 'SET_TRACK', payload: firstTrack });
       // Now we can load the audio player component if it's not already loaded
       setAudioPlayerLoaded(true);
     } catch (error) {
       console.error('Error loading playlist:', error);
+      alert(`Failed to load playlist: ${error.message}`);
     }
   };
 
