@@ -498,13 +498,36 @@ ${
       {splits.length > 0 && (
         <div className="splits-display">
           <h3>Splits</h3>
-          {splits.map((split, i) => (
-            <div key={i} className="split-item">
-              {distanceUnit === 'km' 
+          {splits.map((split, i) => {
+            // Format the split number and ensure proper display for partial splits
+            let splitLabel;
+            
+            if (split.isPartial) {
+              // This is a partial split (the final segment of a run)
+              // Calculate just the partial distance (e.g., 0.49 instead of 1.49)
+              const wholeUnits = Math.floor(split.km);
+              const partialDistance = (split.km - wholeUnits).toFixed(2);
+              splitLabel = distanceUnit === 'km'
+                ? `Partial: ${partialDistance} km`
+                : `Partial: ${partialDistance} mi`;
+            } else if (Number.isInteger(split.km)) {
+              // For whole unit splits (Mile 1, Mile 2, etc.)
+              splitLabel = distanceUnit === 'km' 
                 ? `Km ${split.km}` 
-                : `Mile ${split.km}`}: {formatPace(split.pace, distanceUnit)}
-            </div>
-          ))}
+                : `Mile ${split.km}`;
+            } else {
+              // Fallback for any other case
+              splitLabel = distanceUnit === 'km'
+                ? `Km ${split.km.toFixed(1)}`
+                : `Mile ${split.km.toFixed(2)}`;
+            }
+            
+            return (
+              <div key={i} className="split-item">
+                {splitLabel}: {formatPace(split.pace, distanceUnit)}
+              </div>
+            );
+          })}
         </div>
       )}
 

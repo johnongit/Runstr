@@ -126,31 +126,45 @@ class RunTracker extends EventEmitter {
       // Define the split distance in meters based on selected unit
       const splitDistance = this.distanceUnit === 'km' ? 1000 : 1609.344; // 1km or 1mile in meters
       
+      // Get the current distance in the selected unit (either km or miles)
+      const currentDistanceInUnits = this.distanceUnit === 'km' 
+        ? this.distance / 1000  // Convert meters to km
+        : this.distance / 1609.344;  // Convert meters to miles
+        
+      // Get the last split distance in the selected unit
+      const lastSplitDistanceInUnits = this.distanceUnit === 'km'
+        ? this.lastSplitDistance / 1000
+        : this.lastSplitDistance / 1609.344;
+      
       // Check if a new full unit (km or mile) has been completed
-      if (
-        Math.floor(this.distance / splitDistance) >
-        Math.floor(this.lastSplitDistance / splitDistance)
-      ) {
-        // Calculate the current split number (e.g., 1, 2, 3, ...)
-        const currentSplit = Math.floor(this.distance / splitDistance);
+      // Using Math.floor ensures we only trigger when a whole unit is completed
+      if (Math.floor(currentDistanceInUnits) > Math.floor(lastSplitDistanceInUnits)) {
+        // Calculate the current split number (1, 2, 3, etc.)
+        const currentSplitNumber = Math.floor(currentDistanceInUnits);
 
         // Determine the elapsed time at the previous split (or 0 at start)
         const previousSplitTime = this.splits.length
           ? this.splits[this.splits.length - 1].time
           : 0;
+        
         // Calculate the duration for this split (time difference)
         const splitDuration = this.duration - previousSplitTime;
-        // Calculate pace for this split
-        const splitPace = this.calculatePace(splitDistance, splitDuration); // seconds per unit
+        
+        // Calculate pace for this split - pace is in time per distance unit
+        const splitPace = splitDuration / (splitDistance / 1000); // seconds per km or mile
+        
+        console.log(`Recording split at ${currentSplitNumber} ${this.distanceUnit}s with pace ${splitPace}`);
 
         // Record the split with the unit count, cumulative time, and split pace
         this.splits.push({
-          km: currentSplit, // We keep the field name as 'km' for backward compatibility
+          km: currentSplitNumber, // We keep using 'km' field name for compatibility, but it represents the unit number (mile or km)
           time: this.duration,
-          pace: splitPace
+          pace: splitPace,
+          isPartial: false // This is a whole unit split
         });
-        // Update lastSplitDistance to the current total distance
-        this.lastSplitDistance = this.distance;
+        
+        // Update lastSplitDistance to the whole unit completed (in meters)
+        this.lastSplitDistance = currentSplitNumber * splitDistance;
 
         // Emit an event with updated splits array
         this.emit('splitRecorded', this.splits);
@@ -300,28 +314,61 @@ class RunTracker extends EventEmitter {
     clearInterval(this.timerInterval);
     clearInterval(this.paceInterval);
 
-    // Define the split distance based on selected unit
-    const splitDistance = this.distanceUnit === 'km' ? 1000 : 1609.344; // 1km or 1mile in meters
+    // Calculate distance in selected units (km or miles)
+    const totalDistanceInUnits = this.distanceUnit === 'km' 
+      ? this.distance / 1000 
+      : this.distance / 1609.344;
+      
+    const lastSplitDistanceInUnits = this.distanceUnit === 'km'
+      ? this.lastSplitDistance / 1000
+      : this.lastSplitDistance / 1609.344;
     
-    // If there's an incomplete split (current split distance > 0), calculate its pace.
-    const incompleteSplitDistance = this.distance - this.lastSplitDistance;
-    if (incompleteSplitDistance > 0) {
-      const lastSplitTime = this.splits.length
-        ? this.splits[this.splits.length - 1].time
-        : 0;
-      const incompleteSplitTime = this.duration - lastSplitTime;
-      const incompleteSplitPace = this.calculatePace(
-        incompleteSplitDistance,
-        incompleteSplitTime
-      );
-
-      const currentSplit = Math.ceil(this.distance / splitDistance);
-
-      this.splits.push({
-        km: currentSplit,
-        time: this.duration,
-        pace: incompleteSplitPace
-      });
+    // If there's an incomplete split, record it
+    // This happens when we've gone past the last whole unit but haven't completed the next one
+    const completedUnits = Math.floor(totalDistanceInUnits);
+    const lastRecordedUnit = Math.floor(lastSplitDistanceInUnits);
+    
+    // Check if we have a partial distance beyond the last whole unit
+    const hasPartialDistance = totalDistanceInUnits > completedUnits && totalDistanceInUnits > lastRecordedUnit;
+    
+    // Also check if we've completed a whole unit that hasn't been recorded yet
+    const hasUnrecordedWholeUnit = completedUnits > lastRecordedUnit;
+    
+    if (hasPartialDistance || hasUnrecordedWholeUnit) {
+      // Get the distance of this final split (either partial or whole)
+      const finalSplitDistance = this.distance - this.lastSplitDistance;
+      
+      // Only process if we have a meaningful distance to record
+      if (finalSplitDistance > 10) { // More than 10 meters
+        const lastSplitTime = this.splits.length
+          ? this.splits[this.splits.length - 1].time
+          : 0;
+        const finalSplitDuration = this.duration - lastSplitTime;
+        
+        // Format the split number correctly
+        let splitNumber;
+        
+        if (hasUnrecordedWholeUnit) {
+          // If we completed a whole unit that wasn't recorded, use that unit number
+          splitNumber = completedUnits;
+        } else {
+          // For partial distances, we'll preserve the total distance for data integrity
+          // but add a flag to indicate it's a partial distance
+          splitNumber = parseFloat(totalDistanceInUnits.toFixed(2));
+        }
+        
+        // Calculate pace for this final split
+        const finalSplitPace = finalSplitDuration / (finalSplitDistance / 1000);
+        
+        console.log(`Recording final split at ${splitNumber} ${this.distanceUnit}s with pace ${finalSplitPace}`);
+  
+        this.splits.push({
+          km: splitNumber,
+          time: this.duration,
+          pace: finalSplitPace,
+          isPartial: hasPartialDistance && !hasUnrecordedWholeUnit // Flag to indicate this is a partial distance
+        });
+      }
     }
 
     // Reset state
