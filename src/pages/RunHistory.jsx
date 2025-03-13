@@ -72,10 +72,10 @@ export const RunHistory = () => {
     };
   }, [distanceUnit]);
 
-  // Recalculate stats when distance unit changes
+  // Recalculate stats when any of its dependencies change
   useEffect(() => {
     calculateStats();
-  }, [distanceUnit, calculateStats]);
+  }, [calculateStats, distanceUnit, runHistory, userProfile]);
 
   // Format date to a consistent readable format
   const formatDate = (dateString) => {
@@ -353,10 +353,6 @@ export const RunHistory = () => {
     setStats(newStats);
     console.log('Stats recalculated:', newStats);
   }, [runHistory, calculateCaloriesBurned, userProfile]);
-
-  useEffect(() => {
-    calculateStats();
-  }, [calculateStats]);
 
   const loadRunHistory = () => {
     const storedRuns = localStorage.getItem('runHistory');
