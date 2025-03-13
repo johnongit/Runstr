@@ -407,6 +407,30 @@ ${
     }
   }, [distanceUnit]);
 
+  // Add cleanup on component mount to ensure no lingering tracking
+  useEffect(() => {
+    // Reset the distance display to zero immediately - this helps with the UI flashing issue
+    setDistance(0);
+    
+    // Initialize everything properly
+    const initializeTracker = async () => {
+      // Ensure any previous watchers are cleaned up
+      await runTracker.cleanupWatchers();
+      
+      // Reset state for a clean start
+      runTracker.distance = 0;
+      runTracker.duration = 0;
+      runTracker.pace = 0;
+    };
+    
+    initializeTracker();
+
+    // Cleanup when component unmounts
+    return () => {
+      runTracker.stop();
+    };
+  }, []);
+
   return (
     <div className="run-tracker">
       {showPermissionDialog && (

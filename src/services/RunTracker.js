@@ -92,6 +92,12 @@ class RunTracker extends EventEmitter {
   }
 
   addPosition(newPosition) {
+    // Only process position updates if actively tracking (not paused and tracking is on)
+    if (!this.isTracking || this.isPaused) {
+      // Don't process position updates when not actively tracking
+      return;
+    }
+    
     if (this.positions.length > 0) {
       const lastPosition = this.positions[this.positions.length - 1];
       const distanceIncrement = this.calculateDistance(
@@ -183,6 +189,9 @@ class RunTracker extends EventEmitter {
         return;
       }
       
+      // First, ensure any existing watchers are cleaned up
+      await this.cleanupWatchers();
+      
       this.watchId = await BackgroundGeolocation.addWatcher(
         {
           backgroundMessage: 'Tracking your run...',
@@ -211,6 +220,20 @@ class RunTracker extends EventEmitter {
       );
     } catch (error) {
       console.error('Error starting background tracking:', error);
+    }
+  }
+
+  async cleanupWatchers() {
+    try {
+      // If we have an existing watchId, clean it up
+      if (this.watchId) {
+        await BackgroundGeolocation.removeWatcher({
+          id: this.watchId
+        });
+        this.watchId = null;
+      }
+    } catch (error) {
+      console.error('Error cleaning up watchers:', error);
     }
   }
 
@@ -249,9 +272,9 @@ class RunTracker extends EventEmitter {
 
     this.isPaused = true;
     this.lastPauseTime = Date.now(); // Record the time when paused
-    BackgroundGeolocation.removeWatcher({
-      id: this.watchId
-    });
+    
+    // Use our centralized method to clean up watchers
+    await this.cleanupWatchers();
 
     clearInterval(this.timerInterval); // Stop the timer
     clearInterval(this.paceInterval); // Stop the pace calculator
@@ -267,15 +290,11 @@ class RunTracker extends EventEmitter {
     this.startPaceCalculator(); // Restart the pace calculator
   }
 
-  stop() {
+  async stop() {
     if (!this.isTracking) return;
 
     // Stop tracking location
-    if (BackgroundGeolocation) {
-      BackgroundGeolocation.stopTracking();
-    } else if (navigator && navigator.geolocation) {
-      navigator.geolocation.clearWatch(this.watchId);
-    }
+    await this.cleanupWatchers();
 
     // Stop timers
     clearInterval(this.timerInterval);
