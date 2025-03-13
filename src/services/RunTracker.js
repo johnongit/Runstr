@@ -270,13 +270,16 @@ class RunTracker extends EventEmitter {
   stop() {
     if (!this.isTracking) return;
 
-    this.isTracking = false;
-    BackgroundGeolocation.removeWatcher({
-      id: this.watchId
-    });
+    // Stop tracking location
+    if (BackgroundGeolocation) {
+      BackgroundGeolocation.stopTracking();
+    } else if (navigator && navigator.geolocation) {
+      navigator.geolocation.clearWatch(this.watchId);
+    }
 
-    clearInterval(this.timerInterval); // Stop the timer
-    clearInterval(this.paceInterval); // Stop the pace calculator
+    // Stop timers
+    clearInterval(this.timerInterval);
+    clearInterval(this.paceInterval);
 
     // Define the split distance based on selected unit
     const splitDistance = this.distanceUnit === 'km' ? 1000 : 1609.344; // 1km or 1mile in meters
@@ -302,19 +305,109 @@ class RunTracker extends EventEmitter {
       });
     }
 
-    // Emit final values
+    // Reset state
+    this.isTracking = false;
+    this.isPaused = false;
+
+    // Emit final results
+    const finalResults = {
+      distance: this.distance,
+      duration: this.duration,
+      pace: this.pace,
+      splits: [...this.splits],
+      elevation: {
+        gain: this.elevation.gain,
+        loss: this.elevation.loss
+      }
+    };
+
+    this.emit('stopped', finalResults);
+
+    // Reset tracked values
+    this.distance = 0;
+    this.duration = 0;
+    this.pace = 0;
+    this.splits = [];
+    this.positions = [];
+    this.startTime = 0;
+    this.pausedTime = 0;
+    this.lastPauseTime = 0;
+    this.lastSplitDistance = 0;
+    this.elevation = {
+      current: null,
+      gain: 0,
+      loss: 0,
+      lastAltitude: null
+    };
+  }
+
+  // Restore an active tracking session that was not paused
+  restoreTracking(savedState) {
+    // Set the base values from saved state
+    this.distance = savedState.distance;
+    this.duration = savedState.duration;
+    this.pace = savedState.pace;
+    this.splits = [...savedState.splits];
+    this.elevation = {
+      ...savedState.elevation,
+      lastAltitude: savedState.elevation.current
+    };
+    
+    // Calculate time difference since the run was saved
+    const timeDifference = (new Date().getTime() - savedState.timestamp) / 1000;
+    
+    // Update duration with elapsed time
+    this.duration += timeDifference;
+    
+    // Set tracking state
+    this.isTracking = true;
+    this.isPaused = false;
+    
+    // Set start time to account for elapsed duration
+    this.startTime = Date.now() - (this.duration * 1000);
+    this.pausedTime = 0;
+    this.lastPauseTime = 0;
+    
+    // Start the tracking services
+    this.startTracking();
+    this.startTimer();
+    this.startPaceCalculator();
+    
+    // Emit updated values
     this.emit('distanceChange', this.distance);
     this.emit('durationChange', this.duration);
     this.emit('paceChange', this.pace);
     this.emit('splitRecorded', this.splits);
-    this.emit('elevationChange', {...this.elevation}); // Emit final elevation data
-    this.emit('stopped', {
-      distance: this.distance,
-      duration: this.duration,
-      pace: this.pace,
-      splits: this.splits,
-      elevation: {...this.elevation} // Include elevation data in stopped event
-    });
+    this.emit('elevationChange', {...this.elevation});
+  }
+  
+  // Restore an active tracking session that was paused
+  restoreTrackingPaused(savedState) {
+    // Set the base values from saved state
+    this.distance = savedState.distance;
+    this.duration = savedState.duration;
+    this.pace = savedState.pace;
+    this.splits = [...savedState.splits];
+    this.elevation = {
+      ...savedState.elevation,
+      lastAltitude: savedState.elevation.current
+    };
+    
+    // Set tracking state
+    this.isTracking = true;
+    this.isPaused = true;
+    
+    // Set start time and pause time
+    this.startTime = Date.now() - (this.duration * 1000);
+    this.pausedTime = 0;
+    this.lastPauseTime = Date.now();
+    
+    // Emit updated values
+    this.emit('distanceChange', this.distance);
+    this.emit('durationChange', this.duration);
+    this.emit('paceChange', this.pace);
+    this.emit('splitRecorded', this.splits);
+    this.emit('elevationChange', {...this.elevation});
   }
 }
 

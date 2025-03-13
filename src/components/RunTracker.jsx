@@ -43,6 +43,54 @@ export const RunTracker = () => {
     }
   }, []);
 
+  // Check for active run on component mount
+  useEffect(() => {
+    const runState = localStorage.getItem('activeRunState');
+    
+    if (runState) {
+      const runData = JSON.parse(runState);
+      
+      if (runData.isRunning) {
+        // Restore run state
+        setIsRunning(true);
+        setIsPaused(runData.isPaused);
+        setDistance(runData.distance);
+        setDuration(runData.duration);
+        setPace(runData.pace);
+        setSplits(runData.splits);
+        setElevation(runData.elevation);
+        
+        // Re-initialize the run tracker with saved state
+        if (runData.isRunning && !runData.isPaused) {
+          runTracker.restoreTracking(runData);
+        } else if (runData.isRunning && runData.isPaused) {
+          runTracker.restoreTrackingPaused(runData);
+        }
+      }
+    }
+  }, []);
+
+  // Save run state to localStorage when it changes
+  useEffect(() => {
+    if (isRunning) {
+      const runData = {
+        isRunning,
+        isPaused,
+        distance,
+        duration,
+        pace,
+        splits,
+        elevation,
+        timestamp: new Date().getTime()
+      };
+      
+      localStorage.setItem('activeRunState', JSON.stringify(runData));
+    } else {
+      // Clear active run state when run is stopped
+      localStorage.removeItem('activeRunState');
+    }
+  }, [isRunning, isPaused, distance, duration, pace, splits, elevation]);
+
   useEffect(() => {
     runTracker.on('distanceChange', setDistance);
     runTracker.on('durationChange', setDuration);
@@ -199,6 +247,8 @@ export const RunTracker = () => {
   };
 
   const stopRun = () => {
+    // Remove active run state from localStorage when manually stopping
+    localStorage.removeItem('activeRunState');
     startCountdown('stop');
   };
 
