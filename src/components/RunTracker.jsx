@@ -113,12 +113,14 @@ export const RunTracker = () => {
         }
       };
 
-      // todo: move this to utils
+      // We'll update the UI immediately with the run data
+      updateLastRun(runData);
+
+      // Check for potential duplicates before adding
       const existingRuns = JSON.parse(
         localStorage.getItem('runHistory') || '[]'
       );
       
-      // Check for potential duplicates before adding
       const isDuplicate = existingRuns.some(run => {
         // Check if there's already a run with the same date, distance, and duration
         // within a small margin of error (0.1km and 5 seconds)
@@ -130,13 +132,20 @@ export const RunTracker = () => {
       // Only add the run if it's not a duplicate
       if (!isDuplicate) {
         const updatedRuns = [...existingRuns, runData];
+        // Store the run data in localStorage
         localStorage.setItem('runHistory', JSON.stringify(updatedRuns));
         
         // Store run locally for offline sync
         storeRunLocally(runData);
         
+        // Update the run history state
         setRunHistory((prev) => [...prev, runData]);
-        updateLastRun(runData);
+
+        // Dispatch a custom event to notify other components about run history changes
+        const runHistoryUpdateEvent = new CustomEvent('runHistoryUpdated', {
+          detail: { runData }
+        });
+        document.dispatchEvent(runHistoryUpdateEvent);
       } else {
         console.log('Duplicate run detected - not adding to history');
       }
@@ -166,7 +175,14 @@ export const RunTracker = () => {
   const loadRunHistory = () => {
     const storedRuns = JSON.parse(localStorage.getItem('runHistory') || '[]');
     setRunHistory(storedRuns);
-    if (storedRuns.length > 0) {
+    
+    // First check if there's a separate last run stored (this ensures immediate data consistency)
+    const storedLastRun = localStorage.getItem('lastRun');
+    if (storedLastRun) {
+      setLastRun(JSON.parse(storedLastRun));
+    } 
+    // If no separate last run, fall back to the last item in the run history
+    else if (storedRuns.length > 0) {
       setLastRun(storedRuns[storedRuns.length - 1]);
     }
   };
@@ -254,6 +270,8 @@ export const RunTracker = () => {
 
   const updateLastRun = (runData) => {
     setLastRun(runData);
+    // Store the last run in localStorage separately to ensure immediate consistency
+    localStorage.setItem('lastRun', JSON.stringify(runData));
   };
 
   const toggleDistanceUnit = () => {
@@ -358,6 +376,36 @@ ${
       }
     }
   };
+
+  // Listen for the runCompleted event to ensure LastRun is updated immediately
+  useEffect(() => {
+    const handleRunCompleted = () => {
+      console.log("Run completed event received");
+      
+      // Force reload the run history to ensure we have the latest data
+      setTimeout(() => {
+        loadRunHistory();
+      }, 100);
+    };
+    
+    document.addEventListener('runCompleted', handleRunCompleted);
+    
+    return () => {
+      document.removeEventListener('runCompleted', handleRunCompleted);
+    };
+  }, []);
+
+  // When distance unit changes, ensure all displayed data is updated correctly
+  useEffect(() => {
+    // Force refresh of last run display when unit changes
+    if (lastRun) {
+      const updatedLastRun = {...lastRun};
+      setLastRun(null);
+      setTimeout(() => {
+        setLastRun(updatedLastRun);
+      }, 0);
+    }
+  }, [distanceUnit]);
 
   return (
     <div className="run-tracker">

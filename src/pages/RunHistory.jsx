@@ -47,6 +47,18 @@ export const RunHistory = () => {
 
   useEffect(() => {
     loadRunHistory();
+    
+    // Add event listener for run history updates
+    const handleRunHistoryUpdate = () => {
+      console.log("Run history update event received");
+      loadRunHistory();
+    };
+    
+    document.addEventListener('runHistoryUpdated', handleRunHistoryUpdate);
+    
+    return () => {
+      document.removeEventListener('runHistoryUpdated', handleRunHistoryUpdate);
+    };
   }, []);
 
   // Listen for changes to the distance unit in localStorage
@@ -58,11 +70,20 @@ export const RunHistory = () => {
 
     window.addEventListener('storage', handleStorageChange);
     
-    // Check for changes frequently
+    // Check for changes frequently to localStorage to catch updates from other tabs/components
     const checkInterval = setInterval(() => {
       const currentUnit = localStorage.getItem('distanceUnit') || 'km';
       if (currentUnit !== distanceUnit) {
         setDistanceUnit(currentUnit);
+      }
+      
+      // Also check for changes to run history
+      const storedRuns = localStorage.getItem('runHistory');
+      if (storedRuns) {
+        const parsedRuns = JSON.parse(storedRuns);
+        if (parsedRuns.length !== runHistory.length) {
+          loadRunHistory();
+        }
       }
     }, 1000);
 
@@ -70,7 +91,7 @@ export const RunHistory = () => {
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(checkInterval);
     };
-  }, [distanceUnit]);
+  }, [distanceUnit, runHistory.length]);
 
   // Recalculate stats when distanceUnit changes
   useEffect(() => {
@@ -85,6 +106,22 @@ export const RunHistory = () => {
       calculateStats();
     }
   }, [runHistory, userProfile]);
+
+  // Listen for run completed events to update stats in real-time
+  useEffect(() => {
+    const handleRunCompleted = () => {
+      console.log("Run completed event received in RunHistory");
+      
+      // Force reload run history and recalculate stats
+      loadRunHistory();
+    };
+    
+    document.addEventListener('runCompleted', handleRunCompleted);
+    
+    return () => {
+      document.removeEventListener('runCompleted', handleRunCompleted);
+    };
+  }, []);
 
   // Format date to a consistent readable format
   const formatDate = (dateString) => {

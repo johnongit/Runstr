@@ -323,6 +323,17 @@ class RunTracker extends EventEmitter {
 
     this.emit('stopped', finalResults);
 
+    // Dispatch a global event to ensure UI components update
+    // This helps ensure consistency across the app
+    try {
+      const runCompletedEvent = new CustomEvent('runCompleted', {
+        detail: { finalResults }
+      });
+      document.dispatchEvent(runCompletedEvent);
+    } catch (error) {
+      console.error('Error dispatching runCompleted event:', error);
+    }
+
     // Reset tracked values
     this.distance = 0;
     this.duration = 0;
