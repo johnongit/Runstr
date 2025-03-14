@@ -50,6 +50,7 @@ export function convertDistance(meters, unit) {
 }
 
 /**
+<<<<<<< HEAD
  * Converts a pace from seconds per meter to a human-readable pace format (minutes per kilometer).
  *
  * @param {number} pace - The pace in seconds per meter.
@@ -67,7 +68,49 @@ export function formatPace(pace) {
 
   // Get the remaining seconds after extracting the minutes
   const seconds = Math.round(secondsPerKm % 60);
+=======
+ * Converts a pace from seconds per meter to a human-readable pace format (minutes per kilometer or mile).
+ *
+ * @param {number} pace - The pace in seconds per meter.
+ * @param {string} unit - The unit to format pace in ("km" or "mi"). Defaults to "km".
+ * @returns {string} A formatted pace string in "MM:SS" per kilometer/mile format.
+ */
+export function formatPace(pace, unit = 'km') {
+  // Handle invalid or non-positive pace values
+  if (!pace || pace <= 0) return '--:--';
+
+  // Convert pace from seconds per meter to seconds per unit (km or mi)
+  let secondsPerUnit;
+  
+  if (unit === 'mi') {
+    // 1 mile = 1609.344 meters
+    secondsPerUnit = pace * 1609.344;
+  } else {
+    // Default to km
+    secondsPerUnit = pace * 1000;
+  }
+
+  // Extract the number of whole minutes from the total seconds
+  const minutes = Math.floor(secondsPerUnit / 60);
+
+  // Get the remaining seconds after extracting the minutes
+  const seconds = Math.round(secondsPerUnit % 60);
+>>>>>>> Simple-updates
 
   // Format the output as "MM:SS", ensuring two-digit seconds
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
+<<<<<<< HEAD
+=======
+
+/**
+ * Formats pace with the appropriate unit label for display.
+ * 
+ * @param {number} pace - The pace in seconds per meter.
+ * @param {string} unit - The unit to format pace in ("km" or "mi"). Defaults to "km".
+ * @returns {string} A formatted pace string with unit label, e.g., "4:30 min/km" or "7:15 min/mi".
+ */
+export function formatPaceWithUnit(pace, unit = 'km') {
+  return `${formatPace(pace, unit)} min/${unit}`;
+}
+>>>>>>> Simple-updates

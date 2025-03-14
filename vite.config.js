@@ -7,13 +7,56 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+<<<<<<< HEAD
         entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]'
+=======
+        entryFileNames: 'assets/[name].[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]',
+        manualChunks: {
+          // Split vendor packages into separate chunks for better caching
+          vendor: [
+            'react', 
+            'react-dom', 
+            'react-router-dom',
+            '@nostr-dev-kit/ndk',
+            'nostr-tools'
+          ],
+          // Audio player in separate chunk
+          audioPlayer: [
+            'react-h5-audio-player',
+            'react-player'
+          ]
+        }
+      }
+    },
+    // Enable source maps for production
+    sourcemap: false,
+    // Optimize bundle size
+    minify: 'terser',
+    // Enable chunk size reporting
+    reportCompressedSize: true,
+    // Optimize CSS
+    cssCodeSplit: true,
+    // Configure Terser for better minification
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console logs in production
+        drop_debugger: true
+>>>>>>> Simple-updates
       }
     }
   },
   server: {
+<<<<<<< HEAD
+=======
+    // Enable faster Hot Module Replacement
+    hmr: {
+      overlay: true,
+    },
+>>>>>>> Simple-updates
     proxy: {
       '/api/v1': {
         target: 'https://wavlake.com',
@@ -53,5 +96,29 @@ export default defineConfig({
         }
       }
     }
+<<<<<<< HEAD
+=======
+  },
+  // Add optimizations for better production builds
+  optimizeDeps: {
+    include: [
+      'react', 
+      'react-dom', 
+      'react-router-dom',
+      '@nostr-dev-kit/ndk',
+      'nostr-tools',
+      'react-h5-audio-player'
+    ],
+    // Optimize dependency pre-bundling
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+    },
+  },
+  // Improve the speed of the dev server
+  esbuild: {
+    jsxInject: `import React from 'react'`,
+>>>>>>> Simple-updates
   }
 })

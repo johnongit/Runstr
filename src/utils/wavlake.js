@@ -135,6 +135,7 @@ export const fetchLikedPlaylist = async () => {
   const url = `${WAVLAKE_CATALOG_API_BASE_URL}/library/tracks`;
 
   try {
+<<<<<<< HEAD
     const res = await fetch(url, {
       headers: {
         Authorization: await nip98.getToken(
@@ -147,11 +148,59 @@ export const fetchLikedPlaylist = async () => {
     });
 
     const tracks = await res.json().then((res) => res.data.tracks);
+=======
+    // Ensure Nostr is connected before trying to fetch liked tracks
+    if (!window.nostr) {
+      throw new Error('Nostr extension not found. Please log in first to access your liked tracks.');
+    }
+
+    // Get the signature for authentication
+    const authToken = await nip98.getToken(
+      url,
+      'get',
+      (event) => window.nostr.signEvent(event),
+      true
+    ).catch(err => {
+      console.error('Error getting Nostr signature:', err);
+      throw new Error('Failed to authenticate with Nostr: ' + (err.message || 'Unknown error'));
+    });
+
+    // Fetch the liked tracks
+    const res = await fetch(url, {
+      headers: {
+        Authorization: authToken
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch liked tracks: ${res.status} ${res.statusText}`);
+    }
+
+    const jsonResponse = await res.json();
+    if (!jsonResponse.data || !jsonResponse.data.tracks) {
+      throw new Error('Invalid response format from server');
+    }
+
+    const tracks = jsonResponse.data.tracks;
+
+    // Ensure each track has required fields
+    const validatedTracks = tracks.map(track => {
+      // Add default mediaUrl if missing
+      if (!track.mediaUrl && track.id) {
+        track.mediaUrl = `${WAVLAKE_API_BASE_URL}/stream/track/${track.id}`;
+      }
+      return track;
+    });
+>>>>>>> Simple-updates
 
     return {
       id: LIKED,
       title: 'Liked',
+<<<<<<< HEAD
       tracks,
+=======
+      tracks: validatedTracks,
+>>>>>>> Simple-updates
       isPrivate: true
     };
   } catch (error) {
@@ -161,6 +210,7 @@ export const fetchLikedPlaylist = async () => {
 };
 
 export const fetchPlaylistById = async (playlistId) => {
+<<<<<<< HEAD
   const response = await fetch(
     `${WAVLAKE_API_BASE_URL}/content/playlist/${playlistId}`
   );
@@ -182,5 +232,63 @@ export const fetchPlaylist = async (playlistId) => {
       return fetchTrendingHipHop();
     default:
       return fetchPlaylistById(playlistId);
+=======
+  try {
+    const response = await fetch(
+      `${WAVLAKE_API_BASE_URL}/content/playlist/${playlistId}`
+    );
+    
+    if (!response.ok) {
+      const error = new Error(`Failed to fetch playlist: ${response.statusText}`);
+      error.status = response.status;
+      throw error;
+    }
+    
+    const data = await response.json();
+    
+    // Ensure the playlist has the expected structure
+    if (!data.tracks || !Array.isArray(data.tracks)) {
+      throw new Error('Invalid playlist data format');
+    }
+    
+    // Add missing mediaUrls if needed
+    const tracksWithUrls = data.tracks.map(track => {
+      if (!track.mediaUrl && track.id) {
+        track.mediaUrl = `${WAVLAKE_API_BASE_URL}/stream/track/${track.id}`;
+      }
+      return track;
+    });
+    
+    return { 
+      id: playlistId, 
+      ...data, 
+      tracks: tracksWithUrls 
+    };
+  } catch (error) {
+    console.error(`Error fetching playlist ${playlistId}:`, error);
+    throw error;
+  }
+};
+
+export const fetchPlaylist = async (playlistId) => {
+  console.log(`Fetching playlist: ${playlistId}`);
+  
+  try {
+    switch (playlistId) {
+      case TOP_40:
+        return fetchTop40();
+      case TRENDING_ROCK_PLAYLIST_ID:
+        return fetchTrendingRock();
+      case TRENDING_HIPHOP_PLAYLIST_ID:
+        return fetchTrendingHipHop();
+      case LIKED:
+        return fetchLikedPlaylist();
+      default:
+        return fetchPlaylistById(playlistId);
+    }
+  } catch (error) {
+    console.error(`Error in fetchPlaylist for ${playlistId}:`, error);
+    throw error;
+>>>>>>> Simple-updates
   }
 };

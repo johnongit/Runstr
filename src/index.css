@@ -11,6 +11,19 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+<<<<<<< HEAD
+=======
+  
+  /* Custom properties for consistent sizing */
+  --vh: 1vh;
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --container-padding: 16px;
+}
+
+/* Box sizing for all elements */
+*, *::before, *::after {
+  box-sizing: border-box;
+>>>>>>> Simple-updates
 }
 
 a {
@@ -27,7 +40,19 @@ body {
   display: flex;
   min-width: 320px;
   min-height: 100vh;
+<<<<<<< HEAD
   padding-top: 4rem;
+=======
+  /* Use the custom vh property for more accurate height on mobile */
+  min-height: calc(var(--vh, 1vh) * 100);
+  padding-top: 4rem;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+>>>>>>> Simple-updates
 }
 
 h1 {
@@ -45,6 +70,12 @@ button {
   background-color: #1a1a1a;
   cursor: pointer;
   transition: border-color 0.25s;
+<<<<<<< HEAD
+=======
+  min-height: 44px; /* Ensure touch-friendly size */
+  min-width: 44px;
+  touch-action: manipulation;
+>>>>>>> Simple-updates
 }
 button:hover {
   border-color: #646cff;
@@ -54,6 +85,38 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+<<<<<<< HEAD
+=======
+/* Ensure inputs are touch-friendly */
+input, 
+textarea, 
+select {
+  font-size: 16px; /* Prevent zoom on focus in iOS */
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+/* Fix for Android Chrome */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  body, html {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  /* Force hardware acceleration for smoother animations */
+  .card, 
+  .teammate-card,
+  .history-item,
+  .post-item,
+  .team-item,
+  .event-card {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+}
+
+>>>>>>> Simple-updates
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

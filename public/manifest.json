@@ -1,6 +1,11 @@
 {
+<<<<<<< HEAD
   "name": "Nostr Run Club",
   "short_name": "RunClub",
+=======
+  "name": "RUNSTR",
+  "short_name": "RUNSTR",
+>>>>>>> Simple-updates
   "description": "Track your runs and connect with runners on Nostr",
   "start_url": "/",
   "display": "standalone",

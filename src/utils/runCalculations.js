@@ -183,11 +183,23 @@ export function calculatePace(distance, duration, positions = []) {
 }
 
 /**
+<<<<<<< HEAD
  * Calculate split times for each kilometer
  */
 export function calculateSplits(positions) {
   if (!positions.length) return [];
 
+=======
+ * Calculate split times for each kilometer or mile
+ * @param {Array} positions - Array of position objects
+ * @param {string} unit - The unit to use for splits ('km' or 'mi')
+ */
+export function calculateSplits(positions, unit = 'km') {
+  if (!positions.length) return [];
+
+  const splitDistance = unit === 'km' ? 1000 : 1609.344; // 1km or 1mile in meters
+  
+>>>>>>> Simple-updates
   const splits = [];
   let currentSplit = {
     distance: 0,
@@ -206,8 +218,13 @@ export function calculateSplits(positions) {
     currentSplit.distance += distance;
     currentSplit.duration = positions[i].timestamp - currentSplit.startTime;
 
+<<<<<<< HEAD
     // When we reach 1km, record the split
     if (currentSplit.distance >= 1000) {
+=======
+    // When we reach the split distance, record the split
+    if (currentSplit.distance >= splitDistance) {
+>>>>>>> Simple-updates
       splits.push({
         pace: calculatePace(currentSplit.distance, currentSplit.duration),
         duration: currentSplit.duration,
@@ -215,7 +232,11 @@ export function calculateSplits(positions) {
       });
 
       currentSplit = {
+<<<<<<< HEAD
         distance: currentSplit.distance - 1000,
+=======
+        distance: currentSplit.distance - splitDistance,
+>>>>>>> Simple-updates
         duration: 0,
         startTime: positions[i].timestamp
       };
@@ -255,6 +276,12 @@ export function calculateStats(positions, elapsedTime = null) {
     };
   }
 
+<<<<<<< HEAD
+=======
+  // Get user's preferred distance unit
+  const distanceUnit = localStorage.getItem('distanceUnit') || 'km';
+
+>>>>>>> Simple-updates
   // Sort positions by timestamp to ensure correct order
   const sortedPositions = [...positions].sort(
     (a, b) => a.timestamp - b.timestamp
@@ -351,7 +378,11 @@ export function calculateStats(positions, elapsedTime = null) {
     duration: duration,
     pace: pace,
     currentSpeed: currentSpeed,
+<<<<<<< HEAD
     splits: calculateSplits(filteredPositions),
+=======
+    splits: calculateSplits(filteredPositions, distanceUnit),
+>>>>>>> Simple-updates
     positions: filteredPositions,
     elevation: {
       current: smoothElevation(filteredPositions),

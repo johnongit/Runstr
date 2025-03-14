@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { createContext, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
@@ -31,3 +32,15 @@ export function NostrProvider({ children }) {
 NostrProvider.propTypes = {
   children: PropTypes.node.isRequired
 };
+=======
+import { createContext } from 'react';
+
+// Create the Nostr context with default values
+export const NostrContext = createContext({
+  publicKey: null,
+  isNostrReady: false,
+  requestNostrPermissions: async () => false,
+  defaultZapAmount: 1000,
+  updateDefaultZapAmount: () => {}
+});
+>>>>>>> Simple-updates
