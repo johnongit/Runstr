@@ -25,6 +25,7 @@ alwaysApply: true
 3. Always preserve any Bitcoin/Lightning integration features
 4. Keep existing settings structure and only add to it, never reorganize without permission
 5. Don't modify any authentication or user profile management features
+6. This is a mobile app, currently focused on android and graphene OS
 
 ## Implementation Sequence
 1. First suggest changes to data models/types

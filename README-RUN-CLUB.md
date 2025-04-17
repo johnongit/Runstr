@@ -1,57 +1,55 @@
 # RUNSTR Run Club Feature
 
-The Run Club feature is a new addition to RUNSTR that enables users to participate in two popular running groups on Nostr: "Messi Run Club" and "#RUNSTR".
+The Run Club feature connects you with running communities on Nostr.
 
 ## Features
 
-- **Join Run Clubs**: Connect with two popular running groups on the Nostr network.
-- **Real-time Chat**: Communicate with other runners in real-time using Nostr's decentralized messaging.
-- **Pin Messages**: Pin important messages for quick reference.
+- **My Clubs**: View Nostr groups (NIP-29) you follow or have joined, managed via your Nostr NIP-51 lists.
+- **Discover Clubs**: Access two featured public running groups: "Messi Run Club" and "#RUNSTR".
+- **Real-time Chat**: Communicate within groups using Nostr's decentralized messaging (Kind 39001).
+- **Pin Messages**: Locally pin important messages within a group chat for quick reference.
 - **Coming Soon**: Events and challenges features are planned for future updates.
 
 ## Technical Implementation
 
-The Run Club feature is built using the [NIP-29 Groups Protocol](https://github.com/nostr-protocol/nips/blob/master/29.md) on the Nostr network. This provides a decentralized, censorship-resistant platform for runners to connect without relying on a central server.
+The Run Club feature uses the following Nostr standards:
+
+- **NIP-29 Groups**: Groups are identified by `naddr` coordinates, using kind 39000 for group metadata.
+- **NIP-51 Lists**: User-followed groups ("My Clubs") are fetched from the user's Kind 30001 list event (assuming `#d` tag "groups").
+- **Kind 39000**: Group metadata is fetched using the kind, pubkey, and identifier from the group's naddr.
+- **Kind 39001**: Group chat messages, referenced using the '#e' tag with the group's identifier.
 
 ### Key Components
 
-1. **Group Metadata (Kind 30080/30081)**: Groups are identified using their `naddr` identifier which contains kind, pubkey, and identifier information.
-2. **Group Messages (Kind 84)**: Messages within Run Clubs are published as Kind 84 events, tagged with the appropriate group identifier.
-3. **Direct Relay Communication**: The app communicates directly with Nostr relays without any bridge or synchronization layer.
-4. **Local Message Pinning**: Users can pin important messages locally.
-5. **Real-time Updates**: The application subscribes to channel messages in real-time using Nostr relays.
-
-### Compliance with NIP-29
-
-Our implementation follows the NIP-29 specification:
-
-- Uses proper format for group identifiers (kind:pubkey:identifier)
-- Messages are tagged with the group identifier using 'a' tags
-- Messages are properly signed using the user's Nostr key
-- Group metadata is parsed from the appropriate events
+1. **Direct Relay Communication**: The app communicates primarily with wss://groups.0xchat.com for group functionality, with fallback to other relays.
+2. **Nostr Client Utilities**: 
+   - Parse `naddr` to extract group coordinates (kind 39000, pubkey, identifier)
+   - Fetch group metadata using kind 39000
+   - Fetch and post messages using kind 39001 with '#e' tag
+   - Fetch NIP-51 lists for user's joined groups
+3. **Local Caching**: User's joined group list and pinned messages are cached locally for better performance.
 
 ## Getting Started
 
-To start using the Run Club feature:
-
-1. Navigate to the "RUN CLUB" section in the main menu
-2. You'll see two running clubs: "Messi Run Club" and "#RUNSTR"
-3. Click on a club to join the chat
-4. You'll need a Nostr key to participate (connect in Settings if you haven't already)
+1.  Navigate to the "RUN CLUB" section in the main menu.
+2.  Choose "My Clubs" to see groups you follow on Nostr (requires Nostr login).
+3.  Choose "Discover Clubs" to see the two featured public groups.
+4.  Click on a club to view its chat.
+5.  You'll need a Nostr key (connect in Settings) to send messages or see "My Clubs".
 
 ### Message Features
 
-- Regular messages appear in chronological order
-- Hover over any message to reveal the "Pin" option
-- Pinned messages appear at the top of the chat for quick reference
+- Messages appear in chronological order.
+- Hover over a message to reveal the "Pin" option (stored locally).
+- Pinned messages appear at the top of the chat.
 
 ## Future Enhancements
 
 - Ability to share run data directly in the chat
-- Integration with Nostr zaps for tipping great running advice
+- Integration with Nostr zaps for tipping
 - Group run scheduling and coordination
 - Run Club challenges and competitions
 
 ## Feedback
 
-This feature is in active development. If you have any feedback or suggestions, please reach out to the RUNSTR team. 
+This feature is in active development. Feedback is welcome! 

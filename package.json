@@ -22,7 +22,8 @@
     "test-hashtag": "node hashtag-test.cjs",
     "debug": "node nostr-debug.cjs",
     "quick-test": "node quick-hashtag-test.cjs",
-    "diagnose-feed": "node scripts/diagnose-feed.js"
+    "diagnose-feed": "node scripts/diagnose-feed.js",
+    "test:nip29": "node scripts/test-nip29.js"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.20",
@@ -33,7 +34,7 @@
     "@getalby/sdk": "^3.8.2",
     "@nostr-dev-kit/ndk": "^2.13.0-rc2",
     "lucide-react": "^0.485.0",
-    "nostr-tools": "^2.11.0",
+    "nostr-tools": "^2.1.5",
     "prop-types": "^15.8.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

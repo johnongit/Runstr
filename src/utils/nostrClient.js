@@ -1,6 +1,7 @@
 import { SimplePool, finalizeEvent, verifyEvent } from 'nostr-tools';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { decode as decodeNip19 } from 'nostr-tools/nip19';
+import { parseNaddr as parseNaddrInternal } from './nostrClient'; // Alias if needed
 
 // Create a simple pool with reasonable timeouts
 const pool = new SimplePool({
@@ -86,22 +87,42 @@ export const parseNaddr = (naddrString) => {
 };
 
 /**
- * Fetch group metadata based on naddr components
- * @param {number} kind - The event kind (30081 or similar)
- * @param {string} pubkey - The group creator's pubkey
- * @param {string} identifier - The group identifier (d tag)
- * @param {Array<string>} relayList - Optional list of relays to query
- * @returns {Promise<Object|null>} The group metadata or null if not found
+ * Fetch group messages using proven kind 39001 approach
+ * @param {string} groupId - The group identifier from naddr
+ * @returns {Promise<Array>} Array of group messages
  */
-export const fetchGroupMetadata = async (kind, pubkey, identifier, relayList = relays) => {
+export const fetchGroupMessages = async (groupId, relays = ['wss://groups.0xchat.com']) => {
   try {
     const filter = {
-      kinds: [kind],
-      authors: [pubkey],
-      '#d': [identifier]
+      kinds: [39001],
+      '#e': [groupId],
+      limit: 50
     };
     
-    const events = await pool.list(relayList, [filter]);
+    const events = await pool.list(relays, [filter]);
+    
+    // Sort by created_at
+    return events.sort((a, b) => a.created_at - b.created_at);
+  } catch (error) {
+    console.error('Error fetching group messages:', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch group metadata using kind from naddr
+ * @param {Object} groupData - Decoded naddr data
+ * @returns {Promise<Object>} Group metadata
+ */
+export const fetchGroupMetadata = async (groupData, relays = ['wss://groups.0xchat.com']) => {
+  try {
+    const filter = {
+      kinds: [groupData.kind], // Use kind from naddr (39000)
+      authors: [groupData.pubkey],
+      '#d': [groupData.identifier]
+    };
+    
+    const events = await pool.list(relays, [filter]);
     if (!events || events.length === 0) {
       return null;
     }
@@ -127,35 +148,7 @@ export const fetchGroupMetadata = async (kind, pubkey, identifier, relayList = r
     };
   } catch (error) {
     console.error('Error fetching group metadata:', error);
-    return null;
-  }
-};
-
-/**
- * Fetch messages for a specific group
- * @param {Object} groupInfo - Group information from parseNaddr
- * @param {number} limit - Maximum number of messages to fetch
- * @param {Array<string>} relayList - Optional list of relays to query
- * @returns {Promise<Array>} Array of group messages
- */
-export const fetchGroupMessages = async (groupInfo, limit = 100, relayList = relays) => {
-  try {
-    // Format the a-tag for NIP29 group messages (kind:pubkey:identifier)
-    const aTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
-    
-    const filter = {
-      kinds: [84], // NIP29 group message kind
-      '#a': [aTag],
-      limit
-    };
-    
-    const events = await pool.list(relayList, [filter]);
-    
-    // Sort by created_at
-    return events.sort((a, b) => a.created_at - b.created_at);
-  } catch (error) {
-    console.error('Error fetching group messages:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -364,5 +357,213 @@ export const createAndPublishEvent = async (eventTemplate, privateKey) => {
   } catch (error) {
     console.error('Error creating and publishing event:', error);
     throw error;
+  }
+};
+
+/**
+ * Fetch the user's list of followed/joined groups from NIP-51 list event.
+ * @param {string} pubkey - The user's public key.
+ * @param {string[]} relayList - Relays to query.
+ * @returns {Promise<Object[]>} - An array of group objects with metadata.
+ */
+export const fetchUserGroupList = async (pubkey, relayList = relays) => {
+  try {
+    console.log(`Fetching group list for pubkey: ${pubkey}`);
+    const filter = {
+      authors: [pubkey],
+      kinds: [30001], // Standard kind for NIP-51 lists
+      '#d': ['groups'] // Assuming 'groups' is the convention used
+      // Consider adding 'communities' or 'bookmarks' if 'groups' yields no results
+    };
+    
+    const listEvents = await pool.list(relayList, [filter]);
+    if (!listEvents || listEvents.length === 0) {
+      console.log('No group list event (kind 30001, #d=groups) found.');
+      // Optionally, try fetching kind 10001 or other conventions
+      return [];
+    }
+
+    // Sort by created_at to get the latest list event
+    const latestListEvent = listEvents.sort((a, b) => b.created_at - a.created_at)[0];
+    console.log('Found list event:', latestListEvent);
+
+    const groupIdentifiers = [];
+    latestListEvent.tags.forEach(tag => {
+      // Look for 'a' tags representing groups (kind:pubkey:identifier)
+      if (tag[0] === 'a' && tag[1]) {
+         const parts = tag[1].split(':');
+         // Basic validation: check for kind, pubkey, identifier
+         if (parts.length === 3 && !isNaN(parseInt(parts[0])) && parts[1]?.length === 64 && parts[2]) {
+            groupIdentifiers.push({ 
+              kind: parseInt(parts[0]), 
+              pubkey: parts[1], 
+              identifier: parts[2],
+              relay: tag[2] // Optional relay hint
+            });
+         }
+      } 
+      // TODO: Potentially add support for naddr strings stored in tags if needed
+    });
+
+    console.log('Found group identifiers:', groupIdentifiers);
+
+    if (groupIdentifiers.length === 0) {
+        return [];
+    }
+
+    // Fetch metadata for each group identifier found in the list
+    const groupPromises = groupIdentifiers.map(async (group) => {
+      try {
+        const metadata = await fetchGroupMetadata(
+          group.kind,
+          group.pubkey,
+          group.identifier,
+          group.relay ? [...relayList, group.relay] : relayList // Include relay hint if available
+        );
+        if (metadata) {
+          // Construct naddr for navigation (if possible)
+          // Note: nostr-tools encode doesn't directly support naddr from parts easily
+          // We might need to store the original naddr or reconstruct it carefully
+          // For now, pass the parts needed for TeamDetail
+          return { 
+              ...metadata, 
+              // Pass identifier parts instead of trying to reconstruct naddr here
+              identifierData: group 
+          };
+        }
+        return null;
+      } catch (metaError) {
+         console.error(`Error fetching metadata for group ${group.identifier}:`, metaError);
+         return null;
+      }
+    });
+
+    const groupsWithMetadata = (await Promise.all(groupPromises)).filter(g => g !== null);
+    console.log('Groups with metadata:', groupsWithMetadata);
+    return groupsWithMetadata;
+
+  } catch (error) {
+    console.error('Error fetching user group list:', error);
+    return [];
+  }
+};
+
+// Update the group message posting function to use kind 39001
+export const postGroupMessage = async (groupId, content, privateKey) => {
+  try {
+    const event = {
+      kind: 39001,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['e', groupId]
+      ],
+      content
+    };
+    
+    // ... existing code ...
+  } catch (error) {
+    console.error('Error posting group message:', error);
+    throw error;
+  }
+};
+
+/**
+ * Join a group by adding it to the user's NIP-51 groups list
+ * @param {Object} groupData - Group data including naddr components
+ * @returns {Promise<boolean>} Success status
+ */
+export const joinGroup = async (groupData) => {
+  try {
+    const userPubkey = await getUserPublicKey();
+    if (!userPubkey) {
+      throw new Error('User not authenticated with Nostr');
+    }
+
+    // Fetch the user's current groups list
+    const filter = {
+      kinds: [30001],
+      authors: [userPubkey],
+      '#d': ['groups']
+    };
+    
+    const events = await pool.list(relays, [filter]);
+    const currentEvent = events.length > 0 
+      ? events.sort((a, b) => b.created_at - a.created_at)[0]
+      : null;
+
+    // Parse the naddr to get group components
+    const groupInfo = parseNaddr(groupData.naddr);
+    if (!groupInfo) {
+      throw new Error('Invalid group data');
+    }
+
+    // Create the a-tag for the group
+    const groupTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
+    
+    // Prepare tags for the new event
+    let tags = [
+      ['d', 'groups']  // NIP-51 list identifier
+    ];
+
+    // Add existing group tags if any
+    if (currentEvent) {
+      const existingTags = currentEvent.tags.filter(t => 
+        t[0] === 'a' && t[1] !== groupTag
+      );
+      tags = [...tags, ...existingTags];
+    }
+
+    // Add the new group tag
+    tags.push(['a', groupTag, groupData.relay]);
+
+    // Create and publish the new list event
+    const event = {
+      kind: 30001,
+      created_at: Math.floor(Date.now() / 1000),
+      tags,
+      content: ''  // NIP-51 lists typically have empty content
+    };
+
+    const publishedEvent = await createAndPublishEvent(event);
+    return !!publishedEvent;
+
+  } catch (error) {
+    console.error('Error joining group:', error);
+    return false;
+  }
+};
+
+/**
+ * Check if user has joined a specific group
+ * @param {string} naddr - Group naddr
+ * @returns {Promise<boolean>} Whether user has joined the group
+ */
+export const hasJoinedGroup = async (naddr) => {
+  try {
+    const userPubkey = await getUserPublicKey();
+    if (!userPubkey) return false;
+
+    const groupInfo = parseNaddr(naddr);
+    if (!groupInfo) return false;
+
+    const filter = {
+      kinds: [30001],
+      authors: [userPubkey],
+      '#d': ['groups']
+    };
+
+    const events = await pool.list(relays, [filter]);
+    if (!events || events.length === 0) return false;
+
+    const latestEvent = events.sort((a, b) => b.created_at - a.created_at)[0];
+    const groupTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
+
+    return latestEvent.tags.some(tag => 
+      tag[0] === 'a' && tag[1] === groupTag
+    );
+
+  } catch (error) {
+    console.error('Error checking group membership:', error);
+    return false;
   }
 }; 

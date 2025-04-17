@@ -19,6 +19,33 @@ alwaysApply: true
 4. Balance aesthetics with functional requirements - never sacrifice usability for visual appeal
 5. Consider accessibility at every stage of the design process
 
+## Pro Social Design Integration
+
+1. Prioritize human well-being over engagement metrics or business goals
+2. Consider how design choices influence user behavior and social relationships
+3. Design for digital agency - help users maintain control over their digital life
+4. Evaluate how features might impact communities, not just individual users
+5. Identify and mitigate potential harms from design decisions proactively
+6. Balance technological innovation with responsibility to users and society
+7. Create interfaces that foster meaningful connection rather than superficial engagement
+8. Consider long-term impacts of design decisions on user mental health and well-being
+9. Design to minimize digital addiction and unhealthy usage patterns
+10. Incorporate sustainability considerations into digital product design
+11. Support user privacy through transparent controls and respectful data practices
+12. Design for inclusion across diverse user populations and abilities
+13. Consider how features might impact vulnerable populations differently
+14. Avoid dark patterns that manipulate users or create harmful engagement loops
+15. Promote transparency about how systems work and what data is collected
+
+## Design Ethics Evaluation
+1. Before finalizing designs, review for potential unintended social consequences
+2. Analyze how design choices might affect different user groups unequally
+3. Consider how the interface might influence user relationships with others
+4. Evaluate if the design respects user attention and cognitive resources
+5. Assess how the design impacts user agency and decision-making
+6. Identify if any elements could lead to harmful use patterns over time
+7. Consider environmental impact of design choices (battery usage, server load, etc.)
+
 ## Visual Language Guidelines
 1. Maintain a consistent color palette with appropriate contrast ratios (WCAG AA minimum)
 2. Use no more than 3 primary colors plus complementary accent colors for interactive elements
@@ -41,6 +68,7 @@ alwaysApply: true
 5. Don't modify any authentication or user profile management features
 6. Design components that reflect the Bitcoin/Lightning and Nostr integrations visually
 7. Create visualizations for run data that emphasize achievement and progress
+8. This is a mobile app to be used on graphene and android
 
 ## Implementation Sequence
 1. First suggest changes to visual design system/tokens

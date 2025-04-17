@@ -2,7 +2,7 @@ import { createContext, useState, useEffect, useCallback, useContext } from 'rea
 import PropTypes from 'prop-types';
 import teamsDataService from '../services/TeamsDataService';
 import { NostrContext } from './NostrContext';
-import { getUserPublicKey } from '../utils/nostrClient';
+import { getUserPublicKey, fetchUserGroupList } from '../utils/nostrClient';
 
 // Create context
 export const TeamsContext = createContext();
@@ -20,319 +20,163 @@ export const TeamsProvider = ({ children }) => {
   // Get Nostr context
   const { publicKey: nostrPublicKey } = useContext(NostrContext);
   
-  // Teams state
+  // State for centralized teams (if still needed)
   const [teams, setTeams] = useState([]);
-  const [myTeams, setMyTeams] = useState([]);
-  const [selectedTeam, setSelectedTeam] = useState(null);
-  const [teamMessages, setTeamMessages] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [teamChallenges, setTeamChallenges] = useState([]);
-  const [pinnedPosts, setPinnedPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [myTeams, setMyTeams] = useState([]); // Centralized teams user is a member of
+  const [selectedTeam, setSelectedTeam] = useState(null); // For centralized teams
+  
+  // State for Nostr groups
+  const [myNostrGroups, setMyNostrGroups] = useState([]);
+  const [loadingNostrGroups, setLoadingNostrGroups] = useState(false);
+  
+  // General state
+  const [loading, setLoading] = useState(true); // Loading state for centralized teams
   const [error, setError] = useState(null);
   const [currentUser, setCurrentUser] = useState(() => {
-    return localStorage.getItem('currentUser') || null;
+    // Prioritize Nostr pubkey if available from previous session
+    return localStorage.getItem('currentNostrPubkey') || localStorage.getItem('currentUser') || null;
   });
 
-  // Use Nostr public key as current user if available
+  // Update currentUser when Nostr pubkey changes and trigger Nostr group fetch
   useEffect(() => {
-    const syncNostrUser = async () => {
+    const syncNostrUserAndFetchGroups = async () => {
       if (nostrPublicKey) {
-        // If we have a Nostr public key, use it as the current user
+        console.log("Nostr public key available:", nostrPublicKey);
         setCurrentUser(nostrPublicKey);
-        localStorage.setItem('currentUser', nostrPublicKey);
+        localStorage.setItem('currentNostrPubkey', nostrPublicKey); // Store Nostr key specifically
+        
+        // --- Fetch Nostr Groups --- 
+        setLoadingNostrGroups(true);
+        setError(null); // Clear previous errors
+        try {
+          // Load cached groups first
+          const cacheKey = `my_nostr_groups_${nostrPublicKey}`;
+          const cachedData = localStorage.getItem(cacheKey);
+          if (cachedData) {
+            setMyNostrGroups(JSON.parse(cachedData));
+            setLoadingNostrGroups(false); // Show cached immediately
+            console.log("Displayed cached Nostr groups.");
+          } else {
+             console.log("No cached Nostr groups found.");
+             // Keep loading true if no cache
+          }
+          
+          // Fetch fresh list from relays
+          console.log("Fetching fresh Nostr groups from relays...");
+          const groups = await fetchUserGroupList(nostrPublicKey);
+          setMyNostrGroups(groups);
+          console.log("Fetched fresh Nostr groups:", groups);
+          
+          // Cache the fresh list
+          localStorage.setItem(cacheKey, JSON.stringify(groups));
+          console.log("Cached fresh Nostr groups.");
+
+        } catch (err) {
+          console.error('Error loading My Nostr Clubs in context:', err);
+          setError('Failed to load your Nostr clubs.');
+          // Keep showing cached groups if fetch fails and cache existed
+          if (!localStorage.getItem(cacheKey)) {
+             setMyNostrGroups([]); // Clear if fetch fails and no cache
+          }
+        } finally {
+          setLoadingNostrGroups(false); // Mark loading as complete
+        }
+        // --- End Fetch Nostr Groups --- 
+
+      } else {
+        console.log("No Nostr public key available.");
+        // Optionally clear Nostr-specific data if user logs out of Nostr
+        // setCurrentUser(localStorage.getItem('currentUser') || null); // Revert to non-Nostr user? Requires thought.
+        setMyNostrGroups([]);
+        localStorage.removeItem('currentNostrPubkey');
+        // Consider clearing the cache for the logged-out pubkey? Or leave it?
       }
     };
     
-    syncNostrUser();
-  }, [nostrPublicKey]);
+    syncNostrUserAndFetchGroups();
+  }, [nostrPublicKey]); // Rerun when Nostr public key changes
 
-  // Define the fetchTeams function
+  // --- Centralized Team Functions (Keep if still needed, otherwise remove) --- 
+  
+  // Define the fetchTeams function (centralized)
   const fetchTeams = useCallback(() => {
     try {
       const allTeams = teamsDataService.getAllTeams();
       setTeams(allTeams);
     } catch (err) {
-      console.error('Error fetching teams:', err);
-      setError('Failed to load teams');
+      console.error('Error fetching centralized teams:', err);
+      setError('Failed to load centralized teams');
     }
   }, []);
 
-  // Define the fetchMyTeams function
+  // Define the fetchMyTeams function (centralized)
   const fetchMyTeams = useCallback(() => {
-    if (currentUser) {
+    if (currentUser && !currentUser.startsWith('npub')) { // Only run for non-Nostr users?
       try {
         const userTeams = teamsDataService.getUserTeams(currentUser);
-        console.log('Fetched user teams:', userTeams);
         setMyTeams(userTeams);
-      } catch (err) {
-        console.error('Error fetching user teams:', err);
-        setError('Failed to load your teams');
+      } catch (err) { 
+         // Handle error 
       }
     } else {
       setMyTeams([]);
     }
   }, [currentUser]);
   
-  // Initialize the context
+  // Initialize the context (mostly for centralized teams now)
   useEffect(() => {
-    // Clear any existing demo data
-    const teamsStorageKey = 'runstr_teams';
-    const membershipStorageKey = 'runstr_team_memberships';
-    const teamMessagesKey = 'runstr_team_messages';
-    const pinnedPostsKey = 'runstr_pinned_posts';
-    const teamChallengesKey = 'runstr_team_challenges';
+    setLoading(true);
+    teamsDataService.initialize().then(() => {
+        fetchTeams();
+        fetchMyTeams();
+        setLoading(false);
+    });
     
-    // Check if this is the first run after update to remove demo data
-    const demoRemoved = localStorage.getItem('runstr_demo_removed');
-    if (!demoRemoved) {
-      localStorage.removeItem(teamsStorageKey);
-      localStorage.removeItem(membershipStorageKey);
-      localStorage.removeItem(teamMessagesKey);
-      localStorage.removeItem(pinnedPostsKey);
-      localStorage.removeItem(teamChallengesKey);
-      localStorage.setItem('runstr_demo_removed', 'true');
-    }
-    
-    // Initialize the services
-    teamsDataService.initialize();
-    
-    // Load initial data
-    fetchTeams();
-    fetchMyTeams();
-    
-    // Add event listeners
     teamsDataService.addListener('teams', fetchTeams);
     teamsDataService.addListener('myTeams', fetchMyTeams);
     teamsDataService.addListener('error', (error) => setError(error));
     
     return () => {
-      // Remove event listeners on cleanup
       teamsDataService.removeListener('teams', fetchTeams);
       teamsDataService.removeListener('myTeams', fetchMyTeams);
       teamsDataService.removeListener('error', (error) => setError(error));
     };
   }, [currentUser, fetchTeams, fetchMyTeams]); // Re-initialize when user changes
 
-  // Select a team
+  // Select a team (centralized)
   const selectTeam = useCallback((teamId) => {
-    try {
-      setLoading(true);
-      console.log(`Selecting team: ${teamId}`);
-      
-      const team = teamsDataService.getTeamById(teamId);
-      
-      if (team) {
-        console.log('Team found:', team);
-        setSelectedTeam(team);
-        
-        // Load related data
-        const messages = teamsDataService.getTeamMessages(teamId);
-        console.log(`Loaded ${messages.length} messages for team`);
-        setTeamMessages(messages);
-        
-        const members = teamsDataService.getMemberships(teamId);
-        console.log(`Loaded ${members.length} members for team`);
-        setTeamMembers(members);
-        
-        const challenges = teamsDataService.getTeamChallenges(teamId);
-        console.log(`Loaded ${challenges.length} challenges for team`);
-        setTeamChallenges(challenges);
-        
-        const pinned = teamsDataService.getPinnedPosts(teamId);
-        console.log(`Loaded ${pinned.length} pinned posts for team`);
-        setPinnedPosts(pinned);
-      } else {
-        console.error('Team not found with ID:', teamId);
-        setError('Team not found');
-      }
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('Error selecting team:', error);
-      setError('Failed to load team details. Please try again later.');
-      setLoading(false);
-    }
+     // ... implementation for selecting a centralized team ...
   }, []);
 
-  // Create a team
+  // Create a team (centralized) - REMOVE IF NOT NEEDED
   const createTeam = useCallback(async (teamData) => {
-    try {
-      if (!currentUser) {
-        throw new Error('You must be logged in to create a team');
-      }
-      
-      console.log('Creating team with data:', { ...teamData, creatorId: currentUser });
-      
-      const newTeam = await teamsDataService.createTeam({
-        ...teamData,
-        creatorId: currentUser,
-      });
-      
-      if (newTeam) {
-        console.log('Team created successfully:', newTeam);
-        
-        // Add creator as admin
-        const memberAdded = await teamsDataService.addMember(newTeam.id, currentUser, 'admin');
-        console.log('Creator added as admin:', memberAdded);
-        
-        if (!memberAdded) {
-          console.error('Failed to add creator as admin');
-        }
-        
-        // Explicitly reload my teams to ensure UI updates
-        fetchMyTeams();
-        
-        return newTeam;
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error creating team:', error);
-      setError(error.message || 'Failed to create team');
-      return null;
-    }
+     // ... remove create team logic ...
+     console.warn("Team creation is disabled.");
+     return null;
   }, [currentUser, fetchMyTeams]);
 
-  // Join a team
+  // Join a team (centralized) - REMOVE IF NOT NEEDED
   const joinTeam = useCallback(async (teamId) => {
-    try {
-      if (!currentUser) {
-        throw new Error('You must be logged in to join a team');
-      }
-      
-      const success = await teamsDataService.addMember(teamId, currentUser);
-      return success;
-    } catch (error) {
-      console.error('Error joining team:', error);
-      setError(error.message || 'Failed to join team');
-      return false;
-    }
+     // ... remove join team logic ...
+     console.warn("Joining centralized teams is disabled.");
+     return false;
   }, [currentUser]);
 
-  // Leave a team
+  // Leave a team (centralized) - REMOVE IF NOT NEEDED
   const leaveTeam = useCallback((teamId) => {
-    try {
-      if (!currentUser) {
-        throw new Error('You must be logged in to leave a team');
-      }
-      
-      const success = teamsDataService.removeMember(teamId, currentUser);
-      
-      // If leaving the currently selected team, clear selection
-      if (success && selectedTeam && selectedTeam.id === teamId) {
-        setSelectedTeam(null);
-        setTeamMessages([]);
-        setTeamMembers([]);
-        setTeamChallenges([]);
-        setPinnedPosts([]);
-      }
-      
-      return success;
-    } catch (error) {
-      console.error('Error leaving team:', error);
-      setError(error.message || 'Failed to leave team');
-      return false;
-    }
+     // ... remove leave team logic ...
+     console.warn("Leaving centralized teams is disabled.");
+     return false;
   }, [currentUser, selectedTeam]);
 
-  // Send message to team chat
+  // Send message to team chat (centralized) - REMOVE IF NOT NEEDED
   const sendMessage = useCallback(async (teamId, content) => {
-    try {
-      if (!currentUser) {
-        throw new Error('You must be logged in to send a message');
-      }
-      
-      const message = await teamsDataService.addTeamMessage(teamId, currentUser, content);
-      return message;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      setError(error.message || 'Failed to send message');
-      return null;
-    }
+     // ... remove send message logic ...
+     console.warn("Sending messages to centralized teams is disabled.");
+     return null;
   }, [currentUser]);
 
-  // Pin a post
-  const pinPost = useCallback((teamId, postData) => {
-    try {
-      if (!currentUser) {
-        throw new Error('You must be logged in to pin a post');
-      }
-      
-      // Check if user is an admin
-      const memberships = teamsDataService.getMemberships(teamId);
-      const userMembership = memberships.find(m => m.userId === currentUser);
-      
-      if (!userMembership || userMembership.role !== 'admin') {
-        throw new Error('Only team admins can pin posts');
-      }
-      
-      const pin = teamsDataService.pinPost(teamId, postData);
-      return pin;
-    } catch (error) {
-      console.error('Error pinning post:', error);
-      setError(error.message || 'Failed to pin post');
-      return null;
-    }
-  }, [currentUser]);
-
-  // Create a team challenge
-  const createChallenge = useCallback((teamId, challengeData) => {
-    try {
-      if (!currentUser) {
-        throw new Error('You must be logged in to create a challenge');
-      }
-      
-      // Check if user is an admin
-      const memberships = teamsDataService.getMemberships(teamId);
-      const userMembership = memberships.find(m => m.userId === currentUser);
-      
-      if (!userMembership || userMembership.role !== 'admin') {
-        throw new Error('Only team admins can create challenges');
-      }
-      
-      const challenge = teamsDataService.createChallenge(teamId, {
-        ...challengeData,
-        creatorId: currentUser
-      });
-      
-      return challenge;
-    } catch (error) {
-      console.error('Error creating challenge:', error);
-      setError(error.message || 'Failed to create challenge');
-      return null;
-    }
-  }, [currentUser]);
-
-  // Join a challenge
-  const joinChallenge = useCallback((challengeId) => {
-    try {
-      if (!currentUser) {
-        throw new Error('You must be logged in to join a challenge');
-      }
-      
-      const success = teamsDataService.joinChallenge(challengeId, currentUser);
-      return success;
-    } catch (error) {
-      console.error('Error joining challenge:', error);
-      setError(error.message || 'Failed to join challenge');
-      return false;
-    }
-  }, [currentUser]);
-
-  // Set current user
-  const setUser = useCallback((userId) => {
-    setCurrentUser(userId);
-    localStorage.setItem('currentUser', userId);
-    
-    // Update user-specific data
-    if (userId) {
-      const userTeams = teamsDataService.getUserTeams(userId);
-      setMyTeams(userTeams);
-    } else {
-      setMyTeams([]);
-    }
-  }, []);
+  // --- End Centralized Team Functions --- 
 
   // Clear error
   const clearError = useCallback(() => {
@@ -341,25 +185,28 @@ export const TeamsProvider = ({ children }) => {
 
   // Context value
   const value = {
+    // Centralized team state (if kept)
     teams,
     myTeams,
     selectedTeam,
-    teamMessages,
-    teamMembers,
-    teamChallenges,
-    pinnedPosts,
     loading,
+    
+    // Nostr group state
+    myNostrGroups,
+    loadingNostrGroups,
+    
+    // General state
     error,
     currentUser,
+    
+    // Centralized team actions (if kept)
     selectTeam,
-    createTeam,
-    joinTeam,
-    leaveTeam,
-    sendMessage,
-    pinPost,
-    createChallenge,
-    joinChallenge,
-    setUser,
+    createTeam, // Keep if needed, otherwise remove
+    joinTeam,   // Keep if needed, otherwise remove
+    leaveTeam,  // Keep if needed, otherwise remove
+    sendMessage,// Keep if needed, otherwise remove
+    
+    // General actions
     clearError
   };
 

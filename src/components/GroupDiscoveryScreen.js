@@ -1,195 +1,149 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import { parseNaddr, fetchGroupMetadata } from '../utils/nostrClient';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { nip19 } from 'nostr-tools';
+import { joinGroup, hasJoinedGroup, getUserPublicKey } from '../utils/nostrClient';
 
-// Hardcoded group naddr values
-const MESSI_RUN_CLUB_NADDR = 'naddr1qvzqqqyctqpzptvcmkzg2fuxuvltqegc0r4cxkey95jl0sp9teh95azm77mtu9wgqyv8wumn8ghj7emjda6hquewxpuxx6rpwshxxmmd9uq3samnwvaz7tm8wfhh2urn9cc8scmgv96zucm0d5hsqsp4vfsnswrxve3rwdmyxgun2vnrx4jnvef5xs6rqcehxu6kgcmrvymkvvtpxuerwwp4xasn2cfhxymnxdpexsergvfhx3jnjce5vyunvg7fw59';
-const RUNSTR_NADDR = 'naddr1qvzqqqyctqpzptvcmkzg2fuxuvltqegc0r4cxkey95jl0sp9teh95azm77mtu9wgqyv8wumn8ghj7emjda6hquewxpuxx6rpwshxxmmd9uq3samnwvaz7tm8wfhh2urn9cc8scmgv96zucm0d5hsqspevfjxxcehx4jrqvnyxejnqcfkxs6rwc3kxa3rxcnrxdjnxctyxgmrqv34xasnscfjvccnswpkvyer2etxxgcngvrzxcerzetxxccxznx86es';
+const FEATURED_GROUPS = [
+  {
+    name: "Messi Run Club",
+    description: "Join Messi's running community! Share your runs, get inspired, and connect with fellow runners.",
+    naddr: "naddr1qqxnzd3cxyerxd3h8qerwwfcqgsgydql6q7lj0wfkxycclqfvxqqzg4mhxue69uhhyetvv9ujuerpd46hxtnfdehhytnwdaehgu3wwa5kuapwqqqp65wkk2pqz",
+    relay: "wss://groups.0xchat.com",
+    members: 42,
+    tags: ["Football", "Running", "Community"]
+  },
+  {
+    name: "#RUNSTR",
+    description: "The official RUNSTR community. Share your achievements, get tips, and connect with runners worldwide!",
+    naddr: "naddr1qqxnzd3cxyerxd3h8qerwwfcqgsgydql6q7lj0wfkxycclqfvxqqzg4mhxue69uhhyetvv9ujuerpd46hxtnfdehhytnwdaehgu3wwa5kuapwqqqp65wkk2pqz",
+    relay: "wss://groups.0xchat.com",
+    members: 156,
+    tags: ["Official", "Community", "Running"]
+  }
+];
 
-const GroupDiscoveryScreen = ({ navigation }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [groups, setGroups] = useState([]);
+const GroupDiscoveryScreen = () => {
+  const navigation = useNavigation();
+  const [joinedGroups, setJoinedGroups] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Load the two hardcoded groups
   useEffect(() => {
-    loadHardcodedGroups();
+    loadJoinedStatus();
   }, []);
 
-  // Load the two specified Nostr groups
-  const loadHardcodedGroups = async () => {
+  const loadJoinedStatus = async () => {
+    const pubkey = await getUserPublicKey();
+    if (!pubkey) return;
+
+    const joinedStatus = {};
+    for (const group of FEATURED_GROUPS) {
+      joinedStatus[group.naddr] = await hasJoinedGroup(group.naddr);
+    }
+    setJoinedGroups(joinedStatus);
+  };
+
+  const handleGroupPress = (group) => {
+    navigation.navigate('TeamDetail', { 
+      group,
+      isNostrGroup: true
+    });
+  };
+
+  const handleJoinGroup = async (group) => {
+    const pubkey = await getUserPublicKey();
+    if (!pubkey) {
+      Alert.alert(
+        "Authentication Required",
+        "Please connect your Nostr key in Settings to join groups.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
     setIsLoading(true);
-    setError(null);
-    
     try {
-      const messiGroupInfo = parseNaddr(MESSI_RUN_CLUB_NADDR);
-      const runstrGroupInfo = parseNaddr(RUNSTR_NADDR);
-      
-      if (!messiGroupInfo || !runstrGroupInfo) {
-        throw new Error('Failed to parse naddr values');
+      const success = await joinGroup(group);
+      if (success) {
+        setJoinedGroups(prev => ({
+          ...prev,
+          [group.naddr]: true
+        }));
+        Alert.alert(
+          "Success",
+          `You've joined ${group.name}!`,
+          [{ text: "OK" }]
+        );
+      } else {
+        throw new Error("Failed to join group");
       }
-      
-      const loadedGroups = [];
-      
-      // Fetch Messi Run Club metadata
-      const messiMetadata = await fetchGroupMetadata(
-        messiGroupInfo.kind,
-        messiGroupInfo.pubkey,
-        messiGroupInfo.identifier,
-        messiGroupInfo.relays
-      );
-      
-      if (messiMetadata) {
-        loadedGroups.push({
-          id: MESSI_RUN_CLUB_NADDR,
-          naddr: MESSI_RUN_CLUB_NADDR,
-          groupInfo: messiGroupInfo,
-          metadata: messiMetadata.metadata || { name: 'Messi Run Club', about: 'Running club for Messi fans' },
-          created_at: messiMetadata.created_at || Date.now() / 1000
-        });
-      }
-      
-      // Fetch #RUNSTR metadata
-      const runstrMetadata = await fetchGroupMetadata(
-        runstrGroupInfo.kind,
-        runstrGroupInfo.pubkey,
-        runstrGroupInfo.identifier,
-        runstrGroupInfo.relays
-      );
-      
-      if (runstrMetadata) {
-        loadedGroups.push({
-          id: RUNSTR_NADDR,
-          naddr: RUNSTR_NADDR,
-          groupInfo: runstrGroupInfo,
-          metadata: runstrMetadata.metadata || { name: '#RUNSTR', about: 'Official RUNSTR running club' },
-          created_at: runstrMetadata.created_at || Date.now() / 1000
-        });
-      }
-      
-      setGroups(loadedGroups);
     } catch (error) {
-      console.error('Error loading hardcoded groups:', error);
-      setError('Failed to load running clubs. Please try again.');
-      
-      // Fallback to basic information if metadata fetch fails
-      setGroups([
-        {
-          id: MESSI_RUN_CLUB_NADDR,
-          naddr: MESSI_RUN_CLUB_NADDR,
-          metadata: { name: 'Messi Run Club', about: 'Running club for Messi fans' },
-          created_at: Date.now() / 1000
-        },
-        {
-          id: RUNSTR_NADDR,
-          naddr: RUNSTR_NADDR,
-          metadata: { name: '#RUNSTR', about: 'Official RUNSTR running club' },
-          created_at: Date.now() / 1000
-        }
-      ]);
+      Alert.alert(
+        "Error",
+        "Failed to join the group. Please try again.",
+        [{ text: "OK" }]
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Navigate to the group chatroom
-  const goToGroupChat = (group) => {
-    if (navigation && navigation.navigate) {
-      navigation.navigate('TeamDetail', { 
-        naddr: group.naddr,
-        name: group.metadata.name 
-      });
-    }
-  };
-
-  // Render a group card
-  const renderGroupCard = ({ item }) => {
-    return (
-      <TouchableOpacity 
-        style={styles.groupCard}
-        onPress={() => goToGroupChat(item)}
-      >
-        <View style={styles.groupHeader}>
-          {item.metadata.picture ? (
-            <Image 
-              source={{ uri: item.metadata.picture }} 
-              style={styles.groupAvatar} 
-              defaultSource={require('../assets/default-group-icon.png')}
-            />
-          ) : (
-            <View style={styles.defaultAvatar}>
-              <Text style={styles.defaultAvatarText}>
-                {item.metadata.name ? item.metadata.name.charAt(0).toUpperCase() : 'G'}
-              </Text>
-            </View>
-          )}
-          <View style={styles.groupInfo}>
-            <Text style={styles.groupName}>{item.metadata.name || 'Unnamed Group'}</Text>
-            <Text style={styles.groupTimestamp}>
-              Created: {new Date(item.created_at * 1000).toLocaleDateString()}
-            </Text>
-          </View>
+  const renderTags = (tags) => (
+    <View style={styles.tagContainer}>
+      {tags.map((tag, index) => (
+        <View key={index} style={styles.tag}>
+          <Text style={styles.tagText}>#{tag}</Text>
         </View>
-        
-        <Text style={styles.groupDescription} numberOfLines={3}>
-          {item.metadata.about || 'No description available'}
-        </Text>
-        
-        <View style={styles.joinButton}>
-          <Text style={styles.joinButtonText}>View Group</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+      ))}
+    </View>
+  );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Running Clubs</Text>
-      </View>
+      <Text style={styles.header}>Discover Running Groups</Text>
+      <Text style={styles.subheader}>Join a community of runners and share your journey</Text>
       
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity 
-            style={styles.refreshButton}
-            onPress={loadHardcodedGroups}
-          >
-            <Text style={styles.refreshButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4a90e2" />
-          <Text style={styles.loadingText}>Loading running clubs...</Text>
-        </View>
-      ) : (
-        <>
-          {groups.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No running clubs found</Text>
-              <TouchableOpacity 
-                style={styles.refreshButton}
-                onPress={loadHardcodedGroups}
-              >
-                <Text style={styles.refreshButtonText}>Refresh</Text>
-              </TouchableOpacity>
+      {FEATURED_GROUPS.map((group, index) => (
+        <TouchableOpacity 
+          key={index} 
+          style={styles.groupCard}
+          onPress={() => handleGroupPress(group)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardHeader}>
+            <Text style={styles.groupName}>{group.name}</Text>
+            <View style={styles.memberBadge}>
+              <Text style={styles.memberCount}>{group.members} members</Text>
             </View>
-          ) : (
-            <FlatList
-              data={groups}
-              renderItem={renderGroupCard}
-              keyExtractor={item => item.id}
-              contentContainerStyle={styles.groupsList}
-              showsVerticalScrollIndicator={false}
-              refreshing={isLoading}
-              onRefresh={loadHardcodedGroups}
-            />
-          )}
-        </>
-      )}
+          </View>
+          
+          <Text style={styles.groupDescription}>{group.description}</Text>
+          
+          {renderTags(group.tags)}
+          
+          <View style={styles.cardFooter}>
+            <TouchableOpacity 
+              onPress={() => handleJoinGroup(group)}
+              disabled={isLoading || joinedGroups[group.naddr]}
+              style={[
+                styles.joinButton,
+                (isLoading || joinedGroups[group.naddr]) && styles.joinButtonDisabled
+              ]}
+            >
+              <Text style={[
+                styles.joinText,
+                (isLoading || joinedGroups[group.naddr]) && styles.joinTextDisabled
+              ]}>
+                {joinedGroups[group.naddr] 
+                  ? "Joined ✓" 
+                  : isLoading 
+                    ? "Joining..." 
+                    : "Join Group"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 };
@@ -197,129 +151,102 @@ const GroupDiscoveryScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5'
+    padding: 16,
+    backgroundColor: '#121212', // Dark theme background
   },
   header: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#4a90e2'
-  },
-  headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: 'white'
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
-  groupsList: {
-    padding: 12
+  subheader: {
+    fontSize: 16,
+    color: '#A0A0A0',
+    marginBottom: 24,
   },
   groupCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
+    borderRadius: 12,
+    backgroundColor: '#1E1E1E',
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  groupHeader: {
+  cardHeader: {
     flexDirection: 'row',
-    marginBottom: 12
-  },
-  groupAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#e0e0e0'
-  },
-  defaultAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#4a90e2',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  defaultAvatarText: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold'
-  },
-  groupInfo: {
-    marginLeft: 12,
-    flex: 1,
-    justifyContent: 'center'
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   groupName: {
-    fontSize: 16,
-    fontWeight: 'bold'
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    flex: 1,
   },
-  groupTimestamp: {
+  memberBadge: {
+    backgroundColor: '#2A2A2A',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  memberCount: {
+    color: '#A0A0A0',
     fontSize: 12,
-    color: '#666',
-    marginTop: 2
   },
   groupDescription: {
     fontSize: 14,
-    color: '#444',
+    color: '#CCCCCC',
     marginBottom: 16,
-    lineHeight: 20
+    lineHeight: 20,
+  },
+  tagContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  tag: {
+    backgroundColor: '#2A2A2A',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  tagText: {
+    color: '#A0A0A0',
+    fontSize: 12,
+  },
+  cardFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#2A2A2A',
+    paddingTop: 12,
+    marginTop: 4,
   },
   joinButton: {
-    backgroundColor: '#4caf50',
-    paddingVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    alignItems: 'center'
+    backgroundColor: '#2A2A2A',
+    alignSelf: 'flex-end',
   },
-  joinButtonText: {
-    color: 'white',
-    fontWeight: 'bold'
+  joinButtonDisabled: {
+    opacity: 0.6,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: 12,
+  joinText: {
+    color: '#4A9EFF',
     fontSize: 14,
-    color: '#666'
+    fontWeight: '600',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24
+  joinTextDisabled: {
+    color: '#A0A0A0',
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 16
-  },
-  refreshButton: {
-    backgroundColor: '#4a90e2',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginTop: 16
-  },
-  refreshButtonText: {
-    color: 'white',
-    fontWeight: 'bold'
-  },
-  errorContainer: {
-    padding: 12,
-    backgroundColor: '#ffebee',
-    borderRadius: 8,
-    margin: 12,
-    alignItems: 'center'
-  },
-  errorText: {
-    color: '#d32f2f',
-    textAlign: 'center'
-  }
 });
 
 export default GroupDiscoveryScreen; 
