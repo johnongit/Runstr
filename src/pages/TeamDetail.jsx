@@ -10,8 +10,13 @@ import {
 } from '../utils/nostrClient';
 import '../components/RunClub.css';
 
+console.log("TeamDetail component file is loading");
+
 export const TeamDetail = () => {
+  console.log("TeamDetail component is rendering");
   const { naddr } = useParams();
+  console.log("Team naddr param:", naddr);
+  
   const navigate = useNavigate();
   const { publicKey } = useContext(NostrContext);
   
@@ -32,7 +37,12 @@ export const TeamDetail = () => {
 
   // Parse naddr and fetch group data on mount
   useEffect(() => {
-    loadGroupData();
+    console.log("TeamDetail useEffect triggered with naddr:", naddr);
+    
+    loadGroupData().catch(err => {
+      console.error("Error in loadGroupData:", err);
+      setError(err.message || "Failed to load group data");
+    });
     
     // Cleanup subscription on unmount
     return () => {
@@ -50,12 +60,15 @@ export const TeamDetail = () => {
   
   // Load the group data from the naddr
   const loadGroupData = async () => {
+    console.log("loadGroupData called for naddr:", naddr);
     setIsLoading(true);
     setError(null);
     
     try {
       // Parse the naddr
       const parsedInfo = parseNaddr(naddr);
+      console.log("Parsed naddr info:", parsedInfo);
+      
       if (!parsedInfo) {
         throw new Error('Invalid group identifier');
       }
@@ -63,12 +76,15 @@ export const TeamDetail = () => {
       setGroupInfo(parsedInfo);
       
       // Fetch group metadata
+      console.log("Fetching group metadata");
       const groupMetadata = await fetchGroupMetadata(
         parsedInfo.kind,
         parsedInfo.pubkey,
         parsedInfo.identifier,
         parsedInfo.relays.length > 0 ? parsedInfo.relays : ['wss://groups.0xchat.com']
       );
+      
+      console.log("Group metadata received:", groupMetadata);
       
       if (!groupMetadata) {
         throw new Error('Group not found');
@@ -95,6 +111,8 @@ export const TeamDetail = () => {
   
   // Setup real-time subscription to new messages
   const setupSubscription = (groupData) => {
+    console.log("Setting up subscription for group:", groupData);
+    
     // Clean up any existing subscription
     if (subscriptionRef.current) {
       subscriptionRef.current.close();
@@ -107,11 +125,15 @@ export const TeamDetail = () => {
       since: Math.floor(Date.now() / 1000) - 10 // Only get messages from 10 seconds ago
     };
     
+    console.log("Subscription filter:", filter);
+    
     try {
       // Subscribe to new messages
       const sub = subscribe(filter);
       
       if (sub) {
+        console.log("Subscription created successfully");
+        
         // Handle incoming events
         sub.on('event', (event) => {
           console.log('New message received:', event);
@@ -124,6 +146,8 @@ export const TeamDetail = () => {
         
         // Store the subscription for cleanup
         subscriptionRef.current = sub;
+      } else {
+        console.warn("Failed to create subscription - subscribe returned null/undefined");
       }
     } catch (error) {
       console.error('Error setting up subscription:', error);
@@ -132,11 +156,18 @@ export const TeamDetail = () => {
   
   // Load messages for the group
   const loadMessages = async (groupData) => {
+    console.log("Loading messages for group:", groupData);
+    
     try {
-      const messages = await fetchGroupMessages(
-        `${groupData.kind}:${groupData.pubkey}:${groupData.identifier}`,
-        groupData.relays.length > 0 ? groupData.relays : ['wss://groups.0xchat.com']
-      );
+      const groupId = `${groupData.kind}:${groupData.pubkey}:${groupData.identifier}`;
+      console.log("Fetching messages with group ID:", groupId);
+      
+      const relays = groupData.relays.length > 0 ? groupData.relays : ['wss://groups.0xchat.com'];
+      console.log("Using relays:", relays);
+      
+      const messages = await fetchGroupMessages(groupId, relays);
+      console.log("Received messages:", messages);
+      
       setMessages(messages);
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -216,17 +247,21 @@ export const TeamDetail = () => {
     setIsSending(true);
     
     try {
+      console.log("Sending message to group:", groupInfo);
       const sentMessage = await sendGroupMessage(groupInfo, messageText.trim());
+      
       if (sentMessage) {
+        console.log("Message sent successfully:", sentMessage);
         setMessageText('');
         // Optimistically add the message to the list
         setMessages(prev => [...prev, sentMessage]);
       } else {
+        console.error("sendGroupMessage returned falsy value");
         setError('Failed to send message');
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      setError('Failed to send message');
+      setError('Failed to send message: ' + error.message);
     } finally {
       setIsSending(false);
     }
@@ -289,6 +324,10 @@ export const TeamDetail = () => {
           <div className="bg-red-900/30 border border-red-800 rounded-lg p-4 mb-6">
             <h1 className="text-xl font-bold text-white mb-2">Error</h1>
             <p className="text-red-300">{error || 'Failed to load group'}</p>
+            <p className="text-gray-400 text-sm mt-2">
+              naddr: {naddr ? naddr.substring(0, 20) + '...' : 'undefined'}<br />
+              Metadata: {metadata ? 'Available' : 'Not Available'}
+            </p>
           </div>
           <button
             onClick={() => navigate('/teams')}
@@ -300,7 +339,7 @@ export const TeamDetail = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="p-4 bg-gray-800 min-h-screen">
       <div className="max-w-4xl mx-auto">
@@ -316,7 +355,7 @@ export const TeamDetail = () => {
           </button>
           
           <div className="flex items-center">
-            {metadata.metadata.picture ? (
+            {metadata.metadata?.picture ? (
               <img 
                 src={metadata.metadata.picture} 
                 alt={metadata.metadata.name} 
@@ -325,17 +364,17 @@ export const TeamDetail = () => {
             ) : (
               <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center mr-4">
                 <span className="text-white text-xl font-bold">
-                  {metadata.metadata.name?.charAt(0) || '#'}
+                  {metadata.metadata?.name?.charAt(0) || '#'}
                 </span>
               </div>
             )}
             
             <div>
               <h1 className="text-2xl font-bold text-white">
-                {metadata.metadata.name || 'Running Club'}
+                {metadata.metadata?.name || 'Running Club'}
               </h1>
               <p className="text-gray-400 text-sm">
-                {metadata.metadata.about || 'A Nostr running community'}
+                {metadata.metadata?.about || 'A Nostr running community'}
               </p>
             </div>
           </div>

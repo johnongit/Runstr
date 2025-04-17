@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { joinGroup, hasJoinedGroup, getUserPublicKey } from '../utils/nostrClient';
 
+console.log("GroupDiscoveryScreen is loading");
+
 // Hardcoded groups for RUNSTR app
 const FEATURED_GROUPS = [
   {
@@ -23,53 +25,75 @@ const FEATURED_GROUPS = [
 ];
 
 const GroupDiscoveryScreen = () => {
+  console.log("GroupDiscoveryScreen component rendering");
   const navigate = useNavigate();
   const [joinedGroups, setJoinedGroups] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     // Check join status when component mounts
-    checkJoinStatus();
+    checkJoinStatus().catch(err => {
+      console.error("Error in checkJoinStatus:", err);
+      setError("Failed to check join status. Will continue showing groups anyway.");
+    });
   }, []);
 
   // Simplified function to check join status for the two groups
   const checkJoinStatus = async () => {
-    const pubkey = await getUserPublicKey();
-    if (!pubkey) return;
-
     try {
+      setIsLoading(true);
+      
+      const pubkey = await getUserPublicKey();
+      if (!pubkey) {
+        console.log("No pubkey available, can't check join status");
+        return;
+      }
+
       const statusMap = {};
       // Check join status for each group
       for (const group of FEATURED_GROUPS) {
-        statusMap[group.naddr] = await hasJoinedGroup(group.naddr);
+        try {
+          statusMap[group.naddr] = await hasJoinedGroup(group.naddr);
+        } catch (innerError) {
+          console.error(`Error checking join status for ${group.name}:`, innerError);
+          statusMap[group.naddr] = false; // Assume not joined if error
+        }
       }
       setJoinedGroups(statusMap);
     } catch (error) {
       console.error("Error checking join status:", error);
       // Don't show error to user, just fail silently
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Navigate to group chat
   const handleGroupPress = (group) => {
-    navigate(`/teams/${group.naddr}`, { 
-      state: { 
-        group,
-        isNostrGroup: true
-      }
-    });
+    try {
+      navigate(`/teams/${group.naddr}`, { 
+        state: { 
+          group,
+          isNostrGroup: true
+        }
+      });
+    } catch (error) {
+      console.error("Error navigating to team detail:", error);
+      setError("Failed to navigate to team detail. Please try again.");
+    }
   };
 
   // Join a group
   const handleJoinGroup = async (group) => {
-    const pubkey = await getUserPublicKey();
-    if (!pubkey) {
-      alert("Authentication Required: Please connect your Nostr key in Settings to join groups.");
-      return;
-    }
-
-    setIsLoading(true);
     try {
+      const pubkey = await getUserPublicKey();
+      if (!pubkey) {
+        alert("Authentication Required: Please connect your Nostr key in Settings to join groups.");
+        return;
+      }
+
+      setIsLoading(true);
       const success = await joinGroup(group);
       if (success) {
         // Update local join status
@@ -113,6 +137,12 @@ const GroupDiscoveryScreen = () => {
     <div className="min-h-screen bg-gray-900 p-4">
       <h1 className="text-2xl font-bold text-white mb-2">Discover Running Groups</h1>
       <p className="text-gray-400 mb-6">Join a community of runners and share your journey</p>
+      
+      {error && (
+        <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-800 rounded-lg">
+          <p className="text-yellow-300 text-sm">{error}</p>
+        </div>
+      )}
       
       {FEATURED_GROUPS.map((group, index) => (
         <div 

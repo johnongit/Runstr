@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { NostrProvider } from './contexts/NostrProvider';
 import { AuthProvider } from './components/AuthProvider';
@@ -11,35 +11,113 @@ import { MenuBar } from './components/MenuBar';
 import { initializeNostr } from './utils/nostr';
 import './App.css';
 
-// Lazy load components
-const AppRoutes = lazy(() => import('./AppRoutes').then(module => ({ default: module.AppRoutes })));
+console.log("App.jsx is loading");
 
-// Loading fallback - removed spinner
-const LoadingFallback = () => (
-  <div></div>
+// Improved error boundary fallback
+const ErrorFallback = () => (
+  <div className="p-6 bg-red-900/30 border border-red-800 rounded-lg m-4">
+    <h2 className="text-2xl font-bold text-white mb-4">App Loading Error</h2>
+    <p className="text-red-300 mb-4">
+      There was a problem loading the app. This could be due to network issues or a problem with the app itself.
+    </p>
+    <button 
+      onClick={() => window.location.reload()}
+      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500"
+    >
+      Reload App
+    </button>
+  </div>
+);
+
+// Enhanced loading component with timeout detection
+const EnhancedLoadingFallback = () => {
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  
+  useEffect(() => {
+    // After 5 seconds of loading, show a timeout warning
+    const timeoutId = setTimeout(() => {
+      setShowTimeoutWarning(true);
+    }, 5000);
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
+  
+  return (
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+      <p className="text-gray-300">Loading RUNSTR...</p>
+      
+      {showTimeoutWarning && (
+        <div className="mt-8 p-4 bg-yellow-900/20 border border-yellow-800 rounded-lg max-w-md">
+          <p className="text-yellow-300 text-center mb-2">
+            Loading is taking longer than expected. Please be patient.
+          </p>
+          <p className="text-yellow-400 text-sm text-center">
+            If this persists, try reloading the app.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Lazy load AppRoutes with error handling
+const AppRoutes = lazy(() => 
+  import('./AppRoutes')
+    .then(module => {
+      console.log("AppRoutes module loaded successfully");
+      return { default: module.default || module.AppRoutes };
+    })
+    .catch(error => {
+      console.error("Error loading AppRoutes:", error);
+      return { 
+        default: () => <ErrorFallback /> 
+      };
+    })
 );
 
 const App = () => {
+  const [hasError, setHasError] = useState(false);
+  
   // Initialize Nostr connection as soon as the app launches
   useEffect(() => {
     const preloadNostr = async () => {
-      console.log('Preloading Nostr connection on app launch');
-      await initializeNostr();
-      
-      // Prefetch run feed data using dynamic import to avoid circular dependencies
       try {
-        const { fetchRunningPosts } = await import('./utils/nostr');
-        console.log('Preloading feed data in background');
-        fetchRunningPosts(10).catch(err => 
-          console.error('Error preloading feed data:', err)
-        );
+        console.log('Preloading Nostr connection on app launch');
+        await initializeNostr();
+        
+        // Prefetch run feed data using dynamic import to avoid circular dependencies
+        try {
+          const { fetchRunningPosts } = await import('./utils/nostr');
+          console.log('Preloading feed data in background');
+          fetchRunningPosts(10).catch(err => 
+            console.error('Error preloading feed data:', err)
+          );
+        } catch (error) {
+          console.error('Error importing feed functions:', error);
+        }
       } catch (error) {
-        console.error('Error importing feed functions:', error);
+        console.error('Error in preloadNostr:', error);
       }
     };
     
     preloadNostr();
   }, []);
+  
+  // Global error handler
+  useEffect(() => {
+    const handleGlobalError = (event) => {
+      console.error('Global error:', event.error);
+      setHasError(true);
+    };
+    
+    window.addEventListener('error', handleGlobalError);
+    return () => window.removeEventListener('error', handleGlobalError);
+  }, []);
+  
+  if (hasError) {
+    return <ErrorFallback />;
+  }
   
   return (
     <Router>
@@ -53,7 +131,7 @@ const App = () => {
                     <div className="relative w-full h-full bg-[#111827] text-white">
                       <MenuBar />
                       <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
-                        <Suspense fallback={<LoadingFallback />}>
+                        <Suspense fallback={<EnhancedLoadingFallback />}>
                           <AppRoutes />
                         </Suspense>
                       </main>
