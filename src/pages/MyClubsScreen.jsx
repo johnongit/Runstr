@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NostrContext } from '../contexts/NostrContext';
 import { fetchUserGroupList } from '../utils/nostrClient';
@@ -103,284 +102,128 @@ const MyClubsScreen = () => {
   };
 
   // Render a group card (similar to GroupDiscoveryScreen)
-  const renderGroupCard = ({ item }) => {
+  const renderGroupCard = (item) => {
     return (
-      <TouchableOpacity 
-        style={styles.groupCard}
-        onPress={() => goToGroupChat(item)}
+      <div 
+        key={item.id}
+        className="bg-gray-800 rounded-lg p-4 mb-4 cursor-pointer hover:bg-gray-750"
+        onClick={() => goToGroupChat(item)}
       >
-        <View style={styles.groupHeader}>
+        <div className="flex items-center mb-3">
           {item.metadata.picture ? (
-            <Image 
-              source={{ uri: item.metadata.picture }} 
-              style={styles.groupAvatar} 
-              defaultSource={require('../assets/default-group-icon.png')} 
+            <img 
+              src={item.metadata.picture} 
+              alt={item.metadata.name || 'Group'}
+              className="w-12 h-12 rounded-full mr-3 bg-gray-700"
             />
           ) : (
-            <View style={styles.defaultAvatar}>
-              <Text style={styles.defaultAvatarText}>
+            <div className="w-12 h-12 rounded-full mr-3 bg-blue-600 flex items-center justify-center">
+              <span className="text-white text-lg font-bold">
                 {item.metadata.name ? item.metadata.name.charAt(0).toUpperCase() : '#'}
-              </Text>
-            </View>
+              </span>
+            </div>
           )}
-          <View style={styles.groupInfo}>
-            <Text style={styles.groupName}>{item.metadata.name || 'Unnamed Group'}</Text>
-            <Text style={styles.groupTimestamp}>
+          <div className="flex-1">
+            <h3 className="text-white font-bold">{item.metadata.name || 'Unnamed Group'}</h3>
+            <p className="text-gray-400 text-xs">
               Kind: {item.kind} • ID: {item.identifierData?.identifier.slice(0,8)}...
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.groupDescription} numberOfLines={3}>
+            </p>
+          </div>
+        </div>
+        <p className="text-gray-300 mb-4 line-clamp-3">
           {item.metadata.about || 'No description available'}
-        </Text>
-        <View style={styles.joinButton}>
-          <Text style={styles.joinButtonText}>View Group</Text>
-        </View>
-      </TouchableOpacity>
+        </p>
+        <div className="mt-2 flex justify-end">
+          <button className="bg-green-600 text-white font-bold py-2 px-4 rounded">
+            View Group
+          </button>
+        </div>
+      </div>
     );
   };
 
   if (!publicKey) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-           <TouchableOpacity onPress={() => navigate('/teams')} style={styles.backButton}>
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-             </svg>
-           </TouchableOpacity>
-          <Text style={styles.headerTitle}>My Clubs</Text>
-           <View style={{ width: 24 }} />
-        </View>
-        <View style={styles.centeredMessageContainer}>
-           <Text style={styles.infoText}>Please connect with Nostr in Settings to see your clubs.</Text>
-           <TouchableOpacity 
-             style={styles.actionButton}
-             onPress={() => navigate('/settings')}
-           >
-             <Text style={styles.actionButtonText}>Go to Settings</Text>
-           </TouchableOpacity>
-        </View>
-      </View>
+      <div className="min-h-screen bg-gray-900">
+        <div className="p-4 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
+          <button 
+            onClick={() => navigate('/teams')}
+            className="text-gray-400 p-1 hover:bg-gray-700 rounded"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </button>
+          <h1 className="text-xl font-bold text-white">My Clubs</h1>
+          <div className="w-6"></div>
+        </div>
+        <div className="flex flex-col items-center justify-center p-6 h-[calc(100vh-64px)]">
+          <p className="text-gray-400 text-center mb-2">Please connect with Nostr in Settings to see your clubs.</p>
+          <button 
+            className="mt-4 bg-blue-600 text-white font-bold py-2 px-4 rounded"
+            onClick={() => navigate('/settings')}
+          >
+            Go to Settings
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-         <TouchableOpacity onPress={() => navigate('/teams')} style={styles.backButton}>
-           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-             <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-           </svg>
-         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Clubs</Text>
-         <View style={{ width: 24 }} />
-      </View>
+    <div className="min-h-screen bg-gray-900">
+      <div className="p-4 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
+        <button 
+          onClick={() => navigate('/teams')}
+          className="text-gray-400 p-1 hover:bg-gray-700 rounded"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        </button>
+        <h1 className="text-xl font-bold text-white">My Clubs</h1>
+        <div className="w-6"></div>
+      </div>
       
       {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity 
-            style={styles.refreshButton}
-            onPress={() => loadMyGroups(publicKey)}
+        <div className="m-4 p-3 bg-gray-800 border border-red-800 rounded-lg text-center">
+          <p className="text-red-400 mb-3">{error}</p>
+          <button 
+            className="bg-blue-600 text-white font-bold py-2 px-4 rounded"
+            onClick={() => loadMyGroups(publicKey)}
           >
-            <Text style={styles.refreshButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+            Retry
+          </button>
+        </div>
       )}
       
       {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4a90e2" />
-          <Text style={styles.loadingText}>Loading your clubs...</Text>
-        </View>
+        <div className="flex flex-col items-center justify-center p-6 h-[calc(100vh-64px)]">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+          <p className="text-gray-400">Loading your clubs...</p>
+        </div>
       ) : (
         <>
           {myGroups.length === 0 ? (
-            <View style={styles.centeredMessageContainer}>
-              <Text style={styles.infoText}>You haven't joined any Nostr clubs yet.</Text>
-              <Text style={styles.infoSubText}>Use another Nostr client to join clubs, or check out the Discover tab.</Text>
-               <TouchableOpacity 
-                 style={styles.actionButton}
-                 onPress={() => navigate('/discover-clubs')}
-               >
-                 <Text style={styles.actionButtonText}>Discover Clubs</Text>
-               </TouchableOpacity>
-            </View>
+            <div className="flex flex-col items-center justify-center p-6 h-[calc(100vh-64px)]">
+              <p className="text-gray-400 text-center mb-2">You haven't joined any Nostr clubs yet.</p>
+              <p className="text-gray-500 text-center mb-6">Use another Nostr client to join clubs, or check out the Discover tab.</p>
+              <button 
+                className="bg-blue-600 text-white font-bold py-2 px-4 rounded"
+                onClick={() => navigate('/discover-clubs')}
+              >
+                Discover Clubs
+              </button>
+            </div>
           ) : (
-            <FlatList
-              data={myGroups}
-              renderItem={renderGroupCard}
-              keyExtractor={item => item.id} // Use event ID as key
-              contentContainerStyle={styles.groupsList}
-              showsVerticalScrollIndicator={false}
-              refreshing={isLoading} // Show refresh indicator during background refresh
-              onRefresh={() => loadMyGroups(publicKey)}
-            />
+            <div className="p-4 overflow-auto">
+              {myGroups.map(group => renderGroupCard(group))}
+            </div>
           )}
         </>
       )}
-    </View>
+    </div>
   );
 };
-
-// Reusing styles from GroupDiscoveryScreen, adding specific ones
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1a222e'
-  },
-  header: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#212936',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#394150'
-  },
-  backButton: {
-     padding: 4,
-     color: '#9ca3af'
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center'
-  },
-  groupsList: {
-    padding: 16
-  },
-  groupCard: {
-    backgroundColor: '#212936',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5
-  },
-  groupHeader: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    alignItems: 'center'
-  },
-  groupAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#394150'
-  },
-  defaultAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#4a90e2',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  defaultAvatarText: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold'
-  },
-  groupInfo: {
-    marginLeft: 12,
-    flex: 1,
-    justifyContent: 'center'
-  },
-  groupName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white'
-  },
-  groupTimestamp: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 2
-  },
-  groupDescription: {
-    fontSize: 14,
-    color: '#d1d5db',
-    marginBottom: 16,
-    lineHeight: 20
-  },
-  joinButton: {
-    backgroundColor: '#4caf50',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center'
-  },
-  joinButtonText: {
-    color: 'white',
-    fontWeight: 'bold'
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#9ca3af'
-  },
-  centeredMessageContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24
-  },
-  infoText: {
-    fontSize: 16,
-    color: '#9ca3af',
-    textAlign: 'center',
-    marginBottom: 8
-  },
-  infoSubText: {
-    fontSize: 14,
-    color: '#6b7280', 
-    textAlign: 'center',
-    marginBottom: 24
-  },
-  actionButton: {
-    backgroundColor: '#4a90e2',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginTop: 16
-  },
-  actionButtonText: {
-    color: 'white',
-    fontWeight: 'bold'
-  },
-  errorContainer: {
-    padding: 12,
-    backgroundColor: '#44403c', // Darker red/brown error background
-    borderRadius: 8,
-    margin: 16,
-    alignItems: 'center'
-  },
-  errorText: {
-    color: '#fca5a5', // Lighter red text for dark background
-    textAlign: 'center',
-    marginBottom: 12
-  },
-  refreshButton: {
-    backgroundColor: '#4a90e2',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  refreshButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 14
-  }
-});
 
 export default MyClubsScreen; 

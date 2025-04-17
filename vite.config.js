@@ -20,8 +20,7 @@ export default defineConfig({
           ],
           // Audio player in separate chunk
           audioPlayer: [
-            'react-h5-audio-player',
-            'react-player'
+            'react-h5-audio-player'
           ]
         }
       }

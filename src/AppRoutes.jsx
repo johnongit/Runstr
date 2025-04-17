@@ -14,7 +14,7 @@ const Events = lazy(() => import('./pages/Events').then(module => ({ default: mo
 const Profile = lazy(() => import('./pages/Profile').then(module => ({ default: module.Profile })));
 const About = lazy(() => import('./pages/About').then(module => ({ default: module.About })));
 const MyClubsScreen = lazy(() => import('./pages/MyClubsScreen').then(module => ({ default: module.MyClubsScreen })));
-const GroupDiscoveryScreen = lazy(() => import('./components/GroupDiscoveryScreen').then(module => ({ default: module.GroupDiscoveryScreen })));
+const GroupDiscoveryScreen = lazy(() => import('./components/GroupDiscoveryScreen.jsx'));
 
 // Loading fallback component - removed spinner
 const LoadingComponent = () => (
