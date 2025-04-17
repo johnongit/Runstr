@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { nip19 } from 'nostr-tools';
 import { joinGroup, hasJoinedGroup, getUserPublicKey } from '../utils/nostrClient';
 
+// Hardcoded groups for RUNSTR app
 const FEATURED_GROUPS = [
   {
     name: "Messi Run Club",
@@ -28,20 +28,29 @@ const GroupDiscoveryScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    loadJoinedStatus();
+    // Check join status when component mounts
+    checkJoinStatus();
   }, []);
 
-  const loadJoinedStatus = async () => {
+  // Simplified function to check join status for the two groups
+  const checkJoinStatus = async () => {
     const pubkey = await getUserPublicKey();
     if (!pubkey) return;
 
-    const joinedStatus = {};
-    for (const group of FEATURED_GROUPS) {
-      joinedStatus[group.naddr] = await hasJoinedGroup(group.naddr);
+    try {
+      const statusMap = {};
+      // Check join status for each group
+      for (const group of FEATURED_GROUPS) {
+        statusMap[group.naddr] = await hasJoinedGroup(group.naddr);
+      }
+      setJoinedGroups(statusMap);
+    } catch (error) {
+      console.error("Error checking join status:", error);
+      // Don't show error to user, just fail silently
     }
-    setJoinedGroups(joinedStatus);
   };
 
+  // Navigate to group chat
   const handleGroupPress = (group) => {
     navigate(`/teams/${group.naddr}`, { 
       state: { 
@@ -51,6 +60,7 @@ const GroupDiscoveryScreen = () => {
     });
   };
 
+  // Join a group
   const handleJoinGroup = async (group) => {
     const pubkey = await getUserPublicKey();
     if (!pubkey) {
@@ -62,21 +72,33 @@ const GroupDiscoveryScreen = () => {
     try {
       const success = await joinGroup(group);
       if (success) {
+        // Update local join status
         setJoinedGroups(prev => ({
           ...prev,
           [group.naddr]: true
         }));
+        
+        // Cache join status in localStorage for persistence
+        try {
+          const joinedKey = `joined_group_${group.naddr}`;
+          localStorage.setItem(joinedKey, "true");
+        } catch (cacheError) {
+          console.error("Error caching join status:", cacheError);
+        }
+        
         alert(`Success: You've joined ${group.name}!`);
       } else {
         throw new Error("Failed to join group");
       }
     } catch (error) {
+      console.error("Error joining group:", error);
       alert("Error: Failed to join the group. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Helper to render tags
   const renderTags = (tags) => (
     <div className="flex flex-wrap gap-2 mb-4">
       {tags.map((tag, index) => (

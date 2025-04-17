@@ -5,7 +5,7 @@ import { NostrContext } from '../contexts/NostrContext';
 
 export const Teams = () => {
   const navigate = useNavigate();
-  const { error, clearError, currentUser } = useContext(TeamsContext);
+  const { error, clearError } = useContext(TeamsContext);
   const { publicKey } = useContext(NostrContext);
   
   const handleNavigation = (path) => {
@@ -14,13 +14,13 @@ export const Teams = () => {
   
   return (
     <div className="px-4 pt-6 pb-20">
-      <h1 className="text-2xl font-bold mb-6 text-center">Clubs & Teams</h1>
+      <h1 className="text-2xl font-bold mb-6 text-center">Running Clubs</h1>
       
       {/* Login status indicator */}
-      {!currentUser && !publicKey && (
+      {!publicKey && (
         <div className="mb-6 p-4 bg-yellow-800/20 border border-yellow-700 rounded-lg">
           <p className="text-yellow-400 text-center">
-            Sign in to join clubs
+            Sign in to join running clubs
           </p>
         </div>
       )}
@@ -45,7 +45,7 @@ export const Teams = () => {
           className="bg-gray-800 rounded-lg p-6 cursor-pointer hover:bg-gray-700 transition duration-200"
         >
           <h2 className="text-xl font-semibold mb-2 text-white">My Clubs</h2>
-          <p className="text-gray-400">View clubs you&apos;ve joined and stay connected with your community</p>
+          <p className="text-gray-400">View clubs you&apos;ve joined and stay connected with your running community</p>
         </div>
         
         <div 
@@ -53,7 +53,7 @@ export const Teams = () => {
           className="bg-gray-800 rounded-lg p-6 cursor-pointer hover:bg-gray-700 transition duration-200"
         >
           <h2 className="text-xl font-semibold mb-2 text-white">Discover Clubs</h2>
-          <p className="text-gray-400">Find featured running communities to join and connect with runners</p>
+          <p className="text-gray-400">Join our featured running communities and connect with runners worldwide</p>
         </div>
       </div>
       
@@ -62,4 +62,6 @@ export const Teams = () => {
       </div>
     </div>
   );
-}; 
+};
+
+export default Teams; 
