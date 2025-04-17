@@ -95,7 +95,7 @@ const MyClubsScreen = () => {
   const goToGroupChat = (group) => {
     const naddr = constructNaddr(group);
     if (naddr) {
-      navigate(`/team/${naddr}`);
+      navigate(`/teams/${naddr}`);
     } else {
        alert("Could not generate address for this group.");
     }
