@@ -2,20 +2,20 @@ import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 
 // Lazy load components to improve initial load performance
-const RunTracker = lazy(() => import('./pages/RunTracker'));
-const RunHistory = lazy(() => import('./pages/RunHistory'));
-const RunClub = lazy(() => import('./pages/RunClub'));
-const Wallet = lazy(() => import('./pages/Wallet'));
-const Music = lazy(() => import('./pages/Music'));
-const NWC = lazy(() => import('./pages/NWC'));
-const Goals = lazy(() => import('./pages/Goals'));
-const TeamDetail = lazy(() => import('./pages/TeamDetail'));
-const Events = lazy(() => import('./pages/Events'));
-const Profile = lazy(() => import('./pages/Profile'));
-const About = lazy(() => import('./pages/About'));
-const MyClubsScreen = lazy(() => import('./pages/MyClubsScreen'));
-const GroupDiscoveryScreen = lazy(() => import('./components/GroupDiscoveryScreen'));
-const Teams = lazy(() => import('./pages/Teams'));
+const RunTracker = lazy(() => import('./components/RunTracker').then(module => ({ default: module.RunTracker || module.default })));
+const RunHistory = lazy(() => import('./pages/RunHistory').then(module => ({ default: module.RunHistory || module.default })));
+const RunClub = lazy(() => import('./pages/RunClub').then(module => ({ default: module.RunClub || module.default })));
+const Wallet = lazy(() => import('./pages/Wallet').then(module => ({ default: module.Wallet || module.default })));
+const Music = lazy(() => import('./pages/Music').then(module => ({ default: module.Music || module.default })));
+const NWC = lazy(() => import('./pages/NWC').then(module => ({ default: module.NWC || module.default })));
+const Goals = lazy(() => import('./pages/Goals').then(module => ({ default: module.Goals || module.default })));
+const TeamDetail = lazy(() => import('./pages/TeamDetail').then(module => ({ default: module.TeamDetail || module.default })));
+const Events = lazy(() => import('./pages/Events').then(module => ({ default: module.Events || module.default })));
+const Profile = lazy(() => import('./pages/Profile').then(module => ({ default: module.Profile || module.default })));
+const About = lazy(() => import('./pages/About').then(module => ({ default: module.About || module.default })));
+const MyClubsScreen = lazy(() => import('./pages/MyClubsScreen').then(module => ({ default: module.MyClubsScreen || module.default })));
+const GroupDiscoveryScreen = lazy(() => import('./components/GroupDiscoveryScreen').then(module => ({ default: module.GroupDiscoveryScreen || module.default })));
+const Teams = lazy(() => import('./pages/Teams').then(module => ({ default: module.Teams || module.default })));
 
 // Loading component to show while lazy loading
 const LoadingComponent = () => (
