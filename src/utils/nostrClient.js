@@ -65,25 +65,49 @@ export const initializeNostr = async () => {
  */
 export const parseNaddr = (naddrString) => {
   try {
-    // Decode the naddr string using nostr-tools NIP19 decoder
-    const { data } = decodeNip19(naddrString);
-    
-    if (!data) {
-      console.error('Invalid naddr format - missing data');
+    if (!naddrString) {
+      console.error('No naddr string provided to parseNaddr');
       return null;
     }
     
-    // Handle both direct naddr and naddr nested in another NIP19 type
-    const naddrData = data.type === 'naddr' ? data : data;
+    console.log(`Attempting to parse naddr string: ${naddrString.substring(0, 30)}...`);
     
-    return {
+    // Decode the naddr string using nostr-tools NIP19 decoder
+    const decodedData = decodeNip19(naddrString);
+    console.log('Decoded naddr data:', decodedData);
+    
+    if (!decodedData || !decodedData.data) {
+      console.error('Invalid naddr format - missing data after decoding');
+      return null;
+    }
+    
+    const { data } = decodedData;
+    
+    // Handle different data formats that might come from decodeNip19
+    let naddrData;
+    if (data.type === 'naddr') {
+      // Handle case where decodedData.data itself has a 'type' property
+      naddrData = data;
+    } else if (data.kind && data.pubkey && data.identifier) {
+      // Handle direct data format
+      naddrData = data;
+    } else {
+      console.error('Invalid naddr data structure:', data);
+      return null;
+    }
+    
+    const result = {
       kind: naddrData.kind,
       pubkey: naddrData.pubkey,
       identifier: naddrData.identifier,
       relays: naddrData.relays || []
     };
+    
+    console.log('Successfully parsed naddr to:', result);
+    return result;
   } catch (error) {
     console.error('Error parsing naddr:', error);
+    console.error('Problematic naddr string:', naddrString);
     return null;
   }
 };
@@ -573,16 +597,25 @@ export const joinGroup = async (naddrString) => {
   try {
     console.log(`Joining group with naddr: ${naddrString}`);
     
+    if (!naddrString) {
+      console.error('No naddr string provided to joinGroup');
+      throw new Error('Missing group identifier');
+    }
+    
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) {
+      console.error('No user public key available - user may not be authenticated');
       throw new Error('User not authenticated with Nostr');
     }
 
     // Parse the naddr to get group components
     const groupInfo = parseNaddr(naddrString);
     if (!groupInfo) {
-      throw new Error('Invalid group data');
+      console.error('Failed to parse naddr:', naddrString);
+      throw new Error('Invalid group data - could not parse naddr');
     }
+
+    console.log('Joining group with parsed info:', groupInfo);
 
     // Fetch the user's current groups list
     const filter = {
@@ -591,14 +624,42 @@ export const joinGroup = async (naddrString) => {
       '#d': ['groups']
     };
     
-    const events = await pool.list(relays, [filter]);
+    console.log('Fetching current groups list with filter:', filter);
+    
+    let events;
+    try {
+      events = await pool.list(relays, [filter]);
+      console.log(`Found ${events.length} existing group list events`);
+    } catch (fetchError) {
+      console.error('Error fetching current groups list:', fetchError);
+      events = [];
+    }
+    
     const currentEvent = events.length > 0 
       ? events.sort((a, b) => b.created_at - a.created_at)[0]
       : null;
+    
+    if (currentEvent) {
+      console.log('Found existing groups list:', currentEvent);
+    } else {
+      console.log('No existing groups list found, will create new one');
+    }
 
     // Create the a-tag for the group (kind:pubkey:identifier format for NIP-29)
     const groupTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
     console.log(`Group tag: ${groupTag}`);
+    
+    // Check if already a member
+    if (currentEvent) {
+      const isAlreadyMember = currentEvent.tags.some(tag => 
+        tag[0] === 'a' && tag[1] === groupTag
+      );
+      
+      if (isAlreadyMember) {
+        console.log('User is already a member of this group');
+        return true;
+      }
+    }
     
     // Prepare tags for the new event
     let tags = [
@@ -625,18 +686,24 @@ export const joinGroup = async (naddrString) => {
     };
 
     console.log(`Creating join event:`, event);
-    const publishedEvent = await createAndPublishEvent(event);
     
-    if (publishedEvent) {
-      console.log(`Successfully joined group ${naddrString}`);
-      return true;
-    } else {
-      console.error(`Failed to publish join event for ${naddrString}`);
-      return false;
+    try {
+      const publishedEvent = await createAndPublishEvent(event);
+      
+      if (publishedEvent) {
+        console.log(`Successfully joined group ${naddrString}`);
+        return true;
+      } else {
+        console.error(`Failed to publish join event for ${naddrString}`);
+        throw new Error('Failed to publish join event');
+      }
+    } catch (publishError) {
+      console.error('Error publishing join event:', publishError);
+      throw new Error(`Failed to publish join event: ${publishError.message}`);
     }
   } catch (error) {
     console.error('Error joining group:', error);
-    return false;
+    throw error; // Let the caller handle the error with the specific message
   }
 };
 

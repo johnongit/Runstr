@@ -98,7 +98,18 @@ const GroupDiscoveryScreen = () => {
   // Navigate to group chat
   const handleGroupPress = (group) => {
     try {
-      navigate(`/teams/${group.naddr}`);
+      // Ensure we have a valid naddr
+      if (!group || !group.naddr) {
+        setError("Invalid group data - missing naddr");
+        return;
+      }
+      
+      // Make sure the naddr is properly encoded for URL
+      const encodedNaddr = encodeURIComponent(group.naddr);
+      console.log(`Navigating to group chat with naddr: ${group.naddr}`);
+      console.log(`Encoded naddr for URL: ${encodedNaddr}`);
+      
+      navigate(`/teams/${encodedNaddr}`);
     } catch (error) {
       console.error("Error navigating to team detail:", error);
       setError("Failed to navigate to team detail. Please try again.");
@@ -116,22 +127,25 @@ const GroupDiscoveryScreen = () => {
 
       setIsLoading(true);
       console.log(`Joining group with naddr: ${group.naddr}`);
-      const success = await joinGroup(group.naddr);
       
-      if (success) {
-        // Update local join status
+      try {
+        // Call the joinGroup function and wait for result
+        await joinGroup(group.naddr);
+        
+        // Update local join status on success
         setJoinedGroups(prev => ({
           ...prev,
           [group.naddr]: true
         }));
         
         alert(`Success: You've joined ${group.name}!`);
-      } else {
-        throw new Error("Failed to join group");
+      } catch (joinError) {
+        console.error("Error joining group:", joinError);
+        alert(`Error: ${joinError.message || "Failed to join the group. Please try again."}`);
+        throw joinError; // Re-throw to be caught by outer catch
       }
     } catch (error) {
-      console.error("Error joining group:", error);
-      alert("Error: Failed to join the group. Please try again.");
+      console.error("Error in handleJoinGroup:", error);
     } finally {
       setIsLoading(false);
     }

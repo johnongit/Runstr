@@ -14,8 +14,10 @@ console.log("TeamDetail component file is loading");
 
 export const TeamDetail = () => {
   console.log("TeamDetail component is rendering");
-  const { naddr } = useParams();
-  console.log("Team naddr param:", naddr);
+  
+  // Change from naddr to teamId to match the route parameter name in AppRoutes.jsx
+  const { teamId } = useParams();
+  console.log("Team parameter from URL:", teamId);
   
   const navigate = useNavigate();
   const { publicKey } = useContext(NostrContext);
@@ -37,9 +39,19 @@ export const TeamDetail = () => {
 
   // Parse naddr and fetch group data on mount
   useEffect(() => {
-    console.log("TeamDetail useEffect triggered with naddr:", naddr);
+    console.log("TeamDetail useEffect triggered with parameter:", teamId);
     
-    loadGroupData().catch(err => {
+    if (!teamId) {
+      setError("No group identifier provided");
+      setIsLoading(false);
+      return;
+    }
+    
+    // Decode the URL parameter in case it was encoded
+    const decodedTeamId = decodeURIComponent(teamId);
+    console.log("Decoded naddr parameter:", decodedTeamId);
+    
+    loadGroupData(decodedTeamId).catch(err => {
       console.error("Error in loadGroupData:", err);
       setError(err.message || "Failed to load group data");
     });
@@ -51,7 +63,7 @@ export const TeamDetail = () => {
         subscriptionRef.current.close();
       }
     };
-  }, [naddr]);
+  }, [teamId]);
   
   // Scroll to bottom of chat when messages change
   useEffect(() => {
@@ -59,25 +71,26 @@ export const TeamDetail = () => {
   }, [messages]);
   
   // Load the group data from the naddr
-  const loadGroupData = async () => {
-    console.log("loadGroupData called for naddr:", naddr);
+  const loadGroupData = async (naddrString) => {
+    console.log("loadGroupData called for parameter:", naddrString);
     setIsLoading(true);
     setError(null);
     
     try {
       // Parse the naddr
-      const parsedInfo = parseNaddr(naddr);
+      console.log("Attempting to parse naddr:", naddrString);
+      const parsedInfo = parseNaddr(naddrString);
       console.log("Parsed naddr info:", parsedInfo);
       
       if (!parsedInfo) {
-        throw new Error('Invalid group identifier');
+        throw new Error(`Invalid group identifier: ${naddrString}`);
       }
       
       setGroupInfo(parsedInfo);
       
       // Fetch group metadata directly using naddr
       console.log("Fetching group metadata");
-      const groupMetadata = await fetchGroupMetadataByNaddr(naddr);
+      const groupMetadata = await fetchGroupMetadataByNaddr(naddrString);
       
       console.log("Group metadata received:", groupMetadata);
       
@@ -91,7 +104,7 @@ export const TeamDetail = () => {
       await loadMessages(parsedInfo);
       
       // Load pinned messages from local storage
-      loadPinnedMessages();
+      loadPinnedMessages(naddrString);
       
       // Subscribe to new messages
       setupSubscription(parsedInfo);
@@ -174,9 +187,9 @@ export const TeamDetail = () => {
   };
   
   // Load pinned messages from local storage
-  const loadPinnedMessages = () => {
+  const loadPinnedMessages = (naddrString) => {
     try {
-      const pinnedStorageKey = `pinned_messages_${naddr}`;
+      const pinnedStorageKey = `pinned_messages_${naddrString || teamId}`;
       const stored = localStorage.getItem(pinnedStorageKey);
       if (stored) {
         setPinnedMessages(JSON.parse(stored));
@@ -190,7 +203,7 @@ export const TeamDetail = () => {
   };
   
   // Pin a message (store locally)
-  const pinMessage = (message) => {
+  const pinMessage = (message, naddrString) => {
     try {
       // Only allow if user is authenticated
       if (!publicKey) {
@@ -198,13 +211,16 @@ export const TeamDetail = () => {
         return;
       }
       
+      // Get the properly decoded naddr
+      const decodedNaddr = naddrString || decodeURIComponent(teamId);
+      
       // Add to pinned messages if not already pinned
       if (!pinnedMessages.some(pinned => pinned.id === message.id)) {
         const updatedPinned = [...pinnedMessages, message];
         setPinnedMessages(updatedPinned);
         
         // Save to local storage
-        const pinnedStorageKey = `pinned_messages_${naddr}`;
+        const pinnedStorageKey = `pinned_messages_${decodedNaddr}`;
         localStorage.setItem(pinnedStorageKey, JSON.stringify(updatedPinned));
       }
     } catch (error) {
@@ -214,7 +230,7 @@ export const TeamDetail = () => {
   };
   
   // Unpin a message
-  const unpinMessage = (messageId) => {
+  const unpinMessage = (messageId, naddrString) => {
     try {
       // Only allow if user is authenticated
       if (!publicKey) {
@@ -222,11 +238,14 @@ export const TeamDetail = () => {
         return;
       }
       
+      // Get the properly decoded naddr
+      const decodedNaddr = naddrString || decodeURIComponent(teamId);
+      
       const updatedPinned = pinnedMessages.filter(message => message.id !== messageId);
       setPinnedMessages(updatedPinned);
       
       // Save to local storage
-      const pinnedStorageKey = `pinned_messages_${naddr}`;
+      const pinnedStorageKey = `pinned_messages_${decodedNaddr}`;
       localStorage.setItem(pinnedStorageKey, JSON.stringify(updatedPinned));
     } catch (error) {
       console.error('Error unpinning message:', error);
@@ -325,16 +344,26 @@ export const TeamDetail = () => {
             <h1 className="text-xl font-bold text-white mb-2">Error</h1>
             <p className="text-red-300">{error || 'Failed to load group'}</p>
             <p className="text-gray-400 text-sm mt-2">
-              naddr: {naddr ? naddr.substring(0, 20) + '...' : 'undefined'}<br />
-              Metadata: {metadata ? 'Available' : 'Not Available'}
+              Group ID: {teamId ? teamId.substring(0, 20) + '...' : 'undefined'}<br />
+              Decoded ID: {teamId ? decodeURIComponent(teamId).substring(0, 20) + '...' : 'undefined'}<br />
+              Metadata: {metadata ? 'Available' : 'Not Available'}<br />
+              GroupInfo: {groupInfo ? `Kind: ${groupInfo.kind}, PubKey: ${groupInfo.pubkey.substring(0, 8)}...` : 'Not Available'}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/teams')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md"
-          >
-            Go Back
-          </button>
+          <div className="flex space-x-4">
+            <button
+              onClick={() => navigate('/teams')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md"
+            >
+              Go Back
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-green-600 text-white rounded-md"
+            >
+              Reload
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -436,7 +465,10 @@ export const TeamDetail = () => {
                         {/* Only show pin option for other people's messages */}
                         {message.pubkey !== publicKey && !pinnedMessages.some(pm => pm.id === message.id) && (
                           <button
-                            onClick={() => pinMessage(message)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              pinMessage(message, teamId);
+                            }}
                             className="text-xs text-gray-500 mt-1 hover:text-blue-400"
                           >
                             Pin Message
@@ -491,7 +523,10 @@ export const TeamDetail = () => {
                             {formatTimestamp(message.created_at)}
                           </span>
                           <button
-                            onClick={() => unpinMessage(message.id)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              unpinMessage(message.id, teamId);
+                            }}
                             className="text-xs text-red-400"
                           >
                             Unpin
