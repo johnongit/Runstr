@@ -1,7 +1,6 @@
 import { SimplePool, finalizeEvent, verifyEvent } from 'nostr-tools';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { decode as decodeNip19 } from 'nostr-tools/nip19';
-import { parseNaddr as parseNaddrInternal } from './nostrClient'; // Alias if needed
 
 // Create a simple pool with reasonable timeouts
 const pool = new SimplePool({
@@ -17,7 +16,7 @@ const relays = [
   'wss://relay.nostr.band',
   'wss://relay.snort.social',
   'wss://purplepag.es',
-  'wss://relay.0xchat.com'  // NIP-29 group support
+  'wss://groups.0xchat.com'  // NIP-29 group support
 ];
 
 // Storage for keys
@@ -69,16 +68,19 @@ export const parseNaddr = (naddrString) => {
     // Decode the naddr string using nostr-tools NIP19 decoder
     const { data } = decodeNip19(naddrString);
     
-    if (!data || data.type !== 'naddr') {
-      console.error('Invalid naddr format', data);
+    if (!data) {
+      console.error('Invalid naddr format - missing data');
       return null;
     }
     
+    // Handle both direct naddr and naddr nested in another NIP19 type
+    const naddrData = data.type === 'naddr' ? data : data;
+    
     return {
-      kind: data.kind,
-      pubkey: data.pubkey,
-      identifier: data.identifier,
-      relays: data.relays || []
+      kind: naddrData.kind,
+      pubkey: naddrData.pubkey,
+      identifier: naddrData.identifier,
+      relays: naddrData.relays || []
     };
   } catch (error) {
     console.error('Error parsing naddr:', error);
@@ -87,11 +89,12 @@ export const parseNaddr = (naddrString) => {
 };
 
 /**
- * Fetch group messages using proven kind 39001 approach
- * @param {string} groupId - The group identifier from naddr
+ * Fetch group messages using proper NIP-29 kind 39001
+ * @param {string} groupId - The group identifier (kind:pubkey:identifier)
+ * @param {string[]} groupRelays - Relays to query
  * @returns {Promise<Array>} Array of group messages
  */
-export const fetchGroupMessages = async (groupId, relays = ['wss://groups.0xchat.com']) => {
+export const fetchGroupMessages = async (groupId, groupRelays = ['wss://groups.0xchat.com']) => {
   try {
     const filter = {
       kinds: [39001],
@@ -99,31 +102,55 @@ export const fetchGroupMessages = async (groupId, relays = ['wss://groups.0xchat
       limit: 50
     };
     
-    const events = await pool.list(relays, [filter]);
+    console.log(`Fetching group messages with filter:`, filter);
+    console.log(`Using relays:`, groupRelays);
+    
+    const events = await pool.list(groupRelays, [filter]);
+    
+    if (!events || events.length === 0) {
+      console.log(`No messages found for group ${groupId}`);
+      return [];
+    }
     
     // Sort by created_at
     return events.sort((a, b) => a.created_at - b.created_at);
   } catch (error) {
     console.error('Error fetching group messages:', error);
-    throw error;
+    return [];
   }
 };
 
 /**
- * Fetch group metadata using kind from naddr
- * @param {Object} groupData - Decoded naddr data
+ * Fetch group metadata using the naddr string directly
+ * @param {string} naddrString - The naddr to use
  * @returns {Promise<Object>} Group metadata
  */
-export const fetchGroupMetadata = async (groupData, relays = ['wss://groups.0xchat.com']) => {
+export const fetchGroupMetadataByNaddr = async (naddrString) => {
   try {
+    const groupInfo = parseNaddr(naddrString);
+    if (!groupInfo) {
+      throw new Error('Invalid naddr format');
+    }
+    
+    // Add groups.0xchat.com as a primary relay for NIP-29 groups
+    const groupRelays = [...new Set([
+      'wss://groups.0xchat.com',
+      ...(groupInfo.relays || [])
+    ])];
+    
     const filter = {
-      kinds: [groupData.kind], // Use kind from naddr (39000)
-      authors: [groupData.pubkey],
-      '#d': [groupData.identifier]
+      kinds: [groupInfo.kind], // Typically 39000 for NIP-29 groups
+      authors: [groupInfo.pubkey],
+      '#d': [groupInfo.identifier]
     };
     
-    const events = await pool.list(relays, [filter]);
+    console.log(`Fetching group metadata for ${naddrString} with filter:`, filter);
+    console.log(`Using relays:`, groupRelays);
+    
+    const events = await pool.list(groupRelays, [filter]);
+    
     if (!events || events.length === 0) {
+      console.log(`No metadata found for group ${naddrString}`);
       return null;
     }
     
@@ -135,6 +162,59 @@ export const fetchGroupMetadata = async (groupData, relays = ['wss://groups.0xch
     try {
       metadata = JSON.parse(latestEvent.content);
     } catch (e) {
+      console.error('Error parsing group metadata content:', e);
+      metadata = { name: 'Unknown Group', about: 'Could not parse group metadata' };
+    }
+    
+    return {
+      id: latestEvent.id,
+      pubkey: latestEvent.pubkey,
+      created_at: latestEvent.created_at,
+      kind: latestEvent.kind,
+      tags: latestEvent.tags,
+      metadata
+    };
+  } catch (error) {
+    console.error('Error fetching group metadata by naddr:', error);
+    return null;
+  }
+};
+
+/**
+ * Fetch group metadata using kind, pubkey, and identifier
+ * @param {number} kind - The kind of the group (typically 39000)
+ * @param {string} pubkey - The group creator's pubkey
+ * @param {string} identifier - The group identifier
+ * @param {string[]} groupRelays - Relays to query
+ * @returns {Promise<Object>} Group metadata
+ */
+export const fetchGroupMetadata = async (kind, pubkey, identifier, groupRelays = ['wss://groups.0xchat.com']) => {
+  try {
+    const filter = {
+      kinds: [kind],
+      authors: [pubkey],
+      '#d': [identifier]
+    };
+    
+    console.log(`Fetching group metadata with filter:`, filter);
+    console.log(`Using relays:`, groupRelays);
+    
+    const events = await pool.list(groupRelays, [filter]);
+    
+    if (!events || events.length === 0) {
+      console.log(`No metadata found for group kind=${kind}, pubkey=${pubkey}, identifier=${identifier}`);
+      return null;
+    }
+    
+    // Sort by created_at in descending order to get the latest
+    const latestEvent = events.sort((a, b) => b.created_at - a.created_at)[0];
+    
+    // Parse the content which contains the group metadata
+    let metadata;
+    try {
+      metadata = JSON.parse(latestEvent.content);
+    } catch (e) {
+      console.error('Error parsing group metadata content:', e);
       metadata = { name: 'Unknown Group', about: 'Could not parse group metadata' };
     }
     
@@ -148,12 +228,12 @@ export const fetchGroupMetadata = async (groupData, relays = ['wss://groups.0xch
     };
   } catch (error) {
     console.error('Error fetching group metadata:', error);
-    throw error;
+    return null;
   }
 };
 
 /**
- * Send a message to a NIP29 group
+ * Send a message to a NIP-29 group
  * @param {Object} groupInfo - Group information from parseNaddr
  * @param {string} content - Message content
  * @returns {Promise<Object|null>} The published event or null on failure
@@ -165,21 +245,37 @@ export const sendGroupMessage = async (groupInfo, content) => {
       throw new Error('User not authenticated with Nostr');
     }
     
-    // Format the a-tag for NIP29 group messages
-    const aTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
+    // Format the e-tag for NIP-29 group messages (kind:pubkey:identifier)
+    const eTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
     
+    // NIP-29 uses kind 39001 for group messages
     const event = {
-      kind: 84, // NIP29 group message kind
+      kind: 39001,
       created_at: Math.floor(Date.now() / 1000),
       tags: [
-        ['a', aTag]
+        ['e', eTag]
       ],
       content,
       pubkey: userPubkey
     };
     
+    console.log(`Sending message to group ${eTag}:`, event);
+    
+    // Primary relay for NIP-29
+    const messageRelays = [...new Set([
+      'wss://groups.0xchat.com',
+      ...(groupInfo.relays || [])
+    ])];
+    
     // Sign and publish the event
-    return await createAndPublishEvent(event);
+    const signedEvent = await createAndPublishEvent(event);
+    
+    // Also publish specifically to group relays for better delivery
+    if (signedEvent) {
+      pool.publish(messageRelays, signedEvent);
+    }
+    
+    return signedEvent;
   } catch (error) {
     console.error('Error sending group message:', error);
     return null;
@@ -449,7 +545,7 @@ export const fetchUserGroupList = async (pubkey, relayList = relays) => {
 };
 
 // Update the group message posting function to use kind 39001
-export const postGroupMessage = async (groupId, content, privateKey) => {
+export const postGroupMessage = async (groupId, content) => {
   try {
     const event = {
       kind: 39001,
@@ -460,7 +556,8 @@ export const postGroupMessage = async (groupId, content, privateKey) => {
       content
     };
     
-    // ... existing code ...
+    // Create and publish the event
+    return await createAndPublishEvent(event);
   } catch (error) {
     console.error('Error posting group message:', error);
     throw error;
@@ -469,14 +566,22 @@ export const postGroupMessage = async (groupId, content, privateKey) => {
 
 /**
  * Join a group by adding it to the user's NIP-51 groups list
- * @param {Object} groupData - Group data including naddr components
+ * @param {string} naddrString - NIP-19 naddr string for the group
  * @returns {Promise<boolean>} Success status
  */
-export const joinGroup = async (groupData) => {
+export const joinGroup = async (naddrString) => {
   try {
+    console.log(`Joining group with naddr: ${naddrString}`);
+    
     const userPubkey = await getUserPublicKey();
     if (!userPubkey) {
       throw new Error('User not authenticated with Nostr');
+    }
+
+    // Parse the naddr to get group components
+    const groupInfo = parseNaddr(naddrString);
+    if (!groupInfo) {
+      throw new Error('Invalid group data');
     }
 
     // Fetch the user's current groups list
@@ -491,14 +596,9 @@ export const joinGroup = async (groupData) => {
       ? events.sort((a, b) => b.created_at - a.created_at)[0]
       : null;
 
-    // Parse the naddr to get group components
-    const groupInfo = parseNaddr(groupData.naddr);
-    if (!groupInfo) {
-      throw new Error('Invalid group data');
-    }
-
-    // Create the a-tag for the group
+    // Create the a-tag for the group (kind:pubkey:identifier format for NIP-29)
     const groupTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
+    console.log(`Group tag: ${groupTag}`);
     
     // Prepare tags for the new event
     let tags = [
@@ -513,8 +613,8 @@ export const joinGroup = async (groupData) => {
       tags = [...tags, ...existingTags];
     }
 
-    // Add the new group tag
-    tags.push(['a', groupTag, groupData.relay]);
+    // Add the new group tag with relay hint
+    tags.push(['a', groupTag, 'wss://groups.0xchat.com']);
 
     // Create and publish the new list event
     const event = {
@@ -524,9 +624,16 @@ export const joinGroup = async (groupData) => {
       content: ''  // NIP-51 lists typically have empty content
     };
 
+    console.log(`Creating join event:`, event);
     const publishedEvent = await createAndPublishEvent(event);
-    return !!publishedEvent;
-
+    
+    if (publishedEvent) {
+      console.log(`Successfully joined group ${naddrString}`);
+      return true;
+    } else {
+      console.error(`Failed to publish join event for ${naddrString}`);
+      return false;
+    }
   } catch (error) {
     console.error('Error joining group:', error);
     return false;

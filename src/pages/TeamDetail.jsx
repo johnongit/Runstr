@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { NostrContext } from '../contexts/NostrContext';
 import { 
   parseNaddr, 
-  fetchGroupMetadata, 
+  fetchGroupMetadataByNaddr, 
   fetchGroupMessages,
   sendGroupMessage,
   subscribe
@@ -75,14 +75,9 @@ export const TeamDetail = () => {
       
       setGroupInfo(parsedInfo);
       
-      // Fetch group metadata
+      // Fetch group metadata directly using naddr
       console.log("Fetching group metadata");
-      const groupMetadata = await fetchGroupMetadata(
-        parsedInfo.kind,
-        parsedInfo.pubkey,
-        parsedInfo.identifier,
-        parsedInfo.relays.length > 0 ? parsedInfo.relays : ['wss://groups.0xchat.com']
-      );
+      const groupMetadata = await fetchGroupMetadataByNaddr(naddr);
       
       console.log("Group metadata received:", groupMetadata);
       
@@ -118,10 +113,13 @@ export const TeamDetail = () => {
       subscriptionRef.current.close();
     }
     
+    // Format the group identifier for NIP-29
+    const groupIdentifier = `${groupData.kind}:${groupData.pubkey}:${groupData.identifier}`;
+    
     // Format the filter for subscription
     const filter = {
-      kinds: [39001],
-      '#e': [`${groupData.kind}:${groupData.pubkey}:${groupData.identifier}`],
+      kinds: [39001], // NIP-29 kind for group messages
+      '#e': [groupIdentifier],
       since: Math.floor(Date.now() / 1000) - 10 // Only get messages from 10 seconds ago
     };
     
@@ -255,6 +253,8 @@ export const TeamDetail = () => {
         setMessageText('');
         // Optimistically add the message to the list
         setMessages(prev => [...prev, sentMessage]);
+        // Scroll to bottom after sending
+        setTimeout(scrollToBottom, 100);
       } else {
         console.error("sendGroupMessage returned falsy value");
         setError('Failed to send message');
