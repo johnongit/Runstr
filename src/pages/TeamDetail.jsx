@@ -90,12 +90,23 @@ export const TeamDetail = () => {
       
       // Fetch group metadata directly using naddr
       console.log("Fetching group metadata");
-      const groupMetadata = await fetchGroupMetadataByNaddr(naddrString);
+      let groupMetadata = null;
+      
+      try {
+        // First try with the standard method
+        groupMetadata = await fetchGroupMetadataByNaddr(naddrString);
+      } catch (fetchError) {
+        console.error("Standard metadata fetch failed:", fetchError);
+        
+        // If it fails, we'll show the error and continue without metadata,
+        // or implement a fallback method similar to GroupDiscoveryScreen
+        setError(`Failed to fetch group metadata: ${fetchError.message}`);
+      }
       
       console.log("Group metadata received:", groupMetadata);
       
       if (!groupMetadata) {
-        throw new Error('Group not found');
+        throw new Error('Group not found or metadata fetch failed');
       }
       
       setMetadata(groupMetadata);
@@ -335,7 +346,7 @@ export const TeamDetail = () => {
     );
   }
   
-  // Error state
+  // Error state with more detailed information
   if (error || !metadata) {
     return (
       <div className="p-4 bg-gray-800 min-h-screen">
@@ -351,13 +362,13 @@ export const TeamDetail = () => {
             </p>
           </div>
           <div className="flex space-x-4">
-            <button
+            <button 
               onClick={() => navigate('/teams')}
               className="px-4 py-2 bg-blue-600 text-white rounded-md"
             >
               Go Back
             </button>
-            <button
+            <button 
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-green-600 text-white rounded-md"
             >

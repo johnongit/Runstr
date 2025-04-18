@@ -1,26 +1,144 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { joinGroup, hasJoinedGroup, getUserPublicKey, fetchGroupMetadataByNaddr } from '../utils/nostrClient';
+import { nip19 } from 'nostr-tools';
 
 console.log("GroupDiscoveryScreen is loading");
 
-// Real NIP29 groups with correct naddr values
+// Featured groups with only naddr and relay info (no hardcoded metadata)
 const FEATURED_GROUPS = [
   {
-    name: "Messi Run Club",
-    description: "Join Messi's running community! Share your runs, get inspired, and connect with fellow runners.",
     naddr: "naddr1qvzqqqyctqpzptvcmkzg2fuxuvltqegc0r4cxkey95jl0sp9teh95azm77mtu9wgqyv8wumn8ghj7emjda6hquewxpuxx6rpwshxxmmd9uq3samnwvaz7tm8wfhh2urn9cc8scmgv96zucm0d5hsqsp4vfsnswrxve3rwdmyxgun2vnrx4jnvef5xs6rqcehxu6kgcmrvymkvvtpxuerwwp4xasn2cfhxymnxdpexsergvfhx3jnjce5vyunvg7fw59",
-    relay: "wss://groups.0xchat.com",
-    tags: ["Football", "Running", "Community"]
+    relay: "wss://groups.0xchat.com"
   },
   {
-    name: "#RUNSTR",
-    description: "The official RUNSTR community. Share your achievements, get tips, and connect with runners worldwide!",
     naddr: "naddr1qvzqqqyctqpzptvcmkzg2fuxuvltqegc0r4cxkey95jl0sp9teh95azm77mtu9wgqyv8wumn8ghj7emjda6hquewxpuxx6rpwshxxmmd9uq3samnwvaz7tm8wfhh2urn9cc8scmgv96zucm0d5hsqspevfjxxcehx4jrqvnyxejnqcfkxs6rwc3kxa3rxcnrxdjnxctyxgmrqv34xasnscfjvccnswpkvyer2etxxgcngvrzxcerzetxxccxznx86es",
-    relay: "wss://groups.0xchat.com",
-    tags: ["Official", "Community", "Running"]
+    relay: "wss://groups.0xchat.com"
   }
 ];
+
+// Direct WebSocket approach for fetching group metadata (similar to test script)
+const fetchGroupMetadataDirectWS = (naddrString, relayUrl) => {
+  return new Promise((resolve, reject) => {
+    try {
+      // Parse the naddr to get the filter components
+      const decodedData = nip19.decode(naddrString);
+      if (!decodedData || !decodedData.data) {
+        return reject(new Error("Invalid naddr format"));
+      }
+      
+      const { data } = decodedData;
+      
+      // Create WebSocket connection
+      console.log(`Connecting to relay: ${relayUrl}`);
+      const ws = new WebSocket(relayUrl);
+      let receivedMetadata = false;
+      let timeoutId;
+      
+      ws.onopen = () => {
+        console.log(`Connected to ${relayUrl}, sending metadata request`);
+        // Create filter for the group metadata
+        const filter = {
+          kinds: [data.kind],
+          authors: [data.pubkey],
+          '#d': [data.identifier]
+        };
+        
+        // Send subscription request
+        ws.send(JSON.stringify(['REQ', 'metadata', filter]));
+        
+        // Set timeout for response
+        timeoutId = setTimeout(() => {
+          if (!receivedMetadata) {
+            console.error('Metadata fetch timeout');
+            ws.close();
+            reject(new Error('Timeout fetching group metadata'));
+          }
+        }, 8000);
+      };
+      
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message[0] === 'EVENT' && message[1] === 'metadata') {
+            const eventData = message[2];
+            console.log('Received group metadata:', eventData);
+            
+            receivedMetadata = true;
+            clearTimeout(timeoutId);
+            
+            // Extract metadata from content or tags
+            let metadata = {};
+            try {
+              if (eventData.content) {
+                const contentData = JSON.parse(eventData.content);
+                metadata = { ...contentData };
+              }
+            } catch (_) {
+              console.log('Content is not JSON, using tag-based metadata');
+            }
+            
+            // Extract metadata from tags
+            if (eventData.tags) {
+              for (const tag of eventData.tags) {
+                if (tag[0] === 'name' && tag[1]) {
+                  metadata.name = tag[1];
+                } else if (tag[0] === 'about' && tag[1]) {
+                  metadata.about = tag[1];
+                } else if (tag[0] === 'picture' && tag[1]) {
+                  metadata.picture = tag[1];
+                }
+              }
+            }
+            
+            // Create result object with all necessary data
+            const result = {
+              id: eventData.id,
+              pubkey: eventData.pubkey,
+              created_at: eventData.created_at,
+              kind: eventData.kind,
+              tags: eventData.tags,
+              metadata
+            };
+            
+            ws.close();
+            resolve(result);
+          } else if (message[0] === 'EOSE' && message[1] === 'metadata') {
+            // End of stored events, if we haven't received metadata yet
+            if (!receivedMetadata) {
+              setTimeout(() => {
+                if (!receivedMetadata) {
+                  console.log('No metadata found for this group');
+                  ws.close();
+                  reject(new Error('No metadata found for this group'));
+                }
+              }, 1000); // Wait a bit longer in case metadata comes after EOSE
+            }
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+        }
+      };
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        clearTimeout(timeoutId);
+        ws.close();
+        reject(new Error('WebSocket error connecting to relay'));
+      };
+      
+      ws.onclose = () => {
+        clearTimeout(timeoutId);
+        if (!receivedMetadata) {
+          reject(new Error('Connection closed without receiving metadata'));
+        }
+      };
+    } catch (error) {
+      console.error('Error in fetchGroupMetadataDirectWS:', error);
+      reject(error);
+    }
+  });
+};
 
 const GroupDiscoveryScreen = () => {
   console.log("GroupDiscoveryScreen component rendering");
@@ -29,39 +147,85 @@ const GroupDiscoveryScreen = () => {
   const [joinedGroups, setJoinedGroups] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [groupsLoading, setGroupsLoading] = useState({});
 
   // Fetch group metadata on component mount
   useEffect(() => {
     const fetchGroups = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+        
+        // Initialize loading state for each group
+        const loadingState = {};
+        FEATURED_GROUPS.forEach(group => {
+          loadingState[group.naddr] = true;
+        });
+        setGroupsLoading(loadingState);
         
         // Fetch metadata for each group
         const groupsPromises = FEATURED_GROUPS.map(async (group) => {
           try {
-            const metadata = await fetchGroupMetadataByNaddr(group.naddr);
-            if (metadata) {
+            console.log(`Fetching metadata for group with naddr: ${group.naddr}`);
+            
+            // First try with the standard fetchGroupMetadataByNaddr
+            try {
+              const metadata = await fetchGroupMetadataByNaddr(group.naddr);
+              if (metadata) {
+                console.log(`Successfully fetched metadata using standard method for ${group.naddr}`);
+                
+                // Update loading state for this group
+                setGroupsLoading(prev => ({...prev, [group.naddr]: false}));
+                
+                return {
+                  ...group,
+                  metadata
+                };
+              }
+            } catch (_) {
+              console.log(`Standard fetch method failed for ${group.naddr}, trying WebSocket approach`);
+            }
+            
+            // If standard method fails, try direct WebSocket approach
+            try {
+              const directMetadata = await fetchGroupMetadataDirectWS(group.naddr, group.relay);
+              console.log(`Successfully fetched metadata using WebSocket method for ${group.naddr}`);
+              
+              // Update loading state for this group
+              setGroupsLoading(prev => ({...prev, [group.naddr]: false}));
+              
               return {
                 ...group,
-                metadata
+                metadata: directMetadata
               };
+            } catch (wsError) {
+              console.error(`WebSocket fetch also failed for ${group.naddr}:`, wsError);
+              throw wsError; // Re-throw for outer catch
             }
-            return group;
           } catch (err) {
-            console.error(`Error fetching metadata for ${group.name}:`, err);
-            return group;
+            console.error(`Error fetching metadata for ${group.naddr}:`, err);
+            
+            // Update loading state for this group
+            setGroupsLoading(prev => ({...prev, [group.naddr]: false}));
+            
+            // Return group with error flag instead of metadata
+            return {
+              ...group,
+              hasError: true,
+              errorMessage: err.message || 'Failed to fetch group data'
+            };
           }
         });
         
         const fetchedGroups = await Promise.all(groupsPromises);
+        console.log("All groups processed:", fetchedGroups);
         setGroupsWithMetadata(fetchedGroups);
         
         // Check join status for each group
         checkJoinStatus();
       } catch (err) {
-        console.error("Error fetching groups:", err);
+        console.error("Error in fetchGroups:", err);
         setError("Failed to load groups. Please try again.");
-        setGroupsWithMetadata(FEATURED_GROUPS);
       } finally {
         setIsLoading(false);
       }
@@ -85,7 +249,7 @@ const GroupDiscoveryScreen = () => {
         try {
           statusMap[group.naddr] = await hasJoinedGroup(group.naddr);
         } catch (innerError) {
-          console.error(`Error checking join status for ${group.name}:`, innerError);
+          console.error(`Error checking join status for group:`, innerError);
           statusMap[group.naddr] = false; // Assume not joined if error
         }
       }
@@ -138,7 +302,8 @@ const GroupDiscoveryScreen = () => {
           [group.naddr]: true
         }));
         
-        alert(`Success: You've joined ${group.name}!`);
+        const groupName = group.metadata?.metadata?.name || 'the group';
+        alert(`Success: You've joined ${groupName}!`);
       } catch (joinError) {
         console.error("Error joining group:", joinError);
         alert(`Error: ${joinError.message || "Failed to join the group. Please try again."}`);
@@ -151,18 +316,22 @@ const GroupDiscoveryScreen = () => {
     }
   };
 
-  // Helper to render tags
-  const renderTags = (tags) => (
-    <div className="flex flex-wrap gap-2 mb-4">
-      {tags.map((tag, index) => (
-        <span key={index} className="px-2 py-1 text-xs bg-gray-800 text-gray-400 rounded-md">
-          #{tag}
-        </span>
-      ))}
-    </div>
-  );
+  // Helper to render tags (if available)
+  const renderTags = (tags) => {
+    if (!tags || !Array.isArray(tags) || tags.length === 0) return null;
+    
+    return (
+      <div className="flex flex-wrap gap-2 mb-4">
+        {tags.map((tag, index) => (
+          <span key={index} className="px-2 py-1 text-xs bg-gray-800 text-gray-400 rounded-md">
+            #{tag}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
-  // Display loading state
+  // Display loading state for entire screen
   if (isLoading && groupsWithMetadata.length === 0) {
     return (
       <div className="min-h-screen bg-gray-900 p-4">
@@ -185,46 +354,115 @@ const GroupDiscoveryScreen = () => {
         </div>
       )}
       
-      {(groupsWithMetadata.length > 0 ? groupsWithMetadata : FEATURED_GROUPS).map((group, index) => (
-        <div 
-          key={index} 
-          className="bg-gray-800 rounded-lg p-4 mb-4 border border-gray-700 cursor-pointer hover:bg-gray-750"
-          onClick={() => handleGroupPress(group)}
-        >
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-xl font-bold text-white">{group.metadata?.name || group.name}</h2>
-            <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs rounded-full">
-              Nostr Group
-            </span>
+      {/* Render each group card */}
+      {groupsWithMetadata.map((group, index) => {
+        // Check if the group is still loading
+        if (groupsLoading[group.naddr]) {
+          return (
+            <div key={index} className="bg-gray-800 rounded-lg p-4 mb-4 border border-gray-700">
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <span className="ml-2 text-gray-400">Loading group data...</span>
+              </div>
+            </div>
+          );
+        }
+        
+        // Check if there was an error loading this group
+        if (group.hasError) {
+          return (
+            <div key={index} className="bg-gray-800 rounded-lg p-4 mb-4 border border-red-800">
+              <h2 className="text-xl font-bold text-white mb-2">Group Error</h2>
+              <p className="text-red-400 mb-2">{group.errorMessage || "Failed to load group data"}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="px-3 py-1 bg-gray-700 text-gray-300 rounded-md text-sm hover:bg-gray-600"
+              >
+                Retry
+              </button>
+            </div>
+          );
+        }
+        
+        // Extract metadata for display
+        const metadata = group.metadata?.metadata || {};
+        const name = metadata.name || 'Unnamed Group';
+        const about = metadata.about || 'No description available';
+        const picture = metadata.picture;
+        
+        // Parse tags from about or use empty array
+        let tags = [];
+        if (about) {
+          const hashtagMatches = about.match(/#[a-zA-Z0-9_]+/g);
+          if (hashtagMatches) {
+            tags = hashtagMatches.map(tag => tag.substring(1)); // Remove # prefix
+          }
+        }
+        
+        return (
+          <div 
+            key={index} 
+            className="bg-gray-800 rounded-lg p-4 mb-4 border border-gray-700 cursor-pointer hover:bg-gray-750"
+            onClick={() => handleGroupPress(group)}
+          >
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex items-center">
+                {picture ? (
+                  <img src={picture} alt={name} className="w-10 h-10 rounded-full mr-3" />
+                ) : (
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-white font-bold">{name.charAt(0)}</span>
+                  </div>
+                )}
+                <h2 className="text-xl font-bold text-white">{name}</h2>
+              </div>
+              <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs rounded-full">
+                Nostr Group
+              </span>
+            </div>
+            
+            <p className="text-gray-300 mb-4">{about}</p>
+            
+            {renderTags(tags)}
+            
+            <div className="border-t border-gray-700 pt-3 mt-1">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent triggering the parent's onClick
+                  handleJoinGroup(group);
+                }}
+                disabled={isLoading || joinedGroups[group.naddr]}
+                className={`px-4 py-2 rounded-md bg-gray-700 float-right
+                  ${(isLoading || joinedGroups[group.naddr]) 
+                    ? 'opacity-60 cursor-not-allowed text-gray-400' 
+                    : 'text-blue-400 hover:bg-gray-600'}`}
+              >
+                {joinedGroups[group.naddr] 
+                  ? "Joined ✓" 
+                  : isLoading 
+                    ? "Joining..." 
+                    : "Join Group"}
+              </button>
+            </div>
           </div>
-          
-          <p className="text-gray-300 mb-4">
-            {group.metadata?.about || group.description}
+        );
+      })}
+      
+      {groupsWithMetadata.length === 0 && !isLoading && (
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <p className="text-center text-gray-400 py-8">
+            No groups available. Please check your network connection and try again.
           </p>
-          
-          {renderTags(group.tags)}
-          
-          <div className="border-t border-gray-700 pt-3 mt-1">
+          <div className="flex justify-center">
             <button 
-              onClick={(e) => {
-                e.stopPropagation(); // Prevent triggering the parent's onClick
-                handleJoinGroup(group);
-              }}
-              disabled={isLoading || joinedGroups[group.naddr]}
-              className={`px-4 py-2 rounded-md bg-gray-700 float-right
-                ${(isLoading || joinedGroups[group.naddr]) 
-                  ? 'opacity-60 cursor-not-allowed text-gray-400' 
-                  : 'text-blue-400 hover:bg-gray-600'}`}
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md"
             >
-              {joinedGroups[group.naddr] 
-                ? "Joined ✓" 
-                : isLoading 
-                  ? "Joining..." 
-                  : "Join Group"}
+              Refresh
             </button>
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 };
