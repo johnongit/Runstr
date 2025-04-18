@@ -470,7 +470,7 @@ export const TeamDetail = () => {
                           <span className="text-xs text-gray-500">
                             {formatTimestamp(message.created_at)}
                         </span>
-                        </div>
+                      </div>
                         <p className="text-gray-200 break-words">{message.content}</p>
                         
                         {/* Only show pin option for other people's messages */}
