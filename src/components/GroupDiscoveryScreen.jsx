@@ -74,7 +74,7 @@ const fetchGroupMetadataDirectWS = (naddrString, relayUrl) => {
                 const contentData = JSON.parse(eventData.content);
                 metadata = { ...contentData };
               }
-            } catch (_) {
+            } catch {
               console.log('Content is not JSON, using tag-based metadata');
             }
             
@@ -85,7 +85,7 @@ const fetchGroupMetadataDirectWS = (naddrString, relayUrl) => {
                   metadata.name = tag[1];
                 } else if (tag[0] === 'about' && tag[1]) {
                   metadata.about = tag[1];
-                } else if (tag[0] === 'picture' && tag[1]) {
+                } else if ((tag[0] === 'picture' || tag[0] === 'image') && tag[1]) {
                   metadata.picture = tag[1];
                 }
               }
@@ -335,7 +335,7 @@ const GroupDiscoveryScreen = () => {
   if (isLoading && groupsWithMetadata.length === 0) {
     return (
       <div className="min-h-screen bg-gray-900 p-4">
-        <h1 className="text-2xl font-bold text-white mb-2">Discover Running Groups</h1>
+        <h1 className="text-2xl font-bold text-white mb-2">Teams</h1>
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         </div>
@@ -344,13 +344,13 @@ const GroupDiscoveryScreen = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4">
-      <h1 className="text-2xl font-bold text-white mb-2">Discover Running Groups</h1>
-      <p className="text-gray-400 mb-6">Join a community of runners and share your journey</p>
+    <div className="px-4 pt-6 pb-20">
+      <h1 className="text-2xl font-bold mb-6 text-center">Teams</h1>
       
+      {/* Error message */}
       {error && (
-        <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-800 rounded-lg">
-          <p className="text-yellow-300 text-sm">{error}</p>
+        <div className="mb-6 p-4 bg-red-900/20 border border-red-800 rounded-lg">
+          <p className="text-red-400">{error}</p>
         </div>
       )}
       
@@ -385,10 +385,10 @@ const GroupDiscoveryScreen = () => {
         }
         
         // Extract metadata for display
-        const metadata = group.metadata?.metadata || {};
+        const metadata = group.metadata?.metadata || group.metadata || {};
         const name = metadata.name || 'Unnamed Group';
         const about = metadata.about || 'No description available';
-        const picture = metadata.picture;
+        const picture = metadata.picture || metadata.image; // Try both picture and image fields
         
         // Parse tags from about or use empty array
         let tags = [];

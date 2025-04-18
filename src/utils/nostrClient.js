@@ -714,21 +714,35 @@ export const hasJoinedGroup = async (naddr) => {
     const groupInfo = parseNaddr(naddr);
     if (!groupInfo) return false;
 
+    // Create a new pool specifically for groups.0xchat.com
+    const groupPool = new SimplePool();
+    const groupRelay = 'wss://groups.0xchat.com';
+
+    // Look for NIP-51 lists (kind 30001) containing group references
     const filter = {
       kinds: [30001],
       authors: [userPubkey],
       '#d': ['groups']
     };
 
-    const events = await pool.list(relays, [filter]);
-    if (!events || events.length === 0) return false;
+    // Query the specific relay
+    const events = await groupPool.list([groupRelay], [filter]);
+    if (!events || events.length === 0) {
+      await groupPool.close();
+      return false;
+    }
 
+    // Sort by created_at to get the latest list
     const latestEvent = events.sort((a, b) => b.created_at - a.created_at)[0];
     const groupTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
 
-    return latestEvent.tags.some(tag => 
+    // Check if the group is in the list
+    const isMember = latestEvent.tags.some(tag => 
       tag[0] === 'a' && tag[1] === groupTag
     );
+
+    await groupPool.close();
+    return isMember;
 
   } catch (error) {
     console.error('Error checking group membership:', error);
