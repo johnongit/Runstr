@@ -22,8 +22,22 @@ const relays = [
 // Storage for keys
 let cachedKeyPair = null;
 
+// Storage for authenticated user's public key from Amber
+let amberUserPubkey = null;
+
 /**
- * Initialize the Nostr client
+ * Set the authenticated user's public key from Amber
+ * @param {string} pubkey - The user's public key
+ */
+export const setAmberUserPubkey = (pubkey) => {
+  if (pubkey && typeof pubkey === 'string') {
+    amberUserPubkey = pubkey;
+    console.log('Set Amber user pubkey:', pubkey);
+  }
+};
+
+/**
+ * Initialize the Nostr client with specific relays for groups
  * @returns {Promise<boolean>} Success status
  */
 export const initializeNostr = async () => {
@@ -34,12 +48,32 @@ export const initializeNostr = async () => {
       return false;
     }
     
-    // Test connection to relays
+    // Ensure we have the primary NIP-29 relay
+    const primaryRelay = 'wss://groups.0xchat.com';
+    if (!relays.includes(primaryRelay)) {
+      relays.unshift(primaryRelay);
+    }
+    
+    // Test connection to relays with priority on groups.0xchat.com
     const connectedRelays = [];
     
+    // Try primary relay first
+    try {
+      const conn = await pool.ensureRelay(primaryRelay);
+      if (conn) {
+        connectedRelays.push(primaryRelay);
+        console.log('Connected to primary groups relay:', primaryRelay);
+      }
+    } catch (error) {
+      console.warn(`Failed to connect to primary relay: ${primaryRelay}`, error);
+    }
+    
+    // Then try other relays
     for (const relay of relays) {
+      if (relay === primaryRelay) continue; // Skip primary, already tried
+      
       try {
-        const conn = pool.ensureRelay(relay);
+        const conn = await pool.ensureRelay(relay);
         if (conn) {
           connectedRelays.push(relay);
         }
@@ -49,9 +83,11 @@ export const initializeNostr = async () => {
     }
     
     console.log(`Connected to ${connectedRelays.length}/${relays.length} relays`);
+    console.log('Connected relays:', connectedRelays);
     
-    // Consider initialization successful if we connect to at least one relay
-    return connectedRelays.length > 0;
+    // Consider initialization successful if we connect to at least groups.0xchat.com
+    // or any two relays
+    return connectedRelays.includes(primaryRelay) || connectedRelays.length >= 2;
   } catch (error) {
     console.error('Error initializing Nostr:', error);
     return false;
@@ -362,39 +398,12 @@ export const getSigningKey = async () => {
  */
 export const getUserPublicKey = async () => {
   try {
-    // First, check if we have cached key
-    if (cachedKeyPair && cachedKeyPair.publicKey) {
-      return cachedKeyPair.publicKey;
+    // First priority: Check if we have an Amber-authenticated pubkey
+    if (amberUserPubkey) {
+      return amberUserPubkey;
     }
     
-    // Try to get from localStorage
-    const npub = localStorage.getItem('currentNpub');
-    if (npub) {
-      const keyPair = {
-        privateKey: generateSecretKey(), // Generate a new one for demo
-        publicKey: npub
-      };
-      cachedKeyPair = keyPair;
-      return npub;
-    }
-    
-    // Try to get from window.nostr (extension) if available
-    if (typeof window !== 'undefined' && window.nostr) {
-      try {
-        const pubkey = await window.nostr.getPublicKey();
-        if (pubkey) {
-          localStorage.setItem('currentNpub', pubkey);
-          cachedKeyPair = {
-            publicKey: pubkey
-          };
-          return pubkey;
-        }
-      } catch (err) {
-        console.error('Error getting public key from extension:', err);
-      }
-    }
-    
-    console.warn('No Nostr public key found');
+    console.warn('No Amber-authenticated public key found');
     return null;
   } catch (error) {
     console.error('Error in getUserPublicKey:', error);

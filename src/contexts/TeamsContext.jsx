@@ -2,7 +2,7 @@ import { createContext, useState, useEffect, useCallback, useContext } from 'rea
 import PropTypes from 'prop-types';
 import teamsDataService from '../services/TeamsDataService';
 import { NostrContext } from './NostrContext';
-import { getUserPublicKey, fetchUserGroupList } from '../utils/nostrClient';
+import { getUserPublicKey, fetchUserGroupList, initializeNostr, setAmberUserPubkey } from '../utils/nostrClient';
 
 // Create context
 export const TeamsContext = createContext();
@@ -43,58 +43,49 @@ export const TeamsProvider = ({ children }) => {
       if (nostrPublicKey) {
         console.log("Nostr public key available:", nostrPublicKey);
         setCurrentUser(nostrPublicKey);
-        localStorage.setItem('currentNostrPubkey', nostrPublicKey); // Store Nostr key specifically
+        
+        // Set the pubkey in nostrClient for Amber authentication
+        setAmberUserPubkey(nostrPublicKey);
+        
+        // Initialize Nostr client with proper relay connections
+        const initialized = await initializeNostr();
+        if (!initialized) {
+          console.error("Failed to initialize Nostr client");
+          setError('Failed to connect to Nostr network');
+          return;
+        }
         
         // --- Fetch Nostr Groups --- 
         setLoadingNostrGroups(true);
         setError(null); // Clear previous errors
+        
         try {
-          // Load cached groups first
-          const cacheKey = `my_nostr_groups_${nostrPublicKey}`;
-          const cachedData = localStorage.getItem(cacheKey);
-          if (cachedData) {
-            setMyNostrGroups(JSON.parse(cachedData));
-            setLoadingNostrGroups(false); // Show cached immediately
-            console.log("Displayed cached Nostr groups.");
-          } else {
-             console.log("No cached Nostr groups found.");
-             // Keep loading true if no cache
-          }
-          
-          // Fetch fresh list from relays
-          console.log("Fetching fresh Nostr groups from relays...");
+          console.log("Fetching Nostr groups from relays...");
           const groups = await fetchUserGroupList(nostrPublicKey);
-          setMyNostrGroups(groups);
-          console.log("Fetched fresh Nostr groups:", groups);
+          console.log("Fetched Nostr groups:", groups);
           
-          // Cache the fresh list
-          localStorage.setItem(cacheKey, JSON.stringify(groups));
-          console.log("Cached fresh Nostr groups.");
-
+          if (groups && groups.length > 0) {
+            setMyNostrGroups(groups);
+          } else {
+            console.log("No groups found for user");
+            setMyNostrGroups([]);
+          }
         } catch (err) {
           console.error('Error loading My Nostr Clubs in context:', err);
           setError('Failed to load your Nostr clubs.');
-          // Keep showing cached groups if fetch fails and cache existed
-          if (!localStorage.getItem(cacheKey)) {
-             setMyNostrGroups([]); // Clear if fetch fails and no cache
-          }
+          setMyNostrGroups([]); // Clear on error
         } finally {
-          setLoadingNostrGroups(false); // Mark loading as complete
+          setLoadingNostrGroups(false);
         }
-        // --- End Fetch Nostr Groups --- 
-
       } else {
-        console.log("No Nostr public key available.");
-        // Optionally clear Nostr-specific data if user logs out of Nostr
-        // setCurrentUser(localStorage.getItem('currentUser') || null); // Revert to non-Nostr user? Requires thought.
+        console.log("No Nostr public key available");
         setMyNostrGroups([]);
-        localStorage.removeItem('currentNostrPubkey');
-        // Consider clearing the cache for the logged-out pubkey? Or leave it?
+        setLoadingNostrGroups(false);
       }
     };
-    
+
     syncNostrUserAndFetchGroups();
-  }, [nostrPublicKey]); // Rerun when Nostr public key changes
+  }, [nostrPublicKey]); // Only depend on nostrPublicKey changes
 
   // --- Centralized Team Functions (Keep if still needed, otherwise remove) --- 
   
