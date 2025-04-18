@@ -36,3 +36,16 @@ yarn-error.log*
 # Keystore files (Android)
 *.jks
 android/keystore.properties
+
+# Added by Claude Task Master
+logs
+*.log
+dev-debug.log
+# Dependency directories
+node_modules/
+# Environment variables
+.vscode
+# OS specific
+# Task files
+tasks.json
+tasks/ 

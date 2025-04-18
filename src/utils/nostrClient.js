@@ -73,34 +73,19 @@ export const parseNaddr = (naddrString) => {
     console.log(`Attempting to parse naddr string: ${naddrString.substring(0, 30)}...`);
     
     // Decode the naddr string using nostr-tools NIP19 decoder
-    const decodedData = decodeNip19(naddrString);
-    console.log('Decoded naddr data:', decodedData);
+    const { type, data } = decodeNip19(naddrString);
+    console.log('Decoded naddr data:', { type, data });
     
-    if (!decodedData || !decodedData.data) {
-      console.error('Invalid naddr format - missing data after decoding');
-      return null;
-    }
-    
-    const { data } = decodedData;
-    
-    // Handle different data formats that might come from decodeNip19
-    let naddrData;
-    if (data.type === 'naddr') {
-      // Handle case where decodedData.data itself has a 'type' property
-      naddrData = data;
-    } else if (data.kind && data.pubkey && data.identifier) {
-      // Handle direct data format
-      naddrData = data;
-    } else {
-      console.error('Invalid naddr data structure:', data);
+    if (type !== 'naddr' || !data) {
+      console.error('Invalid naddr format - expected type "naddr"');
       return null;
     }
     
     const result = {
-      kind: naddrData.kind,
-      pubkey: naddrData.pubkey,
-      identifier: naddrData.identifier,
-      relays: naddrData.relays || []
+      kind: data.kind,
+      pubkey: data.pubkey,
+      identifier: data.identifier,
+      relays: data.relays || []
     };
     
     console.log('Successfully parsed naddr to:', result);

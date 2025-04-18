@@ -379,20 +379,20 @@ export const TeamDetail = () => {
       </div>
     );
   }
-
-  return (
+  
+    return (
     <div className="p-4 bg-gray-800 min-h-screen">
       <div className="max-w-4xl mx-auto">
         {/* Group Header */}
         <div className="flex items-center mb-6">
-          <button
-            onClick={() => navigate('/teams')}
+        <button
+          onClick={() => navigate('/teams')}
             className="mr-4 text-gray-400 hover:text-white"
-          >
+        >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-          </button>
+        </button>
           
           <div className="flex items-center">
             {metadata.metadata?.picture ? (
@@ -405,7 +405,7 @@ export const TeamDetail = () => {
               <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center mr-4">
                 <span className="text-white text-xl font-bold">
                   {metadata.metadata?.name?.charAt(0) || '#'}
-                </span>
+              </span>
               </div>
             )}
             
@@ -440,8 +440,8 @@ export const TeamDetail = () => {
               Pinned Messages ({pinnedMessages.length})
             </button>
           </div>
-        </div>
-        
+      </div>
+      
         {/* Active Tab Content */}
         <div className="tab-content bg-gray-800 rounded-lg">
           {activeTab === 'chat' ? (
@@ -451,12 +451,12 @@ export const TeamDetail = () => {
                 {messages.length === 0 ? (
                   <div className="flex justify-center items-center h-full">
                     <p className="text-gray-500">No messages yet. Start a conversation!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
+              </div>
+            ) : (
+                <div className="space-y-4">
                     {messages.map((message) => (
-                      <div 
-                        key={message.id} 
+                    <div 
+                      key={message.id} 
                         className={`p-3 rounded-lg ${
                           message.pubkey === publicKey
                             ? 'bg-blue-900/20 ml-8'
@@ -469,7 +469,7 @@ export const TeamDetail = () => {
                           </span>
                           <span className="text-xs text-gray-500">
                             {formatTimestamp(message.created_at)}
-                          </span>
+                        </span>
                         </div>
                         <p className="text-gray-200 break-words">{message.content}</p>
                         
@@ -485,14 +485,14 @@ export const TeamDetail = () => {
                             Pin Message
                           </button>
                         )}
-                      </div>
-                    ))}
-                    <div ref={chatEndRef} />
-                  </div>
-                )}
-              </div>
-              
-              {/* Message Input */}
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+              )}
+            </div>
+            
+            {/* Message Input */}
               <form onSubmit={handleSendMessage} className="flex gap-2">
                 <input
                   type="text"
@@ -533,7 +533,7 @@ export const TeamDetail = () => {
                           <span className="text-xs text-yellow-500 mr-2">
                             {formatTimestamp(message.created_at)}
                           </span>
-                          <button
+                <button
                             onClick={(e) => {
                               e.preventDefault();
                               unpinMessage(message.id, teamId);
@@ -541,17 +541,17 @@ export const TeamDetail = () => {
                             className="text-xs text-red-400"
                           >
                             Unpin
-                          </button>
-                        </div>
+                </button>
+              </div>
                       </div>
                       <p className="text-yellow-100">{message.content}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                  </div>
+                ))}
+              </div>
+                )}
+              </div>
+            )}
+          </div>
       </div>
     </div>
   );

@@ -237,7 +237,7 @@ const GroupDiscoveryScreen = () => {
   // Check if user has joined each group
   const checkJoinStatus = async () => {
     try {
-      const pubkey = await getUserPublicKey();
+    const pubkey = await getUserPublicKey();
       if (!pubkey) {
         console.log("No pubkey available, can't check join status");
         return;
@@ -245,7 +245,7 @@ const GroupDiscoveryScreen = () => {
 
       const statusMap = {};
       // Check join status for each group
-      for (const group of FEATURED_GROUPS) {
+    for (const group of FEATURED_GROUPS) {
         try {
           statusMap[group.naddr] = await hasJoinedGroup(group.naddr);
         } catch (innerError) {
@@ -283,13 +283,13 @@ const GroupDiscoveryScreen = () => {
   // Join a group
   const handleJoinGroup = async (group) => {
     try {
-      const pubkey = await getUserPublicKey();
-      if (!pubkey) {
+    const pubkey = await getUserPublicKey();
+    if (!pubkey) {
         alert("Authentication Required: Please connect your Nostr key in Settings to join groups.");
-        return;
-      }
+      return;
+    }
 
-      setIsLoading(true);
+    setIsLoading(true);
       console.log(`Joining group with naddr: ${group.naddr}`);
       
       try {
@@ -322,7 +322,7 @@ const GroupDiscoveryScreen = () => {
     
     return (
       <div className="flex flex-wrap gap-2 mb-4">
-        {tags.map((tag, index) => (
+      {tags.map((tag, index) => (
           <span key={index} className="px-2 py-1 text-xs bg-gray-800 text-gray-400 rounded-md">
             #{tag}
           </span>
@@ -401,7 +401,7 @@ const GroupDiscoveryScreen = () => {
         
         return (
           <div 
-            key={index} 
+          key={index} 
             className="bg-gray-800 rounded-lg p-4 mb-4 border border-gray-700 cursor-pointer hover:bg-gray-750"
             onClick={() => handleGroupPress(group)}
           >
@@ -431,7 +431,7 @@ const GroupDiscoveryScreen = () => {
                   e.stopPropagation(); // Prevent triggering the parent's onClick
                   handleJoinGroup(group);
                 }}
-                disabled={isLoading || joinedGroups[group.naddr]}
+              disabled={isLoading || joinedGroups[group.naddr]}
                 className={`px-4 py-2 rounded-md bg-gray-700 float-right
                   ${(isLoading || joinedGroups[group.naddr]) 
                     ? 'opacity-60 cursor-not-allowed text-gray-400' 
