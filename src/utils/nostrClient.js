@@ -134,16 +134,21 @@ export const parseNaddr = (naddrString) => {
 };
 
 /**
- * Fetch group messages using proper NIP-29 kind 39001
- * @param {string} groupId - The group identifier (kind:pubkey:identifier)
+ * Fetch group messages using proper NIP-29 format
+ * @param {string} groupId - The group identifier
  * @param {string[]} groupRelays - Relays to query
  * @returns {Promise<Array>} Array of group messages
  */
 export const fetchGroupMessages = async (groupId, groupRelays = ['wss://groups.0xchat.com']) => {
   try {
+    // Extract the actual group ID from the compound identifier
+    // NIP-29 uses just the identifier part in the 'h' tag, not the full kind:pubkey:identifier
+    const groupIdParts = groupId.split(':');
+    const actualGroupId = groupIdParts.length === 3 ? groupIdParts[2] : groupId;
+    
+    // NIP-29 uses 'h' tag for group messages, not '#e'
     const filter = {
-      kinds: [39001],
-      '#e': [groupId],
+      '#h': [actualGroupId], // NIP-29 uses h tag with group_id
       limit: 50
     };
     
@@ -153,7 +158,7 @@ export const fetchGroupMessages = async (groupId, groupRelays = ['wss://groups.0
     const events = await pool.list(groupRelays, [filter]);
     
     if (!events || events.length === 0) {
-      console.log(`No messages found for group ${groupId}`);
+      console.log(`No messages found for group ${actualGroupId}`);
       return [];
     }
     
@@ -290,21 +295,22 @@ export const sendGroupMessage = async (groupInfo, content) => {
       throw new Error('User not authenticated with Nostr');
     }
     
-    // Format the e-tag for NIP-29 group messages (kind:pubkey:identifier)
-    const eTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
+    // According to NIP-29, we need to use the 'h' tag with just the identifier
+    const groupIdentifier = groupInfo.identifier;
     
-    // NIP-29 uses kind 39001 for group messages
+    // NIP-29 says any kind with an 'h' tag can be used for messages
+    // We'll use kind:1 (regular notes) for compatibility
     const event = {
-      kind: 39001,
+      kind: 1, // Regular note kind
       created_at: Math.floor(Date.now() / 1000),
       tags: [
-        ['e', eTag]
+        ['h', groupIdentifier] // NIP-29 uses h tag with group_id
       ],
       content,
       pubkey: userPubkey
     };
     
-    console.log(`Sending message to group ${eTag}:`, event);
+    console.log(`Sending message to group ${groupIdentifier}:`, event);
     
     // Primary relay for NIP-29
     const messageRelays = [...new Set([
@@ -562,14 +568,18 @@ export const fetchUserGroupList = async (pubkey, relayList = relays) => {
   }
 };
 
-// Update the group message posting function to use kind 39001
+// Update the group message posting function to use the correct NIP-29 format
 export const postGroupMessage = async (groupId, content) => {
   try {
+    // Extract the actual group ID from the compound identifier if needed
+    const groupIdParts = groupId.split(':');
+    const actualGroupId = groupIdParts.length === 3 ? groupIdParts[2] : groupId;
+    
     const event = {
-      kind: 39001,
+      kind: 1, // Regular note kind for compatibility
       created_at: Math.floor(Date.now() / 1000),
       tags: [
-        ['e', groupId]
+        ['h', actualGroupId] // NIP-29 uses h tag with group_id
       ],
       content
     };
@@ -583,7 +593,7 @@ export const postGroupMessage = async (groupId, content) => {
 };
 
 /**
- * Join a group by adding it to the user's NIP-51 groups list
+ * Join a group by sending a proper NIP-29 join request and adding to NIP-51 list
  * @param {string} naddrString - NIP-19 naddr string for the group
  * @returns {Promise<boolean>} Success status
  */
@@ -611,6 +621,93 @@ export const joinGroup = async (naddrString) => {
 
     console.log('Joining group with parsed info:', groupInfo);
 
+    // Check if already a member before proceeding
+    const isMember = await hasJoinedGroup(naddrString);
+    if (isMember) {
+      console.log('User is already a member of this group');
+      return true;
+    }
+
+    // Determine if the group is open or closed by fetching metadata
+    let isOpenGroup = true; // Default to open
+    try {
+      const groupMetadata = await fetchGroupMetadataByNaddr(naddrString);
+      if (groupMetadata) {
+        // Check if group is marked as closed
+        const closedTag = groupMetadata.tags.find(tag => tag[0] === 'closed');
+        isOpenGroup = !closedTag;
+      }
+    } catch (metadataError) {
+      console.warn('Could not determine if group is open or closed:', metadataError);
+      // Proceed assuming it's open
+    }
+
+    // Send NIP-29 join request (kind 9021)
+    const joinRequest = {
+      kind: 9021,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['h', groupInfo.identifier] // NIP-29 uses h tag with group_id
+      ],
+      content: 'Requesting to join from RUNSTR app' // Optional reason
+    };
+
+    console.log('Sending join request:', joinRequest);
+    
+    // Primary relay for NIP-29
+    const groupRelays = [...new Set([
+      'wss://groups.0xchat.com',
+      ...(groupInfo.relays || [])
+    ])];
+
+    try {
+      // Sign and publish join request
+      const publishedRequest = await createAndPublishEvent(joinRequest);
+      if (!publishedRequest) {
+        throw new Error('Failed to publish join request');
+      }
+      
+      // Also publish specifically to group relays
+      pool.publish(groupRelays, publishedRequest);
+      
+      console.log('Join request sent successfully');
+      
+      // For compatibility, also update the NIP-51 list
+      // This ensures our app can track membership even if relays don't implement NIP-29 fully
+      await addGroupToNip51List(groupInfo);
+      
+      return true;
+    } catch (requestError) {
+      console.error('Error sending join request:', requestError);
+      
+      // If group is open, we'll still add to NIP-51 list even if join request fails
+      if (isOpenGroup) {
+        console.log('Group appears to be open, adding to NIP-51 list anyway');
+        await addGroupToNip51List(groupInfo);
+        return true;
+      }
+      
+      throw new Error(`Failed to join group: ${requestError.message}`);
+    }
+  } catch (error) {
+    console.error('Error joining group:', error);
+    throw error; // Let the caller handle the error with the specific message
+  }
+};
+
+/**
+ * Helper function to add a group to the user's NIP-51 list
+ * @param {Object} groupInfo - Group information from parseNaddr
+ * @returns {Promise<boolean>} Success status
+ */
+const addGroupToNip51List = async (groupInfo) => {
+  try {
+    const userPubkey = await getUserPublicKey();
+    if (!userPubkey) throw new Error('User not authenticated');
+    
+    // Create the a-tag for the group (kind:pubkey:identifier format for NIP-29)
+    const groupTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
+    
     // Fetch the user's current groups list
     const filter = {
       kinds: [30001],
@@ -618,30 +715,10 @@ export const joinGroup = async (naddrString) => {
       '#d': ['groups']
     };
     
-    console.log('Fetching current groups list with filter:', filter);
-    
-    let events;
-    try {
-      events = await pool.list(relays, [filter]);
-      console.log(`Found ${events.length} existing group list events`);
-    } catch (fetchError) {
-      console.error('Error fetching current groups list:', fetchError);
-      events = [];
-    }
-    
+    let events = await pool.list(relays, [filter]);
     const currentEvent = events.length > 0 
       ? events.sort((a, b) => b.created_at - a.created_at)[0]
       : null;
-    
-    if (currentEvent) {
-      console.log('Found existing groups list:', currentEvent);
-    } else {
-      console.log('No existing groups list found, will create new one');
-    }
-
-    // Create the a-tag for the group (kind:pubkey:identifier format for NIP-29)
-    const groupTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
-    console.log(`Group tag: ${groupTag}`);
     
     // Check if already a member
     if (currentEvent) {
@@ -650,7 +727,6 @@ export const joinGroup = async (naddrString) => {
       );
       
       if (isAlreadyMember) {
-        console.log('User is already a member of this group');
         return true;
       }
     }
@@ -679,25 +755,16 @@ export const joinGroup = async (naddrString) => {
       content: ''  // NIP-51 lists typically have empty content
     };
 
-    console.log(`Creating join event:`, event);
-    
-    try {
-      const publishedEvent = await createAndPublishEvent(event);
-      
-      if (publishedEvent) {
-        console.log(`Successfully joined group ${naddrString}`);
-        return true;
-      } else {
-        console.error(`Failed to publish join event for ${naddrString}`);
-        throw new Error('Failed to publish join event');
-      }
-    } catch (publishError) {
-      console.error('Error publishing join event:', publishError);
-      throw new Error(`Failed to publish join event: ${publishError.message}`);
+    const publishedEvent = await createAndPublishEvent(event);
+    if (!publishedEvent) {
+      throw new Error('Failed to publish NIP-51 list update');
     }
+    
+    console.log('Successfully added group to NIP-51 list');
+    return true;
   } catch (error) {
-    console.error('Error joining group:', error);
-    throw error; // Let the caller handle the error with the specific message
+    console.error('Error adding group to NIP-51 list:', error);
+    throw error;
   }
 };
 
@@ -747,5 +814,161 @@ export const hasJoinedGroup = async (naddr) => {
   } catch (error) {
     console.error('Error checking group membership:', error);
     return false;
+  }
+};
+
+/**
+ * Leave a group by sending a proper NIP-29 leave request and removing from NIP-51 list
+ * @param {string} naddrString - NIP-19 naddr string for the group
+ * @returns {Promise<boolean>} Success status
+ */
+export const leaveGroup = async (naddrString) => {
+  try {
+    console.log(`Leaving group with naddr: ${naddrString}`);
+    
+    if (!naddrString) {
+      console.error('No naddr string provided to leaveGroup');
+      throw new Error('Missing group identifier');
+    }
+    
+    const userPubkey = await getUserPublicKey();
+    if (!userPubkey) {
+      console.error('No user public key available - user may not be authenticated');
+      throw new Error('User not authenticated with Nostr');
+    }
+
+    // Parse the naddr to get group components
+    const groupInfo = parseNaddr(naddrString);
+    if (!groupInfo) {
+      console.error('Failed to parse naddr:', naddrString);
+      throw new Error('Invalid group data - could not parse naddr');
+    }
+
+    console.log('Leaving group with parsed info:', groupInfo);
+
+    // Check if user is a member before proceeding
+    const isMember = await hasJoinedGroup(naddrString);
+    if (!isMember) {
+      console.log('User is not a member of this group, nothing to do');
+      return true;
+    }
+
+    // Send NIP-29 leave request (kind 9022)
+    const leaveRequest = {
+      kind: 9022,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['h', groupInfo.identifier] // NIP-29 uses h tag with group_id
+      ],
+      content: 'Leaving group from RUNSTR app' // Optional reason
+    };
+
+    console.log('Sending leave request:', leaveRequest);
+    
+    // Primary relay for NIP-29
+    const groupRelays = [...new Set([
+      'wss://groups.0xchat.com',
+      ...(groupInfo.relays || [])
+    ])];
+
+    try {
+      // Sign and publish leave request
+      const publishedRequest = await createAndPublishEvent(leaveRequest);
+      if (!publishedRequest) {
+        throw new Error('Failed to publish leave request');
+      }
+      
+      // Also publish specifically to group relays
+      pool.publish(groupRelays, publishedRequest);
+      
+      console.log('Leave request sent successfully');
+      
+      // Also update the NIP-51 list for our app tracking
+      await removeGroupFromNip51List(groupInfo);
+      
+      return true;
+    } catch (requestError) {
+      console.error('Error sending leave request:', requestError);
+      
+      // Even if the leave request fails, we'll still update our local list
+      console.log('Updating NIP-51 list anyway');
+      await removeGroupFromNip51List(groupInfo);
+      
+      return true; // Consider it a success for the user
+    }
+  } catch (error) {
+    console.error('Error leaving group:', error);
+    throw error; // Let the caller handle the error with the specific message
+  }
+};
+
+/**
+ * Helper function to remove a group from the user's NIP-51 list
+ * @param {Object} groupInfo - Group information from parseNaddr
+ * @returns {Promise<boolean>} Success status
+ */
+const removeGroupFromNip51List = async (groupInfo) => {
+  try {
+    const userPubkey = await getUserPublicKey();
+    if (!userPubkey) throw new Error('User not authenticated');
+    
+    // Create the a-tag for the group (kind:pubkey:identifier format for NIP-29)
+    const groupTag = `${groupInfo.kind}:${groupInfo.pubkey}:${groupInfo.identifier}`;
+    
+    // Fetch the user's current groups list
+    const filter = {
+      kinds: [30001],
+      authors: [userPubkey],
+      '#d': ['groups']
+    };
+    
+    let events = await pool.list(relays, [filter]);
+    const currentEvent = events.length > 0 
+      ? events.sort((a, b) => b.created_at - a.created_at)[0]
+      : null;
+    
+    // If there's no list or the group isn't in the list, nothing to do
+    if (!currentEvent) {
+      return true;
+    }
+    
+    // Check if the group is in the list
+    const isInList = currentEvent.tags.some(tag => 
+      tag[0] === 'a' && tag[1] === groupTag
+    );
+    
+    if (!isInList) {
+      return true; // Nothing to remove
+    }
+    
+    // Prepare tags for the new event, excluding the group to remove
+    let tags = [
+      ['d', 'groups']  // NIP-51 list identifier
+    ];
+
+    // Add existing group tags except the one we're removing
+    const filteredTags = currentEvent.tags.filter(t => 
+      !(t[0] === 'a' && t[1] === groupTag)
+    );
+    tags = [...tags, ...filteredTags.filter(t => t[0] !== 'd')];
+
+    // Create and publish the new list event
+    const event = {
+      kind: 30001,
+      created_at: Math.floor(Date.now() / 1000),
+      tags,
+      content: ''  // NIP-51 lists typically have empty content
+    };
+
+    const publishedEvent = await createAndPublishEvent(event);
+    if (!publishedEvent) {
+      throw new Error('Failed to publish NIP-51 list update for leave');
+    }
+    
+    console.log('Successfully removed group from NIP-51 list');
+    return true;
+  } catch (error) {
+    console.error('Error removing group from NIP-51 list:', error);
+    throw error;
   }
 }; 

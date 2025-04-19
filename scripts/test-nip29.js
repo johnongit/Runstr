@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import { nip19 } from 'nostr-tools';
+import process from 'process';
 
 // Test configuration
 const TEST_RELAYS = [
