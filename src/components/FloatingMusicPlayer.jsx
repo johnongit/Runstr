@@ -107,7 +107,7 @@ export const FloatingMusicPlayer = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
               </svg>
             </button>
-            <button onClick={handleZapArtist} className="text-yellow-500" disabled={zapStatus.loading}>
+            <button onClick={handleZapArtist} className="text-[#646cff]" disabled={zapStatus.loading}>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
@@ -132,8 +132,8 @@ export const FloatingMusicPlayer = () => {
           {!zapStatus.loading && !zapStatus.success && !zapStatus.error && (
             <button 
               onClick={handleZapArtist}
-              className="ml-2 text-yellow-500"
-              title={`Zap ${currentTrack.artist || 'Artist'} (${defaultZapAmount} sats)`}
+              className="ml-2 text-[#646cff]"
+              title="Zap"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />

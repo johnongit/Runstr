@@ -182,7 +182,7 @@ export function MusicPlayer() {
         <button onClick={handleZapArtist} className={`${styles.controlButton} ${styles.zapButton}`} disabled={zapStatus.loading}>
           <div className="icon-container">
             <div className="icon-zap">⚡</div>
-            <span className={styles.buttonText}>Zap ({defaultZapAmount} sats)</span>
+            <span className={styles.buttonText}>Zap</span>
           </div>
         </button>
       </div>
