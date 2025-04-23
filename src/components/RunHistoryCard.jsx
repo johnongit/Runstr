@@ -189,12 +189,7 @@ export const RunHistoryCard = ({
       {/* Splits table */}
       {expandedRuns.has(run.id) && run.splits && run.splits.length > 0 && (
         <div style={styles.splitsContainer}>
-          <SplitsTable 
-            splits={run.splits} 
-            splitsKm={run.splitsKm}
-            splitsMi={run.splitsMi}
-            distanceUnit={distanceUnit} 
-          />
+          <SplitsTable splits={run.splits} distanceUnit={distanceUnit} />
         </div>
       )}
       

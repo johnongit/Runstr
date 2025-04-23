@@ -6,8 +6,14 @@ import {
   processPostsWithData,
   searchRunningContent
 } from '../utils/nostr';
-import globalFeedState from '../utils/globalFeedState';
-import nostrConnectionManager from '../utils/nostrConnectionManager';
+
+// Global state for caching posts across component instances
+const globalState = {
+  allPosts: [],
+  lastFetchTime: 0,
+  isInitialized: false,
+  activeSubscription: null,
+};
 
 export const useRunFeed = () => {
   const [posts, setPosts] = useState([]);
@@ -18,20 +24,19 @@ export const useRunFeed = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadedSupplementaryData, setLoadedSupplementaryData] = useState(new Set());
-  const [displayLimit, setDisplayLimit] = useState(7); // Number of posts to display initially
-  const [allPosts, setAllPosts] = useState(globalFeedState.getCachedPosts() || []); // Use global cache
+  const [displayLimit, setDisplayLimit] = useState(7); // New state for display limit
+  const [allPosts, setAllPosts] = useState(globalState.allPosts || []); // Use global cache
   const timeoutRef = useRef(null);
-  const initialLoadRef = useRef(globalFeedState.getFeedState().isInitialized);
+  const initialLoadRef = useRef(globalState.isInitialized);
   const subscriptionRef = useRef(null);
 
   // Initialize Nostr as soon as the hook is used, even if component isn't visible
   useEffect(() => {
     const initNostr = async () => {
       // Only initialize once
-      if (!globalFeedState.getFeedState().isInitialized) {
-        const connected = await initializeNostr();
-        globalFeedState.setInitialized(connected);
-        nostrConnectionManager.setConnectionStatus(connected);
+      if (!globalState.isInitialized) {
+        await initializeNostr();
+        globalState.isInitialized = true;
       }
     };
     
@@ -50,31 +55,19 @@ export const useRunFeed = () => {
       console.log('Background fetch: Checking for new posts');
       
       try {
-        // Check if we should proceed with background fetch (low priority)
-        if (nostrConnectionManager.shouldYield('background')) {
-          console.log('Background fetch yielding to higher priority operations');
-          return;
-        }
-        
-        // Start background operation
-        nostrConnectionManager.startOperation('background');
-        
         // Only fetch posts that are newer than our most recent post
-        const feedState = globalFeedState.getFeedState();
-        const newestPostTime = feedState.allPosts.length > 0 
-          ? Math.max(...feedState.allPosts.map(p => p.created_at)) * 1000
+        const newestPostTime = globalState.allPosts.length > 0 
+          ? Math.max(...globalState.allPosts.map(p => p.created_at)) * 1000
           : undefined;
           
         // Only fetch if we haven't fetched in the last 30 seconds
         const now = Date.now();
-        if (now - feedState.lastFetchTime < 30000) {
+        if (now - globalState.lastFetchTime < 30000) {
           console.log('Skipping background fetch, last fetch was too recent');
-          nostrConnectionManager.endOperation('background');
           return;
         }
         
-        // Update global state
-        globalFeedState.setLoading(true);
+        globalState.lastFetchTime = now;
         
         // Fetch new posts
         const limit = 10; // Fetch just a few new posts
@@ -82,8 +75,6 @@ export const useRunFeed = () => {
         
         if (runPostsArray.length === 0) {
           console.log('No new posts found in background fetch');
-          globalFeedState.setLoading(false);
-          nostrConnectionManager.endOperation('background');
           return;
         }
         
@@ -97,34 +88,34 @@ export const useRunFeed = () => {
         
         // Update global cache with new posts
         if (processedPosts.length > 0) {
-          // Add new posts to cache
-          globalFeedState.addPostsToCache(processedPosts);
+          // Remove duplicates and merge with existing posts
+          const existingIds = new Set(globalState.allPosts.map(p => p.id));
+          const newPosts = processedPosts.filter(p => !existingIds.has(p.id));
           
-          // Store supplementary data
-          globalFeedState.storeSupplementaryData(supplementaryData);
-          
-          // Update local state if component is mounted
-          setAllPosts(globalFeedState.getCachedPosts());
-          
-          // Update displayed posts (limited by display limit)
-          setPosts(prevPosts => {
-            // Create merged array with new posts at the top
-            const mergedPosts = [...processedPosts, ...prevPosts];
+          if (newPosts.length > 0) {
+            globalState.allPosts = [...newPosts, ...globalState.allPosts];
             
-            // Only display up to the display limit
-            return mergedPosts.slice(0, displayLimit);
-          });
-          
-          // Update user interactions
-          updateUserInteractions(supplementaryData);
+            // Update local state if component is mounted
+            setAllPosts(prevPosts => {
+              const mergedPosts = [...newPosts, ...prevPosts];
+              return mergedPosts;
+            });
+            
+            // Update displayed posts
+            setPosts(prevPosts => {
+              // Create merged array with new posts at the top
+              const mergedPosts = [...newPosts, ...prevPosts];
+              
+              // Only display up to the display limit
+              return mergedPosts.slice(0, displayLimit);
+            });
+            
+            // Update user interactions
+            updateUserInteractions(supplementaryData);
+          }
         }
-        
-        globalFeedState.setLoading(false);
-        nostrConnectionManager.endOperation('background');
       } catch (error) {
         console.error('Error in background fetch:', error);
-        globalFeedState.setLoading(false);
-        nostrConnectionManager.endOperation('background');
         // Don't set error state - this is a background operation
       }
     }, 60000); // Check every minute
@@ -137,7 +128,7 @@ export const useRunFeed = () => {
         timeoutRef.current = null;
       }
     };
-  }, [displayLimit, updateUserInteractions]);
+  }, [displayLimit]);
 
   // Extract user interactions logic to reuse
   const updateUserInteractions = useCallback((supplementaryData) => {
@@ -175,95 +166,57 @@ export const useRunFeed = () => {
     try {
       setLoading(true);
       setError(null);
-      globalFeedState.setLoading(true);
-      globalFeedState.setLoadingProgress(0);
 
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
 
-      // Start a feed operation
-      const canProceed = nostrConnectionManager.startOperation('feed');
-      if (!canProceed) {
-        console.log('Feed loading deferred due to higher priority operations');
-        // Set a timeout to retry after a short delay
-        setTimeout(() => fetchRunPostsViaSubscription(), 2000);
-        return;
-      }
+      // Initialize Nostr first
+      await initializeNostr();
 
-      // Initialize Nostr first if needed
-      if (!globalFeedState.getFeedState().isInitialized) {
-        const connected = await initializeNostr();
-        globalFeedState.setInitialized(connected);
-        nostrConnectionManager.setConnectionStatus(connected);
-      }
-
-      // Check if we have cached posts that are still valid
-      if (globalFeedState.isCacheValid()) {
-        console.log('Using cached posts from global feed state');
-        const cachedPosts = globalFeedState.getCachedPosts();
-        setAllPosts(cachedPosts);
-        setPosts(cachedPosts.slice(0, displayLimit));
+      // Check if we have cached posts that are recent enough (less than 5 minutes old)
+      const now = Date.now();
+      const isCacheValid = globalState.allPosts.length > 0 && 
+                        (now - globalState.lastFetchTime < 5 * 60 * 1000);
+                        
+      if (isCacheValid) {
+        console.log('Using cached posts from global state');
+        setAllPosts(globalState.allPosts);
+        setPosts(globalState.allPosts.slice(0, displayLimit));
         setLoading(false);
-        globalFeedState.setLoading(false);
         
         // Still update in the background for freshness
         setupBackgroundFetch();
-        nostrConnectionManager.endOperation('feed');
         return;
       }
-
-      // If preloading is complete, use that data
-      const feedState = globalFeedState.getFeedState();
-      if (feedState.preloadComplete && feedState.allPosts.length > 0) {
-        console.log('Using preloaded posts');
-        setAllPosts(feedState.allPosts);
-        setPosts(feedState.allPosts.slice(0, displayLimit));
-        setLoading(false);
-        globalFeedState.setLoading(false);
-        
-        // Set up background fetch
-        setupBackgroundFetch();
-        nostrConnectionManager.endOperation('feed');
-        return;
-      }
-
-      // Update progress
-      globalFeedState.setLoadingProgress(10);
 
       // Set timestamp for paginated loading
       const since = page > 1 ? Date.now() - (page * 7 * 24 * 60 * 60 * 1000) : undefined;
       const limit = 21; // Load 21 posts initially (3 pages worth)
 
       // Fetch posts with running hashtags
-      globalFeedState.setLoadingProgress(20);
       const runPostsArray = await fetchRunningPosts(limit, since);
       
       console.log(`Fetched ${runPostsArray.length} running posts`);
-      globalFeedState.setLoadingProgress(40);
       
       // If we got no results with tags, try a content search as fallback
       if (runPostsArray.length === 0 && page === 1) {
         console.log('No tagged running posts found, trying content search');
-        globalFeedState.setLoadingProgress(50);
         const contentPosts = await searchRunningContent(limit, 72); // 72 hours
         
         if (contentPosts.length > 0) {
           console.log(`Found ${contentPosts.length} posts through content search`);
-          globalFeedState.setLoadingProgress(60);
           
           // Load supplementary data in parallel for all posts
           const supplementaryData = await loadSupplementaryData(contentPosts);
-          globalFeedState.setLoadingProgress(80);
           
           // Process posts with all the data
           const processedPosts = await processPostsWithData(contentPosts, supplementaryData);
-          globalFeedState.setLoadingProgress(90);
           
           // Update global cache
-          globalFeedState.setCachedPosts(processedPosts);
-          globalFeedState.storeSupplementaryData(supplementaryData);
+          globalState.allPosts = processedPosts;
+          globalState.lastFetchTime = now;
           
           // Update state with all processed posts, but only display up to the limit
           setAllPosts(processedPosts);
@@ -274,13 +227,10 @@ export const useRunFeed = () => {
           
           setHasMore(contentPosts.length >= limit);
           setLoading(false);
-          globalFeedState.setLoading(false);
-          globalFeedState.setLoadingProgress(100);
           initialLoadRef.current = true;
           
           // Set up background fetch
           setupBackgroundFetch();
-          nostrConnectionManager.endOperation('feed');
           return;
         }
       }
@@ -296,26 +246,20 @@ export const useRunFeed = () => {
           setPosts([]);
           setAllPosts([]);
           setError('No running posts found. Try again later.');
-          globalFeedState.setLoading(false);
-          globalFeedState.setLoadingProgress(100);
         }
         setLoading(false);
-        nostrConnectionManager.endOperation('feed');
         return;
       }
       
       // Load supplementary data in parallel for all posts
-      globalFeedState.setLoadingProgress(60);
       const supplementaryData = await loadSupplementaryData(runPostsArray);
-      globalFeedState.setLoadingProgress(80);
       
       // Process posts with all the data
       const processedPosts = await processPostsWithData(runPostsArray, supplementaryData);
-      globalFeedState.setLoadingProgress(90);
       
       // Update global cache
-      globalFeedState.setCachedPosts(processedPosts);
-      globalFeedState.storeSupplementaryData(supplementaryData);
+      globalState.allPosts = processedPosts;
+      globalState.lastFetchTime = now;
       
       // Update state with processed posts
       if (page === 1) {
@@ -328,12 +272,11 @@ export const useRunFeed = () => {
           const newPosts = processedPosts.filter(p => !existingIds.has(p.id));
           const mergedPosts = [...prevPosts, ...newPosts];
           
-          // Update global cache with merged posts
-          globalFeedState.setCachedPosts(mergedPosts);
+          // Update global cache
+          globalState.allPosts = mergedPosts;
           
           return mergedPosts;
         });
-        
         // Update displayed posts
         setPosts(prevPosts => {
           const allPostsCombined = [...prevPosts, ...processedPosts];
@@ -356,18 +299,12 @@ export const useRunFeed = () => {
       updateUserInteractions(supplementaryData);
       
       initialLoadRef.current = true;
-      globalFeedState.setLoadingProgress(100);
       
       // Set up background fetch
       setupBackgroundFetch();
-      
-      // End feed operation
-      nostrConnectionManager.endOperation('feed');
     } catch (err) {
       console.error('Error fetching running posts:', err);
       setError(`Failed to load posts: ${err.message}`);
-      globalFeedState.setLoading(false);
-      nostrConnectionManager.endOperation('feed');
     } finally {
       setLoading(false);
     }
@@ -392,20 +329,7 @@ export const useRunFeed = () => {
 
   // Initial load
   useEffect(() => {
-    // If we have preloaded data, use it
-    const feedState = globalFeedState.getFeedState();
-    if (feedState.preloadComplete && feedState.allPosts.length > 0) {
-      console.log('Using preloaded feed data');
-      setAllPosts(feedState.allPosts);
-      setPosts(feedState.allPosts.slice(0, displayLimit));
-      setLoading(false);
-      initialLoadRef.current = true;
-      
-      // Still set up background fetch for updates
-      setupBackgroundFetch();
-    } 
-    // Otherwise fetch if not already initialized
-    else if (!initialLoadRef.current) {
+    if (!initialLoadRef.current) {
       fetchRunPostsViaSubscription();
     }
     
@@ -416,7 +340,7 @@ export const useRunFeed = () => {
         timeoutRef.current = null;
       }
     };
-  }, [fetchRunPostsViaSubscription, setupBackgroundFetch, displayLimit]);
+  }, [fetchRunPostsViaSubscription]);
 
   // Update displayed posts when displayLimit changes
   useEffect(() => {

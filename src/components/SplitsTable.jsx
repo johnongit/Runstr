@@ -2,17 +2,12 @@ import PropTypes from 'prop-types';
 import { formatTime, formatPace } from '../utils/formatters';
 import { useEffect, useState } from 'react';
 
-const SplitsTable = ({ splits, splitsKm, splitsMi, distanceUnit = 'km' }) => {
+const SplitsTable = ({ splits, distanceUnit = 'km' }) => {
   const [visibleColumns, setVisibleColumns] = useState({
     distance: true,
     time: true,
     pace: true
   });
-
-  // Use the appropriate splits based on unit
-  const displaySplits = distanceUnit === 'km' 
-    ? (splitsKm || splits) // Fallback for backward compatibility
-    : (splitsMi || splits);
 
   // Responsive column management based on screen size
   useEffect(() => {
@@ -38,7 +33,7 @@ const SplitsTable = ({ splits, splitsKm, splitsMi, distanceUnit = 'km' }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  if (!displaySplits || displaySplits.length === 0) {
+  if (!splits || splits.length === 0) {
     return null;
   }
 
@@ -69,9 +64,9 @@ const SplitsTable = ({ splits, splitsKm, splitsMi, distanceUnit = 'km' }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700">
-            {displaySplits.map((split, index) => {
+            {splits.map((split, index) => {
               // Calculate individual split time rather than using cumulative time
-              const prevSplitTime = index > 0 ? displaySplits[index - 1].time : 0;
+              const prevSplitTime = index > 0 ? splits[index - 1].time : 0;
               const splitTime = split.time - prevSplitTime;
               
               // Calculate the pace based on the individual split time
@@ -115,15 +110,11 @@ SplitsTable.propTypes = {
       pace: PropTypes.number.isRequired
     })
   ),
-  splitsKm: PropTypes.array, // Add new prop types
-  splitsMi: PropTypes.array, // Add new prop types
   distanceUnit: PropTypes.oneOf(['km', 'mi'])
 };
 
 SplitsTable.defaultProps = {
   splits: [],
-  splitsKm: [],
-  splitsMi: [],
   distanceUnit: 'km'
 };
 

@@ -47,10 +47,7 @@ export const RunTrackerProvider = ({ children }) => {
         pace: runTracker.pace,
         splits: runTracker.splits,
         elevation: runTracker.elevation,
-        activityType: runTracker.activityType || activityType,
-        splitsKm: runTracker.splitsKm,
-        splitsMi: runTracker.splitsMi,
-        startTime: runTracker.startTime
+        activityType: runTracker.activityType || activityType
       };
     } catch (error) {
       console.error('Error initializing run tracker state:', error);
@@ -62,10 +59,7 @@ export const RunTrackerProvider = ({ children }) => {
         pace: 0,
         splits: [],
         elevation: { current: null, gain: 0, loss: 0, lastAltitude: null },
-        activityType: activityType,
-        splitsKm: [],
-        splitsMi: [],
-        startTime: 0
+        activityType: activityType
       };
     }
   });
@@ -83,6 +77,10 @@ export const RunTrackerProvider = ({ children }) => {
 
       const handlePaceChange = (pace) => {
         setTrackingState(prev => ({ ...prev, pace }));
+      };
+
+      const handleSplitRecorded = (splits) => {
+        setTrackingState(prev => ({ ...prev, splits }));
       };
 
       const handleElevationChange = (elevation) => {
@@ -103,40 +101,14 @@ export const RunTrackerProvider = ({ children }) => {
         // The actual saving is now handled by the RunTracker service using RunDataService
       };
 
-      // Handler for split recording in kilometers
-      const handleSplitRecordedKm = (splitsKm) => {
-        setTrackingState(prev => ({
-          ...prev,
-          splitsKm
-        }));
-      };
-
-      // Handler for split recording in miles
-      const handleSplitRecordedMi = (splitsMi) => {
-        setTrackingState(prev => ({
-          ...prev,
-          splitsMi
-        }));
-      };
-
-      // Handler for regular split recording
-      const handleSplitRecorded = (splits) => {
-        setTrackingState(prev => ({
-          ...prev,
-          splits
-        }));
-      };
-
-      // Subscribe to all events
+      // Subscribe to events from the run tracker
       runTracker.on('distanceChange', handleDistanceChange);
       runTracker.on('durationChange', handleDurationChange);
       runTracker.on('paceChange', handlePaceChange);
       runTracker.on('splitRecorded', handleSplitRecorded);
-      runTracker.on('splitRecordedKm', handleSplitRecordedKm);
-      runTracker.on('splitRecordedMi', handleSplitRecordedMi);
       runTracker.on('elevationChange', handleElevationChange);
       runTracker.on('statusChange', handleStatusChange);
-      runTracker.on('runCompleted', handleRunStopped);
+      runTracker.on('stopped', handleRunStopped);
 
       // Check for active run state in localStorage on mount
       const savedRunState = localStorage.getItem('activeRunState');
@@ -153,10 +125,7 @@ export const RunTrackerProvider = ({ children }) => {
             pace: runData.pace,
             splits: runData.splits,
             elevation: runData.elevation,
-            activityType: runData.activityType || activityType,
-            splitsKm: runData.splitsKm,
-            splitsMi: runData.splitsMi,
-            startTime: runData.startTime
+            activityType: runData.activityType || activityType
           });
           
           // Restore tracking if active and not paused
@@ -172,9 +141,6 @@ export const RunTrackerProvider = ({ children }) => {
             runTracker.splits = [...runData.splits];
             runTracker.elevation = {...runData.elevation};
             runTracker.activityType = runData.activityType || activityType;
-            runTracker.splitsKm = [...runData.splitsKm];
-            runTracker.splitsMi = [...runData.splitsMi];
-            runTracker.startTime = runData.startTime;
           }
         } catch (error) {
           console.error('Error restoring run state:', error);
@@ -189,11 +155,9 @@ export const RunTrackerProvider = ({ children }) => {
         runTracker.off('durationChange', handleDurationChange);
         runTracker.off('paceChange', handlePaceChange);
         runTracker.off('splitRecorded', handleSplitRecorded);
-        runTracker.off('splitRecordedKm', handleSplitRecordedKm);
-        runTracker.off('splitRecordedMi', handleSplitRecordedMi);
         runTracker.off('elevationChange', handleElevationChange); 
         runTracker.off('statusChange', handleStatusChange);
-        runTracker.off('runCompleted', handleRunStopped);
+        runTracker.off('stopped', handleRunStopped);
       };
     } catch (error) {
       console.error('Error setting up run tracker event listeners:', error);
@@ -215,9 +179,6 @@ export const RunTrackerProvider = ({ children }) => {
           splits: trackingState.splits,
           elevation: trackingState.elevation,
           activityType: trackingState.activityType,
-          splitsKm: trackingState.splitsKm,
-          splitsMi: trackingState.splitsMi,
-          startTime: trackingState.startTime,
           timestamp: new Date().getTime()
         };
         

@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createAndPublishEvent, createRunContentForNostr } from '../utils/nostr';
+import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
 import { useRunStats } from '../hooks/useRunStats';
 import { useRunProfile } from '../hooks/useRunProfile';
+import { formatTime, displayDistance, formatElevation, formatDate } from '../utils/formatters';
+import runDataService from '../services/RunDataService';
+import SplitsTable from '../components/SplitsTable';
+import { useActivityMode } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { RunHistoryCard } from '../components/RunHistoryCard';
-import SplitsTable from '../components/SplitsTable';
-import { formatDate, formatTime, displayDistance, calculatePace, formatElevation } from '../utils/formatters';
-import runDataService from '../services/RunDataService';
-import { useActivityMode } from '../contexts/ActivityModeContext';
-import { RunHistoryCard as OldRunHistoryCard } from '../components/RunHistoryCard';
 
 export const RunHistory = () => {
   const navigate = useNavigate();
@@ -31,8 +30,6 @@ export const RunHistory = () => {
   const [workoutSavedRuns, setWorkoutSavedRuns] = useState(new Set());
   // Add state for expanded runs to show splits
   const [expandedRuns, setExpandedRuns] = useState(new Set());
-  const [runToPost, setRunToPost] = useState(null);
-  const [postedRunId, setPostedRunId] = useState(null);
 
   // Get user profile and distance unit from custom hooks
   const { userProfile: profile } = useRunProfile();
@@ -210,19 +207,33 @@ export const RunHistory = () => {
     setRunToDelete(null);
   };
 
-  const handlePostToNostr = async (run) => {
-    setRunToPost(run);
-    setIsPosting(true);
-    setPostedRunId(run.id);
+  const handlePostToNostr = (run) => {
+    setSelectedRun(run);
+    setAdditionalContent('');
     setShowModal(true);
   };
 
   const handlePostSubmit = async () => {
-    if (!runToPost) return;
+    if (!selectedRun) return;
+    
+    setIsPosting(true);
     
     try {
-      const content = createRunContentForNostr(runToPost, distanceUnit, additionalContent);
+      const run = selectedRun;
+      const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration);
       
+      const content = `
+Just completed a run with Runstr! 🏃‍♂️💨
+
+⏱️ Duration: ${formatTime(run.duration)}
+📏 Distance: ${displayDistance(run.distance, distanceUnit)}
+⚡ Pace: ${(run.duration / 60 / (distanceUnit === 'km' ? run.distance/1000 : run.distance/1609.344)).toFixed(2)} min/${distanceUnit}
+🔥 Calories: ${caloriesBurned} kcal
+${run.elevation ? `\n🏔️ Elevation Gain: ${formatElevation(run.elevation.gain, distanceUnit)}\n📉 Elevation Loss: ${formatElevation(run.elevation.loss, distanceUnit)}` : ''}
+${additionalContent ? `\n${additionalContent}` : ''}
+#Runstr #Running
+`.trim();
+
       // Create the event template for nostr-tools
       const eventTemplate = {
         kind: 1,

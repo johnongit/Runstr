@@ -9,9 +9,6 @@ import { ActivityModeProvider } from './contexts/ActivityModeContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { MenuBar } from './components/MenuBar';
 import { initializeNostr } from './utils/nostr';
-// Import connection manager and feed state
-import nostrConnectionManager from './utils/nostrConnectionManager';
-import globalFeedState from './utils/globalFeedState';
 import './App.css';
 
 console.log("App.jsx is loading");
@@ -81,76 +78,23 @@ const AppRoutes = lazy(() =>
 
 const App = () => {
   const [hasError, setHasError] = useState(false);
-  const [feedPreloadProgress, setFeedPreloadProgress] = useState(0);
   
   // Initialize Nostr connection as soon as the app launches
   useEffect(() => {
     const preloadNostr = async () => {
       try {
         console.log('Preloading Nostr connection on app launch');
+        await initializeNostr();
         
-        // Initialize connection
-        const connected = await initializeNostr();
-        nostrConnectionManager.setConnectionStatus(connected);
-        globalFeedState.setInitialized(connected);
-        
-        if (!connected) {
-          console.error('Failed to connect to Nostr network');
-          return;
-        }
-        
-        // Start feed preloading with background priority
+        // Prefetch run feed data using dynamic import to avoid circular dependencies
         try {
-          // Mark as preloading in progress
-          globalFeedState.setPreloading(true);
-          globalFeedState.setLoadingProgress(5);
-          setFeedPreloadProgress(5);
-          
-          // Dynamically import feed functions to avoid circular dependencies
-          const { fetchRunningPosts, loadSupplementaryData, processPostsWithData } = await import('./utils/nostr');
-          
-          // Start feed operation if no higher priority operations are active
-          if (nostrConnectionManager.startOperation('background')) {
-            console.log('Preloading feed data in background');
-            
-            // Fetch a reasonable number of posts (more than default to avoid frequent refreshes)
-            globalFeedState.setLoadingProgress(10);
-            setFeedPreloadProgress(10);
-            
-            const runPosts = await fetchRunningPosts(15);
-            globalFeedState.updatePreloadedCount(runPosts.length);
-            
-            // Update progress
-            globalFeedState.setLoadingProgress(40);
-            setFeedPreloadProgress(40);
-            
-            // Load supplementary data in parallel
-            const supplementaryData = await loadSupplementaryData(runPosts);
-            globalFeedState.setLoadingProgress(70);
-            setFeedPreloadProgress(70);
-            
-            // Process posts with supplementary data
-            const processedPosts = await processPostsWithData(runPosts, supplementaryData);
-            
-            // Store in global state
-            globalFeedState.setCachedPosts(processedPosts);
-            globalFeedState.storeSupplementaryData(supplementaryData);
-            
-            // Complete preloading
-            globalFeedState.setLoadingProgress(100);
-            setFeedPreloadProgress(100);
-            globalFeedState.completePreload();
-            
-            console.log(`Successfully preloaded ${processedPosts.length} feed posts`);
-            
-            // End the operation
-            nostrConnectionManager.endOperation('background');
-          } else {
-            console.log('Feed preloading deferred due to higher priority operations');
-          }
+          const { fetchRunningPosts } = await import('./utils/nostr');
+          console.log('Preloading feed data in background');
+          fetchRunningPosts(10).catch(err => 
+            console.error('Error preloading feed data:', err)
+          );
         } catch (error) {
-          console.error('Error in feed preloading:', error);
-          globalFeedState.setPreloading(false);
+          console.error('Error importing feed functions:', error);
         }
       } catch (error) {
         console.error('Error in preloadNostr:', error);

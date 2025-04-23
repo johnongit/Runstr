@@ -5,7 +5,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import runDataService from '../services/RunDataService';
 import { PermissionDialog } from './PermissionDialog';
 import { formatPaceWithUnit, displayDistance, convertDistance, formatElevation } from '../utils/formatters';
-import { createAndPublishEvent, createRunContentForNostr } from '../utils/nostr';
+import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
 import SplitsTable from './SplitsTable';
 import DashboardRunCard from './DashboardRunCard';
 
@@ -85,8 +85,21 @@ export const RunTracker = () => {
     setIsPosting(true);
     
     try {
-      // Use the new utility function to create content
-      const content = createRunContentForNostr(recentRun, distanceUnit, additionalContent);
+      const run = recentRun;
+      // Calculate calories (simplified version)
+      const caloriesBurned = Math.round(run.distance * 0.06);
+      
+      const content = `
+Just completed a run with Runstr! 🏃‍♂️💨
+
+⏱️ Duration: ${runDataService.formatTime(run.duration)}
+📏 Distance: ${displayDistance(run.distance, distanceUnit)}
+⚡ Pace: ${(run.duration / 60 / (distanceUnit === 'km' ? run.distance/1000 : run.distance/1609.344)).toFixed(2)} min/${distanceUnit}
+🔥 Calories: ${caloriesBurned} kcal
+${run.elevation ? `\n🏔️ Elevation Gain: ${formatElevation(run.elevation.gain, distanceUnit)}\n📉 Elevation Loss: ${formatElevation(run.elevation.loss, distanceUnit)}` : ''}
+${additionalContent ? `\n${additionalContent}` : ''}
+#Runstr #Running
+`.trim();
 
       // Create the event template for nostr-tools
       const eventTemplate = {
@@ -234,48 +247,37 @@ export const RunTracker = () => {
     return runDate.toLocaleDateString();
   };
 
-  // Handle saving to workout record
-  const handleSaveToWorkout = async () => {
+  // Add handler for saving workout record
+  const handleSaveWorkoutRecord = async () => {
     if (!recentRun) return;
     
     setIsSavingWorkout(true);
+    setWorkoutSaved(false);
     
     try {
       // Create a workout event with kind 1301 format
-      const content = createRunContentForNostr(recentRun, distanceUnit, '');
+      const workoutEvent = createWorkoutEvent(recentRun, distanceUnit);
       
       // Use the existing createAndPublishEvent function
-      const eventTemplate = {
-        kind: 1301, // Workout/activity kind
-        created_at: Math.floor(recentRun.timestamp / 1000) || Math.floor(Date.now() / 1000),
-        tags: [
-          ['type', 'running'],
-          ['distance', recentRun.distance.toString()],
-          ['duration', recentRun.duration.toString()],
-          ['t', 'Runstr'],
-          ['t', 'workout']
-        ],
-        content
-      };
+      await createAndPublishEvent(workoutEvent);
       
-      await createAndPublishEvent(eventTemplate);
-      
-      // Track that this run has been saved as a workout
+      // Update UI to show success
       setWorkoutSaved(true);
-      
-      // Store this information in localStorage
-      const savedIds = JSON.parse(localStorage.getItem('savedWorkouts') || '[]');
-      localStorage.setItem('savedWorkouts', JSON.stringify([...savedIds, recentRun.id]));
       
       // Show success message
       if (window.Android && window.Android.showToast) {
-        window.Android.showToast('Successfully saved as a workout record!');
+        window.Android.showToast('Workout record saved to Nostr!');
       } else {
-        alert('Successfully saved as a workout record!');
+        alert('Workout record saved to Nostr!');
       }
     } catch (error) {
       console.error('Error saving workout record:', error);
-      alert('Error saving workout record: ' + error.message);
+      
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast('Failed to save workout record: ' + error.message);
+      } else {
+        alert('Failed to save workout record: ' + error.message);
+      }
     } finally {
       setIsSavingWorkout(false);
     }

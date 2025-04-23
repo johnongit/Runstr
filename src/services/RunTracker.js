@@ -12,8 +12,6 @@ class RunTracker extends EventEmitter {
     this.duration = 0; // in seconds
     this.pace = 0; // in seconds per meter
     this.splits = []; // Array to store split objects { km, time, pace }
-    this.splitsKm = []; // Array to store kilometer splits
-    this.splitsMi = []; // Array to store mile splits
     this.positions = [];
     
     // Add elevation tracking data
@@ -30,8 +28,6 @@ class RunTracker extends EventEmitter {
     this.pausedTime = 0; // Total time paused in milliseconds
     this.lastPauseTime = 0; // Timestamp when the run was last paused
     this.lastSplitDistance = 0; // Track last split milestone
-    this.lastSplitDistanceKm = 0; // Track last km split milestone
-    this.lastSplitDistanceMi = 0; // Track last mile split milestone
     this.activityType = localStorage.getItem('activityMode') || ACTIVITY_TYPES.RUN; // Get current activity type
 
     this.watchId = null; // For geolocation watch id
@@ -133,8 +129,56 @@ class RunTracker extends EventEmitter {
         this.updateElevation(newPosition.altitude);
       }
 
-      // Process split updates for both units using the new handleSplit method
-      this.handleSplit(distanceIncrement);
+      // Get current distance unit
+      const distanceUnit = this.getDistanceUnit();
+      
+      // Define the split distance in meters based on selected unit
+      const splitDistance = distanceUnit === 'km' ? 1000 : 1609.344; // 1km or 1mile in meters
+      
+      // Get the current distance in the selected unit (either km or miles)
+      const currentDistanceInUnits = distanceUnit === 'km' 
+        ? this.distance / 1000  // Convert meters to km
+        : this.distance / 1609.344;  // Convert meters to miles
+        
+      // Get the last split distance in the selected unit
+      const lastSplitDistanceInUnits = distanceUnit === 'km'
+        ? this.lastSplitDistance / 1000
+        : this.lastSplitDistance / 1609.344;
+      
+      // Check if a new full unit (km or mile) has been completed
+      // Using Math.floor ensures we only trigger when a whole unit is completed
+      if (Math.floor(currentDistanceInUnits) > Math.floor(lastSplitDistanceInUnits)) {
+        // Calculate the current split number (1, 2, 3, etc.)
+        const currentSplitNumber = Math.floor(currentDistanceInUnits);
+
+        // Determine the elapsed time at the previous split (or 0 at start)
+        const previousSplitTime = this.splits.length
+          ? this.splits[this.splits.length - 1].time
+          : 0;
+        
+        // Calculate the duration for this split (time difference)
+        const splitDuration = this.duration - previousSplitTime;
+        
+        // Calculate pace for this split - pace is in time per distance unit
+        // Pace should be in seconds per meter for proper formatting later
+        const splitPace = splitDuration / splitDistance; 
+        
+        console.log(`Recording split at ${currentSplitNumber} ${distanceUnit}s with pace ${splitPace}`);
+
+        // Record the split with the unit count, cumulative time, and split pace
+        this.splits.push({
+          km: currentSplitNumber, // We keep using 'km' field name for compatibility, but it represents the unit number (mile or km)
+          time: this.duration,
+          pace: splitPace,
+          isPartial: false // This is a whole unit split
+        });
+        
+        // Update lastSplitDistance to the whole unit completed (in meters)
+        this.lastSplitDistance = currentSplitNumber * splitDistance;
+
+        // Emit an event with updated splits array
+        this.emit('splitRecorded', this.splits);
+      }
     }
 
     this.positions.push(newPosition);
@@ -232,11 +276,7 @@ class RunTracker extends EventEmitter {
     this.duration = 0;
     this.pace = 0;
     this.splits = [];
-    this.splitsKm = [];
-    this.splitsMi = [];
     this.lastSplitDistance = 0;
-    this.lastSplitDistanceKm = 0;
-    this.lastSplitDistanceMi = 0;
     
     // Reset elevation data
     this.elevation = {
@@ -302,9 +342,7 @@ class RunTracker extends EventEmitter {
       distance: this.distance,
       duration: this.duration,
       pace: this.pace,
-      splits: this.splits, // For backward compatibility
-      splitsKm: this.splitsKm,
-      splitsMi: this.splitsMi,
+      splits: this.splits,
       elevation: { 
         gain: this.elevation.gain,
         loss: this.elevation.loss
@@ -335,8 +373,6 @@ class RunTracker extends EventEmitter {
     this.duration = savedState.duration;
     this.pace = savedState.pace;
     this.splits = [...savedState.splits];
-    this.splitsKm = savedState.splitsKm ? [...savedState.splitsKm] : [...savedState.splits];
-    this.splitsMi = savedState.splitsMi ? [...savedState.splitsMi] : [];
     this.elevation = {
       ...savedState.elevation,
       lastAltitude: savedState.elevation.current
@@ -358,24 +394,6 @@ class RunTracker extends EventEmitter {
     this.pausedTime = 0;
     this.lastPauseTime = 0;
     
-    // Initialize last split distances
-    if (this.splitsKm.length > 0) {
-      const lastKmSplit = this.splitsKm[this.splitsKm.length - 1];
-      this.lastSplitDistanceKm = lastKmSplit.km * 1000;
-    }
-    
-    if (this.splitsMi.length > 0) {
-      const lastMiSplit = this.splitsMi[this.splitsMi.length - 1];
-      this.lastSplitDistanceMi = lastMiSplit.km * 1609.344;
-    }
-    
-    // For backward compatibility
-    if (this.splits.length > 0) {
-      const lastSplit = this.splits[this.splits.length - 1];
-      const distanceUnit = savedState.unit || this.getDistanceUnit();
-      this.lastSplitDistance = lastSplit.km * (distanceUnit === 'km' ? 1000 : 1609.344);
-    }
-    
     // Start the tracking services
     this.startTracking();
     this.startTimer();
@@ -386,8 +404,6 @@ class RunTracker extends EventEmitter {
     this.emit('durationChange', this.duration);
     this.emit('paceChange', this.pace);
     this.emit('splitRecorded', this.splits);
-    this.emit('splitRecordedKm', this.splitsKm);
-    this.emit('splitRecordedMi', this.splitsMi);
     this.emit('elevationChange', {...this.elevation});
   }
   
@@ -398,31 +414,11 @@ class RunTracker extends EventEmitter {
     this.duration = savedState.duration;
     this.pace = savedState.pace;
     this.splits = [...savedState.splits];
-    this.splitsKm = savedState.splitsKm ? [...savedState.splitsKm] : [...savedState.splits];
-    this.splitsMi = savedState.splitsMi ? [...savedState.splitsMi] : [];
     this.elevation = {
       ...savedState.elevation,
       lastAltitude: savedState.elevation.current
     };
     this.activityType = savedState.activityType || ACTIVITY_TYPES.RUN; // Add activity type or default
-    
-    // Initialize last split distances
-    if (this.splitsKm.length > 0) {
-      const lastKmSplit = this.splitsKm[this.splitsKm.length - 1];
-      this.lastSplitDistanceKm = lastKmSplit.km * 1000;
-    }
-    
-    if (this.splitsMi.length > 0) {
-      const lastMiSplit = this.splitsMi[this.splitsMi.length - 1];
-      this.lastSplitDistanceMi = lastMiSplit.km * 1609.344;
-    }
-    
-    // For backward compatibility
-    if (this.splits.length > 0) {
-      const lastSplit = this.splits[this.splits.length - 1];
-      const distanceUnit = savedState.unit || this.getDistanceUnit();
-      this.lastSplitDistance = lastSplit.km * (distanceUnit === 'km' ? 1000 : 1609.344);
-    }
     
     // Set tracking state
     this.isTracking = true;
@@ -438,8 +434,6 @@ class RunTracker extends EventEmitter {
     this.emit('durationChange', this.duration);
     this.emit('paceChange', this.pace);
     this.emit('splitRecorded', this.splits);
-    this.emit('splitRecordedKm', this.splitsKm);
-    this.emit('splitRecordedMi', this.splitsMi);
     this.emit('elevationChange', {...this.elevation});
   }
 
@@ -448,62 +442,6 @@ class RunTracker extends EventEmitter {
   // for clarity and to ensure it's not overridden
   off(event, callback) {
     return super.off(event, callback);
-  }
-
-  // New method to handle splits for both km and miles
-  handleSplit(distanceIncrement) {
-    // Handle kilometer splits
-    const distanceUnitKm = 1000; // 1km in meters
-    const currentDistanceInKm = this.distance / 1000;
-    const lastSplitDistanceInKm = this.lastSplitDistanceKm / 1000;
-    
-    if (Math.floor(currentDistanceInKm) > Math.floor(lastSplitDistanceInKm)) {
-      const currentSplitNumber = Math.floor(currentDistanceInKm);
-      const previousSplitTime = this.splitsKm.length
-        ? this.splitsKm[this.splitsKm.length - 1].time
-        : 0;
-      const splitDuration = this.duration - previousSplitTime;
-      const splitPace = splitDuration / distanceUnitKm; 
-      
-      this.splitsKm.push({
-        km: currentSplitNumber,
-        time: this.duration,
-        pace: splitPace,
-        isPartial: false
-      });
-      
-      this.lastSplitDistanceKm = currentSplitNumber * distanceUnitKm;
-      this.emit('splitRecordedKm', this.splitsKm);
-    }
-    
-    // Handle mile splits
-    const distanceUnitMi = 1609.344; // 1mi in meters
-    const currentDistanceInMi = this.distance / 1609.344;
-    const lastSplitDistanceInMi = this.lastSplitDistanceMi / 1609.344;
-    
-    if (Math.floor(currentDistanceInMi) > Math.floor(lastSplitDistanceInMi)) {
-      const currentSplitNumber = Math.floor(currentDistanceInMi);
-      const previousSplitTime = this.splitsMi.length
-        ? this.splitsMi[this.splitsMi.length - 1].time
-        : 0;
-      const splitDuration = this.duration - previousSplitTime;
-      const splitPace = splitDuration / distanceUnitMi; 
-      
-      this.splitsMi.push({
-        km: currentSplitNumber, // keep km field name for compatibility
-        time: this.duration,
-        pace: splitPace,
-        isPartial: false
-      });
-      
-      this.lastSplitDistanceMi = currentSplitNumber * distanceUnitMi;
-      this.emit('splitRecordedMi', this.splitsMi);
-    }
-    
-    // For backward compatibility - update the unified splits array based on current unit
-    const distanceUnit = this.getDistanceUnit();
-    this.splits = distanceUnit === 'km' ? [...this.splitsKm] : [...this.splitsMi];
-    this.emit('splitRecorded', this.splits);
   }
 }
 
