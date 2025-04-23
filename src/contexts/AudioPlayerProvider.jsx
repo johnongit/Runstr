@@ -93,9 +93,21 @@ export const AudioPlayerProvider = ({ children }) => {
   // Play previous track
   const playPrevious = useCallback(() => {
     if (playlist && playlist.tracks) {
-      setCurrentTrackIndex((current) => (current > 0 ? current - 1 : 0));
+      // Get the current playback position
+      const currentTime = audioPlayerRef?.audio?.current?.currentTime || 0;
+      const RESTART_THRESHOLD = 3; // Threshold in seconds
+      
+      if (currentTime <= RESTART_THRESHOLD) {
+        // Go to previous track if we're within the threshold
+        setCurrentTrackIndex((current) => (current > 0 ? current - 1 : 0));
+      } else {
+        // Restart the current track if we're beyond the threshold
+        if (audioPlayerRef?.audio?.current) {
+          audioPlayerRef.audio.current.currentTime = 0;
+        }
+      }
     }
-  }, [playlist]);
+  }, [playlist, audioPlayerRef]);
 
   // Skip to a specific track by index
   const skipToTrack = useCallback((trackIndex) => {

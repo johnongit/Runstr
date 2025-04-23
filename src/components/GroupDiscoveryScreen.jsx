@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { joinGroup, hasJoinedGroup, getUserPublicKey, fetchGroupMetadataByNaddr } from '../utils/nostrClient';
+import { getUserPublicKey, fetchGroupMetadataByNaddr } from '../utils/nostrClient';
 import { nip19 } from 'nostr-tools';
 
 console.log("GroupDiscoveryScreen is loading");
@@ -148,6 +148,7 @@ const GroupDiscoveryScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [groupsLoading, setGroupsLoading] = useState({});
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false);
 
   // Fetch group metadata on component mount
   useEffect(() => {
@@ -281,39 +282,9 @@ const GroupDiscoveryScreen = () => {
   };
 
   // Join a group
-  const handleJoinGroup = async (group) => {
-    try {
-    const pubkey = await getUserPublicKey();
-    if (!pubkey) {
-        alert("Authentication Required: Please connect your Nostr key in Settings to join groups.");
-      return;
-    }
-
-    setIsLoading(true);
-      console.log(`Joining group with naddr: ${group.naddr}`);
-      
-      try {
-        // Call the joinGroup function and wait for result
-        await joinGroup(group.naddr);
-        
-        // Update local join status on success
-        setJoinedGroups(prev => ({
-          ...prev,
-          [group.naddr]: true
-        }));
-        
-        const groupName = group.metadata?.metadata?.name || 'the group';
-        alert(`Success: You've joined ${groupName}!`);
-      } catch (joinError) {
-        console.error("Error joining group:", joinError);
-        alert(`Error: ${joinError.message || "Failed to join the group. Please try again."}`);
-        throw joinError; // Re-throw to be caught by outer catch
-      }
-    } catch (error) {
-      console.error("Error in handleJoinGroup:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleJoinGroup = async (e) => {
+    e.stopPropagation(); // Prevent triggering the parent's onClick
+    setShowComingSoonModal(true);
   };
 
   // Helper to render tags (if available)
@@ -346,6 +317,22 @@ const GroupDiscoveryScreen = () => {
   return (
     <div className="px-4 pt-6 pb-20">
       <h1 className="text-2xl font-bold mb-6 text-center">Teams</h1>
+      
+      {/* Coming Soon Modal */}
+      {showComingSoonModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-gray-700">
+            <h2 className="text-xl font-bold text-white mb-4">Coming Soon</h2>
+            <p className="text-gray-300 mb-6">Team joining functionality is coming soon. Stay tuned for updates!</p>
+            <button 
+              onClick={() => setShowComingSoonModal(false)}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Error message */}
       {error && (
@@ -406,16 +393,7 @@ const GroupDiscoveryScreen = () => {
             onClick={() => handleGroupPress(group)}
           >
             <div className="flex justify-between items-start mb-3">
-              <div className="flex items-center">
-                {picture ? (
-                  <img src={picture} alt={name} className="w-10 h-10 rounded-full mr-3" />
-                ) : (
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-white font-bold">{name.charAt(0)}</span>
-                  </div>
-                )}
-                <h2 className="text-xl font-bold text-white">{name}</h2>
-              </div>
+              <h2 className="text-xl font-bold text-white">{name}</h2>
               <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs rounded-full">
                 Nostr Group
               </span>
@@ -427,21 +405,10 @@ const GroupDiscoveryScreen = () => {
             
             <div className="border-t border-gray-700 pt-3 mt-1">
               <button 
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevent triggering the parent's onClick
-                  handleJoinGroup(group);
-                }}
-              disabled={isLoading || joinedGroups[group.naddr]}
-                className={`px-4 py-2 rounded-md bg-gray-700 float-right
-                  ${(isLoading || joinedGroups[group.naddr]) 
-                    ? 'opacity-60 cursor-not-allowed text-gray-400' 
-                    : 'text-blue-400 hover:bg-gray-600'}`}
+                onClick={handleJoinGroup}
+                className="px-4 py-2 rounded-md bg-gray-700 float-right text-blue-400 hover:bg-gray-600"
               >
-                {joinedGroups[group.naddr] 
-                  ? "Joined ✓" 
-                  : isLoading 
-                    ? "Joining..." 
-                    : "Join Group"}
+                Join Group
               </button>
             </div>
           </div>

@@ -42,8 +42,14 @@ export const initializeNostr = async () => {
     // Connect to relays
     await ndk.connect();
     console.log('Connected to NDK relays');
+    
+    // Update status
     isConnected = true;
     lastConnectionCheck = Date.now();
+    
+    // Allow the event loop to process other tasks
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
     return true;
   } catch (error) {
     console.error('Error initializing Nostr:', error);
@@ -786,6 +792,75 @@ export const createWorkoutEvent = (run, distanceUnit) => {
       ...elevationTags
     ]
   };
+};
+
+/**
+ * Create standardized run content for Nostr posts
+ * @param {Object} run - Run data object
+ * @param {string} distanceUnit - Current distance unit ('km' or 'mi')
+ * @param {string} additionalContent - Any additional user comments
+ * @returns {string} Formatted post content
+ */
+export const createRunContentForNostr = (run, distanceUnit, additionalContent = '') => {
+  // Import formatters if needed
+  const formatTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes
+      .toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const displayDistance = (meters, unit) => {
+    const converted = unit === 'mi' ? meters / 1609.344 : meters / 1000;
+    return `${converted.toFixed(2)} ${unit}`;
+  };
+
+  const formatPace = (pace, unit) => {
+    if (!pace || pace === 0) return `-- min/${unit}`;
+    const minutes = Math.floor(pace);
+    const seconds = Math.round((pace - minutes) * 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')} min/${unit}`;
+  };
+
+  const formatElevation = (elevation, unit) => {
+    return `${Math.round(elevation)} m`;
+  };
+
+  // Calculate calories (simplified version)
+  const caloriesBurned = Math.round(run.distance * 0.06);
+  
+  // Get the appropriate splits based on current unit
+  const splits = distanceUnit === 'km' ? run.splitsKm || run.splits : run.splitsMi || run.splits;
+  
+  // Format split data
+  const formatSplitsForPost = (splits) => {
+    if (!splits || !splits.length) return '';
+    
+    return splits.slice(0, 5).map((split, index) => { // Limit to first 5 splits
+      const splitLabel = distanceUnit === 'km' ? 'KM' : 'Mile';
+      const prevSplitTime = index > 0 ? splits[index-1].time : 0;
+      const splitTime = split.time - prevSplitTime;
+      
+      return `${splitLabel} ${index+1}: ${formatTime(splitTime)} (${formatPace(split.pace, distanceUnit)})`;
+    }).join('\n');
+  };
+  
+  // Format the post content
+  const content = `
+Just completed a run with Runstr! 🏃‍♂️💨
+
+⏱️ Duration: ${formatTime(run.duration)}
+📏 Distance: ${displayDistance(run.distance, distanceUnit)}
+⚡ Pace: ${formatPace(run.pace, distanceUnit)}
+🔥 Calories: ${caloriesBurned} kcal
+${run.elevation ? `\n🏔️ Elevation Gain: ${formatElevation(run.elevation.gain, distanceUnit)}\n📉 Elevation Loss: ${formatElevation(run.elevation.loss, distanceUnit)}` : ''}
+${splits && splits.length > 0 ? `\n📊 Splits:\n${formatSplitsForPost(splits)}` : ''}
+${additionalContent ? `\n${additionalContent}` : ''}
+#Runstr #Running
+`.trim();
+
+  return content;
 };
 
 export { ndk };

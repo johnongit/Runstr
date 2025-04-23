@@ -130,3 +130,33 @@ export function convertDistance(meters, unit) {
 export function formatPaceWithUnit(pace, unit = 'km') {
   return `${formatPace(pace, unit)} min/${unit}`;
 }
+
+/**
+ * Convert splits from kilometer format to miles
+ * @param {Array} splits - Array of km split objects
+ * @returns {Array} Array of mile split objects
+ */
+export const convertSplitsToMiles = (splits) => {
+  if (!splits || !splits.length) return [];
+  
+  return splits.map(split => ({
+    ...split,
+    // Convert pace from min/km to min/mi (1 mile = 1.60934 km)
+    pace: split.pace * 1.60934
+  }));
+};
+
+/**
+ * Convert splits from miles format to kilometers
+ * @param {Array} splits - Array of mile split objects
+ * @returns {Array} Array of km split objects
+ */
+export const convertSplitsToKm = (splits) => {
+  if (!splits || !splits.length) return [];
+  
+  return splits.map(split => ({
+    ...split,
+    // Convert pace from min/mi to min/km
+    pace: split.pace / 1.60934
+  }));
+};

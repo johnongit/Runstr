@@ -5,11 +5,7 @@ import {
   parseNaddr, 
   fetchGroupMetadataByNaddr, 
   fetchGroupMessages,
-  sendGroupMessage,
-  subscribe,
-  hasJoinedGroup,
-  joinGroup,
-  leaveGroup
+  subscribe
 } from '../utils/nostrClient';
 import '../components/RunClub.css';
 
@@ -36,12 +32,6 @@ export const TeamDetail = () => {
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
   
-  // New membership-related state
-  const [isMember, setIsMember] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
-  const [isLeaving, setIsLeaving] = useState(false);
-  const [membershipError, setMembershipError] = useState(null);
-  
   const chatEndRef = useRef(null);
   
   // Track the subscription to clean it up
@@ -65,9 +55,6 @@ export const TeamDetail = () => {
       console.error("Error in loadGroupData:", err);
       setError(err.message || "Failed to load group data");
     });
-    
-    // Check membership status
-    checkMembershipStatus(decodedTeamId);
     
     // Cleanup subscription on unmount
     return () => {
@@ -408,81 +395,6 @@ export const TeamDetail = () => {
     return date.toLocaleString();
   };
   
-  // Check if the user is a member of this group
-  const checkMembershipStatus = async (naddrString) => {
-    if (!publicKey) {
-      setIsMember(false);
-      return;
-    }
-    
-    try {
-      const member = await hasJoinedGroup(naddrString);
-      setIsMember(member);
-      console.log(`User membership status for ${naddrString}: ${member ? 'Member' : 'Not a member'}`);
-    } catch (error) {
-      console.error('Error checking membership status:', error);
-      setIsMember(false);
-    }
-  };
-  
-  // Handle joining a group
-  const handleJoinGroup = async () => {
-    if (!publicKey) {
-      setError('You must be authenticated with Nostr to join groups');
-      return;
-    }
-    
-    setIsJoining(true);
-    setMembershipError(null);
-    
-    try {
-      const success = await joinGroup(decodeURIComponent(teamId));
-      if (success) {
-        setIsMember(true);
-        console.log('Successfully joined group');
-        // Reload messages after joining
-        if (groupInfo) {
-          await loadMessages(groupInfo);
-        }
-      } else {
-        throw new Error('Failed to join group');
-      }
-    } catch (error) {
-      console.error('Error joining group:', error);
-      setMembershipError(`Failed to join: ${error.message}`);
-    } finally {
-      setIsJoining(false);
-    }
-  };
-  
-  // Handle leaving a group
-  const handleLeaveGroup = async () => {
-    if (!publicKey) {
-      setError('You must be authenticated with Nostr to leave groups');
-      return;
-    }
-    
-    if (window.confirm('Are you sure you want to leave this group?')) {
-      setIsLeaving(true);
-      setMembershipError(null);
-      
-      try {
-        const success = await leaveGroup(decodeURIComponent(teamId));
-        if (success) {
-          setIsMember(false);
-          console.log('Successfully left group');
-        } else {
-          throw new Error('Failed to leave group');
-        }
-      } catch (error) {
-        console.error('Error leaving group:', error);
-        setMembershipError(`Failed to leave: ${error.message}`);
-      } finally {
-        setIsLeaving(false);
-      }
-    }
-  };
-  
   // If user is not authenticated with Nostr, show a warning
   if (!publicKey) {
     return (
@@ -567,59 +479,15 @@ export const TeamDetail = () => {
             </svg>
           </button>
           
-          <div className="flex items-center flex-1">
-            {metadata.metadata?.picture ? (
-              <img 
-                src={metadata.metadata.picture} 
-                alt={metadata.metadata.name} 
-                className="w-12 h-12 rounded-full mr-4"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center mr-4">
-                <span className="text-white text-xl font-bold">
-                  {metadata.metadata?.name?.charAt(0) || '#'}
-                </span>
-              </div>
-            )}
-            
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-white">
-                {metadata.metadata?.name || 'Running Club'}
-              </h1>
-              <p className="text-gray-400 text-sm">
-                {metadata.metadata?.about || 'A Nostr running community'}
-              </p>
-            </div>
-            
-            {/* Membership controls */}
-            <div className="ml-auto">
-              {isMember ? (
-                <button
-                  onClick={handleLeaveGroup}
-                  disabled={isLeaving}
-                  className="px-3 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-50"
-                >
-                  {isLeaving ? 'Leaving...' : 'Leave Group'}
-                </button>
-              ) : (
-                <button
-                  onClick={handleJoinGroup}
-                  disabled={isJoining}
-                  className="px-3 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 disabled:opacity-50"
-                >
-                  {isJoining ? 'Joining...' : 'Join Group'}
-                </button>
-              )}
-            </div>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-white">
+              {metadata.metadata?.name || 'Running Club'}
+            </h1>
+            <p className="text-gray-400 text-sm">
+              {metadata.metadata?.about || 'A Nostr running community'}
+            </p>
           </div>
         </div>
-        
-        {/* Membership error message */}
-        {membershipError && (
-          <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-4">
-            <p className="text-red-300 text-sm">{membershipError}</p>
-          </div>
-        )}
         
         {/* Tabs */}
         <div className="mb-4">
@@ -643,7 +511,6 @@ export const TeamDetail = () => {
           </div>
         </div>
         
-        {/* Message input - Hide if not a member */}
         <div className="tab-content bg-gray-800 rounded-lg">
           {activeTab === 'chat' ? (
             <>
@@ -652,9 +519,7 @@ export const TeamDetail = () => {
                 {messages.length === 0 ? (
                   <div className="flex justify-center items-center h-full">
                     <p className="text-gray-500">
-                      {isMember 
-                        ? "No messages yet. Start a conversation!" 
-                        : "Join this group to participate in the conversation."}
+                      No messages yet. Group messaging functionality coming soon!
                     </p>
                   </div>
                 ) : (
@@ -697,30 +562,10 @@ export const TeamDetail = () => {
                 )}
               </div>
               
-              {/* Message Input - Only show if member */}
-              {isMember ? (
-                <form onSubmit={handleSendMessage} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    placeholder="Type your message..."
-                    className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg"
-                    disabled={isSending}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSending || !messageText.trim()}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
-                  >
-                    {isSending ? 'Sending...' : 'Send'}
-                  </button>
-                </form>
-              ) : (
-                <div className="bg-gray-700/30 rounded-lg p-3 text-center">
-                  <p className="text-gray-400">Join this group to send messages</p>
-                </div>
-              )}
+              {/* Coming Soon message instead of chat input */}
+              <div className="bg-gray-700/30 rounded-lg p-3 text-center">
+                <p className="text-gray-400">Group messaging functionality coming soon!</p>
+              </div>
             </>
           ) : (
             /* Pinned Messages Tab */

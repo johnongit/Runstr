@@ -2,6 +2,7 @@ import { createContext, useState, useEffect, useCallback, useContext } from 'rea
 import PropTypes from 'prop-types';
 import { NostrContext } from './NostrContext';
 import { fetchUserGroupList, initializeNostr, setAmberUserPubkey } from '../utils/nostrClient';
+import nostrConnectionManager from '../utils/nostrConnectionManager';
 
 // Create context
 export const TeamsContext = createContext();
@@ -32,14 +33,25 @@ export const TeamsProvider = ({ children }) => {
   useEffect(() => {
     const initNostr = async () => {
       try {
+        // Start auth operation with highest priority
+        nostrConnectionManager.startOperation('auth');
+        
         const initialized = await initializeNostr();
         setNostrInitialized(initialized);
+        
+        // Update connection manager status
+        nostrConnectionManager.setConnectionStatus(initialized);
+        
         if (!initialized) {
           setError('Failed to connect to Nostr network');
         }
+        
+        // End auth operation
+        nostrConnectionManager.endOperation('auth');
       } catch (err) {
         console.error('Error initializing Nostr:', err);
         setError('Failed to initialize Nostr connection');
+        nostrConnectionManager.endOperation('auth');
       }
     };
 
@@ -58,6 +70,15 @@ export const TeamsProvider = ({ children }) => {
       setError(null);
       
       try {
+        // Start teams operation
+        const canProceed = nostrConnectionManager.startOperation('teams');
+        
+        if (!canProceed) {
+          console.log('Teams operation deferred due to higher priority operations');
+          setLoadingNostrGroups(false);
+          return;
+        }
+        
         // Set the pubkey in nostrClient for Amber authentication
         setAmberUserPubkey(nostrPublicKey);
         setCurrentUser(nostrPublicKey);
@@ -70,10 +91,16 @@ export const TeamsProvider = ({ children }) => {
         } else {
           setMyNostrGroups([]);
         }
+        
+        // End teams operation
+        nostrConnectionManager.endOperation('teams');
       } catch (err) {
         console.error('Error loading Nostr clubs:', err);
         setError('Failed to load your Nostr clubs');
         setMyNostrGroups([]);
+        
+        // End teams operation even if there was an error
+        nostrConnectionManager.endOperation('teams');
       } finally {
         setLoadingNostrGroups(false);
       }

@@ -3,6 +3,9 @@
  * Centralized service for handling run data throughout the application
  */
 
+// Import the conversion utilities
+import { convertSplitsToKm, convertSplitsToMiles } from '../utils/formatters';
+
 // Define activity types as constants for consistency across the app
 export const ACTIVITY_TYPES = {
   RUN: 'run',
@@ -56,6 +59,23 @@ class RunDataService {
     try {
       const runs = this.getAllRuns();
       
+      // Ensure we have both km and mile splits
+      let splitsKm = runData.splitsKm || [];
+      let splitsMi = runData.splitsMi || [];
+      
+      // For backward compatibility, if only 'splits' exists, convert as needed
+      if (!splitsKm.length && !splitsMi.length && runData.splits && runData.splits.length) {
+        const unit = runData.unit || 'km';
+        
+        if (unit === 'km') {
+          splitsKm = [...runData.splits];
+          splitsMi = convertSplitsToMiles(runData.splits);
+        } else {
+          splitsMi = [...runData.splits];
+          splitsKm = convertSplitsToKm(runData.splits);
+        }
+      }
+      
       // Generate a unique ID if not provided
       const newRun = {
         id: runData.id || Date.now() + '-' + Math.random().toString(36).substr(2, 9),
@@ -63,7 +83,9 @@ class RunDataService {
         timestamp: runData.timestamp || Date.now(),
         // Default activity type to 'run' if not provided (for backward compatibility)
         activityType: runData.activityType || ACTIVITY_TYPES.RUN,
-        ...runData
+        ...runData,
+        splitsKm, // Always include both split formats
+        splitsMi
       };
       
       // Add to beginning of array for most recent first

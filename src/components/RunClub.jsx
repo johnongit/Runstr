@@ -5,6 +5,8 @@ import { useRunFeed } from '../hooks/useRunFeed';
 import { usePostInteractions } from '../hooks/usePostInteractions';
 import { PostList } from './PostList';
 import { handleAppBackground } from '../utils/nostr';
+import RunFeedLoading from './RunFeedLoading';
+import { getFeedState } from '../utils/globalFeedState';
 import './RunClub.css';
 
 const RunClub = () => {
@@ -12,6 +14,26 @@ const RunClub = () => {
   const { wallet } = useAuth();
   const [diagnosticInfo, setDiagnosticInfo] = useState('');
   const [showDebug, setShowDebug] = useState(false);
+  const [feedIsPreloaded, setFeedIsPreloaded] = useState(false);
+  
+  // Check if feed is preloaded
+  useEffect(() => {
+    const feedState = getFeedState();
+    setFeedIsPreloaded(feedState.preloadComplete && feedState.allPosts.length > 0);
+    
+    // Set up an interval to check preload status
+    const interval = setInterval(() => {
+      const currentState = getFeedState();
+      setFeedIsPreloaded(currentState.preloadComplete && currentState.allPosts.length > 0);
+      
+      // Clear interval once preloaded
+      if (currentState.preloadComplete) {
+        clearInterval(interval);
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   // Use the custom hooks
   const {
@@ -97,118 +119,47 @@ const RunClub = () => {
   };
   
   return (
-    <div className="run-club-container">
-      <h2>RUNSTR FEED</h2>
-      {loading && posts.length === 0 ? (
-        <div className="loading-indicator">
-          <p>Loading posts...</p>
-        </div>
-      ) : error ? (
-        <div className="error-message">
-          <p>{error}</p>
-          <div className="error-buttons">
-            <button 
-              className="retry-button" 
-              onClick={fetchRunPostsViaSubscription}
-            >
-              Retry
-            </button>
-            <button 
-              className="diagnose-button" 
-              onClick={diagnoseConnection}
-            >
-              Diagnose Connection
-            </button>
-          </div>
-          {diagnosticInfo && (
-            <div className="diagnostic-info">
-              <p>{diagnosticInfo}</p>
-            </div>
-          )}
-        </div>
-      ) : posts.length === 0 ? (
-        <div className="no-posts-message">
-          <p>No running posts found. Follow some runners or post your own run!</p>
+    <div className="feed-container">
+      <h1 className="text-2xl font-bold mb-4">Running Club</h1>
+      
+      {error && (
+        <div className="p-4 bg-red-900/30 border border-red-800 rounded-lg mb-4">
+          <p className="text-red-300">{error}</p>
           <button 
-            className="retry-button" 
             onClick={fetchRunPostsViaSubscription}
+            className="mt-2 px-3 py-1 bg-red-700 text-white text-sm rounded hover:bg-red-600"
           >
-            Refresh
-          </button>
-          <button 
-            className="diagnose-button" 
-            onClick={diagnoseConnection}
-          >
-            Diagnose Connection
+            Try Again
           </button>
         </div>
-      ) : (
-        <>
-          <PostList
-            posts={posts}
-            loading={loading}
-            page={1}
-            userLikes={userLikes}
-            userReposts={userReposts}
-            handleLike={handleLike}
-            handleRepost={handleRepost}
-            handleZap={(post) => handleZap(post, wallet)}
-            handleCommentClick={handleCommentClick}
-            handleComment={handleComment}
-            commentText={commentText}
-            setCommentText={setCommentText}
-            wallet={wallet}
-          />
-          
-          {/* Load More Button */}
-          {canLoadMore() && (
-            <div className="load-more-container">
-              <button 
-                className="load-more-button" 
-                onClick={loadMorePosts}
-                disabled={loading}
-              >
-                {loading ? 'Loading...' : 'Load More Posts'}
-              </button>
-            </div>
-          )}
-        </>
       )}
       
-      {/* Debug toggle button */}
-      <button 
-        onClick={toggleDebug}
-        className="debug-toggle"
-        style={{
-          bottom: showDebug ? '200px' : '10px'
-        }}
-      >
-        {showDebug ? 'X' : '🐞'}
-      </button>
+      {/* Show loading state */}
+      {loading && !feedIsPreloaded && (
+        <RunFeedLoading showDetail={true} />
+      )}
       
-      {/* Debug overlay - remove after debugging */}
-      {showDebug && (
-        <div className="debug-overlay">
-          <h3>Debug Info</h3>
-          <p>Connected relays: {window.NDK?.pool?.relays?.size || 0}</p>
-          <p>Posts loaded: {posts?.length || 0}</p>
-          <p>Feed error: {error || 'None'}</p>
-          <p>Loading state: {loading ? 'Loading' : 'Idle'}</p>
-          <p>User interactions: {userLikes?.size || 0} likes, {userReposts?.size || 0} reposts</p>
-          <div className="debug-actions">
-            <button 
-              onClick={fetchRunPostsViaSubscription}
-              className="debug-button"
-            >
-              Refresh Feed
-            </button>
-            <button 
-              onClick={diagnoseConnection}
-              className="debug-button secondary"
-            >
-              Test Connection
-            </button>
-          </div>
+      {/* Show feed content */}
+      <PostList 
+        posts={posts}
+        userLikes={userLikes}
+        userReposts={userReposts}
+        onLike={handleLike}
+        onRepost={handleRepost}
+        onZap={handleZap}
+        onComment={handleComment}
+        onCommentClick={handleCommentClick}
+        commentText={commentText}
+        setCommentText={setCommentText}
+        loadMorePosts={loadMorePosts}
+        canLoadMore={canLoadMore}
+        wallet={wallet}
+      />
+      
+      {/* Show diagnostic info if requested */}
+      {showDebug && diagnosticInfo && (
+        <div className="mt-4 p-3 bg-gray-800 rounded text-xs opacity-70 font-mono">
+          {diagnosticInfo}
         </div>
       )}
     </div>
