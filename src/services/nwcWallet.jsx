@@ -1,6 +1,6 @@
 import { getPublicKey } from 'nostr-tools';
 import * as secp256k1 from '@noble/secp256k1';
-import { NWCClient } from '@getalby/sdk';
+import { nwc } from '@getalby/sdk';
 import { RELAYS } from '../utils/nostr';
 
 export class NWCWallet {
@@ -20,7 +20,7 @@ export class NWCWallet {
       }
 
       // Initialize the NWC client
-      this.client = new NWCClient({
+      this.client = new nwc.NWCClient({
         nostrWalletConnectUrl: connectionString
       });
 
