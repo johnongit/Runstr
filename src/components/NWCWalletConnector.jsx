@@ -1,49 +1,95 @@
-import { useEffect, useState, useContext } from 'react';
-import { useAuth } from '../hooks/useAuth.jsx';
-import { Button, init, onConnected } from '@getalby/bitcoin-connect-react';
+import { useState, useEffect, useContext } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import { NostrContext } from '../contexts/NostrContext';
+import { NWCWallet } from '../services/nwcWallet';
 
-// Initialize Bitcoin Connect
-init({
-  appName: 'Nostr Run Club'
-});
-
-// RUNSTR and OpenSats Lightning addresses
-const RUNSTR_LIGHTNING = 'runstr@geyser.fund';
-
-export const WalletConnect = () => {
+export const NWCWalletConnector = () => {
   const { setWallet } = useAuth();
   const { defaultZapAmount, updateDefaultZapAmount } = useContext(NostrContext);
+  const [nwcUrl, setNwcUrl] = useState('');
+  const [connecting, setConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState('');
+  const [isConnected, setIsConnected] = useState(false);
   const [zapAmountInput, setZapAmountInput] = useState(defaultZapAmount.toString());
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [donationStatus, setDonationStatus] = useState({ message: '', isError: false });
 
+  // RUNSTR Lightning address
+  const RUNSTR_LIGHTNING = 'runstr@geyser.fund';
+
+  // Check for saved connection on mount
   useEffect(() => {
-    // Set up connection event listener for wallet state management
-    const unsub = onConnected((provider) => {
-      // Create a wallet interface that matches your app's needs
-      const bitcoinWallet = {
-        provider,
-        makePayment: async (invoice) => {
-          return await provider.sendPayment(invoice);
-        },
-        getBalance: async () => {
-          return await provider.getBalance();
-        }
-      };
-
-      setWallet(bitcoinWallet);
-    });
-
-    return () => {
-      unsub();
-    };
-  }, [setWallet]);
+    const savedNwcUrl = localStorage.getItem('nwcConnectionString');
+    if (savedNwcUrl) {
+      connectWallet(savedNwcUrl);
+    }
+  }, []);
 
   // Update zapAmountInput when defaultZapAmount changes
   useEffect(() => {
     setZapAmountInput(defaultZapAmount.toString());
   }, [defaultZapAmount]);
+
+  const connectWallet = async (connectionString) => {
+    setConnecting(true);
+    setConnectionError('');
+    
+    try {
+      const nwcWallet = new NWCWallet();
+      const connected = await nwcWallet.connect(connectionString);
+      
+      if (connected) {
+        // Save connection string
+        localStorage.setItem('nwcConnectionString', connectionString);
+        
+        // Set up wallet in context
+        setWallet({
+          provider: nwcWallet,
+          isEnabled: () => true,
+          makePayment: async (invoice) => {
+            return await nwcWallet.makePayment(invoice);
+          },
+          sendPayment: async (invoice) => {
+            return await nwcWallet.makePayment(invoice);
+          },
+          getBalance: async () => {
+            return await nwcWallet.getBalance();
+          },
+          generateZapInvoice: async (pubkey, amount, content) => {
+            return await nwcWallet.generateZapInvoice(pubkey, amount, content);
+          }
+        });
+        
+        setIsConnected(true);
+      }
+    } catch (error) {
+      console.error('Failed to connect NWC wallet:', error);
+      setConnectionError(error.message || 'Failed to connect to wallet');
+      localStorage.removeItem('nwcConnectionString');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleConnect = () => {
+    if (nwcUrl.trim()) {
+      connectWallet(nwcUrl.trim());
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      if (useAuth().wallet?.provider) {
+        await useAuth().wallet.provider.disconnect();
+      }
+      setWallet(null);
+      setIsConnected(false);
+      localStorage.removeItem('nwcConnectionString');
+      setNwcUrl('');
+    } catch (error) {
+      console.error('Error disconnecting wallet:', error);
+    }
+  };
 
   const handleUpdateZapAmount = () => {
     if (zapAmountInput && parseInt(zapAmountInput, 10) > 0) {
@@ -56,6 +102,17 @@ export const WalletConnect = () => {
   };
 
   const handleDonate = async (lightning, name) => {
+    if (!useAuth().wallet) {
+      setDonationStatus({ 
+        message: 'Wallet not connected. Please connect your wallet first.', 
+        isError: true 
+      });
+      setTimeout(() => {
+        setDonationStatus({ message: '', isError: false });
+      }, 5000);
+      return;
+    }
+
     try {
       setDonationStatus({ message: `Sending ${defaultZapAmount} sats to ${name}...`, isError: false });
 
@@ -109,10 +166,8 @@ export const WalletConnect = () => {
         throw new Error('Invalid LNURL-pay response: missing payment request');
       }
 
-      // Use Bitcoin Connect to get the provider and pay
-      const { requestProvider } = await import('@getalby/bitcoin-connect');
-      const provider = await requestProvider();
-      await provider.sendPayment(invoiceData.pr);
+      // Pay using the NWC wallet
+      await useAuth().wallet.makePayment(invoiceData.pr);
 
       setDonationStatus({ message: `Successfully donated ${defaultZapAmount} sats to ${name}! ⚡️`, isError: false });
       setTimeout(() => {
@@ -128,19 +183,43 @@ export const WalletConnect = () => {
   };
 
   return (
-    <div className="wallet-connect">
+    <div className="nwc-wallet-connector">
       <div className="connection-section">
-        <h3>Connect your Bitcoin Wallet</h3>
-        <Button
-          onConnect={(provider) => {
-            // The onConnected event handler above will handle the wallet setup
-            console.log('Wallet connected through button:', provider);
-          }}
-        />
-        <p className="helper-text">
-          Connect using Alby extension or other Bitcoin Connect compatible
-          wallets
-        </p>
+        <h3>Connect your Lightning Wallet with NWC</h3>
+        
+        {!isConnected ? (
+          <>
+            <p className="helper-text">
+              Enter your Nostr Wallet Connect URL from your wallet (e.g. Alby, Mutiny, etc.)
+            </p>
+            <div className="input-with-button">
+              <input
+                type="text"
+                value={nwcUrl}
+                onChange={(e) => setNwcUrl(e.target.value)}
+                placeholder="nostr+walletconnect://..."
+                className="nwc-input"
+              />
+              <button 
+                onClick={handleConnect} 
+                disabled={connecting || !nwcUrl.trim()}
+                className="connect-button"
+              >
+                {connecting ? 'Connecting...' : 'Connect'}
+              </button>
+            </div>
+            {connectionError && (
+              <p className="error-message">{connectionError}</p>
+            )}
+          </>
+        ) : (
+          <div className="connected-state">
+            <p className="success-message">Wallet connected successfully! ⚡️</p>
+            <button onClick={handleDisconnect} className="disconnect-button">
+              Disconnect Wallet
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="zap-settings-section">
@@ -179,6 +258,7 @@ export const WalletConnect = () => {
           <button 
             className="donate-button runstr" 
             onClick={() => handleDonate(RUNSTR_LIGHTNING, 'RUNSTR')}
+            disabled={!isConnected}
           >
             ⚡️ Zap RUNSTR ({defaultZapAmount} sats)
           </button>
@@ -196,4 +276,4 @@ export const WalletConnect = () => {
       </div>
     </div>
   );
-};
+}; 

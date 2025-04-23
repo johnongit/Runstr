@@ -15,6 +15,9 @@ const globalState = {
   activeSubscription: null,
 };
 
+// Increased timeout value for network operations
+const NETWORK_TIMEOUT = 20000; // 20 seconds instead of default
+
 export const useRunFeed = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -174,6 +177,9 @@ export const useRunFeed = () => {
 
       // Initialize Nostr first
       await initializeNostr();
+      
+      // Add a small delay to ensure initialization is complete
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Check if we have cached posts that are recent enough (less than 5 minutes old)
       const now = Date.now();
@@ -195,11 +201,47 @@ export const useRunFeed = () => {
       const since = page > 1 ? Date.now() - (page * 7 * 24 * 60 * 60 * 1000) : undefined;
       const limit = 21; // Load 21 posts initially (3 pages worth)
 
-      // Fetch posts with running hashtags
-      const runPostsArray = await fetchRunningPosts(limit, since);
+      // Fetch posts with running hashtags with increased timeout
+      const runPostsPromise = fetchRunningPosts(limit, since);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Fetch timeout')), NETWORK_TIMEOUT)
+      );
+      
+      const runPostsArray = await Promise.race([runPostsPromise, timeoutPromise])
+        .catch(error => {
+          console.error('Error fetching posts:', error);
+          return [];
+        });
       
       console.log(`Fetched ${runPostsArray.length} running posts`);
       
+      // Guard against empty results - try backup strategy if no posts
+      if (runPostsArray.length === 0) {
+        // If we have previous posts, use them as fallback
+        if (globalState.allPosts.length > 0) {
+          console.log('Using previously cached posts as fallback');
+          setAllPosts(globalState.allPosts);
+          setPosts(globalState.allPosts.slice(0, displayLimit));
+          setLoading(false);
+          
+          // Try again in the background after a delay
+          setTimeout(() => {
+            fetchRunPostsViaSubscription().catch(e => 
+              console.error('Background refresh failed:', e)
+            );
+          }, 10000); // Try again in 10 seconds
+          
+          return;
+        } else {
+          // Hard fallback to show something instead of loading indefinitely
+          console.log('No posts found, creating placeholder');
+          setError('Could not fetch posts. Please check your connection.');
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // If we got here, we have successfully fetched posts
       // If we got no results with tags, try a content search as fallback
       if (runPostsArray.length === 0 && page === 1) {
         console.log('No tagged running posts found, trying content search');
@@ -238,17 +280,6 @@ export const useRunFeed = () => {
       // If we didn't get enough posts, there may not be more to load
       if (runPostsArray.length < limit) {
         setHasMore(false);
-      }
-      
-      // Skip processing if we didn't get any posts
-      if (runPostsArray.length === 0) {
-        if (page === 1) {
-          setPosts([]);
-          setAllPosts([]);
-          setError('No running posts found. Try again later.');
-        }
-        setLoading(false);
-        return;
       }
       
       // Load supplementary data in parallel for all posts

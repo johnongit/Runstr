@@ -1,55 +1,52 @@
 import { getPublicKey } from 'nostr-tools';
 import * as secp256k1 from '@noble/secp256k1';
-import { webln } from '@getalby/sdk';
+import { NWCClient } from '@getalby/sdk';
 import { RELAYS } from '../utils/nostr';
 
 export class NWCWallet {
   constructor() {
+    this.client = null;
     this.secretKey = null;
     this.pubKey = null;
     this.relayUrl = null;
     this.walletPubKey = null;
+    this.isConnected = false;
   }
 
   async connect(connectionString) {
     try {
-      const url = new URL(connectionString);
-
-      if (url.protocol !== 'nostr+walletconnect:') {
-        throw new Error('Invalid NWC URL protocol');
+      if (!connectionString.startsWith('nostr+walletconnect://')) {
+        throw new Error('Invalid NWC URL format. Must start with nostr+walletconnect://');
       }
 
-      this.secretKey = secp256k1.utils.randomPrivateKey();
-      this.pubKey = getPublicKey(this.secretKey);
-
-      const params = new URLSearchParams(url.pathname);
-      this.relayUrl = params.get('relay');
-      this.walletPubKey = params.get('pubkey');
-
-      if (!this.relayUrl || !this.walletPubKey) {
-        throw new Error('Missing required NWC parameters');
-      }
-
-      // Initialize WebLN provider
-      this.provider = new webln.NostrWebLNProvider({
+      // Initialize the NWC client
+      this.client = new NWCClient({
         nostrWalletConnectUrl: connectionString
       });
 
-      await this.provider.enable();
+      // Test the connection by fetching wallet info
+      await this.client.getInfo();
+      
+      this.isConnected = true;
+      console.log('NWC wallet connected successfully');
       return true;
     } catch (error) {
       console.error('NWC connection error:', error);
+      this.isConnected = false;
       throw error;
     }
   }
 
   async makePayment(paymentRequest) {
     try {
-      if (!this.provider) {
+      if (!this.client || !this.isConnected) {
         throw new Error('Wallet not connected');
       }
 
-      const response = await this.provider.sendPayment(paymentRequest);
+      const response = await this.client.payInvoice({
+        invoice: paymentRequest
+      });
+      
       return response;
     } catch (error) {
       console.error('Payment error:', error);
@@ -59,12 +56,12 @@ export class NWCWallet {
 
   async getBalance() {
     try {
-      if (!this.provider) {
+      if (!this.client || !this.isConnected) {
         throw new Error('Wallet not connected');
       }
 
-      const response = await this.provider.getBalance();
-      return response.balance;
+      const response = await this.client.getBalance();
+      return response.balance || 0;
     } catch (error) {
       console.error('Get balance error:', error);
       throw error;
@@ -73,7 +70,7 @@ export class NWCWallet {
 
   async generateZapInvoice(pubkey, amount = null, content = '') {
     try {
-      if (!this.provider) {
+      if (!this.client || !this.isConnected) {
         throw new Error('Wallet not connected');
       }
 
@@ -84,9 +81,10 @@ export class NWCWallet {
         zapAmount = storedAmount ? parseInt(storedAmount, 10) : 1000;
       }
 
+      // Create zap request event
       const zapRequest = {
         kind: 9734,
-        content: content,
+        content: content || '',
         tags: [
           ['p', pubkey],
           ['amount', zapAmount.toString()],
@@ -95,16 +93,18 @@ export class NWCWallet {
         created_at: Math.floor(Date.now() / 1000)
       };
 
+      // Have NWC sign the request
       const signedZapRequest = await window.nostr.signEvent(zapRequest);
       const encodedZapRequest = btoa(JSON.stringify(signedZapRequest));
 
-      const invoice = await this.provider.makeInvoice({
+      // Create the invoice
+      const response = await this.client.makeInvoice({
         amount: zapAmount,
-        defaultMemo: `Zap for ${pubkey}`,
+        memo: `Zap for ${pubkey}`,
         zapRequest: encodedZapRequest
       });
 
-      return invoice;
+      return response.paymentRequest || response.invoice || response;
     } catch (error) {
       console.error('Generate zap invoice error:', error);
       throw error;
@@ -113,14 +113,15 @@ export class NWCWallet {
 
   async disconnect() {
     try {
-      if (this.provider) {
-        await this.provider.disable();
-      }
-      this.provider = null;
+      // The NWC client doesn't have a formal disconnect method,
+      // so we'll just clean up our internal state
+      this.client = null;
       this.secretKey = null;
       this.pubKey = null;
       this.relayUrl = null;
       this.walletPubKey = null;
+      this.isConnected = false;
+      return true;
     } catch (error) {
       console.error('Disconnect error:', error);
       throw error;

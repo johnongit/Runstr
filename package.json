@@ -33,7 +33,6 @@
     "@capacitor/android": "^7.0.1",
     "@capacitor/core": "^7.0.1",
     "@getalby/bitcoin-connect": "^3.6.3",
-    "@getalby/bitcoin-connect-react": "^3.6.3",
     "@getalby/sdk": "^3.8.2",
     "@nostr-dev-kit/ndk": "^2.13.0-rc2",
     "lucide-react": "^0.485.0",

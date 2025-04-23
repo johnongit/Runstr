@@ -39,16 +39,48 @@ const CONNECTION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
  */
 export const initializeNostr = async () => {
   try {
-    // Connect to relays
-    await ndk.connect();
+    console.log('Starting Nostr initialization...');
+    
+    // Check if already connected
+    if (isConnected && ndk && ndk.pool && ndk.pool.relays) {
+      const connectedRelays = Array.from(ndk.pool.relays)
+        .filter(r => r.status === 1)
+        .map(r => r.url);
+      
+      if (connectedRelays.length > 0) {
+        console.log(`Already connected to ${connectedRelays.length} relays`);
+        return true;
+      }
+    }
+    
+    // Set a timeout for connection attempt
+    const connectionPromise = ndk.connect();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Connection timeout')), 15000)
+    );
+    
+    // Connect to relays with timeout
+    await Promise.race([connectionPromise, timeoutPromise]);
+    
     console.log('Connected to NDK relays');
     isConnected = true;
     lastConnectionCheck = Date.now();
     return true;
   } catch (error) {
     console.error('Error initializing Nostr:', error);
-    isConnected = false;
-    return false;
+    // Try to recover by forcing a new connection
+    try {
+      console.log('Attempting to recover connection...');
+      await ndk.connect(3); // Connect with max 3 relays to speed up
+      isConnected = true;
+      lastConnectionCheck = Date.now();
+      console.log('Recovery successful');
+      return true;
+    } catch (recoveryError) {
+      console.error('Recovery failed:', recoveryError);
+      isConnected = false;
+      return false;
+    }
   }
 };
 
