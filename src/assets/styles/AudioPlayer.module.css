@@ -195,3 +195,53 @@
     padding: 10px 8px;
   }
 }
+
+.errorMessage {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 0.25rem;
+  text-align: center;
+}
+
+.zapMessage {
+  background-color: #cce5ff;
+  color: #004085;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 0.25rem;
+  text-align: center;
+}
+
+.zapSuccess {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 0.25rem;
+  text-align: center;
+}
+
+.zapError {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 0.25rem;
+  text-align: center;
+}
+
+.zapButton {
+  background-color: #ff9800;
+  color: white;
+}
+
+.zapButton:hover {
+  background-color: #f57c00;
+}
+
+.zapButton:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}

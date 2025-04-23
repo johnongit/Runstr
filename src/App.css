@@ -5736,3 +5736,60 @@ input:checked + .toggle-slider:before {
   margin-bottom: 16px;
   color: #e0e0e0;
 }
+
+/* Feed header button styles */
+.feed-header-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  position: relative;
+  transition: opacity 0.2s;
+}
+
+.feed-header-button:hover {
+  opacity: 0.8;
+}
+
+.feed-header-button:active {
+  opacity: 0.6;
+}
+
+.feed-header-button h2 {
+  margin: 0 0 12px 0;
+  font-size: 1.6rem;
+  color: var(--text-color);
+}
+
+.feed-header-button .refresh-icon {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 1.2rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.feed-header-button.refreshing h2 {
+  opacity: 0.8;
+}
+
+.feed-header-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Make sure the button doesn't interfere with existing styles */
+.run-club-container button.feed-header-button {
+  width: auto;
+  height: auto;
+  min-height: unset;
+  border-radius: 0;
+  margin: 0;
+}

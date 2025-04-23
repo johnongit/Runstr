@@ -100,6 +100,28 @@ export const getTrackById = async (trackId) => {
 };
 
 /**
+ * Get LNURL for a track to enable zapping the artist
+ */
+export const getLnurlForTrack = async (trackId) => {
+  if (!trackId) throw new Error('Track ID is required');
+  
+  try {
+    // Using appId 'runstr2025' as requested
+    const appId = 'runstr2025';
+    const data = await fetchWithHeaders(`/lnurl?contentId=${trackId}&appId=${appId}`);
+    
+    if (!data || !data.lnurl) {
+      throw new Error('Invalid LNURL response from server');
+    }
+    
+    return data.lnurl;
+  } catch (error) {
+    console.error('Error getting LNURL for track:', error);
+    throw error;
+  }
+};
+
+/**
  * Get stream URL for a track
  */
 export const getTrackStreamUrl = (trackId) => {

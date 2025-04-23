@@ -12,6 +12,7 @@ const RunClub = () => {
   const { wallet } = useAuth();
   const [diagnosticInfo, setDiagnosticInfo] = useState('');
   const [showDebug, setShowDebug] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Use the custom hooks
   const {
@@ -57,6 +58,21 @@ const RunClub = () => {
     };
   }, []);
 
+  // Function to refresh the feed when the header is clicked
+  const refreshFeed = () => {
+    // Don't allow multiple refreshes at once
+    if (loading || isRefreshing) return;
+    
+    setIsRefreshing(true);
+    fetchRunPostsViaSubscription()
+      .finally(() => {
+        // Reset the refreshing state after a delay to show animation
+        setTimeout(() => {
+          setIsRefreshing(false);
+        }, 500);
+      });
+  };
+
   // Simple diagnostic function to test connectivity
   const diagnoseConnection = async () => {
     setDiagnosticInfo('Testing connection to Nostr relays...');
@@ -98,7 +114,15 @@ const RunClub = () => {
   
   return (
     <div className="run-club-container">
-      <h2>RUNSTR FEED</h2>
+      <button 
+        className={`feed-header-button ${isRefreshing ? 'refreshing' : ''}`}
+        onClick={refreshFeed}
+        disabled={loading || isRefreshing}
+      >
+        <h2>RUNSTR FEED</h2>
+        {isRefreshing && <span className="refresh-icon">↻</span>}
+      </button>
+
       {loading && posts.length === 0 ? (
         <div className="loading-indicator">
           <p>Loading posts...</p>
@@ -109,7 +133,7 @@ const RunClub = () => {
           <div className="error-buttons">
             <button 
               className="retry-button" 
-              onClick={fetchRunPostsViaSubscription}
+              onClick={refreshFeed}
             >
               Retry
             </button>
@@ -131,7 +155,7 @@ const RunClub = () => {
           <p>No running posts found. Follow some runners or post your own run!</p>
           <button 
             className="retry-button" 
-            onClick={fetchRunPostsViaSubscription}
+            onClick={refreshFeed}
           >
             Refresh
           </button>
@@ -197,7 +221,7 @@ const RunClub = () => {
           <p>User interactions: {userLikes?.size || 0} likes, {userReposts?.size || 0} reposts</p>
           <div className="debug-actions">
             <button 
-              onClick={fetchRunPostsViaSubscription}
+              onClick={refreshFeed}
               className="debug-button"
             >
               Refresh Feed

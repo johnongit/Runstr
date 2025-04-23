@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import styles from '../assets/styles/AudioPlayer.module.css';
+import { NostrContext } from '../contexts/NostrContext';
+import { getLnurlForTrack } from '../utils/wavlake';
 
 export function MusicPlayer() {
   const { 
@@ -14,13 +16,16 @@ export function MusicPlayer() {
     currentTrackIndex
   } = useAudioPlayer();
   
+  const { defaultZapAmount, wallet } = useContext(NostrContext);
   const [errorMessage, setErrorMessage] = useState('');
   const [showErrorMessage, setShowErrorMessage] = useState(false);
+  const [zapStatus, setZapStatus] = useState({ loading: false, success: false, error: null });
 
   // Reset error when track changes
   useEffect(() => {
     setErrorMessage('');
     setShowErrorMessage(false);
+    setZapStatus({ loading: false, success: false, error: null });
   }, [currentTrack]);
 
   // Error handling function
@@ -39,6 +44,50 @@ export function MusicPlayer() {
       togglePlayPause();
     } catch (error) {
       handlePlaybackError(error);
+    }
+  };
+
+  // Handle zap function - sends Bitcoin to the artist
+  const handleZapArtist = async () => {
+    if (!currentTrack) return;
+    if (!wallet || !wallet.isEnabled()) {
+      setZapStatus({ 
+        loading: false, 
+        success: false, 
+        error: 'Wallet not connected. Please connect a Lightning wallet in your settings.' 
+      });
+      
+      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
+      return;
+    }
+    
+    try {
+      setZapStatus({ loading: true, success: false, error: null });
+
+      // Get the LNURL for the current track
+      const lnurl = await getLnurlForTrack(currentTrack.id);
+      
+      // If wallet doesn't support direct LNURL handling, fetch the invoice
+      // For this implementation, we assume the wallet supports LNURL
+      await wallet.sendPayment(lnurl);
+      
+      setZapStatus({ 
+        loading: false, 
+        success: true, 
+        error: null 
+      });
+      
+      // Clear success message after a few seconds
+      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
+    } catch (error) {
+      console.error('Error zapping artist:', error);
+      setZapStatus({ 
+        loading: false, 
+        success: false, 
+        error: typeof error === 'string' ? error : error.message || 'Failed to zap artist.' 
+      });
+      
+      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
     }
   };
 
@@ -81,6 +130,24 @@ export function MusicPlayer() {
           {errorMessage}
         </div>
       )}
+      
+      {/* Zap status messages */}
+      {zapStatus.loading && (
+        <div className={styles.zapMessage}>
+          Sending {defaultZapAmount} sats to {currentTrack.artist || 'the artist'}...
+        </div>
+      )}
+      {zapStatus.success && (
+        <div className={styles.zapSuccess}>
+          Successfully sent {defaultZapAmount} sats to {currentTrack.artist || 'the artist'}! ⚡️
+        </div>
+      )}
+      {zapStatus.error && (
+        <div className={styles.zapError}>
+          {zapStatus.error}
+        </div>
+      )}
+      
       <div className={styles.title}>
         <p>Selected Playlist: {playlist?.title || 'Unknown'}</p>
         <p>Selected Track: {currentTrack.title}</p>
@@ -110,6 +177,12 @@ export function MusicPlayer() {
           <div className="icon-container">
             <div className="icon-next"></div>
             <span className={styles.buttonText}>Next</span>
+          </div>
+        </button>
+        <button onClick={handleZapArtist} className={`${styles.controlButton} ${styles.zapButton}`} disabled={zapStatus.loading}>
+          <div className="icon-container">
+            <div className="icon-zap">⚡</div>
+            <span className={styles.buttonText}>Zap ({defaultZapAmount} sats)</span>
           </div>
         </button>
       </div>

@@ -10,6 +10,7 @@ export const RunClub = () => {
   const { defaultZapAmount } = useContext(NostrContext);
   const { wallet } = useAuth();
   const [diagnosticInfo, setDiagnosticInfo] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Use the custom hooks
   const {
@@ -113,6 +114,21 @@ export const RunClub = () => {
     }
   };
 
+  // Function to refresh the feed when the header is clicked
+  const refreshFeed = () => {
+    // Don't allow multiple refreshes at once
+    if (loading || isRefreshing) return;
+    
+    setIsRefreshing(true);
+    fetchRunPostsViaSubscription()
+      .finally(() => {
+        // Reset the refreshing state after a delay to show animation
+        setTimeout(() => {
+          setIsRefreshing(false);
+        }, 500);
+      });
+  };
+
   // Simple scroll handler
   useEffect(() => {
     const handleScroll = () => {
@@ -132,7 +148,15 @@ export const RunClub = () => {
 
   return (
     <div className="run-club-container">
-      <h2>RUNSTR FEED</h2>
+      <button 
+        className={`feed-header-button ${isRefreshing ? 'refreshing' : ''}`}
+        onClick={refreshFeed}
+        disabled={loading || isRefreshing}
+      >
+        <h2>RUNSTR FEED</h2>
+        {isRefreshing && <span className="refresh-icon">↻</span>}
+      </button>
+      
       {loading && posts.length === 0 ? (
         <div className="loading-indicator">
           <p>Loading posts...</p>
@@ -143,7 +167,7 @@ export const RunClub = () => {
           <div className="error-buttons">
             <button 
               className="retry-button" 
-              onClick={fetchRunPostsViaSubscription}
+              onClick={refreshFeed}
             >
               Retry
             </button>
@@ -165,7 +189,7 @@ export const RunClub = () => {
           <p>No running posts found</p>
           <button 
             className="retry-button" 
-            onClick={fetchRunPostsViaSubscription}
+            onClick={refreshFeed}
           >
             Refresh
           </button>

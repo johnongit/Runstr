@@ -1,6 +1,8 @@
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { NostrContext } from '../contexts/NostrContext';
+import { getLnurlForTrack } from '../utils/wavlake';
 
 export const FloatingMusicPlayer = () => {
   const { 
@@ -11,10 +13,57 @@ export const FloatingMusicPlayer = () => {
     playPrevious
   } = useAudioPlayer();
   
+  const { defaultZapAmount, wallet } = useContext(NostrContext);
   const [expanded, setExpanded] = useState(false);
+  const [zapStatus, setZapStatus] = useState({ loading: false, success: false, error: null });
   const navigate = useNavigate();
   
   if (!currentTrack) return <span></span>;
+
+  // Handle zap function - sends Bitcoin to the artist
+  const handleZapArtist = async (e) => {
+    e.stopPropagation(); // Prevent expanding/collapsing the player
+    
+    if (!currentTrack) return;
+    if (!wallet || !wallet.isEnabled()) {
+      setZapStatus({ 
+        loading: false, 
+        success: false, 
+        error: 'Wallet not connected' 
+      });
+      
+      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
+      return;
+    }
+    
+    try {
+      setZapStatus({ loading: true, success: false, error: null });
+
+      // Get the LNURL for the current track
+      const lnurl = await getLnurlForTrack(currentTrack.id);
+      
+      // Send the payment
+      await wallet.sendPayment(lnurl);
+      
+      setZapStatus({ 
+        loading: false, 
+        success: true, 
+        error: null 
+      });
+      
+      // Clear success message after a few seconds
+      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
+    } catch (error) {
+      console.error('Error zapping artist:', error);
+      setZapStatus({ 
+        loading: false, 
+        success: false, 
+        error: typeof error === 'string' ? error : 'Failed to zap' 
+      });
+      
+      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
+    }
+  };
 
   return (
     <div className={`${expanded ? 'header-player-expanded' : 'header-player-collapsed'}`}>
@@ -31,6 +80,9 @@ export const FloatingMusicPlayer = () => {
           <div className="mb-2">
             <p className="text-sm font-medium truncate">{currentTrack.title}</p>
             <p className="text-xs text-gray-400 truncate">{currentTrack.artist || 'Unknown Artist'}</p>
+            {zapStatus.loading && <p className="text-xs text-blue-400">Sending {defaultZapAmount} sats...</p>}
+            {zapStatus.success && <p className="text-xs text-green-400">Zap sent! ⚡️</p>}
+            {zapStatus.error && <p className="text-xs text-red-400">{zapStatus.error}</p>}
           </div>
           <div className="flex justify-center space-x-8">
             <button onClick={playPrevious} className="text-gray-300">
@@ -55,6 +107,11 @@ export const FloatingMusicPlayer = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
               </svg>
             </button>
+            <button onClick={handleZapArtist} className="text-yellow-500" disabled={zapStatus.loading}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </button>
           </div>
         </div>
       ) : (
@@ -72,6 +129,20 @@ export const FloatingMusicPlayer = () => {
             )}
           </span>
           <span className="text-sm truncate">{currentTrack.title}</span>
+          {!zapStatus.loading && !zapStatus.success && !zapStatus.error && (
+            <button 
+              onClick={handleZapArtist}
+              className="ml-2 text-yellow-500"
+              title={`Zap ${currentTrack.artist || 'Artist'} (${defaultZapAmount} sats)`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </button>
+          )}
+          {zapStatus.loading && <span className="ml-2 text-xs text-blue-400">⚡</span>}
+          {zapStatus.success && <span className="ml-2 text-xs text-green-400">⚡</span>}
+          {zapStatus.error && <span className="ml-2 text-xs text-red-400">⚡</span>}
         </div>
       )}
     </div>
