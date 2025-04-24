@@ -1,6 +1,5 @@
 import { RELAYS } from '../utils/nostr';
-import { getPublicKey } from '../utils/nostr';
-import { nip19 } from 'nostr-tools';
+import { getPublicKey, nip19 } from 'nostr-tools';
 import NDKNip04 from '@nostr-dev-kit/ndk';
 
 export class NWCWallet {
