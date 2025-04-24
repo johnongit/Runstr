@@ -11,26 +11,9 @@
       "debug": true,
       "stopOnTerminate": false,
       "startForeground": true
-    },
-    "App": {
-      "appUrlOpen": {
-        "enabled": true
-      }
     }
   },
   "android": {
-    "useLegacyBridge": true,
-    "intentFilters": [
-      {
-        "action": "android.intent.action.VIEW",
-        "category": [
-          "android.intent.category.DEFAULT",
-          "android.intent.category.BROWSABLE"
-        ],
-        "data": {
-          "scheme": "runstr"
-        }
-      }
-    ]
+    "useLegacyBridge": true
   }
 }

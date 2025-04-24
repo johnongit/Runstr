@@ -68,19 +68,9 @@ export const initializeNostr = async () => {
     return true;
   } catch (error) {
     console.error('Error initializing Nostr:', error);
-    // Try to recover by forcing a new connection
-    try {
-      console.log('Attempting to recover connection...');
-      await ndk.connect(3); // Connect with max 3 relays to speed up
-      isConnected = true;
-      lastConnectionCheck = Date.now();
-      console.log('Recovery successful');
-      return true;
-    } catch (recoveryError) {
-      console.error('Recovery failed:', recoveryError);
-      isConnected = false;
-      return false;
-    }
+    // Do NOT attempt recovery to avoid breaking Amber signer
+    isConnected = false;
+    return false;
   }
 };
 
@@ -574,33 +564,16 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
         };
         
         // Sign using Amber
-        const signResult = await AmberAuth.signEvent(event);
-        
-        // Check if there was an error during signing
-        if (signResult && signResult.error) {
-          console.error('Error signing with Amber:', signResult.error);
-          throw new Error(signResult.message || 'Failed to sign event with Amber');
-        }
-        
+        signedEvent = await AmberAuth.signEvent(event);
         publishResult.signMethod = 'amber';
         
         // If signedEvent is null, the signing is happening asynchronously
         // and we'll need to handle it via deep linking
-        if (!signResult || !signResult.id) {
-          console.log('Async signing in progress, waiting for callback');
-          // In a real implementation, we'd return a Promise that resolves
-          // when the deep link callback is received
-          return {
-            success: false,
-            method: null,
-            signMethod: 'amber',
-            error: 'ASYNC_SIGNING',
-            message: 'Signing in progress, check notifications'
-          };
+        if (!signedEvent) {
+          // In a real implementation, you would return a Promise that
+          // resolves when the deep link callback is received
+          return null;
         }
-        
-        // If we got here, we have a signed event
-        signedEvent = signResult;
       }
     }
     
@@ -663,12 +636,7 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
     return { ...signedEvent, ...publishResult };
   } catch (error) {
     console.error('Error in createAndPublishEvent:', error);
-    return {
-      success: false,
-      error: error.message || 'Unknown error in event creation/publishing',
-      method: null,
-      signMethod: null
-    };
+    throw error;
   }
 };
 

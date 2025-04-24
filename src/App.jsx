@@ -85,27 +85,14 @@ const App = () => {
       try {
         console.log('Preloading Nostr connection on app launch');
         
-        // Set high priority for this task
-        if (navigator && navigator.scheduling && navigator.scheduling.isInputPending) {
-          // Use scheduler API if available
-          const schedulerStep = async (deadline) => {
-            if (deadline.timeRemaining() > 0 || deadline.didTimeout) {
-              await initializeNostr();
-            } else {
-              requestIdleCallback(schedulerStep, { timeout: 1000 });
-            }
-          };
-          requestIdleCallback(schedulerStep, { timeout: 1000 });
-        } else {
-          // Fallback to direct initialization
-          await initializeNostr();
-        }
+        // Direct initialization without scheduling to preserve Amber compatibility
+        await initializeNostr();
         
         // Prefetch run feed data using dynamic import to avoid circular dependencies
         try {
           const { fetchRunningPosts } = await import('./utils/nostr');
           console.log('Preloading feed data in background');
-          // Use a separate task for feed data to prevent blocking
+          // Still use timeout for feed data to prevent blocking
           setTimeout(() => {
             fetchRunningPosts(10).catch(err => 
               console.error('Error preloading feed data:', err)

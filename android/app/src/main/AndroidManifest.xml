@@ -52,12 +52,6 @@
 
     <!-- Add the queries section for Amber integration -->
     <queries>
-        <!-- Support both amber: and nostrsigner: URI schemes -->
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <category android:name="android.intent.category.BROWSABLE" />
-            <data android:scheme="amber" />
-        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />

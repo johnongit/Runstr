@@ -10,12 +10,9 @@ const isAmberInstalled = async () => {
   if (Platform.OS !== 'android') return false;
   
   try {
-    // Check both the newer 'amber:' and the older 'nostrsigner:' URI schemes
-    const canOpenAmber = await Linking.canOpenURL('amber:');
-    if (canOpenAmber) return true;
-    
-    const canOpenNostrSigner = await Linking.canOpenURL('nostrsigner:');
-    return canOpenNostrSigner;
+    // This will check if the app can handle the nostrsigner: URI scheme
+    const canOpen = await Linking.canOpenURL('nostrsigner:');
+    return canOpen;
   } catch (error) {
     console.error('Error checking if Amber is installed:', error);
     return false;
@@ -50,17 +47,9 @@ const requestAuthentication = async () => {
     const eventJson = JSON.stringify(authEvent);
     const encodedEvent = encodeURIComponent(eventJson);
     
-    // Create the URI with the appropriate scheme and add callback URL
+    // Create the URI with the nostrsigner scheme and add callback URL
     const callbackUrl = encodeURIComponent('runstr://callback');
-    
-    // Try the newer amber: scheme first, then fall back to nostrsigner:
-    let amberUri;
-    const canOpenAmber = await Linking.canOpenURL('amber:');
-    if (canOpenAmber) {
-      amberUri = `amber:sign?event=${encodedEvent}&callback=${callbackUrl}`;
-    } else {
-      amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}`;
-    }
+    const amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}`;
     
     console.log('Opening Amber with URI:', amberUri);
     
@@ -72,26 +61,17 @@ const requestAuthentication = async () => {
   } catch (error) {
     console.error('Error authenticating with Amber:', error);
     if (error.message && error.message.includes('Activity not found')) {
-      console.error('Amber app not found or not responding. Please ensure Amber is installed.');
-      return {
-        success: false,
-        error: 'AMBER_NOT_INSTALLED',
-        message: 'Amber app not found. Please install Amber from the Google Play Store.'
-      };
+      console.error('Amber app not found or not responding');
+      return false;
     }
-    
-    return {
-      success: false,
-      error: 'AUTHENTICATION_FAILED',
-      message: error.message || 'Failed to authenticate with Amber'
-    };
+    return false;
   }
 };
 
 /**
  * Sign an event using Amber
  * @param {Object} event - The event to sign
- * @returns {Promise<Object|boolean>} Success status or error object
+ * @returns {Promise<boolean>} Success status
  */
 const signEvent = async (event) => {
   if (Platform.OS !== 'android') {
@@ -103,11 +83,7 @@ const signEvent = async (event) => {
     // Make sure event has required fields
     if (!event.kind || !event.content) {
       console.error('Invalid event object for signing');
-      return {
-        success: false,
-        error: 'INVALID_EVENT',
-        message: 'Event must have kind and content fields'
-      };
+      return false;
     }
     
     // Ensure created_at is set
@@ -119,17 +95,9 @@ const signEvent = async (event) => {
     const eventJson = JSON.stringify(event);
     const encodedEvent = encodeURIComponent(eventJson);
     
-    // Create the URI with the appropriate scheme and add callback URL
+    // Create the URI with the nostrsigner scheme and add callback URL
     const callbackUrl = encodeURIComponent('runstr://callback');
-    
-    // Try the newer amber: scheme first, then fall back to nostrsigner:
-    let amberUri;
-    const canOpenAmber = await Linking.canOpenURL('amber:');
-    if (canOpenAmber) {
-      amberUri = `amber:sign?event=${encodedEvent}&callback=${callbackUrl}`;
-    } else {
-      amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}`;
-    }
+    const amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}`;
     
     console.log('Opening Amber to sign event');
     
@@ -140,21 +108,11 @@ const signEvent = async (event) => {
     return true;
   } catch (error) {
     console.error('Error signing with Amber:', error);
-    
     if (error.message && error.message.includes('Activity not found')) {
       console.error('Amber app not found or not responding');
-      return {
-        success: false,
-        error: 'AMBER_NOT_INSTALLED',
-        message: 'Amber app not found. Please install Amber from the Google Play Store.'
-      };
+      return false;
     }
-    
-    return {
-      success: false,
-      error: 'SIGNING_FAILED',
-      message: error.message || 'Failed to sign event with Amber'
-    };
+    return false;
   }
 };
 
@@ -174,20 +132,8 @@ const setupDeepLinkHandling = (callback) => {
     if (url && url.startsWith('runstr://callback')) {
       try {
         // Parse the URL to get the response
-        // Try using the URL constructor first
-        let response;
-        try {
-          const urlObj = new URL(url);
-          response = urlObj.searchParams.get('response');
-        } catch (urlError) {
-          // If URL constructor fails, fall back to manual parsing
-          const queryStart = url.indexOf('?');
-          if (queryStart !== -1) {
-            const query = url.substring(queryStart + 1);
-            const params = new URLSearchParams(query);
-            response = params.get('response');
-          }
-        }
+        const urlObj = new URL(url);
+        const response = urlObj.searchParams.get('response');
         
         if (response) {
           try {
@@ -195,45 +141,21 @@ const setupDeepLinkHandling = (callback) => {
             const decodedResponse = decodeURIComponent(response);
             const parsedResponse = JSON.parse(decodedResponse);
             
-            console.log('Successfully parsed Amber response:', parsedResponse);
-            
-            // Handle potential permission errors
-            if (parsedResponse.error) {
-              console.error('Amber response contains an error:', parsedResponse.error);
-              callback({ 
-                error: parsedResponse.error,
-                message: parsedResponse.message || 'Unknown Amber error'
-              });
-              return;
-            }
+            console.log('Successfully parsed Amber response');
             
             // Call the callback with the parsed response
             callback(parsedResponse);
-            
-            // If pubkey is present, store it for future use
-            if (parsedResponse.pubkey) {
-              localStorage.setItem('userPublicKey', parsedResponse.pubkey);
-            }
           } catch (error) {
             console.error('Error parsing Amber response JSON:', error);
-            callback({
-              error: 'PARSE_ERROR',
-              message: 'Could not parse response from Amber'
-            });
+            callback(null);
           }
         } else {
           console.error('No response data in callback URL');
-          callback({
-            error: 'NO_RESPONSE',
-            message: 'No response data received from Amber'
-          });
+          callback(null);
         }
       } catch (error) {
         console.error('Error processing callback URL:', error);
-        callback({
-          error: 'CALLBACK_ERROR',
-          message: 'Error processing response from Amber'
-        });
+        callback(null);
       }
     }
   });
@@ -244,28 +166,9 @@ const setupDeepLinkHandling = (callback) => {
   };
 };
 
-/**
- * Check if additional permissions are needed from Amber
- * @returns {Promise<boolean>} Whether additional permissions are needed
- */
-const checkPermissionsNeeded = async () => {
-  // Check if we have a stored public key
-  const storedPubkey = localStorage.getItem('userPublicKey');
-  
-  // If no public key, permissions are definitely needed
-  if (!storedPubkey) {
-    return true;
-  }
-  
-  // Otherwise, assume permissions are granted
-  // (Amber will handle permission revocation on its side)
-  return false;
-};
-
 export default {
   isAmberInstalled,
   requestAuthentication,
   signEvent,
-  setupDeepLinkHandling,
-  checkPermissionsNeeded
+  setupDeepLinkHandling
 }; 
