@@ -20,12 +20,13 @@
 .controls {
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 16px;
   margin: 15px 0;
+  flex-wrap: wrap;
 }
 
 .controlButton {
-  padding: 10px 20px;
+  padding: 10px;
   background-color: #646cff;
   color: white;
   border: none;
@@ -33,15 +34,16 @@
   cursor: pointer;
   transition: all 0.2s ease;
   font-weight: 500;
-  min-width: 100px;
+  min-width: 48px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .buttonText {
-  margin-left: 8px;
-  font-size: 14px;
+  display: none;
 }
 
 .controlButton:hover {
@@ -183,8 +185,10 @@
 
 @media (max-width: 768px) {
   .controlButton {
-    min-width: 80px;
-    padding: 8px 16px;
+    min-width: 40px;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
   }
   
   .upcomingTracks {

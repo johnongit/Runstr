@@ -152,39 +152,29 @@ export function MusicPlayer() {
       
       <div className={styles.title}>
         <p>Selected Playlist: {playlist?.title || 'Unknown'}</p>
-        <p>Selected Track: {currentTrack.title}</p>
       </div>
       <div className={styles.controls}>
         <button onClick={playPrevious} className={styles.controlButton}>
           <div className="icon-container">
             <div className="icon-prev"></div>
-            <span className={styles.buttonText}>Previous</span>
           </div>
         </button>
         <button onClick={safeTogglePlay} className={styles.controlButton}>
           <div className="icon-container">
             {isPlaying ? 
-              <>
-                <div className="icon-pause"></div>
-                <span className={styles.buttonText}>Pause</span>
-              </> : 
-              <>
-                <div className="icon-play"></div>
-                <span className={styles.buttonText}>Play</span>
-              </>
+              <div className="icon-pause"></div> : 
+              <div className="icon-play"></div>
             }
           </div>
         </button>
         <button onClick={playNext} className={styles.controlButton}>
           <div className="icon-container">
             <div className="icon-next"></div>
-            <span className={styles.buttonText}>Next</span>
           </div>
         </button>
         <button onClick={handleZapArtist} className={`${styles.controlButton} ${styles.zapButton}`} disabled={zapStatus.loading}>
           <div className="icon-container">
             <div className="icon-zap">⚡</div>
-            <span className={styles.buttonText}>Zap</span>
           </div>
         </button>
       </div>

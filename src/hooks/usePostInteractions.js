@@ -127,6 +127,15 @@ export const usePostInteractions = ({
     }
 
     try {
+      // Check wallet connection first if possible
+      if (wallet.checkConnection) {
+        const isConnected = await wallet.checkConnection();
+        if (!isConnected) {
+          alert('Wallet connection lost. Please reconnect your wallet in the NWC tab.');
+          return;
+        }
+      }
+
       // Check if author has Lightning address
       if (!post.author.lud16 && !post.author.lud06) {
         alert('This user has not set up their Lightning address');
@@ -162,52 +171,101 @@ export const usePostInteractions = ({
         zapEndpoint = lnurl;
       }
       
-      // Get LNURL-pay metadata
-      const response = await fetch(zapEndpoint);
-      const lnurlPayData = await response.json();
+      // Get LNURL-pay metadata with timeout handling
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 10000);
       
-      if (!lnurlPayData.callback) {
-        throw new Error('Invalid LNURL-pay response');
-      }
-      
-      // Construct callback URL
-      const callbackUrl = new URL(lnurlPayData.callback);
-      callbackUrl.searchParams.append('amount', defaultZapAmount * 1000);
-      callbackUrl.searchParams.append('nostr', JSON.stringify(signedEvent));
-      
-      if (lnurlPayData.commentAllowed) {
-        callbackUrl.searchParams.append('comment', 'Zap for your run! ⚡️');
-      }
-      
-      // Get invoice
-      const invoiceResponse = await fetch(callbackUrl);
-      const invoiceData = await invoiceResponse.json();
-      
-      if (!invoiceData.pr) {
-        throw new Error('Invalid LNURL-pay response');
-      }
-      
-      // Pay invoice using wallet
-      await wallet.makePayment(invoiceData.pr);
-      
-      // Update UI optimistically
-      setPosts(currentPosts => 
-        currentPosts.map(p => {
-          if (p.id === post.id) {
-            return {
-              ...p,
-              zaps: (p.zaps || 0) + 1,
-              zapAmount: (p.zapAmount || 0) + defaultZapAmount
-            };
+      try {
+        // Fetch with timeout
+        const response = await fetch(zapEndpoint, { 
+          signal: abortController.signal 
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Payment endpoint error: ${response.status} ${response.statusText}`);
+        }
+        
+        // Parse response with error handling
+        let lnurlPayData;
+        try {
+          lnurlPayData = await response.json();
+        } catch (error) {
+          throw new Error('Invalid response from payment server. Please try again.');
+        }
+        
+        if (!lnurlPayData.callback) {
+          throw new Error('Invalid LNURL-pay response');
+        }
+        
+        // Construct callback URL
+        const callbackUrl = new URL(lnurlPayData.callback);
+        callbackUrl.searchParams.append('amount', defaultZapAmount * 1000);
+        callbackUrl.searchParams.append('nostr', JSON.stringify(signedEvent));
+        
+        if (lnurlPayData.commentAllowed) {
+          callbackUrl.searchParams.append('comment', 'Zap for your run! ⚡️');
+        }
+        
+        // Get invoice with timeout
+        const invoiceAbortController = new AbortController();
+        const invoiceTimeoutId = setTimeout(() => invoiceAbortController.abort(), 10000);
+        
+        try {
+          const invoiceResponse = await fetch(callbackUrl, {
+            signal: invoiceAbortController.signal
+          });
+          clearTimeout(invoiceTimeoutId);
+          
+          if (!invoiceResponse.ok) {
+            throw new Error(`Invoice request failed: ${invoiceResponse.status} ${invoiceResponse.statusText}`);
           }
-          return p;
-        })
-      );
-      
-      alert('Zap sent successfully! ⚡️');
+          
+          // Parse invoice data with error handling
+          let invoiceData;
+          try {
+            invoiceData = await invoiceResponse.json();
+          } catch (error) {
+            throw new Error('Failed to parse invoice response. Please try again.');
+          }
+          
+          if (!invoiceData.pr) {
+            throw new Error('Invalid LNURL-pay response: missing payment request');
+          }
+          
+          // Pay invoice using wallet
+          await wallet.makePayment(invoiceData.pr);
+          
+          // Update UI optimistically
+          setPosts(currentPosts => 
+            currentPosts.map(p => {
+              if (p.id === post.id) {
+                return {
+                  ...p,
+                  zaps: (p.zaps || 0) + 1,
+                  zapAmount: (p.zapAmount || 0) + defaultZapAmount
+                };
+              }
+              return p;
+            })
+          );
+          
+          alert('Zap sent successfully! ⚡️');
+        } catch (error) {
+          if (error.name === 'AbortError') {
+            throw new Error('Invoice request timed out. Please try again.');
+          }
+          throw error;
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Payment endpoint timed out. Please try again.');
+        }
+        throw error;
+      }
     } catch (error) {
       console.error('Error sending zap:', error);
-      alert('Failed to send zap: ' + error.message);
+      alert('Failed to send zap: ' + (error.message || 'Unknown error'));
     }
   }, [defaultZapAmount, setPosts]);
 
