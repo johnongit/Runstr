@@ -34,7 +34,7 @@
     "@capacitor/android": "^7.0.1",
     "@capacitor/core": "^7.0.1",
     "@getalby/bitcoin-connect": "^3.6.3",
-    "@getalby/sdk": "^3.9.0",
+    "@getalby/sdk": "^5.0.0",
     "@nostr-dev-kit/ndk": "^2.13.0-rc2",
     "boxen": "^8.0.1",
     "chalk": "^4.1.2",

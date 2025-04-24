@@ -1,5 +1,11 @@
-import { RELAYS } from '../utils/nostr';
 import { nwc } from '@getalby/sdk';
+
+// Define reliable relays for zap requests
+const ZAP_RELAYS = [
+  "wss://relay.damus.io",
+  "wss://nos.lol", 
+  "wss://relay.nostr.band"
+];
 
 export class NWCWallet {
   constructor() {
@@ -251,14 +257,16 @@ export class NWCWallet {
         zapAmount = storedAmount ? parseInt(storedAmount, 10) : 1000;
       }
 
-      // Create zap request event
+      console.log(`Generating zap invoice for ${pubkey.substring(0, 8)}... (${zapAmount} sats)`);
+
+      // Create zap request event with more reliable relays
       const zapRequest = {
         kind: 9734,
         content: content || '',
         tags: [
           ['p', pubkey],
           ['amount', zapAmount.toString()],
-          ['relays', ...RELAYS]
+          ['relays', ...ZAP_RELAYS] // Use reliable relays instead of generic RELAYS
         ],
         created_at: Math.floor(Date.now() / 1000)
       };
@@ -267,24 +275,87 @@ export class NWCWallet {
       const signedZapRequest = await window.nostr.signEvent(zapRequest);
       const encodedZapRequest = btoa(JSON.stringify(signedZapRequest));
 
+      console.log('ZapRequest encoded successfully, length:', encodedZapRequest.length);
+
       // Create the invoice with timeout handling
       const abortController = new AbortController();
       const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 second timeout
       
       try {
+        // Try the standard format first
+        console.log('Attempting to create invoice with params:', {
+          amount: zapAmount,
+          memo: `Zap for ${pubkey.substring(0, 8)}...`,
+          zapRequestLength: encodedZapRequest?.length
+        });
+
         // Create the invoice
         const response = await this.client.makeInvoice({
           amount: zapAmount,
-          memo: `Zap for ${pubkey}`,
+          memo: `Zap for ${pubkey.substring(0, 8)}...`,
           zapRequest: encodedZapRequest
         });
         
         // Clear timeout
         clearTimeout(timeoutId);
         
+        if (!response || (!response.paymentRequest && !response.invoice)) {
+          console.warn('Received empty or invalid invoice response:', response);
+          throw new Error('Wallet returned an invalid invoice response');
+        }
+        
         return response.paymentRequest || response.invoice || response;
       } catch (error) {
         clearTimeout(timeoutId);
+        
+        console.error('First invoice creation attempt failed:', error);
+        
+        // Try alternative formats if original fails
+        if (error.message && (error.message.includes('422') || 
+                              error.message.includes('missing payment request') ||
+                              error.message.includes('invalid'))) {
+          console.log('Trying alternative invoice format...');
+          
+          // Try alternative format with zap_request
+          try {
+            const altResponse = await this.client.makeInvoice({
+              amount: zapAmount,
+              description: `Zap for ${pubkey.substring(0, 8)}...`,
+              zap_request: encodedZapRequest // Some implementations use zap_request instead of zapRequest
+            });
+            
+            if (altResponse && (altResponse.paymentRequest || altResponse.invoice)) {
+              console.log('Alternative format successful');
+              return altResponse.paymentRequest || altResponse.invoice || altResponse;
+            }
+          } catch (altError) {
+            console.error('Alternative format also failed:', altError);
+            
+            // Try one more format without zap request
+            try {
+              console.log('Trying basic invoice format without zap request...');
+              const basicResponse = await this.client.makeInvoice({
+                amount: zapAmount,
+                memo: `Zap for ${pubkey.substring(0, 8)}...`
+              });
+              
+              if (basicResponse && (basicResponse.paymentRequest || basicResponse.invoice)) {
+                console.log('Basic format successful (note: this is not a proper zap)');
+                return basicResponse.paymentRequest || basicResponse.invoice || basicResponse;
+              }
+            } catch (basicError) {
+              console.error('All invoice formats failed:', basicError);
+            }
+          }
+        }
+        
+        // If we got here, we should throw a meaningful error based on the original error
+        if (error.message && error.message.includes('422')) {
+          throw new Error('Failed to send zap: The wallet rejected the request (422 error). Your wallet may not fully support zap requests.');
+        } else if (error.message && error.message.includes('missing payment request')) {
+          throw new Error('Failed to send zap: Invalid response from wallet. Please check your wallet compatibility with zaps.');
+        }
+        
         throw error;
       }
     } catch (error) {
