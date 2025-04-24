@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { NWCWallet } from '../services/nwcWallet';
+import { AlbyWallet } from '../services/albyWallet';
 
 // Connection states
 export const CONNECTION_STATES = {
@@ -38,7 +38,7 @@ export const WalletProvider = ({ children }) => {
 
   // Initialize wallet instance
   useEffect(() => {
-    const walletInstance = new NWCWallet();
+    const walletInstance = new AlbyWallet();
     setWallet(walletInstance);
     
     // Try to reconnect using saved credentials
@@ -208,17 +208,18 @@ export const WalletProvider = ({ children }) => {
 
   /**
    * Generate a zap invoice for the given amount
+   * @param {string} pubkey - Pubkey to zap
    * @param {number} amount - Amount in sats
    * @param {string} comment - Optional comment for the invoice
    */
-  const generateZapInvoice = useCallback(async (amount, comment = '') => {
+  const generateZapInvoice = useCallback(async (pubkey, amount, comment = '') => {
     if (!wallet) throw new Error('Wallet not initialized');
     
     try {
       const connected = await ensureConnected();
       if (!connected) throw new Error('Wallet not connected');
       
-      const invoice = await wallet.generateZapInvoice(null, amount, comment);
+      const invoice = await wallet.generateZapInvoice(pubkey, amount, comment);
       return invoice;
     } catch (err) {
       console.error('Failed to generate zap invoice:', err);

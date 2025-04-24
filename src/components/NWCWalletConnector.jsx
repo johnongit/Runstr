@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { NostrContext } from '../contexts/NostrContext';
-import { NWCWallet } from '../services/nwcWallet';
+import { AlbyWallet } from '../services/albyWallet';
 
 export const NWCWalletConnector = () => {
   const { wallet, setWallet } = useAuth();
@@ -28,27 +28,27 @@ export const NWCWalletConnector = () => {
         return connected;
       } else {
         // If no provider exists, create a new one and try to connect
-        const nwcWallet = new NWCWallet();
-        const connected = await nwcWallet.ensureConnected();
+        const albyWallet = new AlbyWallet();
+        const connected = await albyWallet.ensureConnected();
         
         if (connected) {
           setWallet({
-            provider: nwcWallet,
-            isEnabled: () => nwcWallet.isConnected,
+            provider: albyWallet,
+            isEnabled: () => albyWallet.isConnected,
             makePayment: async (invoice) => {
-              return await nwcWallet.makePayment(invoice);
+              return await albyWallet.makePayment(invoice);
             },
             sendPayment: async (invoice) => {
-              return await nwcWallet.makePayment(invoice);
+              return await albyWallet.makePayment(invoice);
             },
             getBalance: async () => {
-              return await nwcWallet.getBalance();
+              return await albyWallet.getBalance();
             },
             generateZapInvoice: async (pubkey, amount, content) => {
-              return await nwcWallet.generateZapInvoice(pubkey, amount, content);
+              return await albyWallet.generateZapInvoice(pubkey, amount, content);
             },
             checkConnection: async () => {
-              return await nwcWallet.checkConnection();
+              return await albyWallet.checkConnection();
             }
           });
           setIsConnected(true);
@@ -116,36 +116,28 @@ export const NWCWalletConnector = () => {
     setConnectionError('');
     
     try {
-      const nwcWallet = new NWCWallet();
-      const connected = await nwcWallet.connect(connectionInput);
+      const albyWallet = new AlbyWallet();
+      const connected = await albyWallet.connect(connectionInput);
       
       if (connected) {
-        // Save connection string based on the type of connection
-        if (connectionInput.startsWith('https://')) {
-          localStorage.setItem('nwcAuthUrl', connectionInput);
-        } else if (connectionInput.startsWith('nostr+walletconnect://')) {
-          localStorage.setItem('nwcConnectionString', connectionInput);
-        }
-        
         // Set up wallet in context
         setWallet({
-          provider: nwcWallet,
-          isEnabled: () => nwcWallet.isConnected,
+          provider: albyWallet,
+          isEnabled: () => albyWallet.isConnected,
           makePayment: async (invoice) => {
-            return await nwcWallet.makePayment(invoice);
+            return await albyWallet.makePayment(invoice);
           },
           sendPayment: async (invoice) => {
-            return await nwcWallet.makePayment(invoice);
+            return await albyWallet.makePayment(invoice);
           },
           getBalance: async () => {
-            return await nwcWallet.getBalance();
+            return await albyWallet.getBalance();
           },
           generateZapInvoice: async (pubkey, amount, content) => {
-            return await nwcWallet.generateZapInvoice(pubkey, amount, content);
+            return await albyWallet.generateZapInvoice(pubkey, amount, content);
           },
-          // Add connection check method
           checkConnection: async () => {
-            return await nwcWallet.checkConnection();
+            return await albyWallet.checkConnection();
           }
         });
         
@@ -154,7 +146,7 @@ export const NWCWalletConnector = () => {
       }
       return false;
     } catch (err) {
-      console.error('Failed to connect NWC wallet:', err);
+      console.error('Failed to connect wallet:', err);
       setConnectionError(err.message || 'Failed to connect to wallet');
       
       return false;
@@ -308,7 +300,7 @@ export const NWCWalletConnector = () => {
       let lnurlPayData;
       try {
         lnurlPayData = await response.json();
-      } catch (err) {
+      } catch {
         throw new Error('Invalid response from payment endpoint. Please try again.');
       }
 
@@ -363,7 +355,7 @@ export const NWCWalletConnector = () => {
       let invoiceData;
       try {
         invoiceData = await invoiceResponse.json();
-      } catch (err) {
+      } catch {
         throw new Error('Failed to parse invoice response. Please try again.');
       }
 
@@ -371,7 +363,7 @@ export const NWCWalletConnector = () => {
         throw new Error('Invalid LNURL-pay response: missing payment request');
       }
 
-      // Pay using the NWC wallet
+      // Pay using the wallet
       await wallet.makePayment(invoiceData.pr);
 
       setDonationStatus({ message: `Successfully donated ${defaultZapAmount} sats to ${name}! ⚡️`, isError: false });
