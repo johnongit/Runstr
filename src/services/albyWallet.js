@@ -1,4 +1,4 @@
-import { LN, nwc, NostrEvent } from '@getalby/sdk';
+import { LN, nwc } from '@getalby/sdk';
 
 /**
  * AlbyWallet class provides a complete wallet implementation using
@@ -291,8 +291,8 @@ export class AlbyWallet {
         "wss://relay.nostr.band"
       ];
 
-      // Create zap request event
-      const zapRequest = new NostrEvent({
+      // Create zap request event as a plain object instead of using NostrEvent
+      const zapRequest = {
         kind: 9734,
         content: content || '',
         tags: [
@@ -301,12 +301,13 @@ export class AlbyWallet {
           ['relays', ...relays]
         ],
         created_at: Math.floor(Date.now() / 1000)
-      });
+      };
 
       // Sign the zap request using window.nostr if available
       let encodedZapRequest;
       if (window.nostr) {
-        const signedZapRequest = await window.nostr.signEvent(zapRequest.toObject());
+        // No need to call toObject() since it's already a plain object
+        const signedZapRequest = await window.nostr.signEvent(zapRequest);
         encodedZapRequest = btoa(JSON.stringify(signedZapRequest));
       } else {
         // Handle case where window.nostr is not available (fallback)
