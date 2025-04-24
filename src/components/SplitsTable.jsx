@@ -37,6 +37,11 @@ const SplitsTable = ({ splits, distanceUnit = 'km' }) => {
     return null;
   }
 
+  // Determine the type of splits we have
+  // RunTracker splits have km, time, pace
+  // runCalculations splits have pace, duration, distance
+  const isRunTrackerSplits = 'km' in splits[0] && 'time' in splits[0];
+
   return (
     <div className="w-full">
       <div className="overflow-x-auto max-w-full pb-2">
@@ -65,13 +70,22 @@ const SplitsTable = ({ splits, distanceUnit = 'km' }) => {
           </thead>
           <tbody className="divide-y divide-gray-700">
             {splits.map((split, index) => {
-              // Calculate individual split time rather than using cumulative time
-              const prevSplitTime = index > 0 ? splits[index - 1].time : 0;
-              const splitTime = split.time - prevSplitTime;
+              let splitTime;
+              let paceMinutes;
               
-              // Calculate the pace based on the individual split time
-              // For a standard unit (1km or 1mi), pace is just the time it took to complete that unit
-              const paceMinutes = splitTime / 60; // Convert seconds to minutes
+              if (isRunTrackerSplits) {
+                // Calculate individual split time rather than using cumulative time
+                const prevSplitTime = index > 0 ? splits[index - 1].time : 0;
+                splitTime = split.time - prevSplitTime;
+                
+                // Calculate the pace based on the individual split time
+                // For a standard unit (1km or 1mi), pace is just the time it took to complete that unit
+                paceMinutes = splitTime / 60; // Convert seconds to minutes
+              } else {
+                // For splits from runCalculations
+                splitTime = split.duration; // duration is already in seconds
+                paceMinutes = split.pace; // Already in minutes per unit
+              }
               
               return (
                 <tr key={index} className="hover:bg-gray-700">
@@ -106,8 +120,12 @@ const SplitsTable = ({ splits, distanceUnit = 'km' }) => {
 SplitsTable.propTypes = {
   splits: PropTypes.arrayOf(
     PropTypes.shape({
-      time: PropTypes.number.isRequired,
-      pace: PropTypes.number.isRequired
+      // Allow both types of split data
+      time: PropTypes.number,
+      pace: PropTypes.number,
+      km: PropTypes.number,
+      duration: PropTypes.number,
+      distance: PropTypes.number
     })
   ),
   distanceUnit: PropTypes.oneOf(['km', 'mi'])

@@ -337,6 +337,16 @@ class RunTracker extends EventEmitter {
       this.pace = runDataService.calculatePace(this.distance, this.duration, this.getDistanceUnit());
     }
     
+    // If we have positions but no splits, calculate them now as a fallback
+    if (this.positions.length > 0 && (!this.splits || this.splits.length === 0)) {
+      // Use the RunDataService to calculate splits
+      const stats = runDataService.calculateStats(this.positions, this.duration);
+      if (stats.splits && stats.splits.length > 0) {
+        this.splits = stats.splits;
+        console.log(`Generated ${this.splits.length} splits on run completion`);
+      }
+    }
+    
     // Create the final run data object
     const finalResults = {
       distance: this.distance,

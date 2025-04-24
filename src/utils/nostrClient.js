@@ -33,6 +33,15 @@ export const setAmberUserPubkey = (pubkey) => {
   if (pubkey && typeof pubkey === 'string') {
     amberUserPubkey = pubkey;
     console.log('Set Amber user pubkey:', pubkey);
+    
+    // Store in localStorage for persistence
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('userPublicKey', pubkey);
+      localStorage.setItem('permissionsGranted', 'true');
+      console.log('Saved Amber pubkey to localStorage');
+    }
+  } else {
+    console.error('Invalid pubkey provided to setAmberUserPubkey:', pubkey);
   }
 };
 

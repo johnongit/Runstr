@@ -2,6 +2,7 @@ import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NostrContext } from '../contexts/NostrContext';
+import { useAuth } from '../hooks/useAuth';
 import { getLnurlForTrack } from '../utils/wavlake';
 
 export const FloatingMusicPlayer = () => {
@@ -13,7 +14,8 @@ export const FloatingMusicPlayer = () => {
     playPrevious
   } = useAudioPlayer();
   
-  const { defaultZapAmount, wallet } = useContext(NostrContext);
+  const { defaultZapAmount } = useContext(NostrContext);
+  const { wallet } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [zapStatus, setZapStatus] = useState({ loading: false, success: false, error: null });
   const navigate = useNavigate();

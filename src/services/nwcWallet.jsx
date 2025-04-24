@@ -1,5 +1,3 @@
-import { getPublicKey } from 'nostr-tools';
-import * as secp256k1 from '@noble/secp256k1';
 import { nwc } from '@getalby/sdk';
 import { RELAYS } from '../utils/nostr';
 
@@ -39,16 +37,45 @@ export class NWCWallet {
 
   async makePayment(paymentRequest) {
     try {
+      // Check if wallet is connected
       if (!this.client || !this.isConnected) {
         throw new Error('Wallet not connected');
       }
 
+      // Validate the payment request format
+      if (!paymentRequest || typeof paymentRequest !== 'string') {
+        throw new Error('Invalid payment request format');
+      }
+
+      // Make the payment
       const response = await this.client.payInvoice({
         invoice: paymentRequest
       });
       
+      // Ensure we have a proper response
+      if (!response) {
+        throw new Error('Empty response from wallet');
+      }
+      
       return response;
     } catch (error) {
+      // Handle JSON parsing errors specifically
+      if (error.message && error.message.includes('JSON')) {
+        console.error('JSON parsing error in payment:', error);
+        throw new Error('Failed to process wallet response. Please reconnect your wallet.');
+      }
+      
+      // Handle connection errors
+      if (error.message && (
+          error.message.includes('connection') || 
+          error.message.includes('connect') ||
+          error.message.includes('timeout')
+      )) {
+        this.isConnected = false;
+        console.error('Connection error in payment:', error);
+        throw new Error('Wallet connection lost. Please reconnect your wallet.');
+      }
+      
       console.error('Payment error:', error);
       throw error;
     }

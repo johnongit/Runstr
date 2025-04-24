@@ -3,6 +3,8 @@
  * Centralized service for handling run data throughout the application
  */
 
+import { calculateStats as calculateRunStats } from '../utils/runCalculations';
+
 // Define activity types as constants for consistency across the app
 export const ACTIVITY_TYPES = {
   RUN: 'run',
@@ -225,6 +227,16 @@ class RunDataService {
     } else {
       return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
     }
+  }
+
+  /**
+   * Calculate workout statistics from position data
+   * @param {Array} positions - Array of GPS positions
+   * @param {number} elapsedTime - Optional total elapsed time in seconds
+   * @returns {Object} Calculated statistics including distance, pace, and splits
+   */
+  calculateStats(positions, elapsedTime = null) {
+    return calculateRunStats(positions, elapsedTime);
   }
 
   /**

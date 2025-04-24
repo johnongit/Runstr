@@ -4,7 +4,7 @@ import { NostrContext } from '../contexts/NostrContext';
 import { NWCWallet } from '../services/nwcWallet';
 
 export const NWCWalletConnector = () => {
-  const { setWallet } = useAuth();
+  const { wallet, setWallet } = useAuth();
   const { defaultZapAmount, updateDefaultZapAmount } = useContext(NostrContext);
   const [nwcUrl, setNwcUrl] = useState('');
   const [connecting, setConnecting] = useState(false);
@@ -79,8 +79,8 @@ export const NWCWalletConnector = () => {
 
   const handleDisconnect = async () => {
     try {
-      if (useAuth().wallet?.provider) {
-        await useAuth().wallet.provider.disconnect();
+      if (wallet?.provider) {
+        await wallet.provider.disconnect();
       }
       setWallet(null);
       setIsConnected(false);
@@ -90,6 +90,32 @@ export const NWCWalletConnector = () => {
       console.error('Error disconnecting wallet:', error);
     }
   };
+
+  // Added function to check wallet connection status
+  const checkWalletConnection = async () => {
+    const savedNwcUrl = localStorage.getItem('nwcConnectionString');
+    if (savedNwcUrl && !isConnected) {
+      console.log('Reconnecting wallet from saved connection');
+      await connectWallet(savedNwcUrl);
+    }
+  };
+
+  // Add effect to recheck connection when the component is focused
+  useEffect(() => {
+    // Check connection initially
+    checkWalletConnection();
+    
+    // Add event listeners for visibility change to recheck connection when tab is focused
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        checkWalletConnection();
+      }
+    });
+    
+    return () => {
+      document.removeEventListener('visibilitychange', () => {});
+    };
+  }, []);
 
   const handleUpdateZapAmount = () => {
     if (zapAmountInput && parseInt(zapAmountInput, 10) > 0) {
@@ -102,7 +128,7 @@ export const NWCWalletConnector = () => {
   };
 
   const handleDonate = async (lightning, name) => {
-    if (!useAuth().wallet) {
+    if (!wallet) {
       setDonationStatus({ 
         message: 'Wallet not connected. Please connect your wallet first.', 
         isError: true 
@@ -167,7 +193,7 @@ export const NWCWalletConnector = () => {
       }
 
       // Pay using the NWC wallet
-      await useAuth().wallet.makePayment(invoiceData.pr);
+      await wallet.makePayment(invoiceData.pr);
 
       setDonationStatus({ message: `Successfully donated ${defaultZapAmount} sats to ${name}! ⚡️`, isError: false });
       setTimeout(() => {
