@@ -4,7 +4,12 @@ import { createContext } from 'react';
 export const NostrContext = createContext({
   publicKey: null,
   isNostrReady: false,
+  isAmberAvailable: false,
   requestNostrPermissions: async () => false,
+  signEvent: async () => { throw new Error('Not implemented') },
   defaultZapAmount: 1000,
-  updateDefaultZapAmount: () => {}
+  updateDefaultZapAmount: () => {},
+  authError: null,
+  clearAuthError: () => {},
+  isAuthenticating: false
 });
