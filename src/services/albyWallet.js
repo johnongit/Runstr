@@ -161,7 +161,7 @@ export class AlbyWallet {
       
       return false;
     } catch (error) {
-      console.error('Failed to reconnect wallet:', error);
+      console.error('[AlbyWallet] Failed to reconnect wallet:', error);
       return false;
     }
   }
@@ -172,9 +172,31 @@ export class AlbyWallet {
    */
   async getInfo() {
     try {
-      return await this.nwcClient.getInfo();
+      if (!this.nwcClient) {
+        console.error('[AlbyWallet] No NWC client available for getInfo');
+        throw new Error('Wallet not initialized');
+      }
+      
+      // Some implementations don't support getInfo, so we handle that case
+      try {
+        const info = await this.nwcClient.getInfo();
+        console.log('[AlbyWallet] Wallet info retrieved:', info);
+        return info;
+      } catch (error) {
+        // If getInfo failed, try to use getBalance as an alternative way to check connection
+        console.warn('[AlbyWallet] getInfo failed, trying getBalance instead:', error);
+        const balance = await this.nwcClient.getBalance();
+        
+        // If we get here, the connection is working even though getInfo failed
+        console.log('[AlbyWallet] Connection confirmed via getBalance');
+        return { 
+          fallback: true, 
+          message: 'This wallet implementation does not support getInfo, but connection is confirmed',
+          balance: balance
+        };
+      }
     } catch (error) {
-      console.error('Get wallet info error:', error);
+      console.error('[AlbyWallet] Get wallet info error:', error);
       throw error;
     }
   }
@@ -205,12 +227,16 @@ export class AlbyWallet {
    */
   async makePayment(invoice) {
     try {
+      console.log('[AlbyWallet] Making payment for invoice:', invoice.substring(0, 30) + '...');
+      
       if (!await this.ensureConnected()) {
+        console.error('[AlbyWallet] Wallet not connected');
         throw new Error('Wallet not connected');
       }
 
       // Validate invoice
       if (!invoice || typeof invoice !== 'string') {
+        console.error('[AlbyWallet] Invalid invoice format');
         throw new Error('Invalid invoice format');
       }
 
@@ -220,21 +246,28 @@ export class AlbyWallet {
       
       try {
         // Use the LN client for better payment experience
+        console.log('[AlbyWallet] Attempting payment with LN client');
         const response = await this.lnClient.pay(invoice);
         clearTimeout(timeoutId);
+        console.log('[AlbyWallet] Payment successful with LN client:', response);
         return response;
       } catch (error) {
         clearTimeout(timeoutId);
         
         // If LN client fails, fallback to NWC client
+        console.error('[AlbyWallet] LN client payment failed:', error);
+        
         if (error.message?.includes('timeout') || error.name === 'AbortError') {
-          console.warn('LN client payment timeout, using NWC client instead');
-          return await this.nwcClient.payInvoice({ invoice });
+          console.warn('[AlbyWallet] LN client payment timeout, using NWC client instead');
+          console.log('[AlbyWallet] Attempting payment with NWC client');
+          const nwcResponse = await this.nwcClient.payInvoice({ invoice });
+          console.log('[AlbyWallet] Payment successful with NWC client:', nwcResponse);
+          return nwcResponse;
         }
         throw error;
       }
     } catch (error) {
-      console.error('Payment error:', error);
+      console.error('[AlbyWallet] Payment error:', error);
       throw error;
     }
   }
@@ -276,11 +309,15 @@ export class AlbyWallet {
    */
   async generateZapInvoice(pubkey, amount, content = '') {
     try {
+      console.log(`[AlbyWallet] Generating zap invoice for ${pubkey.substring(0, 8)}... (${amount} sats)`);
+      
       if (!await this.ensureConnected()) {
+        console.error('[AlbyWallet] Wallet not connected');
         throw new Error('Wallet not connected');
       }
 
       if (!pubkey) {
+        console.error('[AlbyWallet] Pubkey is required for zap invoice');
         throw new Error('Pubkey is required for zap invoice');
       }
 
@@ -298,14 +335,25 @@ export class AlbyWallet {
         created_at: Math.floor(Date.now() / 1000)
       };
 
+      console.log('[AlbyWallet] Created zap request:', JSON.stringify(zapRequest));
+
       // Sign the zap request using window.nostr if available
       let encodedZapRequest;
       if (window.nostr) {
         // No need to call toObject() since it's already a plain object
-        const signedZapRequest = await window.nostr.signEvent(zapRequest);
-        encodedZapRequest = btoa(JSON.stringify(signedZapRequest));
+        console.log('[AlbyWallet] Signing zap request with window.nostr');
+        try {
+          const signedZapRequest = await window.nostr.signEvent(zapRequest);
+          console.log('[AlbyWallet] Signed zap request:', JSON.stringify(signedZapRequest));
+          encodedZapRequest = btoa(JSON.stringify(signedZapRequest));
+          console.log('[AlbyWallet] Encoded zap request (length):', encodedZapRequest.length);
+        } catch (signError) {
+          console.error('[AlbyWallet] Error signing zap request:', signError);
+          throw new Error(`Failed to sign zap request: ${signError.message || 'Unknown error'}`);
+        }
       } else {
         // Handle case where window.nostr is not available (fallback)
+        console.error('[AlbyWallet] window.nostr not available');
         throw new Error('Nostr extension not available for signing zap request');
       }
 
@@ -315,6 +363,7 @@ export class AlbyWallet {
       
       try {
         // Try standard format first
+        console.log('[AlbyWallet] Making invoice with standard format');
         const response = await this.nwcClient.makeInvoice({
           amount: amount * 1000, // Convert to msats
           memo: `Zap for ${pubkey.substring(0, 8)}...`,
@@ -322,36 +371,57 @@ export class AlbyWallet {
         });
         
         clearTimeout(timeoutId);
+        console.log('[AlbyWallet] Invoice created successfully (standard format):', response);
         return response.paymentRequest || response.invoice || response;
       } catch (error) {
         clearTimeout(timeoutId);
         
+        // Check for HTTP 422 errors, which often indicate permission issues with NWC
+        if (error.message && error.message.includes('422')) {
+          console.error('[AlbyWallet] HTTP 422 error - This often means your wallet service doesn\'t support zaps or has incorrect permissions:', error);
+          
+          // Some NWC services return 422 for ZapRequest but might support regular invoices
+          try {
+            console.log('[AlbyWallet] Trying to generate a regular invoice as fallback');
+            const regularInvoice = await this.generateInvoice(amount, `Zap for ${pubkey.substring(0, 8)}...`);
+            console.log('[AlbyWallet] Regular invoice created as fallback:', regularInvoice);
+            return regularInvoice;
+          } catch (regularInvoiceError) {
+            console.error('[AlbyWallet] Failed to generate regular invoice:', regularInvoiceError);
+            // Continue to other fallbacks
+          }
+        }
+        
         // Try alternative format if the first attempt fails
-        console.error('First zap invoice attempt failed:', error);
+        console.error('[AlbyWallet] First zap invoice attempt failed:', error);
         
         // Try alternative format with zap_request
         try {
+          console.log('[AlbyWallet] Trying alternative format with zap_request');
           const altResponse = await this.nwcClient.makeInvoice({
             amount: amount * 1000,
             description: `Zap for ${pubkey.substring(0, 8)}...`,
             zap_request: encodedZapRequest
           });
           
+          console.log('[AlbyWallet] Invoice created successfully (alternative format):', altResponse);
           return altResponse.paymentRequest || altResponse.invoice || altResponse;
         } catch (altError) {
-          console.error('Alternative format failed:', altError);
+          console.error('[AlbyWallet] Alternative format failed:', altError);
           
           // Last resort: generate a regular invoice without zap request
+          console.log('[AlbyWallet] Trying basic invoice format (without zap request)');
           const basicResponse = await this.nwcClient.makeInvoice({
             amount: amount * 1000,
             memo: `Zap for ${pubkey.substring(0, 8)}...`
           });
           
+          console.log('[AlbyWallet] Invoice created successfully (basic format):', basicResponse);
           return basicResponse.paymentRequest || basicResponse.invoice || basicResponse;
         }
       }
     } catch (error) {
-      console.error('Generate zap invoice error:', error);
+      console.error('[AlbyWallet] Generate zap invoice error:', error);
       throw error;
     }
   }

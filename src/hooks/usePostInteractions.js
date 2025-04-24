@@ -142,6 +142,46 @@ export const usePostInteractions = ({
         return;
       }
 
+      // Log which zap method we're using
+      console.log('[ZapFlow] Starting zap process for post:', post.id);
+      
+      // First, try to use the wallet's built-in generateZapInvoice if it supports that method
+      if (wallet.generateZapInvoice) {
+        try {
+          console.log('[ZapFlow] Wallet supports direct zap method, using wallet.generateZapInvoice');
+          
+          // If the wallet supports direct zapping, use that
+          const invoice = await wallet.generateZapInvoice(post.author.pubkey, defaultZapAmount, 'Zap for your run! ⚡️');
+          console.log('[ZapFlow] Successfully generated zap invoice:', invoice.substring(0, 30) + '...');
+          
+          // Pay the invoice
+          await wallet.makePayment(invoice);
+          
+          // Update UI optimistically
+          setPosts(currentPosts => 
+            currentPosts.map(p => {
+              if (p.id === post.id) {
+                return {
+                  ...p,
+                  zaps: (p.zaps || 0) + 1,
+                  zapAmount: (p.zapAmount || 0) + defaultZapAmount
+                };
+              }
+              return p;
+            })
+          );
+          
+          alert('Zap sent successfully! ⚡️');
+          return; // Exit early as we've successfully sent the zap
+        } catch (zapError) {
+          // If direct zap fails, log error and fall back to manual LNURL flow
+          console.error('[ZapFlow] Direct zap method failed, falling back to LNURL flow:', zapError);
+        }
+      }
+      
+      // Fallback to manual LNURL flow
+      console.log('[ZapFlow] Using manual LNURL-pay flow');
+      
       // Create zap request
       const zapEvent = {
         kind: 9734, // Zap request
@@ -151,12 +191,16 @@ export const usePostInteractions = ({
           ['p', post.author.pubkey],
           ['e', post.id],
           ['amount', (defaultZapAmount * 1000).toString()], // millisats
+          ['r', 'wss://relay.damus.io'],
+          ['r', 'wss://nos.lol'],
+          ['r', 'wss://relay.nostr.band']
         ],
         pubkey: await window.nostr.getPublicKey()
       };
       
       // Sign the event
       const signedEvent = await window.nostr.signEvent(zapEvent);
+      console.log('[ZapFlow] Created and signed zap request event');
       
       // Parse Lightning address
       let zapEndpoint;
@@ -171,16 +215,18 @@ export const usePostInteractions = ({
         zapEndpoint = lnurl;
       }
       
+      console.log('[ZapFlow] Using zap endpoint:', zapEndpoint);
+      
       // Get LNURL-pay metadata with timeout handling
-      const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 10000);
+      const metadataAbortController = new AbortController();
+      const metadataTimeoutId = setTimeout(() => metadataAbortController.abort(), 10000);
       
       try {
         // Fetch with timeout
         const response = await fetch(zapEndpoint, { 
-          signal: abortController.signal 
+          signal: metadataAbortController.signal 
         });
-        clearTimeout(timeoutId);
+        clearTimeout(metadataTimeoutId);
         
         if (!response.ok) {
           throw new Error(`Payment endpoint error: ${response.status} ${response.statusText}`);
@@ -190,7 +236,8 @@ export const usePostInteractions = ({
         let lnurlPayData;
         try {
           lnurlPayData = await response.json();
-        } catch (error) {
+          console.log('[ZapFlow] Received LNURL-pay metadata:', lnurlPayData);
+        } catch {
           throw new Error('Invalid response from payment server. Please try again.');
         }
         
@@ -201,11 +248,27 @@ export const usePostInteractions = ({
         // Construct callback URL
         const callbackUrl = new URL(lnurlPayData.callback);
         callbackUrl.searchParams.append('amount', defaultZapAmount * 1000);
-        callbackUrl.searchParams.append('nostr', JSON.stringify(signedEvent));
+        
+        // Try to keep the Nostr event small to avoid URL size limits
+        // Some LNURL-pay servers have trouble with large nostr events
+        try {
+          const compactEvent = {
+            ...signedEvent,
+            // Minimize the size by only including the essential fields if the event is large
+            tags: signedEvent.tags.filter(tag => ['p', 'e', 'amount', 'r'].includes(tag[0])).slice(0, 10)
+          };
+          callbackUrl.searchParams.append('nostr', JSON.stringify(compactEvent));
+          console.log('[ZapFlow] Added compacted nostr event to callback URL');
+        } catch (jsonError) {
+          console.error('[ZapFlow] Error stringifying nostr event:', jsonError);
+          // If JSON.stringify fails, still try to proceed without the nostr param
+        }
         
         if (lnurlPayData.commentAllowed) {
           callbackUrl.searchParams.append('comment', 'Zap for your run! ⚡️');
         }
+        
+        console.log('[ZapFlow] Callback URL (truncated):', callbackUrl.toString().substring(0, 100) + '...');
         
         // Get invoice with timeout
         const invoiceAbortController = new AbortController();
@@ -225,7 +288,8 @@ export const usePostInteractions = ({
           let invoiceData;
           try {
             invoiceData = await invoiceResponse.json();
-          } catch (error) {
+            console.log('[ZapFlow] Received invoice data:', invoiceData);
+          } catch {
             throw new Error('Failed to parse invoice response. Please try again.');
           }
           
@@ -234,7 +298,9 @@ export const usePostInteractions = ({
           }
           
           // Pay invoice using wallet
+          console.log('[ZapFlow] Paying invoice with wallet...');
           await wallet.makePayment(invoiceData.pr);
+          console.log('[ZapFlow] Payment successful!');
           
           // Update UI optimistically
           setPosts(currentPosts => 
