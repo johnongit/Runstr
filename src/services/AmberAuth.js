@@ -5,13 +5,29 @@
 
 import { Platform, Linking } from '../utils/react-native-shim';
 
+// Debug mode
+const DEBUG = true;
+
+// Debug log
+const logDebug = (...args) => {
+  if (DEBUG) {
+    console.log('[AmberAuth]', ...args);
+  }
+};
+
 // Check if Amber is installed (will only work in native context)
 const isAmberInstalled = async () => {
-  if (Platform.OS !== 'android') return false;
+  logDebug('Checking if Amber is installed');
+  
+  if (Platform.OS !== 'android') {
+    logDebug('Not on Android, Amber is not available');
+    return false;
+  }
   
   try {
     // This will check if the app can handle the nostrsigner: URI scheme
     const canOpen = await Linking.canOpenURL('nostrsigner:');
+    logDebug('Can open nostrsigner URI:', canOpen);
     return canOpen;
   } catch (error) {
     console.error('Error checking if Amber is installed:', error);
@@ -25,6 +41,8 @@ const isAmberInstalled = async () => {
  * @returns {Promise<boolean>} Success status
  */
 const requestAuthentication = async () => {
+  logDebug('Requesting authentication with Amber');
+  
   if (Platform.OS !== 'android') {
     console.warn('Amber authentication is only supported on Android');
     return false;
@@ -51,7 +69,7 @@ const requestAuthentication = async () => {
     const callbackUrl = encodeURIComponent('runstr://callback');
     const amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}`;
     
-    console.log('Opening Amber with URI:', amberUri);
+    logDebug('Opening Amber with URI:', amberUri);
     
     // Open Amber using the URI
     await Linking.openURL(amberUri);
@@ -74,6 +92,8 @@ const requestAuthentication = async () => {
  * @returns {Promise<boolean>} Success status
  */
 const signEvent = async (event) => {
+  logDebug('Signing event with Amber:', event);
+  
   if (Platform.OS !== 'android') {
     console.warn('Amber signing is only supported on Android');
     return false;
@@ -91,6 +111,11 @@ const signEvent = async (event) => {
       event.created_at = Math.floor(Date.now() / 1000);
     }
     
+    // Make sure tags is an array
+    if (!event.tags) {
+      event.tags = [];
+    }
+    
     // Convert to JSON and encode for URL
     const eventJson = JSON.stringify(event);
     const encodedEvent = encodeURIComponent(eventJson);
@@ -99,7 +124,7 @@ const signEvent = async (event) => {
     const callbackUrl = encodeURIComponent('runstr://callback');
     const amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}`;
     
-    console.log('Opening Amber to sign event');
+    logDebug('Opening Amber to sign event with URI:', amberUri);
     
     // Open Amber using the URI
     await Linking.openURL(amberUri);
@@ -116,24 +141,58 @@ const signEvent = async (event) => {
   }
 };
 
+// Global callback storage to handle async operations
+let pendingCallbacks = {};
+
 /**
  * Setup deep link handling for Amber response
  * @param {Function} callback - The callback to handle the response
  */
 const setupDeepLinkHandling = (callback) => {
-  console.log('Setting up deep link handling for Amber responses');
+  logDebug('Setting up deep link handling for Amber responses');
+  
+  // Store the callback for later use
+  pendingCallbacks.auth = callback;
   
   // Set up event listener for deep links
   const linkingListener = Linking.addEventListener('url', ({ url }) => {
-    console.log('Received deep link URL:', url);
+    logDebug('Received deep link URL:', url);
     
     // Handle the response from Amber
     // URL format: runstr://callback?response=...
     if (url && url.startsWith('runstr://callback')) {
       try {
         // Parse the URL to get the response
-        const urlObj = new URL(url);
-        const response = urlObj.searchParams.get('response');
+        let urlObj;
+        
+        // Handle different URL parsing methods
+        if (typeof URL !== 'undefined') {
+          urlObj = new URL(url);
+        } else {
+          // Simple URL parser fallback
+          const searchParams = {};
+          const queryString = url.split('?')[1];
+          if (queryString) {
+            const params = queryString.split('&');
+            params.forEach(param => {
+              const [key, value] = param.split('=');
+              if (key && value) {
+                searchParams[key] = value;
+              }
+            });
+          }
+          urlObj = { searchParams };
+        }
+        
+        // Get response parameter
+        let response;
+        if (urlObj.searchParams instanceof URLSearchParams) {
+          response = urlObj.searchParams.get('response');
+        } else {
+          response = urlObj.searchParams.response;
+        }
+        
+        logDebug('Extracted response:', response);
         
         if (response) {
           try {
@@ -141,28 +200,40 @@ const setupDeepLinkHandling = (callback) => {
             const decodedResponse = decodeURIComponent(response);
             const parsedResponse = JSON.parse(decodedResponse);
             
-            console.log('Successfully parsed Amber response');
+            logDebug('Successfully parsed Amber response:', parsedResponse);
             
-            // Call the callback with the parsed response
-            callback(parsedResponse);
+            // Call the appropriate callback
+            if (pendingCallbacks.auth) {
+              pendingCallbacks.auth(parsedResponse);
+            }
           } catch (error) {
             console.error('Error parsing Amber response JSON:', error);
-            callback(null);
+            if (pendingCallbacks.auth) {
+              pendingCallbacks.auth(null);
+            }
           }
         } else {
           console.error('No response data in callback URL');
-          callback(null);
+          if (pendingCallbacks.auth) {
+            pendingCallbacks.auth(null);
+          }
         }
       } catch (error) {
         console.error('Error processing callback URL:', error);
-        callback(null);
+        if (pendingCallbacks.auth) {
+          pendingCallbacks.auth(null);
+        }
       }
     }
   });
   
   // Return function to remove the listener
   return () => {
-    linkingListener.remove();
+    logDebug('Removing deep link listener');
+    pendingCallbacks = {};
+    if (linkingListener && typeof linkingListener.remove === 'function') {
+      linkingListener.remove();
+    }
   };
 };
 

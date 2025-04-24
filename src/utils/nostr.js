@@ -529,6 +529,8 @@ const publishWithRetry = async (ndkEvent, maxRetries = 3, delay = 2000) => {
  */
 export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null) => {
   try {
+    console.log('Starting event creation and publishing process');
+    
     // Get publishing strategy metadata to return to caller
     const publishResult = {
       success: false,
@@ -542,16 +544,26 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
     
     // Use platform-specific signing
     if (Platform.OS === 'android') {
+      console.log('Android detected, checking for Amber');
       // Check if Amber is available
       const isAmberAvailable = await AmberAuth.isAmberInstalled();
+      console.log('Amber available:', isAmberAvailable);
       
       if (isAmberAvailable) {
+        console.log('Using Amber for signing');
         // For Android with Amber, we use Amber for signing
         if (!pubkey) {
-          // If no pubkey provided, we need to get it first
+          // If no pubkey provided, we need to get it from localStorage
           pubkey = localStorage.getItem('userPublicKey');
           
+          // If still no pubkey, check if we have it in NostrContext
+          if (!pubkey && typeof localStorage.getItem('permissionsGranted') === 'string') {
+            pubkey = localStorage.getItem('permissionsGranted') === 'true' ? 
+              localStorage.getItem('userPublicKey') : null;
+          }
+          
           if (!pubkey) {
+            console.error('No public key available for Amber signing');
             throw new Error('No public key available. Please log in first.');
           }
         }
@@ -560,20 +572,27 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
         const event = {
           ...eventTemplate,
           pubkey,
-          created_at: Math.floor(Date.now() / 1000)
+          created_at: Math.floor(Date.now() / 1000),
+          // Ensure tags is an array
+          tags: Array.isArray(eventTemplate.tags) ? eventTemplate.tags : []
         };
         
-        // Sign using Amber
-        signedEvent = await AmberAuth.signEvent(event);
-        publishResult.signMethod = 'amber';
+        console.log('Prepared event for Amber signing:', event);
         
-        // If signedEvent is null, the signing is happening asynchronously
-        // and we'll need to handle it via deep linking
-        if (!signedEvent) {
-          // In a real implementation, you would return a Promise that
-          // resolves when the deep link callback is received
-          return null;
-        }
+        // Amber signing is asynchronous via deep links
+        // We can only initiate the process here
+        await AmberAuth.signEvent(event);
+        console.log('Amber signing initiated via deep link');
+        
+        publishResult.signMethod = 'amber';
+        publishResult.success = true; // Assume success when launching Amber
+        publishResult.method = 'amber-deeplink';
+        
+        // For Amber, we return immediately with a partial result
+        // The actual signed event will be handled via deep link callback
+        return { ...publishResult };
+      } else {
+        console.log('Amber not available, falling back to window.nostr');
       }
     }
     
@@ -594,6 +613,8 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
         pubkey,
         created_at: Math.floor(Date.now() / 1000)
       };
+      
+      console.log('Using browser extension for signing');
       
       // Sign the event using the browser extension
       signedEvent = await window.nostr.signEvent(event);

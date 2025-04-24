@@ -85,6 +85,32 @@ const App = () => {
       try {
         console.log('Preloading Nostr connection on app launch');
         
+        // Check for Capacitor - important for Android/Amber functionality
+        const isCapacitorApp = typeof window !== 'undefined' && 
+          window.Capacitor && 
+          window.Capacitor.isNative;
+        
+        // Initialize platform capabilities first if in native app
+        if (isCapacitorApp) {
+          console.log('Capacitor detected, setting up native capabilities');
+          
+          // Wait slightly to ensure capabilities are fully initialized
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // Initialize deep link handling if in Capacitor
+          try {
+            const { App } = window.Capacitor.Plugins;
+            if (App && App.addListener) {
+              App.addListener('appUrlOpen', ({ url }) => {
+                console.log('App opened with URL:', url);
+                // Let the system handle this through Linking handlers
+              });
+            }
+          } catch (e) {
+            console.warn('Error setting up Capacitor URL handling:', e);
+          }
+        }
+        
         // Direct initialization without scheduling to preserve Amber compatibility
         await initializeNostr();
         
