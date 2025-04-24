@@ -284,21 +284,16 @@ export class AlbyWallet {
         throw new Error('Pubkey is required for zap invoice');
       }
 
-      // List of reliable relays for zap requests
-      const relays = [
-        "wss://relay.damus.io",
-        "wss://nos.lol", 
-        "wss://relay.nostr.band"
-      ];
-
       // Create zap request event as a plain object instead of using NostrEvent
       const zapRequest = {
         kind: 9734,
         content: content || '',
         tags: [
           ['p', pubkey],
-          ['amount', amount.toString()],
-          ['relays', ...relays]
+          ['amount', (amount * 1000).toString()], // Convert to millisats per NIP-57
+          ['r', 'wss://relay.damus.io'], // Use 'r' tag for each relay according to NIP-57
+          ['r', 'wss://nos.lol'],
+          ['r', 'wss://relay.nostr.band']
         ],
         created_at: Math.floor(Date.now() / 1000)
       };
@@ -316,7 +311,7 @@ export class AlbyWallet {
 
       // Create timeout handler
       const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 30000);
+      const timeoutId = setTimeout(() => abortController.abort(), 30000); // Define timeoutId properly
       
       try {
         // Try standard format first
