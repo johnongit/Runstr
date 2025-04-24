@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { NWCWallet } from '../services/nwcWallet';
 
@@ -41,6 +41,29 @@ export const WalletProvider = ({ children }) => {
     const walletInstance = new NWCWallet();
     setWallet(walletInstance);
     
+    // Try to reconnect using saved credentials
+    const savedAuthUrl = localStorage.getItem('nwcAuthUrl');
+    const savedConnectionString = localStorage.getItem('nwcConnectionString');
+    
+    if (savedAuthUrl || savedConnectionString) {
+      // Attempt to reconnect on mount
+      setTimeout(async () => {
+        try {
+          setConnectionState(CONNECTION_STATES.CONNECTING);
+          await walletInstance.ensureConnected();
+          const isConnected = await walletInstance.checkConnection();
+          if (isConnected) {
+            setConnectionState(CONNECTION_STATES.CONNECTED);
+          } else {
+            setConnectionState(CONNECTION_STATES.DISCONNECTED);
+          }
+        } catch (err) {
+          console.error('Failed to reconnect on mount:', err);
+          setConnectionState(CONNECTION_STATES.DISCONNECTED);
+        }
+      }, 500);
+    }
+    
     return () => {
       if (connectionCheckInterval) {
         clearInterval(connectionCheckInterval);
@@ -75,7 +98,7 @@ export const WalletProvider = ({ children }) => {
       setConnectionState(CONNECTION_STATES.CONNECTING);
       setError(null);
       
-      const connected = await wallet.reconnectWithSavedCredentials();
+      const connected = await wallet.ensureConnected();
       
       if (connected) {
         setConnectionState(CONNECTION_STATES.CONNECTED);
@@ -129,7 +152,7 @@ export const WalletProvider = ({ children }) => {
     if (!wallet) return false;
     
     try {
-      const isConnected = await wallet.isConnected();
+      const isConnected = await wallet.checkConnection();
       
       if (isConnected) {
         // Only update state if different to avoid re-renders
@@ -195,7 +218,7 @@ export const WalletProvider = ({ children }) => {
       const connected = await ensureConnected();
       if (!connected) throw new Error('Wallet not connected');
       
-      const invoice = await wallet.generateInvoice(amount, comment);
+      const invoice = await wallet.generateZapInvoice(null, amount, comment);
       return invoice;
     } catch (err) {
       console.error('Failed to generate zap invoice:', err);

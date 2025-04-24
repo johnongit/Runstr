@@ -1,17 +1,12 @@
 import { RELAYS } from '../utils/nostr';
-import { getPublicKey, nip19 } from 'nostr-tools';
-import NDKNip04 from '@nostr-dev-kit/ndk';
+import { nwc } from '@getalby/sdk';
 
 export class NWCWallet {
   constructor() {
     this.client = null;
-    this.secretKey = null;
-    this.pubKey = null;
-    this.relayUrl = null;
-    this.walletPubKey = null;
     this.isConnected = false;
-    this.authUrl = null;
     this.connectionString = null;
+    this.authUrl = null;
     this.lastConnectionCheck = 0;
     this.connectionCheckInterval = null;
     this.reconnectAttempts = 0;
@@ -31,41 +26,32 @@ export class NWCWallet {
       if (connectionUrl.startsWith('nostr+walletconnect://')) {
         this.connectionString = connectionUrl;
         localStorage.setItem('nwcConnectionString', connectionUrl);
-      } else if (connectionUrl.includes('?relay=')) {
+        
+        // Initialize the NWC client with direct connection string
+        this.client = new nwc.NWCClient({
+          nostrWalletConnectUrl: connectionUrl
+        });
+      } 
+      // Check if the connection is an authorization URL (https://...)
+      else if (connectionUrl.startsWith('https://')) {
         this.authUrl = connectionUrl;
         localStorage.setItem('nwcAuthUrl', connectionUrl);
+        
+        // Try to use the modern fromAuthorizationUrl approach
+        try {
+          this.client = await nwc.NWCClient.fromAuthorizationUrl(connectionUrl, {
+            name: "RUNSTR App " + Date.now(),
+          });
+          this.connectionString = 'auth_url_connection';
+          localStorage.setItem('nwcConnectionString', 'auth_url_connection');
+        } catch (error) {
+          console.warn('Could not connect via authUrl:', error);
+          throw error;
+        }
       }
-      
-      // Parse the connection URL
-      const url = new URL(connectionUrl);
-      const params = new URLSearchParams(url.search);
-      
-      // Extract connection parameters
-      this.relayUrl = params.get('relay') || this.relayUrl;
-      this.secretKey = params.get('secret') || this.secretKey;
-      
-      // For nostr+walletconnect format URLs
-      if (url.pathname.length > 2) {
-        // Extract secret from pathname (removing leading slash)
-        this.secretKey = url.pathname.substring(1);
+      else {
+        throw new Error('Invalid connection format. Must start with nostr+walletconnect:// or https://');
       }
-      
-      // Generate keys if needed
-      if (!this.secretKey) {
-        throw new Error('No secret key provided in connection URL');
-      }
-      
-      try {
-        this.pubKey = nip19.npubEncode(getPublicKey(this.secretKey));
-        this.client = new NDKNip04.NDKPrivateKeySigner(this.secretKey);
-      } catch (err) {
-        console.error('Error generating keys:', err);
-        throw new Error('Invalid secret key in connection URL');
-      }
-      
-      // Reset connection state
-      this.reconnectAttempts = 0;
-      this.isConnected = false;
 
       // Test the connection by fetching wallet info
       const info = await this.client.getInfo();
@@ -161,7 +147,7 @@ export class NWCWallet {
         }
         
         const savedConnectionString = localStorage.getItem('nwcConnectionString');
-        if (savedConnectionString) {
+        if (savedConnectionString && savedConnectionString !== 'auth_url_connection') {
           return await this.connect(savedConnectionString);
         }
       }
@@ -328,10 +314,6 @@ export class NWCWallet {
       // The NWC client doesn't have a formal disconnect method,
       // so we'll just clean up our internal state
       this.client = null;
-      this.secretKey = null;
-      this.pubKey = null;
-      this.relayUrl = null;
-      this.walletPubKey = null;
       this.isConnected = false;
       this.authUrl = null;
       this.connectionString = null;

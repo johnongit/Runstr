@@ -21,31 +21,54 @@ export const NWCWalletConnector = () => {
   // Function for reconnection - defined before it's used
   const reconnectWallet = useCallback(async () => {
     try {
-      // Try auth URL first if available
-      const savedAuthUrl = localStorage.getItem('nwcAuthUrl');
-      if (savedAuthUrl) {
-        console.log('Attempting to reconnect with saved auth URL');
-        await connectWallet(savedAuthUrl);
-        return;
+      // Try to reconnect with any saved credentials
+      if (wallet?.provider) {
+        const connected = await wallet.provider.ensureConnected();
+        setIsConnected(connected);
+        return connected;
+      } else {
+        // If no provider exists, create a new one and try to connect
+        const nwcWallet = new NWCWallet();
+        const connected = await nwcWallet.ensureConnected();
+        
+        if (connected) {
+          setWallet({
+            provider: nwcWallet,
+            isEnabled: () => nwcWallet.isConnected,
+            makePayment: async (invoice) => {
+              return await nwcWallet.makePayment(invoice);
+            },
+            sendPayment: async (invoice) => {
+              return await nwcWallet.makePayment(invoice);
+            },
+            getBalance: async () => {
+              return await nwcWallet.getBalance();
+            },
+            generateZapInvoice: async (pubkey, amount, content) => {
+              return await nwcWallet.generateZapInvoice(pubkey, amount, content);
+            },
+            checkConnection: async () => {
+              return await nwcWallet.checkConnection();
+            }
+          });
+          setIsConnected(true);
+          return true;
+        }
       }
-      
-      // Fall back to connection string
-      const savedNwcUrl = localStorage.getItem('nwcConnectionString');
-      if (savedNwcUrl) {
-        console.log('Attempting to reconnect with saved connection string');
-        await connectWallet(savedNwcUrl);
-      }
+      return false;
     } catch (err) {
       console.error('Failed to reconnect wallet:', err);
+      setIsConnected(false);
+      return false;
     }
-  }, [/* will add connectWallet dependency later */]);
+  }, [wallet, setWallet]);
 
   // Connection check function using useCallback to avoid circular dependencies
   const checkWalletConnection = useCallback(async () => {
     // Don't check if no wallet exists
     if (!wallet?.provider) {
       setIsConnected(false);
-      return;
+      return false;
     }
     
     try {
@@ -60,11 +83,14 @@ export const NWCWalletConnector = () => {
         console.log('Connection lost, attempting to reconnect...');
         await reconnectWallet();
       }
+      
+      return isConnected;
     } catch (err) {
       console.error('Error checking wallet connection:', err);
       setIsConnected(false);
+      return false;
     }
-  }, [wallet, reconnectWallet]);
+  }, [wallet, reconnectWallet, isConnected]);
 
   // Setup periodic connection checks to maintain wallet health
   const startConnectionChecks = useCallback(() => {
@@ -97,7 +123,6 @@ export const NWCWalletConnector = () => {
         // Save connection string based on the type of connection
         if (connectionInput.startsWith('https://')) {
           localStorage.setItem('nwcAuthUrl', connectionInput);
-          localStorage.setItem('nwcConnectionString', connectionInput);
         } else if (connectionInput.startsWith('nostr+walletconnect://')) {
           localStorage.setItem('nwcConnectionString', connectionInput);
         }
@@ -125,58 +150,35 @@ export const NWCWalletConnector = () => {
         });
         
         setIsConnected(true);
+        return true;
       }
+      return false;
     } catch (err) {
       console.error('Failed to connect NWC wallet:', err);
       setConnectionError(err.message || 'Failed to connect to wallet');
       
-      // Only remove from localStorage if this is a fresh connection attempt
-      // If reconnecting, keep the connection string for future attempts
-      if (!localStorage.getItem('nwcConnectionString')) {
-        localStorage.removeItem('nwcConnectionString');
-        localStorage.removeItem('nwcAuthUrl');
-      }
+      return false;
     } finally {
       setConnecting(false);
     }
   }, [setWallet]);
 
-  // Update reconnectWallet to include connectWallet dependency
-  useEffect(() => {
-    reconnectWallet.current = async () => {
-      try {
-        // Try auth URL first if available
-        const savedAuthUrl = localStorage.getItem('nwcAuthUrl');
-        if (savedAuthUrl) {
-          await connectWallet(savedAuthUrl);
-          return;
-        }
-        
-        // Fall back to connection string
-        const savedNwcUrl = localStorage.getItem('nwcConnectionString');
-        if (savedNwcUrl) {
-          await connectWallet(savedNwcUrl);
-        }
-      } catch (err) {
-        console.error('Failed to reconnect wallet:', err);
-      }
-    };
-  }, [connectWallet]);
-
   // Check for saved connection on mount
   useEffect(() => {
-    const savedConnection = localStorage.getItem('nwcConnectionString');
-    if (savedConnection) {
-      connectWallet(savedConnection);
-    }
+    // Try to reconnect on mount
+    const tryReconnect = async () => {
+      const connected = await reconnectWallet();
+      if (connected) {
+        startConnectionChecks();
+      }
+    };
     
-    // Set up periodic connection check
-    startConnectionChecks();
+    tryReconnect();
     
     return () => {
       stopConnectionChecks();
     };
-  }, [connectWallet, startConnectionChecks, stopConnectionChecks]);
+  }, [reconnectWallet, startConnectionChecks, stopConnectionChecks]);
 
   // Update zapAmountInput when defaultZapAmount changes
   useEffect(() => {
@@ -202,7 +204,7 @@ export const NWCWalletConnector = () => {
       console.error("Error with auth URL connection:", err);
       setConnectionError(err.message || "Failed to connect with authorization URL");
     }
-  }, [connectWallet, setConnectionError]);
+  }, [connectWallet]);
 
   const handleDisconnect = useCallback(async () => {
     try {
@@ -228,6 +230,13 @@ export const NWCWalletConnector = () => {
       }
     };
     
+    // Define the pageshow handler outside of the addEventListener to allow proper cleanup
+    const handlePageShow = (event) => {
+      if (event.persisted) {
+        checkWalletConnection();
+      }
+    };
+    
     // When page becomes visible (user switches tabs)
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
@@ -235,21 +244,12 @@ export const NWCWalletConnector = () => {
     window.addEventListener('focus', checkWalletConnection);
     
     // Additional listener for mobile browsers
-    window.addEventListener('pageshow', (event) => {
-      // Check if the page is shown from bfcache (back-forward cache)
-      if (event.persisted) {
-        checkWalletConnection();
-      }
-    });
+    window.addEventListener('pageshow', handlePageShow);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', checkWalletConnection);
-      window.removeEventListener('pageshow', (event) => {
-        if (event.persisted) {
-          checkWalletConnection();
-        }
-      });
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, [checkWalletConnection]); // Only depends on checkWalletConnection
 
@@ -278,8 +278,8 @@ export const NWCWalletConnector = () => {
     try {
       // Check connection before attempting donation
       if (wallet.checkConnection && !(await wallet.checkConnection())) {
-        await reconnectWallet();
-        if (!wallet.isEnabled()) {
+        const reconnected = await reconnectWallet();
+        if (!reconnected) {
           throw new Error('Wallet connection is not active. Please reconnect.');
         }
       }
