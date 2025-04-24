@@ -4,20 +4,11 @@ import { AudioPlayerContext, initialState, audioReducer } from './audioPlayerCon
 import { fetchPlaylist } from '../utils/wavlake';
 
 // Lazy load the audio player to improve initial page load time
-// Add extra delay to prevent interference with other operations
-const ReactAudioPlayer = lazy(() => {
-  // Add delay to postpone loading
-  return new Promise(resolve => {
-    // Wait 2 seconds before starting to load the audio player
-    setTimeout(() => {
-      import('react-h5-audio-player').then(module => {
-        // Also import the CSS only when the component is loaded
-        import('react-h5-audio-player/lib/styles.css');
-        resolve(module);
-      });
-    }, 2000); // 2 second delay
-  });
-});
+const ReactAudioPlayer = lazy(() => import('react-h5-audio-player').then(module => {
+  // Also import the CSS only when the component is loaded
+  import('react-h5-audio-player/lib/styles.css');
+  return module;
+}));
 
 export const AudioPlayerProvider = ({ children }) => {
   const [state, dispatch] = useReducer(audioReducer, initialState);

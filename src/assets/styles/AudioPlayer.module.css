@@ -17,88 +17,6 @@
   margin-bottom: 10px;
 }
 
-/* New header styling */
-.playerHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.playlistInfo {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.playlistLabel {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.playlistTitle {
-  font-weight: bold;
-  color: rgba(255, 255, 255, 0.87);
-}
-
-/* Track display with artwork */
-.trackDisplay {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
-  padding: 10px;
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-}
-
-.trackArtwork {
-  width: 80px;
-  height: 80px;
-  border-radius: 8px;
-  overflow: hidden;
-  background-color: #242424;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.coverImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.defaultCover {
-  font-size: 30px;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.trackInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.trackTitle {
-  font-weight: bold;
-  font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.87);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.trackArtist {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .controls {
   display: flex;
   justify-content: center;
@@ -119,18 +37,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.buttonIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.playButton {
-  background-color: #646cff;
-  color: white;
-  min-width: 120px;
 }
 
 .buttonText {
@@ -287,15 +193,6 @@
   
   .trackItem {
     padding: 10px 8px;
-  }
-  
-  .trackDisplay {
-    flex-direction: column;
-    text-align: center;
-  }
-  
-  .trackInfo {
-    width: 100%;
   }
 }
 
