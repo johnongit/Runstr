@@ -15,18 +15,6 @@ const logDebug = (...args) => {
   }
 };
 
-// Maximum number of retries for Amber operations
-const MAX_RETRIES = 2;
-
-// Timeout for operations (in milliseconds)
-const OPERATION_TIMEOUT = 30000;
-
-// Tracking state for operations
-let pendingOperations = {
-  auth: null,
-  sign: null
-};
-
 // Check if Amber is installed (will only work in native context)
 const isAmberInstalled = async () => {
   logDebug('Checking if Amber is installed');
@@ -40,24 +28,9 @@ const isAmberInstalled = async () => {
     // This will check if the app can handle the nostrsigner: URI scheme
     const canOpen = await Linking.canOpenURL('nostrsigner:');
     logDebug('Can open nostrsigner URI:', canOpen);
-    
-    // Store result in localStorage for faster future checks
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('amber_installed', canOpen ? 'true' : 'false');
-      localStorage.setItem('amber_check_timestamp', Date.now().toString());
-    }
-    
     return canOpen;
   } catch (error) {
     console.error('Error checking if Amber is installed:', error);
-    // Try to use cached result if available
-    if (typeof localStorage !== 'undefined') {
-      const cached = localStorage.getItem('amber_installed');
-      if (cached === 'true' || cached === 'false') {
-        logDebug('Using cached Amber installed status:', cached);
-        return cached === 'true';
-      }
-    }
     return false;
   }
 };
@@ -67,18 +40,12 @@ const isAmberInstalled = async () => {
  * This will open Amber and prompt the user for authentication
  * @returns {Promise<boolean>} Success status
  */
-const requestAuthentication = async (retryCount = 0) => {
-  logDebug('Requesting authentication with Amber (attempt ' + (retryCount + 1) + ')');
+const requestAuthentication = async () => {
+  logDebug('Requesting authentication with Amber');
   
   if (Platform.OS !== 'android') {
     console.warn('Amber authentication is only supported on Android');
     return false;
-  }
-  
-  // Clear any existing auth operation
-  if (pendingOperations.auth) {
-    logDebug('Cancelling previous auth operation');
-    pendingOperations.auth = null;
   }
   
   try {
@@ -90,8 +57,7 @@ const requestAuthentication = async (retryCount = 0) => {
       tags: [
         ['relay', 'wss://relay.damus.io'],
         ['relay', 'wss://nos.lol'],
-        ['relay', 'wss://relay.nostr.band'],
-        ['relay', 'wss://relay.snort.social'] // Additional relay for redundancy
+        ['relay', 'wss://relay.nostr.band']
       ]
     };
     
@@ -101,52 +67,21 @@ const requestAuthentication = async (retryCount = 0) => {
     
     // Create the URI with the nostrsigner scheme and add callback URL
     const callbackUrl = encodeURIComponent('runstr://callback');
-    // Add a unique identifier to prevent caching issues
-    const uniqueId = Date.now();
-    const amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}&_=${uniqueId}`;
+    const amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}`;
     
     logDebug('Opening Amber with URI:', amberUri);
-    
-    // Create operation tracking
-    const operationPromise = new Promise((resolve, reject) => {
-      pendingOperations.auth = { resolve, reject };
-      
-      // Set timeout to prevent hanging
-      setTimeout(() => {
-        if (pendingOperations.auth) {
-          pendingOperations.auth = null;
-          reject(new Error('Authentication timeout'));
-        }
-      }, OPERATION_TIMEOUT);
-    });
     
     // Open Amber using the URI
     await Linking.openURL(amberUri);
     
-    // Wait for callback to resolve/reject the promise
-    return await operationPromise;
+    // Authentication success will be handled by deep linking callback
+    return true;
   } catch (error) {
     console.error('Error authenticating with Amber:', error);
-    
-    // Handle specific error cases
     if (error.message && error.message.includes('Activity not found')) {
       console.error('Amber app not found or not responding');
-      // Update stored state to reflect Amber not being available
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('amber_installed', 'false');
-        localStorage.setItem('amber_check_timestamp', Date.now().toString());
-      }
       return false;
     }
-    
-    // Retry logic
-    if (retryCount < MAX_RETRIES) {
-      logDebug(`Retrying authentication (${retryCount + 1}/${MAX_RETRIES})`);
-      // Wait a moment before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return requestAuthentication(retryCount + 1);
-    }
-    
     return false;
   }
 };
@@ -156,18 +91,12 @@ const requestAuthentication = async (retryCount = 0) => {
  * @param {Object} event - The event to sign
  * @returns {Promise<boolean>} Success status
  */
-const signEvent = async (event, retryCount = 0) => {
-  logDebug('Signing event with Amber (attempt ' + (retryCount + 1) + '):', event);
+const signEvent = async (event) => {
+  logDebug('Signing event with Amber:', event);
   
   if (Platform.OS !== 'android') {
     console.warn('Amber signing is only supported on Android');
     return false;
-  }
-  
-  // Clear any existing sign operation
-  if (pendingOperations.sign) {
-    logDebug('Cancelling previous sign operation');
-    pendingOperations.sign = null;
   }
   
   try {
@@ -193,52 +122,21 @@ const signEvent = async (event, retryCount = 0) => {
     
     // Create the URI with the nostrsigner scheme and add callback URL
     const callbackUrl = encodeURIComponent('runstr://callback');
-    // Add a unique identifier to prevent caching issues
-    const uniqueId = Date.now();
-    const amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}&_=${uniqueId}`;
+    const amberUri = `nostrsigner:sign?event=${encodedEvent}&callback=${callbackUrl}`;
     
     logDebug('Opening Amber to sign event with URI:', amberUri);
-    
-    // Create operation tracking
-    const operationPromise = new Promise((resolve, reject) => {
-      pendingOperations.sign = { resolve, reject, event };
-      
-      // Set timeout to prevent hanging
-      setTimeout(() => {
-        if (pendingOperations.sign) {
-          pendingOperations.sign = null;
-          reject(new Error('Signing timeout'));
-        }
-      }, OPERATION_TIMEOUT);
-    });
     
     // Open Amber using the URI
     await Linking.openURL(amberUri);
     
-    // Wait for callback to resolve/reject the promise
-    return await operationPromise;
+    // Signing success will be handled by deep linking callback
+    return true;
   } catch (error) {
     console.error('Error signing with Amber:', error);
-    
-    // Handle specific error cases
     if (error.message && error.message.includes('Activity not found')) {
       console.error('Amber app not found or not responding');
-      // Update stored state to reflect Amber not being available
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('amber_installed', 'false');
-        localStorage.setItem('amber_check_timestamp', Date.now().toString());
-      }
       return false;
     }
-    
-    // Retry logic
-    if (retryCount < MAX_RETRIES) {
-      logDebug(`Retrying signing (${retryCount + 1}/${MAX_RETRIES})`);
-      // Wait a moment before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return signEvent(event, retryCount + 1);
-    }
-    
     return false;
   }
 };
@@ -266,12 +164,10 @@ const setupDeepLinkHandling = (callback) => {
       try {
         // Parse the URL to get the response
         let urlObj;
-        let response = null;
         
         // Handle different URL parsing methods
         if (typeof URL !== 'undefined') {
           urlObj = new URL(url);
-          response = urlObj.searchParams.get('response');
         } else {
           // Simple URL parser fallback
           const searchParams = {};
@@ -286,6 +182,13 @@ const setupDeepLinkHandling = (callback) => {
             });
           }
           urlObj = { searchParams };
+        }
+        
+        // Get response parameter
+        let response;
+        if (urlObj.searchParams instanceof URLSearchParams) {
+          response = urlObj.searchParams.get('response');
+        } else {
           response = urlObj.searchParams.response;
         }
         
@@ -303,67 +206,20 @@ const setupDeepLinkHandling = (callback) => {
             if (pendingCallbacks.auth) {
               pendingCallbacks.auth(parsedResponse);
             }
-            
-            // Resolve pending operations if any
-            if (pendingOperations.auth) {
-              pendingOperations.auth.resolve(true);
-              pendingOperations.auth = null;
-            }
-            
-            if (pendingOperations.sign && parsedResponse.id) {
-              pendingOperations.sign.resolve(true);
-              pendingOperations.sign = null;
-            }
           } catch (error) {
             console.error('Error parsing Amber response JSON:', error);
-            
-            // Reject pending operations
-            if (pendingOperations.auth) {
-              pendingOperations.auth.reject(new Error('Failed to parse Amber response'));
-              pendingOperations.auth = null;
-            }
-            
-            if (pendingOperations.sign) {
-              pendingOperations.sign.reject(new Error('Failed to parse Amber response'));
-              pendingOperations.sign = null;
-            }
-            
             if (pendingCallbacks.auth) {
               pendingCallbacks.auth(null);
             }
           }
         } else {
           console.error('No response data in callback URL');
-          
-          // Reject pending operations
-          if (pendingOperations.auth) {
-            pendingOperations.auth.reject(new Error('No response data in callback URL'));
-            pendingOperations.auth = null;
-          }
-          
-          if (pendingOperations.sign) {
-            pendingOperations.sign.reject(new Error('No response data in callback URL'));
-            pendingOperations.sign = null;
-          }
-          
           if (pendingCallbacks.auth) {
             pendingCallbacks.auth(null);
           }
         }
       } catch (error) {
         console.error('Error processing callback URL:', error);
-        
-        // Reject pending operations
-        if (pendingOperations.auth) {
-          pendingOperations.auth.reject(error);
-          pendingOperations.auth = null;
-        }
-        
-        if (pendingOperations.sign) {
-          pendingOperations.sign.reject(error);
-          pendingOperations.sign = null;
-        }
-        
         if (pendingCallbacks.auth) {
           pendingCallbacks.auth(null);
         }
@@ -375,34 +231,15 @@ const setupDeepLinkHandling = (callback) => {
   return () => {
     logDebug('Removing deep link listener');
     pendingCallbacks = {};
-    pendingOperations = { auth: null, sign: null };
     if (linkingListener && typeof linkingListener.remove === 'function') {
       linkingListener.remove();
     }
   };
 };
 
-/**
- * Check the readiness of the Amber deep link connection
- * @returns {Promise<boolean>} True if ready
- */
-const checkAmberConnection = async () => {
-  logDebug('Checking Amber connection');
-  
-  // Verify Amber is installed
-  const installed = await isAmberInstalled();
-  if (!installed) {
-    logDebug('Amber is not installed');
-    return false;
-  }
-  
-  return true;
-};
-
 export default {
   isAmberInstalled,
   requestAuthentication,
   signEvent,
-  setupDeepLinkHandling,
-  checkAmberConnection
+  setupDeepLinkHandling
 }; 
