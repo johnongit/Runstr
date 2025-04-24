@@ -1,5 +1,7 @@
-import { nwc } from '@getalby/sdk';
 import { RELAYS } from '../utils/nostr';
+import { getPublicKey } from '../utils/nostr';
+import { nip19 } from 'nostr-tools';
+import NDKNip04 from '@nostr-dev-kit/ndk';
 
 export class NWCWallet {
   constructor() {
@@ -9,42 +11,62 @@ export class NWCWallet {
     this.relayUrl = null;
     this.walletPubKey = null;
     this.isConnected = false;
-    this.lastConnectionCheck = 0;
     this.authUrl = null;
     this.connectionString = null;
+    this.lastConnectionCheck = 0;
+    this.connectionCheckInterval = null;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
   }
 
-  async connect(connection) {
+  async connect(connectionUrl) {
+    // Clear any existing reconnection timers
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+    }
+
     try {
-      // Check if the connection is an authorization URL (https://...)
-      if (connection.startsWith('https://')) {
-        this.authUrl = connection;
-        console.log('Connecting via authorization URL');
-        
-        // Try to use the modern fromAuthorizationUrl approach if available
-        try {
-          this.client = await nwc.NWCClient.fromAuthorizationUrl(connection, {
-            name: "RUNSTR App" + Date.now(),
-          });
-          this.connectionString = 'auth_url_connection';
-        } catch (error) {
-          console.warn('Could not connect via authUrl, trying legacy method:', error);
-          throw error;
-        }
+      console.log('Connecting NWC wallet with URL:', connectionUrl.substring(0, 20) + '...');
+      
+      // Store the connection info for potential reconnection
+      if (connectionUrl.startsWith('nostr+walletconnect://')) {
+        this.connectionString = connectionUrl;
+        localStorage.setItem('nwcConnectionString', connectionUrl);
+      } else if (connectionUrl.includes('?relay=')) {
+        this.authUrl = connectionUrl;
+        localStorage.setItem('nwcAuthUrl', connectionUrl);
       }
-      // Check if the connection is a wallet connect URL (nostr+walletconnect://...)
-      else if (connection.startsWith('nostr+walletconnect://')) {
-        this.connectionString = connection;
-        console.log('Connecting via NWC URL');
-        
-        // Initialize the NWC client with direct connection string
-        this.client = new nwc.NWCClient({
-          nostrWalletConnectUrl: connection
-        });
+      
+      // Parse the connection URL
+      const url = new URL(connectionUrl);
+      const params = new URLSearchParams(url.search);
+      
+      // Extract connection parameters
+      this.relayUrl = params.get('relay') || this.relayUrl;
+      this.secretKey = params.get('secret') || this.secretKey;
+      
+      // For nostr+walletconnect format URLs
+      if (url.pathname.length > 2) {
+        // Extract secret from pathname (removing leading slash)
+        this.secretKey = url.pathname.substring(1);
       }
-      else {
-        throw new Error('Invalid connection format. Must start with nostr+walletconnect:// or https://');
+      
+      // Generate keys if needed
+      if (!this.secretKey) {
+        throw new Error('No secret key provided in connection URL');
       }
+      
+      try {
+        this.pubKey = nip19.npubEncode(getPublicKey(this.secretKey));
+        this.client = new NDKNip04.NDKPrivateKeySigner(this.secretKey);
+      } catch (err) {
+        console.error('Error generating keys:', err);
+        throw new Error('Invalid secret key in connection URL');
+      }
+      
+      // Reset connection state
+      this.reconnectAttempts = 0;
+      this.isConnected = false;
 
       // Test the connection by fetching wallet info
       const info = await this.client.getInfo();
@@ -53,12 +75,44 @@ export class NWCWallet {
       this.isConnected = true;
       this.lastConnectionCheck = Date.now();
       console.log('NWC wallet connected successfully');
+      
+      // Set up periodic connection checks
+      this.startConnectionMonitoring();
+      
       return true;
     } catch (error) {
       console.error('NWC connection error:', error);
       this.isConnected = false;
       throw error;
     }
+  }
+
+  // Add periodic connection monitoring
+  startConnectionMonitoring() {
+    // Clear any existing interval
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+    }
+    
+    // Check connection every 2 minutes
+    this.connectionCheckInterval = setInterval(async () => {
+      const isConnected = await this.checkConnection();
+      
+      // If not connected, try to reconnect
+      if (!isConnected && this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.reconnectAttempts++;
+        console.log(`Connection lost. Attempting reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+        await this.ensureConnected();
+      } else if (!isConnected) {
+        console.log('Max reconnection attempts reached. Please reconnect manually.');
+        // Stop trying after max attempts
+        clearInterval(this.connectionCheckInterval);
+        this.connectionCheckInterval = null;
+      } else {
+        // Reset reconnect attempts on successful connection
+        this.reconnectAttempts = 0;
+      }
+    }, 120000); // 2 minutes
   }
 
   // Add a health check method to verify connection is still alive
@@ -100,6 +154,17 @@ export class NWCWallet {
         return await this.connect(this.authUrl);
       } else if (this.connectionString) {
         return await this.connect(this.connectionString);
+      } else {
+        // Try localStorage as last resort
+        const savedAuthUrl = localStorage.getItem('nwcAuthUrl');
+        if (savedAuthUrl) {
+          return await this.connect(savedAuthUrl);
+        }
+        
+        const savedConnectionString = localStorage.getItem('nwcConnectionString');
+        if (savedConnectionString) {
+          return await this.connect(savedConnectionString);
+        }
       }
       return false;
     } catch (error) {
@@ -255,6 +320,12 @@ export class NWCWallet {
 
   async disconnect() {
     try {
+      // Clear any monitoring intervals
+      if (this.connectionCheckInterval) {
+        clearInterval(this.connectionCheckInterval);
+        this.connectionCheckInterval = null;
+      }
+      
       // The NWC client doesn't have a formal disconnect method,
       // so we'll just clean up our internal state
       this.client = null;
@@ -265,6 +336,12 @@ export class NWCWallet {
       this.isConnected = false;
       this.authUrl = null;
       this.connectionString = null;
+      this.reconnectAttempts = 0;
+      
+      // Clear stored connection data
+      localStorage.removeItem('nwcAuthUrl');
+      localStorage.removeItem('nwcConnectionString');
+      
       return true;
     } catch (error) {
       console.error('Disconnect error:', error);
