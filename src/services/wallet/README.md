@@ -1,114 +1,53 @@
-# Wallet Implementation
-
-## Overview
+# Lightning Wallet Integration for RUNSTR
 
 This directory contains the lightning wallet integration for the RUNSTR application, focusing on NWC (Nostr Wallet Connect) functionality using the Alby JS SDK.
 
-## Key Components
+## Components
 
-- **AlbyWallet**: Core implementation using the Alby SDK for wallet operations
-- **WalletContext**: React context managing wallet state and operations
+- **AlbyWallet**: Core wallet implementation using both the NWC and LN clients from the Alby SDK
 - **NWCWalletConnector**: UI component for connecting to NWC wallets
 
 ## Features
 
 - **Connection Management**: Connect with NWC URLs and authorization URLs
-- **Persistent Connection**: Save and restore wallet connection between sessions
-- **Auto-reconnection**: Automatically reconnect on connection loss
-- **Balance Checking**: Fetch and display wallet balance
-- **Payment Processing**: Pay lightning invoices
-- **Invoice Generation**: Create invoices with support for zaps
-- **Error Handling**: Comprehensive error handling with timeouts and fallbacks
+- **Zap Support**: Create and pay Lightning invoices, including zap requests
+- **Persistence**: Automatically reconnect to previously connected wallets
+- **Connection Monitoring**: Periodically check connection status and handle reconnection
 
-## Usage
+## AlbyWallet Class
 
-### Connecting a Wallet
+The `AlbyWallet` class is designed to provide a reliable Lightning wallet implementation with several key features:
 
-```jsx
-import { useWallet } from '../services/wallet';
+### Key Methods
 
-function MyComponent() {
-  const { connectWithUrl, isConnected } = useWallet();
-  
-  const handleConnect = async () => {
-    const url = 'nostr+walletconnect://...';
-    await connectWithUrl(url);
-  };
-  
-  return (
-    <div>
-      {isConnected ? (
-        <div>Wallet connected!</div>
-      ) : (
-        <button onClick={handleConnect}>Connect Wallet</button>
-      )}
-    </div>
-  );
-}
-```
+- `connect(url)`: Connect to a wallet using a NWC URL or authorization URL
+- `disconnect()`: Disconnect from the wallet
+- `makePayment(invoice)`: Pay a BOLT11 invoice
+- `generateInvoice(amount, memo)`: Create a new Lightning invoice
+- `generateZapInvoice(pubkey, amount, content)`: Create a zap invoice for a specific Nostr pubkey
+- `getBalance()`: Get the wallet balance in sats
+- `checkConnection()`: Verify the wallet connection is still active
+- `ensureConnected()`: Check connection and attempt reconnection if needed
 
-### Making Payments
+### Connection Types
 
-```jsx
-import { useWallet } from '../services/wallet';
+The wallet supports two connection methods:
 
-function PaymentComponent() {
-  const { wallet, isConnected, ensureConnected } = useWallet();
-  
-  const handlePayment = async (invoice) => {
-    if (!isConnected) {
-      await ensureConnected();
-    }
-    
-    try {
-      const result = await wallet.makePayment(invoice);
-      console.log('Payment successful!', result);
-    } catch (error) {
-      console.error('Payment failed:', error);
-    }
-  };
-  
-  return (
-    <button onClick={() => handlePayment('lnbc...')}>
-      Pay Invoice
-    </button>
-  );
-}
-```
+1. **Direct NWC URLs** (`nostr+walletconnect://...`): Standard NWC connection URLs
+2. **Authorization URLs** (`https://...`): Used by some wallets like Alby
 
-### Creating Zap Invoices
+### Design Decisions
 
-```jsx
-import { useWallet } from '../services/wallet';
+1. **Dual-Client Approach**: The wallet uses Alby's NWC and LN clients in combination for best functionality
+2. **Fallback Mechanisms**: If primary payment methods fail, alternative approaches are used
+3. **Auto-Reconnection**: The wallet attempts to reconnect automatically when connection is lost
+4. **Multiple Zap Invoice Formats**: Supports various zap request formats for wider wallet compatibility
 
-function ZapComponent({ pubkey }) {
-  const { generateZapInvoice, isConnected } = useWallet();
-  
-  const handleZap = async () => {
-    if (!isConnected) return;
-    
-    try {
-      const amount = 1000; // 1000 sats
-      const comment = 'Great post!';
-      const invoice = await generateZapInvoice(pubkey, amount, comment);
-      console.log('Zap invoice created:', invoice);
-    } catch (error) {
-      console.error('Failed to create zap invoice:', error);
-    }
-  };
-  
-  return (
-    <button onClick={handleZap} disabled={!isConnected}>
-      Zap 1000 sats
-    </button>
-  );
-}
-```
+## NWCWalletConnector Component
 
-## Implementation Notes
+The `NWCWalletConnector` component provides a user interface for:
 
-1. The wallet uses Alby's NWC and LN clients in combination for best functionality
-2. Connection state is maintained in local storage for persistence
-3. Multiple fallback methods for zap requests to handle different wallet implementations
-4. Periodic connection checks ensure wallet stays connected
-5. All wallet operations return Promises for flexible handling 
+1. Connecting to NWC-compatible wallets
+2. Managing default zap amounts
+3. Supporting the RUNSTR project with donations
+4. Checking wallet connection status 

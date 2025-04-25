@@ -1,4 +1,6 @@
 import { LN, nwc } from '@getalby/sdk';
+import { Platform } from '../utils/react-native-shim';
+import AmberAuth from '../services/AmberAuth';
 
 /**
  * AlbyWallet class provides a complete wallet implementation using
@@ -15,6 +17,7 @@ export class AlbyWallet {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.lastConnectionCheck = 0;
+    this.authUrl = null;
   }
 
   /**
@@ -40,6 +43,7 @@ export class AlbyWallet {
       }
       else if (url.startsWith('https://')) {
         // Authorization URL
+        this.authUrl = url;
         localStorage.setItem('nwcAuthUrl', url);
         
         try {
@@ -55,7 +59,7 @@ export class AlbyWallet {
           this.lnClient = new LN(nwcUrl);
         } catch (error) {
           console.error('Failed to connect via authorization URL:', error);
-          throw error;
+          throw new Error(`Authorization URL connection failed: ${error.message || 'Unknown error'}`);
         }
       }
       else {
@@ -63,7 +67,12 @@ export class AlbyWallet {
       }
 
       // Test the connection
-      await this.getInfo();
+      try {
+        await this.getInfo();
+      } catch (error) {
+        console.error('Connection test failed:', error);
+        throw new Error(`Wallet connection test failed: ${error.message || 'Unknown error'}`);
+      }
       
       this.isConnected = true;
       this.lastConnectionCheck = Date.now();
@@ -75,6 +84,11 @@ export class AlbyWallet {
     } catch (error) {
       console.error('Wallet connection error:', error);
       this.isConnected = false;
+      
+      // Clean up partial connections
+      this.nwcClient = null;
+      this.lnClient = null;
+      
       throw error;
     }
   }
@@ -86,6 +100,7 @@ export class AlbyWallet {
     // Clear any existing interval
     if (this.connectionCheckInterval) {
       clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
     }
     
     // Check connection every 2 minutes
@@ -149,9 +164,19 @@ export class AlbyWallet {
     
     // Try to reconnect using saved credentials
     try {
+      // Try to reconnect using authUrl first, as it's the most reliable method
+      if (this.authUrl) {
+        return await this.connect(this.authUrl);
+      }
+      
       const savedAuthUrl = localStorage.getItem('nwcAuthUrl');
       if (savedAuthUrl) {
         return await this.connect(savedAuthUrl);
+      }
+      
+      // Fall back to connection string if auth URL is not available
+      if (this.connectionString) {
+        return await this.connect(this.connectionString);
       }
       
       const savedConnectionString = localStorage.getItem('nwcConnectionString');
@@ -212,11 +237,20 @@ export class AlbyWallet {
       }
       
       const response = await this.nwcClient.getBalance();
-      // Convert msats to sats
-      return Math.floor((response.balance || 0) / 1000);
+      // Handle different response formats and convert msats to sats if needed
+      if (typeof response === 'object' && response !== null) {
+        // If balance is in msats (NWC standard), convert to sats
+        return Math.floor((response.balance || 0) / 1000);
+      } else if (typeof response === 'number') {
+        // Some implementations might return just a number
+        return response;
+      }
+      
+      // Default fallback
+      return 0;
     } catch (error) {
-      console.error('Get balance error:', error);
-      throw error;
+      console.error('[AlbyWallet] Get balance error:', error);
+      throw new Error(`Failed to get wallet balance: ${error.message || 'Unknown error'}`);
     }
   }
 
@@ -257,14 +291,27 @@ export class AlbyWallet {
         // If LN client fails, fallback to NWC client
         console.error('[AlbyWallet] LN client payment failed:', error);
         
-        if (error.message?.includes('timeout') || error.name === 'AbortError') {
-          console.warn('[AlbyWallet] LN client payment timeout, using NWC client instead');
-          console.log('[AlbyWallet] Attempting payment with NWC client');
+        console.warn('[AlbyWallet] LN client payment failed, using NWC client instead');
+        console.log('[AlbyWallet] Attempting payment with NWC client');
+        
+        try {
           const nwcResponse = await this.nwcClient.payInvoice({ invoice });
           console.log('[AlbyWallet] Payment successful with NWC client:', nwcResponse);
           return nwcResponse;
+        } catch (nwcError) {
+          console.error('[AlbyWallet] NWC client payment also failed:', nwcError);
+          
+          // If this is a connection issue, mark connection as broken
+          if (nwcError.message && (
+              nwcError.message.includes('connection') || 
+              nwcError.message.includes('connect') ||
+              nwcError.message.includes('timeout')
+          )) {
+            this.isConnected = false;
+          }
+          
+          throw new Error(`Payment failed: ${nwcError.message || 'Unknown error'}`);
         }
-        throw error;
       }
     } catch (error) {
       console.error('[AlbyWallet] Payment error:', error);
@@ -284,18 +331,40 @@ export class AlbyWallet {
         throw new Error('Wallet not connected');
       }
 
+      // Ensure amount is a valid number
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error('Amount must be a positive number');
+      }
+
       // Convert sats to msats for NWC API
       const amountMsats = amount * 1000;
       
-      const response = await this.nwcClient.makeInvoice({
-        amount: amountMsats,
-        memo: memo || `Invoice for ${amount} sats`
-      });
+      // Create abort controller for timeout handling
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 30000);
       
-      // Return the invoice string depending on the response format
-      return response.paymentRequest || response.invoice || response;
+      try {
+        const response = await this.nwcClient.makeInvoice({
+          amount: amountMsats,
+          memo: memo || `Invoice for ${amount} sats`
+        });
+        
+        clearTimeout(timeoutId);
+        
+        // Return the invoice string depending on the response format
+        return response.paymentRequest || response.invoice || response;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        
+        if (error.name === 'AbortError') {
+          throw new Error('Invoice generation timed out. Please try again.');
+        }
+        
+        console.error('[AlbyWallet] Invoice generation error:', error);
+        throw new Error(`Failed to generate invoice: ${error.message || 'Unknown error'}`);
+      }
     } catch (error) {
-      console.error('Generate invoice error:', error);
+      console.error('[AlbyWallet] Generate invoice error:', error);
       throw error;
     }
   }
@@ -328,7 +397,9 @@ export class AlbyWallet {
         tags: [
           ['p', pubkey],
           ['amount', (amount * 1000).toString()], // Convert to millisats per NIP-57
-          ['r', 'wss://relay.damus.io'], // Use 'r' tag for each relay according to NIP-57
+          ['relays', 'wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'], // NIP-57 format
+          // Individual relay entries for maximum compatibility
+          ['r', 'wss://relay.damus.io'],
           ['r', 'wss://nos.lol'],
           ['r', 'wss://relay.nostr.band']
         ],
@@ -337,8 +408,36 @@ export class AlbyWallet {
 
       console.log('[AlbyWallet] Created zap request:', JSON.stringify(zapRequest));
 
-      // Sign the zap request using window.nostr if available
+      // Sign the zap request using the appropriate method based on platform
       let encodedZapRequest;
+      
+      // For Android, use Amber if available
+      if (Platform.OS === 'android') {
+        try {
+          console.log('[AlbyWallet] Checking for Amber availability on Android');
+          const isAmberAvailable = await AmberAuth.isAmberInstalled();
+          
+          if (isAmberAvailable) {
+            console.log('[AlbyWallet] Signing zap request with Amber');
+            // Amber signing happens asynchronously via deep linking
+            // We need a way to get the result back, which would typically
+            // be handled via the setupDeepLinkHandling callback
+            
+            // For now, we'll fall back to regular invoices on Android
+            // until a proper integration with the deep link handler is implemented
+            console.log('[AlbyWallet] Falling back to regular invoice on Android until full Amber integration is complete');
+            const regularInvoice = await this.generateInvoice(amount, `Zap for ${pubkey.substring(0, 8)}...`);
+            return regularInvoice;
+          } else {
+            console.log('[AlbyWallet] Amber not available, checking for window.nostr');
+          }
+        } catch (amberError) {
+          console.error('[AlbyWallet] Error with Amber integration:', amberError);
+          // Continue to window.nostr fallback
+        }
+      }
+      
+      // Web fallback: try window.nostr if available
       if (window.nostr) {
         // No need to call toObject() since it's already a plain object
         console.log('[AlbyWallet] Signing zap request with window.nostr');
@@ -352,14 +451,15 @@ export class AlbyWallet {
           throw new Error(`Failed to sign zap request: ${signError.message || 'Unknown error'}`);
         }
       } else {
-        // Handle case where window.nostr is not available (fallback)
-        console.error('[AlbyWallet] window.nostr not available');
-        throw new Error('Nostr extension not available for signing zap request');
+        // Handle case where no signer is available (fallback)
+        console.error('[AlbyWallet] No signer available (neither Amber nor window.nostr)');
+        const regularInvoice = await this.generateInvoice(amount, `Payment for ${pubkey.substring(0, 8)}...`);
+        return regularInvoice;
       }
 
-      // Create timeout handler
+      // Rest of the method remains the same (invoice generation)
       const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 30000); // Define timeoutId properly
+      const timeoutId = setTimeout(() => abortController.abort(), 30000);
       
       try {
         // Try standard format first
@@ -411,13 +511,18 @@ export class AlbyWallet {
           
           // Last resort: generate a regular invoice without zap request
           console.log('[AlbyWallet] Trying basic invoice format (without zap request)');
-          const basicResponse = await this.nwcClient.makeInvoice({
-            amount: amount * 1000,
-            memo: `Zap for ${pubkey.substring(0, 8)}...`
-          });
-          
-          console.log('[AlbyWallet] Invoice created successfully (basic format):', basicResponse);
-          return basicResponse.paymentRequest || basicResponse.invoice || basicResponse;
+          try {
+            const basicResponse = await this.nwcClient.makeInvoice({
+              amount: amount * 1000,
+              memo: `Zap for ${pubkey.substring(0, 8)}...`
+            });
+            
+            console.log('[AlbyWallet] Invoice created successfully (basic format):', basicResponse);
+            return basicResponse.paymentRequest || basicResponse.invoice || basicResponse;
+          } catch (basicError) {
+            console.error('[AlbyWallet] All invoice formats failed:', basicError);
+            throw new Error('Failed to generate zap invoice: Wallet may not support zaps');
+          }
         }
       }
     } catch (error) {
@@ -443,6 +548,7 @@ export class AlbyWallet {
       this.lnClient = null;
       this.isConnected = false;
       this.connectionString = null;
+      this.authUrl = null;
       this.reconnectAttempts = 0;
       
       // Clear stored connection info
@@ -451,7 +557,7 @@ export class AlbyWallet {
       
       return true;
     } catch (error) {
-      console.error('Disconnect error:', error);
+      console.error('[AlbyWallet] Disconnect error:', error);
       throw error;
     }
   }
@@ -465,7 +571,9 @@ export class AlbyWallet {
       isConnected: this.isConnected,
       hasNwcClient: !!this.nwcClient,
       hasLnClient: !!this.lnClient,
-      lastChecked: this.lastConnectionCheck
+      lastChecked: this.lastConnectionCheck,
+      reconnectAttempts: this.reconnectAttempts,
+      hasAuthUrl: !!this.authUrl
     };
   }
 } 
