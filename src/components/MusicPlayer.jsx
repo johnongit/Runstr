@@ -2,8 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import styles from '../assets/styles/AudioPlayer.module.css';
 import { NostrContext } from '../contexts/NostrContext';
-import { useAuth } from '../hooks/useAuth';
-import { getLnurlForTrack } from '../utils/wavlake';
+import WavlakeZap from './WavlakeZap';
 
 export function MusicPlayer() {
   const { 
@@ -18,7 +17,6 @@ export function MusicPlayer() {
   } = useAudioPlayer();
   
   const { defaultZapAmount } = useContext(NostrContext);
-  const { wallet } = useAuth();
   const [errorMessage, setErrorMessage] = useState('');
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [zapStatus, setZapStatus] = useState({ loading: false, success: false, error: null });
@@ -49,48 +47,27 @@ export function MusicPlayer() {
     }
   };
 
-  // Handle zap function - sends Bitcoin to the artist
-  const handleZapArtist = async () => {
-    if (!currentTrack) return;
-    if (!wallet || !wallet.isEnabled()) {
-      setZapStatus({ 
-        loading: false, 
-        success: false, 
-        error: 'Wallet not connected. Please connect a Lightning wallet in your settings.' 
-      });
-      
-      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
-      return;
-    }
+  // Handle zap success
+  const handleZapSuccess = () => {
+    setZapStatus({ 
+      loading: false, 
+      success: true, 
+      error: null 
+    });
     
-    try {
-      setZapStatus({ loading: true, success: false, error: null });
+    // Clear success message after a few seconds
+    setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
+  };
 
-      // Get the LNURL for the current track
-      const lnurl = await getLnurlForTrack(currentTrack.id);
-      
-      // If wallet doesn't support direct LNURL handling, fetch the invoice
-      // For this implementation, we assume the wallet supports LNURL
-      await wallet.sendPayment(lnurl);
-      
-      setZapStatus({ 
-        loading: false, 
-        success: true, 
-        error: null 
-      });
-      
-      // Clear success message after a few seconds
-      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
-    } catch (error) {
-      console.error('Error zapping artist:', error);
-      setZapStatus({ 
-        loading: false, 
-        success: false, 
-        error: typeof error === 'string' ? error : error.message || 'Failed to zap artist.' 
-      });
-      
-      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
-    }
+  // Handle zap error
+  const handleZapError = (error) => {
+    setZapStatus({ 
+      loading: false, 
+      success: false, 
+      error: typeof error === 'string' ? error : error.message || 'Failed to zap artist.' 
+    });
+    
+    setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
   };
 
   if (!currentTrack) return null;
@@ -172,11 +149,14 @@ export function MusicPlayer() {
             <div className="icon-next"></div>
           </div>
         </button>
-        <button onClick={handleZapArtist} className={`${styles.controlButton} ${styles.zapButton}`} disabled={zapStatus.loading}>
-          <div className="icon-container">
-            <div className="icon-zap">⚡</div>
-          </div>
-        </button>
+        <WavlakeZap 
+          trackId={currentTrack.id}
+          amount={defaultZapAmount}
+          buttonClass={`${styles.controlButton} ${styles.zapButton}`}
+          buttonText=""
+          onSuccess={handleZapSuccess}
+          onError={handleZapError}
+        />
       </div>
       <div className={styles.nowPlaying}>
         <p>Now playing: {currentTrack.title} - {currentTrack.artist || 'Unknown Artist'}</p>

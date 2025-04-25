@@ -19,8 +19,11 @@ const DEFAULT_RELAYS = [
   'wss://relay.damus.io',
   'wss://nos.lol', 
   'wss://relay.nostr.band',
+  'wss://nostr.wine',
+  'wss://eden.nostr.land',
+  'wss://e.nos.lol',
   'wss://relay.snort.social',
-  'wss://relay.current.fyi'
+  'wss://relay.0xchat.com'
 ];
 
 // Default hashtags for running posts

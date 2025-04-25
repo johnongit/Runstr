@@ -36,7 +36,6 @@ const RELAYS = [
   'wss://groups.0xchat.com',  // Primary relay for NIP-29 groups
   'wss://nos.lol',
   'wss://relay.0xchat.com',
-  'wss://relay.primal.net',
   'wss://relay.damus.io',
   'wss://eden.nostr.land',
   'wss://nostr.wine'

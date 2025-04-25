@@ -1,4 +1,5 @@
 import { nip98 } from 'nostr-tools';
+import { bech32 } from 'bech32';
 
 // todo: move this to env variables
 const WAVLAKE_CATALOG_API_BASE_URL = 'https://catalog.wavlake.com/v1';
@@ -118,6 +119,171 @@ export const getLnurlForTrack = async (trackId) => {
   } catch (error) {
     console.error('Error getting LNURL for track:', error);
     throw error;
+  }
+};
+
+/**
+ * Process a Wavlake LNURL payment using NWC wallet
+ * This is separate from Nostr zaps to avoid using window.nostr in mobile
+ * @param {string} lnurl - The LNURL string from Wavlake API
+ * @param {object} wallet - The NWC wallet instance
+ * @param {number} amount - Optional amount in sats, if not specified will use the default from LNURL
+ * @returns {Promise<object>} - Payment result
+ */
+export const processWavlakeLnurlPayment = async (lnurl, wallet, amount = null) => {
+  if (!lnurl) throw new Error('LNURL is required');
+  if (!wallet) throw new Error('Wallet is required');
+  
+  try {
+    // First, decode the LNURL (bech32 encoded URL)
+    // For most wallet implementations, they can handle the LNURL directly
+    // If the wallet has direct LNURL support, use it
+    if (wallet.sendPayment && typeof wallet.sendPayment === 'function') {
+      try {
+        console.log('[WavlakeZap] Attempting direct LNURL payment');
+        const result = await wallet.sendPayment(lnurl);
+        return result;
+      } catch (directError) {
+        console.error('[WavlakeZap] Direct LNURL payment failed:', directError);
+        // Continue to manual flow if direct payment fails
+      }
+    }
+    
+    // Manual LNURL-pay flow if direct payment isn't supported
+    console.log('[WavlakeZap] Falling back to manual LNURL-pay flow');
+    
+    // 1. Make HTTP request to the LNURL
+    // The LNURL is a bech32-encoded URL that we need to decode
+    let lnurlDecoded;
+    try {
+      lnurlDecoded = lnurl.toLowerCase().startsWith('lnurl')
+        ? bech32ToUrl(lnurl)
+        : lnurl;
+      
+      console.log('[WavlakeZap] Decoded LNURL:', lnurlDecoded);
+    } catch (decodeError) {
+      console.error('[WavlakeZap] Failed to decode LNURL:', decodeError);
+      throw new Error('Invalid LNURL format');
+    }
+    
+    // 2. Fetch the LNURL-pay parameters
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 10000);
+    
+    try {
+      const response = await fetch(lnurlDecoded, { 
+        signal: abortController.signal 
+      });
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`LNURL request failed: ${response.status}`);
+      }
+      
+      const lnurlPayData = await response.json();
+      console.log('[WavlakeZap] LNURL-pay data:', lnurlPayData);
+      
+      // Verify this is a valid LNURL-pay response
+      if (lnurlPayData.tag !== 'payRequest') {
+        throw new Error('Invalid LNURL-pay response: Not a payment request');
+      }
+      
+      // 3. Determine the payment amount
+      const payAmount = amount || lnurlPayData.minSendable / 1000; // Convert from millisats if no amount specified
+      const millisats = Math.round(payAmount * 1000);
+      
+      // Validate amount is within allowed range
+      if (millisats < lnurlPayData.minSendable) {
+        throw new Error(`Amount too small. Minimum is ${lnurlPayData.minSendable / 1000} sats`);
+      }
+      if (lnurlPayData.maxSendable && millisats > lnurlPayData.maxSendable) {
+        throw new Error(`Amount too large. Maximum is ${lnurlPayData.maxSendable / 1000} sats`);
+      }
+      
+      // 4. Call the callback URL with amount to get the invoice
+      const callbackUrl = new URL(lnurlPayData.callback);
+      callbackUrl.searchParams.append('amount', millisats.toString());
+      
+      // Add comment if allowed
+      if (lnurlPayData.commentAllowed) {
+        callbackUrl.searchParams.append('comment', 'Zap from RUNSTR ⚡️');
+      }
+      
+      // Get invoice
+      const invoiceAbortController = new AbortController();
+      const invoiceTimeoutId = setTimeout(() => invoiceAbortController.abort(), 10000);
+      
+      try {
+        const invoiceResponse = await fetch(callbackUrl.toString(), {
+          signal: invoiceAbortController.signal
+        });
+        clearTimeout(invoiceTimeoutId);
+        
+        if (!invoiceResponse.ok) {
+          throw new Error(`Invoice request failed: ${invoiceResponse.status}`);
+        }
+        
+        const invoiceData = await invoiceResponse.json();
+        console.log('[WavlakeZap] Invoice data:', invoiceData);
+        
+        if (!invoiceData.pr) {
+          throw new Error('No payment request in response');
+        }
+        
+        // 5. Pay the invoice using the wallet
+        console.log('[WavlakeZap] Paying invoice:', invoiceData.pr.substring(0, 30) + '...');
+        const paymentResult = await wallet.payInvoice(invoiceData.pr);
+        console.log('[WavlakeZap] Payment result:', paymentResult);
+        
+        return paymentResult;
+      } catch (invoiceError) {
+        clearTimeout(invoiceTimeoutId);
+        console.error('[WavlakeZap] Invoice request error:', invoiceError);
+        throw invoiceError;
+      }
+    } catch (lnurlFetchError) {
+      clearTimeout(timeoutId);
+      console.error('[WavlakeZap] LNURL fetch error:', lnurlFetchError);
+      throw lnurlFetchError;
+    }
+  } catch (error) {
+    console.error('[WavlakeZap] Process payment error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Helper function to decode a bech32 encoded LNURL to a regular URL
+ * @param {string} lnurl - The LNURL string to decode
+ * @returns {string} - The decoded URL
+ */
+export const bech32ToUrl = (lnurl) => {
+  try {
+    // If LNURL already starts with http, it's already decoded
+    if (lnurl.toLowerCase().startsWith('http')) {
+      return lnurl;
+    }
+    
+    // Remove 'lightning:' prefix if it exists
+    const formattedLnurl = lnurl.startsWith('lightning:') 
+      ? lnurl.slice(10) 
+      : lnurl;
+    
+    // Decode the LNURL using bech32 library
+    const decoded = bech32.decode(formattedLnurl, 1023);
+    const words = decoded.words;
+    
+    // Convert the decoded words to bytes
+    const bytes = bech32.fromWords(words);
+    
+    // Convert bytes to a string (URL)
+    const url = new TextDecoder().decode(new Uint8Array(bytes));
+    
+    console.log('[WavlakeZap] Decoded LNURL:', url);
+    return url;
+  } catch (error) {
+    console.error('[WavlakeZap] bech32ToUrl error:', error);
+    throw new Error('Failed to decode LNURL: ' + (error.message || 'Unknown error'));
   }
 };
 

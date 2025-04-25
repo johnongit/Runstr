@@ -2,8 +2,8 @@ import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NostrContext } from '../contexts/NostrContext';
-import { useAuth } from '../hooks/useAuth';
-import { getLnurlForTrack } from '../utils/wavlake';
+import WavlakeZap from './WavlakeZap';
+import PropTypes from 'prop-types';
 
 export const FloatingMusicPlayer = () => {
   const { 
@@ -15,7 +15,6 @@ export const FloatingMusicPlayer = () => {
   } = useAudioPlayer();
   
   const { defaultZapAmount } = useContext(NostrContext);
-  const { wallet } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [zapStatus, setZapStatus] = useState({ loading: false, success: false, error: null });
   const navigate = useNavigate();
@@ -45,49 +44,28 @@ export const FloatingMusicPlayer = () => {
 
   if (!currentTrack) return <span></span>;
 
-  // Handle zap function - sends Bitcoin to the artist
-  const handleZapArtist = async (e) => {
-    if (e) e.stopPropagation(); // Prevent expanding/collapsing the player
+  // Handle zap success
+  const handleZapSuccess = () => {
+    setZapStatus({ 
+      loading: false, 
+      success: true, 
+      error: null 
+    });
     
-    if (!currentTrack) return;
-    if (!wallet || !wallet.isEnabled()) {
-      setZapStatus({ 
-        loading: false, 
-        success: false, 
-        error: 'Wallet not connected' 
-      });
-      
-      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
-      return;
-    }
-    
-    try {
-      setZapStatus({ loading: true, success: false, error: null });
+    // Clear success message after a few seconds
+    setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
+  };
 
-      // Get the LNURL for the current track
-      const lnurl = await getLnurlForTrack(currentTrack.id);
-      
-      // Send the payment
-      await wallet.sendPayment(lnurl);
-      
-      setZapStatus({ 
-        loading: false, 
-        success: true, 
-        error: null 
-      });
-      
-      // Clear success message after a few seconds
-      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
-    } catch (error) {
-      console.error('Error zapping artist:', error);
-      setZapStatus({ 
-        loading: false, 
-        success: false, 
-        error: typeof error === 'string' ? error : 'Failed to zap' 
-      });
-      
-      setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
-    }
+  // Handle zap error
+  const handleZapError = (error) => {
+    console.error('Error zapping artist:', error);
+    setZapStatus({ 
+      loading: false, 
+      success: false, 
+      error: typeof error === 'string' ? error : error.message || 'Failed to zap' 
+    });
+    
+    setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
   };
 
   // Custom Progress Bar Component
@@ -99,6 +77,10 @@ export const FloatingMusicPlayer = () => {
       />
     </div>
   );
+
+  ProgressBar.propTypes = {
+    value: PropTypes.number.isRequired
+  };
   
   // Format time (simplified as we don't have actual duration)
   const formatTime = (seconds) => {
@@ -185,15 +167,14 @@ export const FloatingMusicPlayer = () => {
               </svg>
             </button>
             
-            <button 
-              onClick={handleZapArtist} 
-              className="bg-[#646cff] hover:bg-[#535bf2] text-white p-2 rounded-full"
-              disabled={zapStatus.loading}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </button>
+            <WavlakeZap
+              trackId={currentTrack.id}
+              amount={defaultZapAmount}
+              buttonClass="bg-[#646cff] hover:bg-[#535bf2] text-white p-2 rounded-full"
+              buttonText=""
+              onSuccess={handleZapSuccess}
+              onError={handleZapError}
+            />
           </div>
           
           {zapStatus.loading && <p className="text-xs text-blue-400 mt-3 text-center">Sending {defaultZapAmount} sats...</p>}
@@ -234,18 +215,14 @@ export const FloatingMusicPlayer = () => {
           </span>
           
           {!zapStatus.loading && !zapStatus.success && !zapStatus.error && (
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleZapArtist();
-              }}
-              className="ml-2 text-[#646cff] hover:text-[#535bf2] bg-transparent border-none p-1 rounded-full"
-              title="Zap"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </button>
+            <WavlakeZap
+              trackId={currentTrack.id}
+              amount={defaultZapAmount}
+              buttonClass="ml-2 text-[#646cff] hover:text-[#535bf2] bg-transparent border-none p-1 rounded-full"
+              buttonText=""
+              onSuccess={handleZapSuccess}
+              onError={handleZapError}
+            />
           )}
           
           {zapStatus.loading && <span className="ml-2 text-xs text-blue-400">⚡</span>}

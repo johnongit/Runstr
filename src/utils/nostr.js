@@ -12,11 +12,6 @@ export const RELAYS = [
   'wss://eden.nostr.land',   // Additional reliable relay
   'wss://e.nos.lol',         // Additional reliable relay
   'wss://relay.snort.social', // Backup relay
-  'wss://feeds.nostr.band/running',
-  'wss://feeds.nostr.band/popular',
-  'wss://feeds.nostr.band/memes',
-  'wss://purplerelay.com',
-  'wss://nostr.bitcoiner.social',
   'wss://relay.0xchat.com',  // NIP-29 group support for running clubs
 ];
 

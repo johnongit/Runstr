@@ -338,13 +338,8 @@ async function testAdditionalRelays() {
   
   // Sample of reliable relays from Primal's list
   const additionalRelays = [
-    'wss://feeds.nostr.band/running',
-    'wss://feeds.nostr.band/popular',
-    'wss://feeds.nostr.band/memes',
-    'wss://purplerelay.com',
     'wss://relay.current.fyi',
-    'wss://relay.nostrplebs.com',
-    'wss://nostr.bitcoiner.social'
+    'wss://relay.nostrplebs.com'
   ];
   
   let workingRelaysCount = 0;

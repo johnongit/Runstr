@@ -313,9 +313,7 @@ async function testAdditionalRelays() {
   const additionalRelays = [
     'wss://nostr.wine',
     'wss://feeds.nostr.band',
-    'wss://feeds.nostr.band/running',
     'wss://relay.snort.social',
-    'wss://purplerelay.com',
     'wss://relay.current.fyi',
     'wss://relay.nostrplebs.com'
   ];
