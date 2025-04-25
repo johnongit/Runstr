@@ -1,0 +1,33 @@
+.wavlake-zap-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.wavlake-zap-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.zap-icon {
+  margin-right: 4px;
+}
+
+.zap-loading-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+} 

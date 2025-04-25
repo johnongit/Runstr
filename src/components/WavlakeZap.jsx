@@ -2,8 +2,7 @@ import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { useWallet } from '../contexts/WalletContext';
 import { getLnurlForTrack, processWavlakeLnurlPayment } from '../utils/wavlake';
-import { IonSpinner, IonIcon, IonToast } from '@ionic/react';
-import { flash } from 'ionicons/icons';
+import '../assets/styles/WavlakeZap.css';
 
 /**
  * WavlakeZap Component
@@ -28,14 +27,11 @@ const WavlakeZap = ({
 }) => {
   const { wallet, isConnected, connectWallet } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastColor, setToastColor] = useState('success');
 
   const handleZap = async () => {
     if (!trackId) {
       console.error('[WavlakeZap] No track ID provided');
-      showError('No track ID provided');
+      if (onError) onError(new Error('No track ID provided'));
       return;
     }
 
@@ -44,7 +40,7 @@ const WavlakeZap = ({
         await connectWallet();
       } catch (error) {
         console.error('[WavlakeZap] Failed to connect wallet:', error);
-        showError('Failed to connect wallet. Please try again.');
+        if (onError) onError(error);
         return;
       }
     }
@@ -64,7 +60,6 @@ const WavlakeZap = ({
       const result = await processWavlakeLnurlPayment(lnurl, wallet, amount);
       
       console.log('[WavlakeZap] Payment successful:', result);
-      showSuccess('Artist zapped successfully! ⚡');
       
       // Call success callback if provided
       if (onSuccess && typeof onSuccess === 'function') {
@@ -72,7 +67,6 @@ const WavlakeZap = ({
       }
     } catch (error) {
       console.error('[WavlakeZap] Zap failed:', error);
-      showError(`Zap failed: ${error.message || 'Unknown error'}`);
       
       // Call error callback if provided
       if (onError && typeof onError === 'function') {
@@ -83,43 +77,20 @@ const WavlakeZap = ({
     }
   };
 
-  const showSuccess = (message) => {
-    setToastColor('success');
-    setToastMessage(message);
-    setShowToast(true);
-  };
-
-  const showError = (message) => {
-    setToastColor('danger');
-    setToastMessage(message);
-    setShowToast(true);
-  };
-
   return (
-    <>
-      <button
-        className={`wavlake-zap-button ${buttonClass}`}
-        onClick={handleZap}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <IonSpinner name="dots" />
-        ) : (
-          <>
-            <IonIcon icon={flash} /> {buttonText}
-          </>
-        )}
-      </button>
-
-      <IonToast
-        isOpen={showToast}
-        onDidDismiss={() => setShowToast(false)}
-        message={toastMessage}
-        duration={3000}
-        color={toastColor}
-        position="bottom"
-      />
-    </>
+    <button
+      className={`wavlake-zap-button ${buttonClass}`}
+      onClick={handleZap}
+      disabled={isLoading}
+    >
+      {isLoading ? (
+        <div className="zap-loading-spinner"></div>
+      ) : (
+        <>
+          <span className="zap-icon">⚡</span> {buttonText}
+        </>
+      )}
+    </button>
   );
 };
 
