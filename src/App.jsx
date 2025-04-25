@@ -7,6 +7,7 @@ import { RunTrackerProvider } from './contexts/RunTrackerContext';
 import { TeamsProvider } from './contexts/TeamsContext';
 import { ActivityModeProvider } from './contexts/ActivityModeContext';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { WalletProvider } from './contexts/WalletContext';
 import { MenuBar } from './components/MenuBar';
 import { initializeNostr } from './utils/nostr';
 import './App.css';
@@ -128,14 +129,16 @@ const App = () => {
               <ActivityModeProvider>
                 <RunTrackerProvider>
                   <TeamsProvider>
-                    <div className="relative w-full h-full bg-[#111827] text-white">
-                      <MenuBar />
-                      <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
-                        <Suspense fallback={<EnhancedLoadingFallback />}>
-                          <AppRoutes />
-                        </Suspense>
-                      </main>
-                    </div>
+                    <WalletProvider>
+                      <div className="relative w-full h-full bg-[#111827] text-white">
+                        <MenuBar />
+                        <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
+                          <Suspense fallback={<EnhancedLoadingFallback />}>
+                            <AppRoutes />
+                          </Suspense>
+                        </main>
+                      </div>
+                    </WalletProvider>
                   </TeamsProvider>
                 </RunTrackerProvider>
               </ActivityModeProvider>

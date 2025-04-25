@@ -138,10 +138,10 @@ export const processWavlakeLnurlPayment = async (lnurl, wallet, amount = null) =
     // First, decode the LNURL (bech32 encoded URL)
     // For most wallet implementations, they can handle the LNURL directly
     // If the wallet has direct LNURL support, use it
-    if (wallet.sendPayment && typeof wallet.sendPayment === 'function') {
+    if (wallet.makePayment && typeof wallet.makePayment === 'function') {
       try {
         console.log('[WavlakeZap] Attempting direct LNURL payment');
-        const result = await wallet.sendPayment(lnurl);
+        const result = await wallet.makePayment(lnurl);
         return result;
       } catch (directError) {
         console.error('[WavlakeZap] Direct LNURL payment failed:', directError);
@@ -232,7 +232,7 @@ export const processWavlakeLnurlPayment = async (lnurl, wallet, amount = null) =
         
         // 5. Pay the invoice using the wallet
         console.log('[WavlakeZap] Paying invoice:', invoiceData.pr.substring(0, 30) + '...');
-        const paymentResult = await wallet.payInvoice(invoiceData.pr);
+        const paymentResult = await wallet.makePayment(invoiceData.pr);
         console.log('[WavlakeZap] Payment result:', paymentResult);
         
         return paymentResult;

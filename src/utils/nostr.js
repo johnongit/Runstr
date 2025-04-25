@@ -127,13 +127,13 @@ export const fetchRunningPosts = async (limit = 7, since = undefined) => {
     const defaultSince = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
     const sinceTimestamp = since ? Math.floor(since / 1000) : defaultSince;
     
-    console.log(`Fetching posts with #runstr and #running hashtags from ${new Date(sinceTimestamp * 1000).toLocaleString()}`);
+    console.log(`Fetching posts with #runstr hashtag from ${new Date(sinceTimestamp * 1000).toLocaleString()}`);
     
-    // Simplified approach: Only fetch posts with the two specific hashtags
+    // Simplified approach: Only fetch posts with the runstr hashtag
     const events = await ndk.fetchEvents({
       kinds: [1], // Regular posts
       limit: limit,
-      "#t": ["runstr", "running"],  // Only these two specific hashtags
+      "#t": ["runstr"],  // Only the runstr hashtag
       since: sinceTimestamp
     });
     
@@ -142,47 +142,16 @@ export const fetchRunningPosts = async (limit = 7, since = undefined) => {
       .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
       .slice(0, limit);
     
-    console.log(`Found ${eventArray.length} posts with #runstr and #running hashtags`);
+    console.log(`Found ${eventArray.length} posts with #runstr hashtag`);
     
     if (eventArray.length > 0) {
       return eventArray;
     }
     
-    // Fallback if no posts found with both tags
-    console.log("No posts found with both tags, trying individual tag queries...");
+    // Fallback to content-based filtering if no hashtag results
+    console.log("No posts found with #runstr, falling back to content filtering...");
     
-    // Try fetching with each tag separately and combine results
-    const [runstrEvents, runningEvents] = await Promise.all([
-      ndk.fetchEvents({
-        kinds: [1],
-        limit: limit,
-        "#t": ["runstr"],
-        since: sinceTimestamp
-      }),
-      ndk.fetchEvents({
-        kinds: [1],
-        limit: limit,
-        "#t": ["running"],
-        since: sinceTimestamp
-      })
-    ]);
-    
-    // Combine and deduplicate events
-    const uniqueEvents = new Map();
-    
-    [...Array.from(runstrEvents), ...Array.from(runningEvents)].forEach(event => {
-      if (event && event.id && !uniqueEvents.has(event.id)) {
-        uniqueEvents.set(event.id, event);
-      }
-    });
-    
-    // Sort by created_at and limit
-    const fallbackArray = Array.from(uniqueEvents.values())
-      .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
-      .slice(0, limit);
-    
-    console.log(`Found ${fallbackArray.length} posts with individual hashtags`);
-    return fallbackArray;
+    return await searchRunningContent(limit, 168); // 168 hours = 7 days
   } catch (error) {
     console.error('Error fetching hashtag posts:', error);
     return [];
