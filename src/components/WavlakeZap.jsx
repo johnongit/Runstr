@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import PropTypes from 'prop-types';
-import { useWallet } from '../contexts/WalletContext';
+import { WalletContext } from '../contexts/WalletContext';
 import { getLnurlForTrack, processWavlakeLnurlPayment } from '../utils/wavlake';
 import '../assets/styles/WavlakeZap.css';
 
@@ -25,7 +25,7 @@ const WavlakeZap = ({
   onSuccess,
   onError
 }) => {
-  const { wallet, isConnected, connectWallet } = useWallet();
+  const { wallet, isConnected, ensureConnected } = useContext(WalletContext);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleZap = async () => {
@@ -35,18 +35,23 @@ const WavlakeZap = ({
       return;
     }
 
-    if (!isConnected || !wallet) {
-      try {
-        await connectWallet();
-      } catch (error) {
-        console.error('[WavlakeZap] Failed to connect wallet:', error);
-        if (onError) onError(error);
-        return;
-      }
+    if (!wallet) {
+      console.error('[WavlakeZap] No wallet available');
+      if (onError) onError(new Error('Lightning wallet not connected. Connect wallet in settings.'));
+      return;
     }
 
     setIsLoading(true);
     try {
+      // First ensure wallet is connected
+      if (!isConnected) {
+        console.log('[WavlakeZap] Wallet not connected, attempting to connect...');
+        const connected = await ensureConnected();
+        if (!connected) {
+          throw new Error('Failed to connect wallet. Please try again.');
+        }
+      }
+      
       // 1. Get LNURL for track
       console.log('[WavlakeZap] Getting LNURL for track:', trackId);
       const lnurl = await getLnurlForTrack(trackId);
