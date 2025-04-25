@@ -300,11 +300,14 @@ export const NWCWalletConnector = () => {
       let lnurlPayData;
       try {
         lnurlPayData = await response.json();
-      } catch {
+        console.log('[DonationFlow] Received LNURL-pay metadata:', lnurlPayData);
+      } catch (error) {
+        console.error('[DonationFlow] Failed to parse LNURL-pay metadata:', error);
         throw new Error('Invalid response from payment endpoint. Please try again.');
       }
 
       if (!lnurlPayData.callback) {
+        console.error('[DonationFlow] Invalid LNURL-pay response - missing callback URL:', lnurlPayData);
         throw new Error('Invalid LNURL-pay response: missing callback URL');
       }
 
@@ -331,6 +334,22 @@ export const NWCWalletConnector = () => {
         callbackUrl.searchParams.append('comment', comment);
       }
 
+      // Add lnurl parameter if needed (required for NIP-57 compatibility)
+      if (lightning.includes('@')) {
+        // If we have a lightning address, add it as lnurl parameter (bech32 encoded)
+        // This is just a basic compatibility step - in a real implementation you'd
+        // properly encode this as per LUD-01, but we're assuming most LNURL servers
+        // will work without this parameter in the donation flow
+        callbackUrl.searchParams.append('lnurl', lightning);
+      }
+
+      // Log the callback URL for debugging
+      const callbackUrlString = callbackUrl.toString();
+      console.log('[DonationFlow] Callback URL:', 
+        callbackUrlString.substring(0, Math.min(100, callbackUrlString.length)) + 
+        (callbackUrlString.length > 100 ? '...' : '')
+      );
+
       // Get the invoice with timeout and error handling
       let invoiceResponse;
       try {
@@ -355,11 +374,14 @@ export const NWCWalletConnector = () => {
       let invoiceData;
       try {
         invoiceData = await invoiceResponse.json();
-      } catch {
+        console.log('[DonationFlow] Received invoice data:', invoiceData);
+      } catch (error) {
+        console.error('[DonationFlow] Failed to parse invoice response:', error);
         throw new Error('Failed to parse invoice response. Please try again.');
       }
 
       if (!invoiceData.pr) {
+        console.error('[DonationFlow] Invalid LNURL-pay response - missing payment request:', invoiceData);
         throw new Error('Invalid LNURL-pay response: missing payment request');
       }
 

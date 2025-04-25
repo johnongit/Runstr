@@ -191,9 +191,10 @@ export const usePostInteractions = ({
           ['p', post.author.pubkey],
           ['e', post.id],
           ['amount', (defaultZapAmount * 1000).toString()], // millisats
-          ['r', 'wss://relay.damus.io'],
-          ['r', 'wss://nos.lol'],
-          ['r', 'wss://relay.nostr.band']
+          // Add multiple relay hints to increase success rate
+          ['relays', 'wss://relay.damus.io'],
+          ['relays', 'wss://nos.lol'],
+          ['relays', 'wss://relay.nostr.band']
         ],
         pubkey: await window.nostr.getPublicKey()
       };
@@ -237,12 +238,14 @@ export const usePostInteractions = ({
         try {
           lnurlPayData = await response.json();
           console.log('[ZapFlow] Received LNURL-pay metadata:', lnurlPayData);
-        } catch {
+        } catch (error) {
+          console.error('[ZapFlow] Failed to parse LNURL-pay metadata:', error);
           throw new Error('Invalid response from payment server. Please try again.');
         }
         
         if (!lnurlPayData.callback) {
-          throw new Error('Invalid LNURL-pay response');
+          console.error('[ZapFlow] Invalid LNURL-pay response - missing callback URL:', lnurlPayData);
+          throw new Error('Invalid LNURL-pay response: missing callback URL');
         }
         
         // Construct callback URL
@@ -252,15 +255,26 @@ export const usePostInteractions = ({
         // Try to keep the Nostr event small to avoid URL size limits
         // Some LNURL-pay servers have trouble with large nostr events
         try {
+          // Ensure essential tags are included in the compacted event
+          // According to NIP-57, we need: p, relays, amount, lnurl (and optionally e)
           const compactEvent = {
             ...signedEvent,
-            // Minimize the size by only including the essential fields if the event is large
-            tags: signedEvent.tags.filter(tag => ['p', 'e', 'amount', 'r'].includes(tag[0])).slice(0, 10)
+            tags: signedEvent.tags.filter(tag => 
+              ['p', 'e', 'amount', 'relays', 'lnurl'].includes(tag[0])
+            )
           };
-          callbackUrl.searchParams.append('nostr', JSON.stringify(compactEvent));
+          
+          const nostrParam = JSON.stringify(compactEvent);
+          callbackUrl.searchParams.append('nostr', encodeURIComponent(nostrParam));
           console.log('[ZapFlow] Added compacted nostr event to callback URL');
+          
+          // Add lnurl parameter if we have it (required by NIP-57)
+          if (lnurl) {
+            callbackUrl.searchParams.append('lnurl', lnurl);
+            console.log('[ZapFlow] Added lnurl parameter to callback URL');
+          }
         } catch (jsonError) {
-          console.error('[ZapFlow] Error stringifying nostr event:', jsonError);
+          console.error('[ZapFlow] Error preparing nostr event for callback:', jsonError);
           // If JSON.stringify fails, still try to proceed without the nostr param
         }
         
@@ -268,7 +282,12 @@ export const usePostInteractions = ({
           callbackUrl.searchParams.append('comment', 'Zap for your run! ⚡️');
         }
         
-        console.log('[ZapFlow] Callback URL (truncated):', callbackUrl.toString().substring(0, 100) + '...');
+        // Log the full callback URL for debugging (truncated for security)
+        const callbackUrlString = callbackUrl.toString();
+        console.log('[ZapFlow] Callback URL (truncated):', 
+          callbackUrlString.substring(0, Math.min(100, callbackUrlString.length)) + 
+          (callbackUrlString.length > 100 ? '...' : '')
+        );
         
         // Get invoice with timeout
         const invoiceAbortController = new AbortController();
@@ -289,11 +308,13 @@ export const usePostInteractions = ({
           try {
             invoiceData = await invoiceResponse.json();
             console.log('[ZapFlow] Received invoice data:', invoiceData);
-          } catch {
+          } catch (error) {
+            console.error('[ZapFlow] Failed to parse invoice response:', error);
             throw new Error('Failed to parse invoice response. Please try again.');
           }
           
           if (!invoiceData.pr) {
+            console.error('[ZapFlow] Invalid LNURL-pay response - missing payment request:', invoiceData);
             throw new Error('Invalid LNURL-pay response: missing payment request');
           }
           
