@@ -1,9 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRunProfile } from '../hooks/useRunProfile';
+import { publishHealthProfile } from '../utils/nostrHealth';
+import '../assets/styles/profile.css';
 
 export const Profile = () => {
   const navigate = useNavigate();
+  
+  // State for Nostr publishing
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [unitPreferences, setUnitPreferences] = useState({
+    weight: 'kg',
+    height: 'metric'
+  });
   
   // Get user profile from custom hook
   const { 
@@ -12,10 +21,46 @@ export const Profile = () => {
     handleProfileSubmit: saveProfile
   } = useRunProfile();
 
+  // Handle unit toggle
+  const handleUnitChange = useCallback((metric, value) => {
+    setUnitPreferences(prev => ({
+      ...prev,
+      [metric]: value
+    }));
+  }, []);
+
   // Custom submit handler that navigates back after saving
   const handleProfileSubmit = () => {
     saveProfile();
     navigate('/history'); // Navigate back to RunHistory after saving
+  };
+
+  // Handle publishing health profile to Nostr
+  const handlePublishToNostr = async () => {
+    setIsPublishing(true);
+    
+    try {
+      // Publish health profile to Nostr
+      const result = await publishHealthProfile(profile, unitPreferences);
+      
+      // Show success message
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast(`Health profile published to Nostr! (${result.published}/${result.totalMetrics} metrics)`);
+      } else {
+        alert(`Health profile published to Nostr! (${result.published}/${result.totalMetrics} metrics)`);
+      }
+    } catch (error) {
+      console.error('Error publishing health profile to Nostr:', error);
+      
+      // Show error message
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast('Failed to publish profile: ' + error.message);
+      } else {
+        alert('Failed to publish profile: ' + error.message);
+      }
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -25,7 +70,25 @@ export const Profile = () => {
       
       <div className="form-container">
         <div className="form-group">
-          <label htmlFor="weight">Weight (kg)</label>
+          <div className="flex justify-between items-center mb-2">
+            <label htmlFor="weight">Weight</label>
+            <div className="unit-toggle">
+              <button
+                type="button"
+                className={`unit-button ${unitPreferences.weight === 'kg' ? 'active' : ''}`}
+                onClick={() => handleUnitChange('weight', 'kg')}
+              >
+                kg
+              </button>
+              <button
+                type="button"
+                className={`unit-button ${unitPreferences.weight === 'lb' ? 'active' : ''}`}
+                onClick={() => handleUnitChange('weight', 'lb')}
+              >
+                lb
+              </button>
+            </div>
+          </div>
           <input
             id="weight"
             type="number"
@@ -35,7 +98,25 @@ export const Profile = () => {
         </div>
         
         <div className="form-group height-inputs">
-          <label>Height</label>
+          <div className="flex justify-between items-center mb-2">
+            <label>Height</label>
+            <div className="unit-toggle">
+              <button
+                type="button"
+                className={`unit-button ${unitPreferences.height === 'metric' ? 'active' : ''}`}
+                onClick={() => handleUnitChange('height', 'metric')}
+              >
+                cm
+              </button>
+              <button
+                type="button"
+                className={`unit-button ${unitPreferences.height === 'imperial' ? 'active' : ''}`}
+                onClick={() => handleUnitChange('height', 'imperial')}
+              >
+                ft/in
+              </button>
+            </div>
+          </div>
           <div className="height-fields">
             <div className="height-field">
               <input
@@ -71,6 +152,8 @@ export const Profile = () => {
           >
             <option value="male">Male</option>
             <option value="female">Female</option>
+            <option value="non-binary">Non-binary</option>
+            <option value="prefer-not-to-say">Prefer not to say</option>
           </select>
         </div>
         
@@ -103,6 +186,13 @@ export const Profile = () => {
             onClick={handleProfileSubmit}
           >
             Save Profile
+          </button>
+          <button 
+            className="nostr-button"
+            onClick={handlePublishToNostr}
+            disabled={isPublishing}
+          >
+            {isPublishing ? 'Publishing...' : 'Save Health Profile to Nostr'}
           </button>
           <button 
             className="cancel-button"

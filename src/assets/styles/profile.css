@@ -1,0 +1,120 @@
+/* Profile page styles */
+
+/* Form container */
+.form-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+/* Input styling */
+input[type="number"],
+input[type="text"],
+select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+/* Unit toggle styles */
+.unit-toggle {
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #ccc;
+}
+
+.unit-button {
+  background-color: #f5f5f5;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.unit-button.active {
+  background-color: #2563eb;
+  color: white;
+}
+
+/* Height fields */
+.height-fields {
+  display: flex;
+  gap: 10px;
+}
+
+.height-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.height-field input {
+  flex: 1;
+  margin-right: 8px;
+}
+
+/* Button styles */
+.form-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.save-button,
+.cancel-button {
+  padding: 10px 16px;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.save-button {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+}
+
+.save-button:hover {
+  background-color: #1d4ed8;
+}
+
+.cancel-button {
+  background-color: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.cancel-button:hover {
+  background-color: #e5e7eb;
+}
+
+/* Nostr button style */
+.nostr-button {
+  background-color: #8a30ff; /* Purple color for Nostr */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.nostr-button:hover {
+  background-color: #7029d2;
+}
+
+.nostr-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+} 
