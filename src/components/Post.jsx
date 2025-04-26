@@ -127,14 +127,26 @@ export const Post = ({
 
   // Handle comment click with loading state
   const handleCommentClickWithLoading = useCallback((postId) => {
-    if (!post.commentsLoaded && !commentsLoading) {
-      setCommentsLoading(true);
-      // Call the original handler which should load the comments
-      handleCommentClick(postId).finally(() => {
-        setCommentsLoading(false);
-      });
-    } else {
-      handleCommentClick(postId);
+    try {
+      if (!post.commentsLoaded && !commentsLoading) {
+        setCommentsLoading(true);
+        // Call the original handler which should load the comments
+        handleCommentClick(postId)
+          .then(() => {
+            setCommentsLoading(false);
+          })
+          .catch(error => {
+            console.error('Error in comment loading:', error);
+            setCommentsLoading(false);
+          });
+      } else {
+        handleCommentClick(postId).catch(error => {
+          console.error('Error toggling comments:', error);
+        });
+      }
+    } catch (error) {
+      console.error('Unexpected error in comment handling:', error);
+      setCommentsLoading(false);
     }
   }, [post, commentsLoading, handleCommentClick]);
 

@@ -374,12 +374,60 @@ export const useRunFeed = () => {
                 setPosts(latestPosts => {
                   return latestPosts.map(p => {
                     if (p.id === postId) {
+                      // Get comments from the response
+                      let postComments = [];
+                      
+                      // Check both formats of response for backward compatibility
+                      if (commentData[postId]) {
+                        // New format with postId keys
+                        postComments = commentData[postId];
+                      } else if (commentData.comments && commentData.comments.size > 0) {
+                        // Original format with Set of comments
+                        const commentsArray = Array.from(commentData.comments);
+                        
+                        // Process comments into the expected format
+                        postComments = commentsArray
+                          .filter(comment => {
+                            // Filter for comments that are replies to this post
+                            const eTag = comment.tags?.find(tag => tag[0] === 'e');
+                            return eTag && eTag[1] === postId;
+                          })
+                          .map(comment => ({
+                            id: comment.id || `comment-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                            content: comment.content || '',
+                            created_at: comment.created_at || Math.floor(Date.now() / 1000),
+                            author: {
+                              pubkey: comment.pubkey || '',
+                              profile: {
+                                name: 'Anonymous',
+                                picture: undefined
+                              }
+                            }
+                          }));
+                      }
+                      
                       // Mark comments as loaded and add fetched comments
                       return { 
                         ...p, 
                         commentsLoaded: true,
-                        // Use the comment data from the response, or fallback to existing comments
-                        comments: commentData?.[postId] || p.comments || []
+                        // Use the processed comments, or fallback to existing comments
+                        comments: postComments.length > 0 ? postComments : p.comments || []
+                      };
+                    }
+                    return p;
+                  });
+                });
+              })
+              .catch(error => {
+                console.error('Error loading comments:', error);
+                // Even if comments fail to load, mark as loaded to prevent infinite retries
+                setPosts(latestPosts => {
+                  return latestPosts.map(p => {
+                    if (p.id === postId) {
+                      return { 
+                        ...p, 
+                        commentsLoaded: true,
+                        comments: p.comments || [] 
                       };
                     }
                     return p;

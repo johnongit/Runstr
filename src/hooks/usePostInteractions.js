@@ -15,7 +15,12 @@ export const usePostInteractions = ({
   const handleCommentClick = useCallback((postId) => {
     // Make sure we have post's comments loaded
     if (!loadedSupplementaryData.has(postId)) {
-      loadSupplementaryData(postId);
+      try {
+        // Updated call to loadSupplementaryData with proper parameters
+        loadSupplementaryData([postId], 'comments');
+      } catch (error) {
+        console.error('Error loading supplementary data:', error);
+      }
     }
     
     // Toggle comment visibility
@@ -127,12 +132,20 @@ export const usePostInteractions = ({
     }
 
     try {
-      // Check wallet connection first if possible
+      // More robust wallet connection check with reconnection attempt
       if (wallet.checkConnection) {
+        console.log('[ZapFlow] Checking wallet connection before zapping');
         const isConnected = await wallet.checkConnection();
-        if (!isConnected) {
-          alert('Wallet connection lost. Please reconnect your wallet in the NWC tab.');
-          return;
+        
+        if (!isConnected && wallet.ensureConnected) {
+          console.log('[ZapFlow] Connection lost, attempting to reconnect wallet');
+          // Try to reconnect before failing
+          const reconnected = await wallet.ensureConnected();
+          if (!reconnected) {
+            alert('Wallet connection lost. Please reconnect your wallet in the NWC tab.');
+            return;
+          }
+          console.log('[ZapFlow] Wallet successfully reconnected');
         }
       }
 

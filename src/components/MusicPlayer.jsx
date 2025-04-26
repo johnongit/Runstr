@@ -48,26 +48,38 @@ export function MusicPlayer() {
   };
 
   // Handle zap success
-  const handleZapSuccess = () => {
-    setZapStatus({ 
-      loading: false, 
-      success: true, 
-      error: null 
+  const handleZapSuccess = (/* result */) => {
+    setZapStatus({
+      loading: false,
+      success: true,
+      error: null
     });
     
-    // Clear success message after a few seconds
-    setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      setZapStatus(prev => ({
+        ...prev,
+        success: false
+      }));
+    }, 3000);
   };
 
   // Handle zap error
   const handleZapError = (error) => {
-    setZapStatus({ 
-      loading: false, 
-      success: false, 
-      error: typeof error === 'string' ? error : error.message || 'Failed to zap artist.' 
+    console.error('Zap error:', error);
+    setZapStatus({
+      loading: false,
+      success: false,
+      error: error.message || 'Failed to send zap'
     });
     
-    setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 5000);
+    // Hide error message after 5 seconds
+    setTimeout(() => {
+      setZapStatus(prev => ({
+        ...prev,
+        error: null
+      }));
+    }, 5000);
   };
 
   if (!currentTrack) return null;
@@ -111,19 +123,14 @@ export function MusicPlayer() {
       )}
       
       {/* Zap status messages */}
-      {zapStatus.loading && (
-        <div className={styles.zapMessage}>
-          Sending {defaultZapAmount} sats to {currentTrack.artist || 'the artist'}...
+      {zapStatus.error && (
+        <div className={styles.zapError}>
+          {zapStatus.error}
         </div>
       )}
       {zapStatus.success && (
         <div className={styles.zapSuccess}>
           Successfully sent {defaultZapAmount} sats to {currentTrack.artist || 'the artist'}! ⚡️
-        </div>
-      )}
-      {zapStatus.error && (
-        <div className={styles.zapError}>
-          {zapStatus.error}
         </div>
       )}
       

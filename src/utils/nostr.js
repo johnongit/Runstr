@@ -160,10 +160,11 @@ export const fetchRunningPosts = async (limit = 7, since = undefined) => {
 
 /**
  * Load all supplementary data for posts in parallel
- * @param {Array} posts - Array of posts to load data for
+ * @param {Array} posts - Array of posts or post IDs to load data for
+ * @param {string} [type] - Optional type of data to load (ignored but kept for compatibility)
  * @returns {Promise<Object>} Object containing all supplementary data
  */
-export const loadSupplementaryData = async (posts) => {
+export const loadSupplementaryData = async (posts, type) => {
   if (!posts || posts.length === 0) return {
     profileEvents: new Set(),
     comments: new Set(),
@@ -172,18 +173,31 @@ export const loadSupplementaryData = async (posts) => {
     zapReceipts: new Set()
   };
   
+  // Handle case where a single postId is passed instead of an array of posts
+  if (typeof posts === 'string') {
+    posts = [{ id: posts }];
+    console.log('Warning: loadSupplementaryData called with string instead of post array');
+  }
+  
+  // Handle case where an array of postIds is passed
+  if (Array.isArray(posts) && typeof posts[0] === 'string') {
+    posts = posts.map(id => ({ id }));
+    console.log('Warning: loadSupplementaryData called with array of strings');
+  }
+  
   // Extract all post IDs
   const postIds = posts.map(post => post.id);
-  // Extract unique author public keys
-  const authors = [...new Set(posts.map(post => post.pubkey))];
+  
+  // Extract unique author public keys (if available)
+  const authors = [...new Set(posts.filter(post => post.pubkey).map(post => post.pubkey))];
   
   // Run all queries in parallel like in the working implementation
   const [profileEvents, comments, likes, reposts, zapReceipts] = await Promise.all([
-    // Profile information
-    fetchEvents({
+    // Profile information (only if we have author public keys)
+    authors.length > 0 ? fetchEvents({
       kinds: [0],
       authors
-    }),
+    }) : Promise.resolve(new Set()),
     
     // Comments
     fetchEvents({
@@ -210,13 +224,22 @@ export const loadSupplementaryData = async (posts) => {
     })
   ]);
   
-  return {
+  // If called with a single ID, add the ID to the result for easier lookup
+  const result = {
     profileEvents,
     comments,
     likes,
     reposts,
     zapReceipts
   };
+  
+  // If called with a single post ID and 'comments' type, structure the result
+  // to be compatible with the expected format in handleCommentClick
+  if (type === 'comments' && postIds.length === 1) {
+    result[postIds[0]] = Array.from(comments);
+  }
+  
+  return result;
 };
 
 /**

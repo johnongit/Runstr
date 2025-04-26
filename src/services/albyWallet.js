@@ -158,32 +158,53 @@ export class AlbyWallet {
    * @returns {Promise<boolean>} - Connection status
    */
   async ensureConnected() {
+    // First check current connection status
     if (await this.checkConnection()) {
+      console.log('[AlbyWallet] Connection check passed, wallet is connected');
       return true;
     }
     
+    console.log('[AlbyWallet] Connection check failed, attempting to reconnect...');
+    
     // Try to reconnect using saved credentials
     try {
-      // Try to reconnect using authUrl first, as it's the most reliable method
-      if (this.authUrl) {
-        return await this.connect(this.authUrl);
+      // Try each reconnection method in sequence, with multiple attempts
+      for (let attempt = 0; attempt < 3; attempt++) {
+        console.log(`[AlbyWallet] Reconnection attempt ${attempt + 1}/3`);
+        
+        // Try to reconnect using authUrl first, as it's the most reliable method
+        if (this.authUrl) {
+          console.log('[AlbyWallet] Attempting reconnection using existing authUrl');
+          const connected = await this.connect(this.authUrl);
+          if (connected) return true;
+        }
+        
+        const savedAuthUrl = localStorage.getItem('nwcAuthUrl');
+        if (savedAuthUrl) {
+          console.log('[AlbyWallet] Attempting reconnection using saved authUrl');
+          const connected = await this.connect(savedAuthUrl);
+          if (connected) return true;
+        }
+        
+        // Fall back to connection string if auth URL is not available
+        if (this.connectionString) {
+          console.log('[AlbyWallet] Attempting reconnection using existing connectionString');
+          const connected = await this.connect(this.connectionString);
+          if (connected) return true;
+        }
+        
+        const savedConnectionString = localStorage.getItem('nwcConnectionString');
+        if (savedConnectionString) {
+          console.log('[AlbyWallet] Attempting reconnection using saved connectionString');
+          const connected = await this.connect(savedConnectionString);
+          if (connected) return true;
+        }
+        
+        // Wait briefly before next attempt
+        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-      const savedAuthUrl = localStorage.getItem('nwcAuthUrl');
-      if (savedAuthUrl) {
-        return await this.connect(savedAuthUrl);
-      }
-      
-      // Fall back to connection string if auth URL is not available
-      if (this.connectionString) {
-        return await this.connect(this.connectionString);
-      }
-      
-      const savedConnectionString = localStorage.getItem('nwcConnectionString');
-      if (savedConnectionString) {
-        return await this.connect(savedConnectionString);
-      }
-      
+      console.error('[AlbyWallet] All reconnection attempts failed');
       return false;
     } catch (error) {
       console.error('[AlbyWallet] Failed to reconnect wallet:', error);

@@ -46,32 +46,39 @@ export const WalletProvider = ({ children }) => {
     const savedConnectionString = localStorage.getItem('nwcConnectionString');
     
     if (savedAuthUrl || savedConnectionString) {
-      // Attempt to reconnect on mount
-      setTimeout(async () => {
+      // Attempt to reconnect immediately on mount - removed the setTimeout delay
+      (async () => {
         try {
           setConnectionState(CONNECTION_STATES.CONNECTING);
           await walletInstance.ensureConnected();
           const isConnected = await walletInstance.checkConnection();
           if (isConnected) {
+            console.log('[WalletContext] Successfully reconnected wallet on mount');
             setConnectionState(CONNECTION_STATES.CONNECTED);
+            // Also get balance after successful connection
+            try {
+              const currentBalance = await walletInstance.getBalance();
+              setBalance(currentBalance);
+            } catch (balanceErr) {
+              console.error('Failed to fetch initial balance:', balanceErr);
+            }
           } else {
+            console.log('[WalletContext] Could not reconnect wallet on mount');
             setConnectionState(CONNECTION_STATES.DISCONNECTED);
           }
         } catch (err) {
           console.error('Failed to reconnect on mount:', err);
           setConnectionState(CONNECTION_STATES.DISCONNECTED);
         }
-      }, 500);
+      })();
     }
     
     return () => {
       if (connectionCheckInterval) {
         clearInterval(connectionCheckInterval);
       }
-      // Disconnect wallet on unmount if connected
-      if (walletInstance && connectionState === CONNECTION_STATES.CONNECTED) {
-        walletInstance.disconnect();
-      }
+      // Remove the disconnect call to keep wallet connected when navigating
+      // This allows the wallet to stay connected in the background
     };
   }, []);
 

@@ -45,27 +45,38 @@ export const FloatingMusicPlayer = () => {
   if (!currentTrack) return <span></span>;
 
   // Handle zap success
-  const handleZapSuccess = () => {
-    setZapStatus({ 
-      loading: false, 
-      success: true, 
-      error: null 
+  const handleZapSuccess = (/* result */) => {
+    setZapStatus({
+      loading: false,
+      success: true,
+      error: null
     });
     
-    // Clear success message after a few seconds
-    setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      setZapStatus(prev => ({
+        ...prev,
+        success: false
+      }));
+    }, 3000);
   };
 
   // Handle zap error
   const handleZapError = (error) => {
-    console.error('Error zapping artist:', error);
-    setZapStatus({ 
-      loading: false, 
-      success: false, 
-      error: typeof error === 'string' ? error : error.message || 'Failed to zap' 
+    console.error('Floating player zap error:', error);
+    setZapStatus({
+      loading: false,
+      success: false,
+      error: error.message || 'Failed to send zap'
     });
     
-    setTimeout(() => setZapStatus({ loading: false, success: false, error: null }), 3000);
+    // Hide error message after 5 seconds
+    setTimeout(() => {
+      setZapStatus(prev => ({
+        ...prev,
+        error: null
+      }));
+    }, 5000);
   };
 
   // Custom Progress Bar Component
@@ -177,9 +188,8 @@ export const FloatingMusicPlayer = () => {
             />
           </div>
           
-          {zapStatus.loading && <p className="text-xs text-blue-400 mt-3 text-center">Sending {defaultZapAmount} sats...</p>}
-          {zapStatus.success && <p className="text-xs text-green-400 mt-3 text-center">Zap sent! ⚡️</p>}
           {zapStatus.error && <p className="text-xs text-red-400 mt-3 text-center">{zapStatus.error}</p>}
+          {zapStatus.success && <p className="text-xs text-green-400 mt-3 text-center">Zap sent! ⚡️</p>}
           
           <div className="flex justify-between items-center mt-3">
             <button onClick={() => navigate('/music')} className="text-xs text-[#646cff]">
@@ -214,7 +224,7 @@ export const FloatingMusicPlayer = () => {
             {currentTrack.title}
           </span>
           
-          {!zapStatus.loading && !zapStatus.success && !zapStatus.error && (
+          {!zapStatus.error && (
             <WavlakeZap
               trackId={currentTrack.id}
               amount={defaultZapAmount}
@@ -225,8 +235,6 @@ export const FloatingMusicPlayer = () => {
             />
           )}
           
-          {zapStatus.loading && <span className="ml-2 text-xs text-blue-400">⚡</span>}
-          {zapStatus.success && <span className="ml-2 text-xs text-green-400">⚡</span>}
           {zapStatus.error && <span className="ml-2 text-xs text-red-400">⚡</span>}
           
           <button 

@@ -16,6 +16,41 @@
   margin-right: 4px;
 }
 
+/* Success state styling */
+.zap-success-state {
+  background-color: #4caf50 !important;
+  color: white !important;
+}
+
+.zap-success-icon {
+  animation: zap-success-pulse 1.5s ease-in-out;
+}
+
+@keyframes zap-success-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* Error state styling */
+.zap-error-state {
+  background-color: #f44336 !important;
+  color: white !important;
+}
+
+.zap-error {
+  animation: zap-error-shake 0.5s ease-in-out;
+}
+
+@keyframes zap-error-shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-3px); }
+  100% { transform: translateX(0); }
+}
+
+/* Legacy spinner code - keeping for backward compatibility */
 .zap-loading-spinner {
   display: inline-block;
   width: 1em;
