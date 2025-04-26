@@ -7,12 +7,27 @@ import { PostList } from './PostList';
 import { handleAppBackground } from '../utils/nostr';
 import './RunClub.css';
 
+// Progressive loading indicator component
+const ProgressiveLoadingIndicator = ({ progress }) => {
+  return (
+    <div className="progressive-loading">
+      <div className="loading-animation">
+        <div className="dot"></div>
+        <div className="dot"></div>
+        <div className="dot"></div>
+      </div>
+      <p>Loading posts from relays{progress > 0 ? ` (${progress} found)` : '...'}</p>
+    </div>
+  );
+};
+
 const RunClub = () => {
   const { defaultZapAmount } = useContext(NostrContext);
   const { wallet } = useAuth();
   const [diagnosticInfo, setDiagnosticInfo] = useState('');
   const [showDebug, setShowDebug] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   
   // Use the custom hooks
   const {
@@ -48,6 +63,15 @@ const RunClub = () => {
     loadedSupplementaryData,
     defaultZapAmount
   });
+
+  // Update loading progress when posts change
+  useEffect(() => {
+    if (loading && posts.length > 0) {
+      setLoadingProgress(posts.length);
+    } else if (!loading) {
+      setLoadingProgress(0);
+    }
+  }, [loading, posts.length]);
 
   // Handle app lifecycle events for Android
   useEffect(() => {
@@ -123,9 +147,30 @@ const RunClub = () => {
         {isRefreshing && <span className="refresh-icon">↻</span>}
       </button>
 
-      {loading && posts.length === 0 ? (
+      {loading ? (
         <div className="loading-indicator">
-          <p>Loading posts...</p>
+          {posts.length === 0 ? (
+            <ProgressiveLoadingIndicator progress={loadingProgress} />
+          ) : (
+            <div className="posts-loading-more">
+              <PostList
+                posts={posts}
+                loading={loading}
+                page={1}
+                userLikes={userLikes}
+                userReposts={userReposts}
+                handleLike={handleLike}
+                handleRepost={handleRepost}
+                handleZap={(post) => handleZap(post, wallet)}
+                handleCommentClick={handleCommentClick}
+                handleComment={handleComment}
+                commentText={commentText}
+                setCommentText={setCommentText}
+                wallet={wallet}
+              />
+              <ProgressiveLoadingIndicator progress={loadingProgress} />
+            </div>
+          )}
         </div>
       ) : error ? (
         <div className="error-message">

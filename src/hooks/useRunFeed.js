@@ -3,8 +3,7 @@ import {
   initializeNostr, 
   fetchRunningPosts, 
   loadSupplementaryData, 
-  processPostsWithData,
-  searchRunningContent
+  processPostsWithData
 } from '../utils/nostr';
 
 // Global state for caching posts across component instances
@@ -200,40 +199,7 @@ export const useRunFeed = () => {
       
       console.log(`Fetched ${runPostsArray.length} running posts`);
       
-      // If we got no results with tags, try a content search as fallback
-      if (runPostsArray.length === 0 && page === 1) {
-        console.log('No tagged running posts found, trying content search');
-        const contentPosts = await searchRunningContent(limit, 72); // 72 hours
-        
-        if (contentPosts.length > 0) {
-          console.log(`Found ${contentPosts.length} posts through content search`);
-          
-          // Load supplementary data in parallel for all posts
-          const supplementaryData = await loadSupplementaryData(contentPosts);
-          
-          // Process posts with all the data
-          const processedPosts = await processPostsWithData(contentPosts, supplementaryData);
-          
-          // Update global cache
-          globalState.allPosts = processedPosts;
-          globalState.lastFetchTime = now;
-          
-          // Update state with all processed posts, but only display up to the limit
-          setAllPosts(processedPosts);
-          setPosts(processedPosts.slice(0, displayLimit));
-          
-          // Update user interactions
-          updateUserInteractions(supplementaryData);
-          
-          setHasMore(contentPosts.length >= limit);
-          setLoading(false);
-          initialLoadRef.current = true;
-          
-          // Set up background fetch
-          setupBackgroundFetch();
-          return;
-        }
-      }
+      // Remove content fallback - as requested, only use hashtag search
       
       // If we didn't get enough posts, there may not be more to load
       if (runPostsArray.length < limit) {

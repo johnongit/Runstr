@@ -932,4 +932,60 @@
   min-height: unset;
   border-radius: 0;
   margin: 0;
+}
+
+/* Progressive loading indicator styles */
+.progressive-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  margin: 10px 0;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.loading-animation {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  background-color: #0088cc;
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: pulse 1.4s infinite ease-in-out;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.posts-loading-more {
+  display: flex;
+  flex-direction: column;
+}
+
+.posts-loading-more .progressive-loading {
+  margin-top: 20px;
+  background-color: transparent;
 } 

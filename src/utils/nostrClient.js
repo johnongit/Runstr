@@ -347,8 +347,45 @@ export const fetchEvents = async (filter) => {
       filter.limit = 50;
     }
     
-    // Simple fetch with timeout
-    const events = await pool.list(relays, [filter], { timeout: 10000 });
+    // Prioritize relays based on performance metrics
+    let prioritizedRelays = [...relays]; // Default to existing relays order
+    
+    try {
+      // Load performance metrics from localStorage
+      const relayPerformance = JSON.parse(localStorage.getItem('relayPerformance') || '{}');
+      if (Object.keys(relayPerformance).length > 0) {
+        // Calculate average response time for each relay
+        const relayScores = Object.entries(relayPerformance).map(([relay, metrics]) => {
+          const avgTime = metrics.count > 0 ? metrics.totalTime / metrics.count : Infinity;
+          // Also factor in recent activity - prefer relays used recently
+          const recencyBonus = Date.now() - (metrics.lastUpdated || 0) < 24 * 60 * 60 * 1000 ? 1 : 0.5;
+          return { 
+            relay, 
+            score: avgTime * (1 - recencyBonus) // Lower score is better
+          };
+        });
+        
+        // Sort relays by score (fastest first)
+        relayScores.sort((a, b) => a.score - b.score);
+        
+        // Extract just the relay URLs that exist in our relays array
+        const fastRelays = relayScores
+          .map(item => item.relay)
+          .filter(relay => relays.includes(relay));
+        
+        // Combine fast relays with any remaining relays
+        const remainingRelays = relays.filter(relay => !fastRelays.includes(relay));
+        prioritizedRelays = [...fastRelays, ...remainingRelays];
+        
+        console.log('Using prioritized relays order:', prioritizedRelays.slice(0, 3), '...');
+      }
+    } catch (err) {
+      console.warn('Error prioritizing relays:', err);
+      // Fall back to default relay order
+    }
+    
+    // Simple fetch with timeout - using prioritized relays
+    const events = await pool.list(prioritizedRelays, [filter], { timeout: 10000 });
     console.log(`Fetched ${events.length} events`);
     return events;
   } catch (error) {

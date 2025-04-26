@@ -123,35 +123,114 @@ export const fetchEvents = async (filter) => {
  */
 export const fetchRunningPosts = async (limit = 7, since = undefined) => {
   try {
-    // If no custom "since" provided, use 30 days
-    const defaultSince = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+    // If no custom "since" provided, use 14 days (reduced from 30 for faster loading)
+    const defaultSince = Math.floor(Date.now() / 1000) - 14 * 24 * 60 * 60;
     const sinceTimestamp = since ? Math.floor(since / 1000) : defaultSince;
     
     console.log(`Fetching posts with #runstr hashtag from ${new Date(sinceTimestamp * 1000).toLocaleString()}`);
     
-    // Simplified approach: Only fetch posts with the runstr hashtag
-    const events = await ndk.fetchEvents({
-      kinds: [1], // Regular posts
-      limit: limit,
-      "#t": ["runstr"],  // Only the runstr hashtag
-      since: sinceTimestamp
+    // Track unique events to avoid duplicates
+    const uniqueEvents = new Map();
+    let receivedEvents = false;
+    
+    // Create a promise that will resolve once we have enough events or timeout
+    return new Promise((resolve) => {
+      // Set a maximum timeout - don't wait forever for all relays
+      const maxTimeout = setTimeout(() => {
+        console.log(`Timeout reached with ${uniqueEvents.size} posts collected`);
+        
+        // Convert to array, sort by created_at (newest first), and limit results
+        const eventArray = Array.from(uniqueEvents.values())
+          .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+          .slice(0, limit);
+        
+        resolve(eventArray);
+      }, 12000); // 12 second max timeout
+      
+      // Create a subscription to receive events as they arrive
+      const sub = ndk.subscribe({
+        kinds: [1], // Regular posts
+        limit: limit * 2, // Get more than needed to allow for better sorting
+        "#t": ["runstr"],  // Only the runstr hashtag
+        since: sinceTimestamp
+      });
+      
+      // Track relay performance
+      const relayPerformance = {};
+      
+      // Process events as they arrive
+      sub.on('event', (event) => {
+        // Track which relay sent this event
+        const relay = event.relay?.url || 'unknown';
+        if (!relayPerformance[relay]) {
+          relayPerformance[relay] = { count: 0, startTime: Date.now() };
+        }
+        relayPerformance[relay].count++;
+        receivedEvents = true;
+        
+        // Store unique events by id
+        uniqueEvents.set(event.id, event);
+        
+        // If we have enough events, we can resolve early
+        if (uniqueEvents.size >= limit) {
+          setTimeout(() => {
+            clearTimeout(maxTimeout);
+            
+            // Save relay performance metrics to localStorage for future prioritization
+            try {
+              const storedMetrics = JSON.parse(localStorage.getItem('relayPerformance') || '{}');
+              
+              // Update metrics with new data
+              Object.entries(relayPerformance).forEach(([relay, metrics]) => {
+                const responseTime = metrics.count > 0 ? 
+                  (Date.now() - metrics.startTime) : 0;
+                
+                storedMetrics[relay] = storedMetrics[relay] || { 
+                  count: 0, 
+                  totalTime: 0,
+                  lastUpdated: Date.now()
+                };
+                storedMetrics[relay].count += metrics.count;
+                storedMetrics[relay].totalTime += responseTime;
+                storedMetrics[relay].lastUpdated = Date.now();
+              });
+              
+              localStorage.setItem('relayPerformance', JSON.stringify(storedMetrics));
+            } catch (err) {
+              console.warn('Could not save relay performance data', err);
+            }
+            
+            // Convert to array, sort by created_at (newest first), and limit results
+            const eventArray = Array.from(uniqueEvents.values())
+              .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+              .slice(0, limit);
+            
+            console.log(`Resolved early with ${eventArray.length} posts with #runstr hashtag`);
+            sub.stop();
+            resolve(eventArray);
+          }, 1000); // Wait a short time for potentially more relevant events
+        }
+      });
+      
+      // Handle when the subscription is complete from a relay
+      sub.on('eose', () => {
+        // If we've already received some events and it's been more than 3 seconds,
+        // resolve to show content quickly without waiting for all relays
+        if (receivedEvents && uniqueEvents.size > 0 && Date.now() - sub.started > 3000) {
+          clearTimeout(maxTimeout);
+          
+          console.log(`EOSE received with ${uniqueEvents.size} posts collected`);
+          
+          // Convert to array, sort by created_at (newest first), and limit results
+          const eventArray = Array.from(uniqueEvents.values())
+            .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+            .slice(0, limit);
+          
+          sub.stop();
+          resolve(eventArray);
+        }
+      });
     });
-    
-    // Convert to array and sort by created_at (newest first)
-    const eventArray = Array.from(events)
-      .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
-      .slice(0, limit);
-    
-    console.log(`Found ${eventArray.length} posts with #runstr hashtag`);
-    
-    if (eventArray.length > 0) {
-      return eventArray;
-    }
-    
-    // Fallback to content-based filtering if no hashtag results
-    console.log("No posts found with #runstr, falling back to content filtering...");
-    
-    return await searchRunningContent(limit, 168); // 168 hours = 7 days
   } catch (error) {
     console.error('Error fetching hashtag posts:', error);
     return [];
