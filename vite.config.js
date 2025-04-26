@@ -7,11 +7,6 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-<<<<<<< HEAD
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]'
-=======
         entryFileNames: 'assets/[name].[hash].js',
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[hash].[ext]',
@@ -21,13 +16,11 @@ export default defineConfig({
             'react', 
             'react-dom', 
             'react-router-dom',
-            '@nostr-dev-kit/ndk',
             'nostr-tools'
           ],
           // Audio player in separate chunk
           audioPlayer: [
-            'react-h5-audio-player',
-            'react-player'
+            'react-h5-audio-player'
           ]
         }
       }
@@ -45,18 +38,14 @@ export default defineConfig({
       compress: {
         drop_console: true, // Remove console logs in production
         drop_debugger: true
->>>>>>> Simple-updates
       }
     }
   },
   server: {
-<<<<<<< HEAD
-=======
     // Enable faster Hot Module Replacement
     hmr: {
       overlay: true,
     },
->>>>>>> Simple-updates
     proxy: {
       '/api/v1': {
         target: 'https://wavlake.com',
@@ -96,8 +85,6 @@ export default defineConfig({
         }
       }
     }
-<<<<<<< HEAD
-=======
   },
   // Add optimizations for better production builds
   optimizeDeps: {
@@ -105,7 +92,6 @@ export default defineConfig({
       'react', 
       'react-dom', 
       'react-router-dom',
-      '@nostr-dev-kit/ndk',
       'nostr-tools',
       'react-h5-audio-player'
     ],
@@ -119,6 +105,5 @@ export default defineConfig({
   // Improve the speed of the dev server
   esbuild: {
     jsxInject: `import React from 'react'`,
->>>>>>> Simple-updates
   }
 })

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import styles from '../assets/styles/AudioPlayer.module.css';
+import { NostrContext } from '../contexts/NostrContext';
+import WavlakeZap from './WavlakeZap';
 
 export function MusicPlayer() {
   const { 
@@ -14,13 +16,16 @@ export function MusicPlayer() {
     currentTrackIndex
   } = useAudioPlayer();
   
+  const { defaultZapAmount } = useContext(NostrContext);
   const [errorMessage, setErrorMessage] = useState('');
   const [showErrorMessage, setShowErrorMessage] = useState(false);
+  const [zapStatus, setZapStatus] = useState({ loading: false, success: false, error: null });
 
   // Reset error when track changes
   useEffect(() => {
     setErrorMessage('');
     setShowErrorMessage(false);
+    setZapStatus({ loading: false, success: false, error: null });
   }, [currentTrack]);
 
   // Error handling function
@@ -40,6 +45,41 @@ export function MusicPlayer() {
     } catch (error) {
       handlePlaybackError(error);
     }
+  };
+
+  // Handle zap success
+  const handleZapSuccess = (/* result */) => {
+    setZapStatus({
+      loading: false,
+      success: true,
+      error: null
+    });
+    
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      setZapStatus(prev => ({
+        ...prev,
+        success: false
+      }));
+    }, 3000);
+  };
+
+  // Handle zap error
+  const handleZapError = (error) => {
+    console.error('Zap error:', error);
+    setZapStatus({
+      loading: false,
+      success: false,
+      error: error.message || 'Failed to send zap'
+    });
+    
+    // Hide error message after 5 seconds
+    setTimeout(() => {
+      setZapStatus(prev => ({
+        ...prev,
+        error: null
+      }));
+    }, 5000);
   };
 
   if (!currentTrack) return null;
@@ -81,37 +121,49 @@ export function MusicPlayer() {
           {errorMessage}
         </div>
       )}
+      
+      {/* Zap status messages */}
+      {zapStatus.error && (
+        <div className={styles.zapError}>
+          {zapStatus.error}
+        </div>
+      )}
+      {zapStatus.success && (
+        <div className={styles.zapSuccess}>
+          Successfully sent {defaultZapAmount} sats to {currentTrack.artist || 'the artist'}! ⚡️
+        </div>
+      )}
+      
       <div className={styles.title}>
         <p>Selected Playlist: {playlist?.title || 'Unknown'}</p>
-        <p>Selected Track: {currentTrack.title}</p>
       </div>
       <div className={styles.controls}>
         <button onClick={playPrevious} className={styles.controlButton}>
           <div className="icon-container">
             <div className="icon-prev"></div>
-            <span className={styles.buttonText}>Previous</span>
           </div>
         </button>
         <button onClick={safeTogglePlay} className={styles.controlButton}>
           <div className="icon-container">
             {isPlaying ? 
-              <>
-                <div className="icon-pause"></div>
-                <span className={styles.buttonText}>Pause</span>
-              </> : 
-              <>
-                <div className="icon-play"></div>
-                <span className={styles.buttonText}>Play</span>
-              </>
+              <div className="icon-pause"></div> : 
+              <div className="icon-play"></div>
             }
           </div>
         </button>
         <button onClick={playNext} className={styles.controlButton}>
           <div className="icon-container">
             <div className="icon-next"></div>
-            <span className={styles.buttonText}>Next</span>
           </div>
         </button>
+        <WavlakeZap 
+          trackId={currentTrack.id}
+          amount={defaultZapAmount}
+          buttonClass={`${styles.controlButton} ${styles.zapButton}`}
+          buttonText=""
+          onSuccess={handleZapSuccess}
+          onError={handleZapError}
+        />
       </div>
       <div className={styles.nowPlaying}>
         <p>Now playing: {currentTrack.title} - {currentTrack.artist || 'Unknown Artist'}</p>

@@ -1,46 +1,142 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { publishToNostr } from '../utils/nostr';
-import { storeRunLocally } from '../utils/offline';
-import { runTracker } from '../services/RunTracker';
-<<<<<<< HEAD
-import { convertDistance, formatPace, formatTime } from '../utils/formatters';
-=======
-import { convertDistance, formatPace, formatPaceWithUnit, formatTime } from '../utils/formatters';
+import { useRunTracker } from '../contexts/RunTrackerContext';
+import { useActivityMode } from '../contexts/ActivityModeContext';
+import { useSettings } from '../contexts/SettingsContext';
+import runDataService from '../services/RunDataService';
 import { PermissionDialog } from './PermissionDialog';
->>>>>>> Simple-updates
+import { formatPaceWithUnit, displayDistance, convertDistance, formatElevation } from '../utils/formatters';
+import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
+import SplitsTable from './SplitsTable';
+import DashboardRunCard from './DashboardRunCard';
 
 export const RunTracker = () => {
-  const [isRunning, setIsRunning] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [runHistory, setRunHistory] = useState([]);
-  const [distanceUnit, setDistanceUnit] = useState(
-    () => localStorage.getItem('distanceUnit') || 'km'
-  );
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [lastRun, setLastRun] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-<<<<<<< HEAD
-=======
-  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
-  const [countdown, setCountdown] = useState(0); // Countdown timer value
-  const [isCountingDown, setIsCountingDown] = useState(false); // Flag to indicate countdown is in progress
-  const [countdownType, setCountdownType] = useState(''); // 'start' or 'stop'
->>>>>>> Simple-updates
-  const navigate = useNavigate();
+  const { 
+    isTracking,
+    isPaused,
+    distance,
+    duration,
+    pace,
+    elevation,
+    splits,
+    startRun,
+    pauseRun,
+    resumeRun,
+    stopRun
+  } = useRunTracker();
 
-  const [distance, setDistance] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [pace, setPace] = useState(0);
-  const [splits, setSplits] = useState([]);
-<<<<<<< HEAD
-=======
-  // Add state for elevation data
-  const [elevation, setElevation] = useState({
-    current: null,
-    gain: 0,
-    loss: 0
-  });
+  const { getActivityText } = useActivityMode();
+  const { distanceUnit } = useSettings();
+
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [isCountingDown, setIsCountingDown] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+  const [countdownType, setCountdownType] = useState('start');
+  const [recentRun, setRecentRun] = useState(null);
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [additionalContent, setAdditionalContent] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
+  const [workoutSaved, setWorkoutSaved] = useState(false);
+  const [isSavingWorkout, setIsSavingWorkout] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Load the most recent run
+  useEffect(() => {
+    const loadRecentRun = () => {
+      const storedRuns = localStorage.getItem('runHistory');
+      if (storedRuns) {
+        try {
+          const parsedRuns = JSON.parse(storedRuns);
+          if (parsedRuns.length > 0) {
+            // Sort runs by date (most recent first)
+            const sortedRuns = [...parsedRuns].sort((a, b) => new Date(b.date) - new Date(a.date));
+            setRecentRun(sortedRuns[0]);
+          }
+        } catch (error) {
+          console.error('Error loading recent run:', error);
+        }
+      }
+    };
+    
+    loadRecentRun();
+    
+    // Listen for run completed events
+    const handleRunCompleted = () => {
+      console.log("Run completed event received");
+      loadRecentRun();
+    };
+    
+    document.addEventListener('runCompleted', handleRunCompleted);
+    
+    return () => {
+      document.removeEventListener('runCompleted', handleRunCompleted);
+    };
+  }, []);
+
+  // Handle posting to Nostr
+  const handlePostToNostr = () => {
+    if (!recentRun) return;
+    setAdditionalContent('');
+    setShowPostModal(true);
+  };
+
+  const handlePostSubmit = async () => {
+    if (!recentRun) return;
+    
+    setIsPosting(true);
+    
+    try {
+      const run = recentRun;
+      // Calculate calories (simplified version)
+      const caloriesBurned = Math.round(run.distance * 0.06);
+      
+      const content = `
+Just completed a run with Runstr! 🏃‍♂️💨
+
+⏱️ Duration: ${runDataService.formatTime(run.duration)}
+📏 Distance: ${displayDistance(run.distance, distanceUnit)}
+⚡ Pace: ${(run.duration / 60 / (distanceUnit === 'km' ? run.distance/1000 : run.distance/1609.344)).toFixed(2)} min/${distanceUnit}
+🔥 Calories: ${caloriesBurned} kcal
+${run.elevation ? `\n🏔️ Elevation Gain: ${formatElevation(run.elevation.gain, distanceUnit)}\n📉 Elevation Loss: ${formatElevation(run.elevation.loss, distanceUnit)}` : ''}
+${additionalContent ? `\n${additionalContent}` : ''}
+#Runstr #Running
+`.trim();
+
+      // Create the event template for nostr-tools
+      const eventTemplate = {
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['t', 'Runstr'],
+          ['t', 'Running']
+        ],
+        content: content
+      };
+
+      // Use the createAndPublishEvent function from nostr-tools
+      await createAndPublishEvent(eventTemplate);
+      
+      setShowPostModal(false);
+      setAdditionalContent('');
+      
+      // Show success message
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast('Successfully posted to Nostr!');
+      } else {
+        alert('Successfully posted to Nostr!');
+      }
+    } catch (error) {
+      console.error('Error posting to Nostr:', error);
+      
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast('Failed to post to Nostr: ' + error.message);
+      } else {
+        alert('Failed to post to Nostr: ' + error.message);
+      }
+    } finally {
+      setIsPosting(false);
+      setShowPostModal(false);
+    }
+  };
 
   // Check if permissions have been granted on component mount
   useEffect(() => {
@@ -52,195 +148,16 @@ export const RunTracker = () => {
     }
   }, []);
 
-  // Check for active run on component mount
-  useEffect(() => {
-    const runState = localStorage.getItem('activeRunState');
-    
-    if (runState) {
-      const runData = JSON.parse(runState);
-      
-      if (runData.isRunning) {
-        // Restore run state
-        setIsRunning(true);
-        setIsPaused(runData.isPaused);
-        setDistance(runData.distance);
-        setDuration(runData.duration);
-        setPace(runData.pace);
-        setSplits(runData.splits);
-        setElevation(runData.elevation);
-        
-        // Re-initialize the run tracker with saved state
-        if (runData.isRunning && !runData.isPaused) {
-          runTracker.restoreTracking(runData);
-        } else if (runData.isRunning && runData.isPaused) {
-          runTracker.restoreTrackingPaused(runData);
-        }
-      }
-    }
-  }, []);
-
-  // Save run state to localStorage when it changes
-  useEffect(() => {
-    if (isRunning) {
-      const runData = {
-        isRunning,
-        isPaused,
-        distance,
-        duration,
-        pace,
-        splits,
-        elevation,
-        timestamp: new Date().getTime()
-      };
-      
-      localStorage.setItem('activeRunState', JSON.stringify(runData));
-    } else {
-      // Clear active run state when run is stopped
-      localStorage.removeItem('activeRunState');
-    }
-  }, [isRunning, isPaused, distance, duration, pace, splits, elevation]);
->>>>>>> Simple-updates
-
-  useEffect(() => {
-    runTracker.on('distanceChange', setDistance);
-    runTracker.on('durationChange', setDuration);
-    runTracker.on('paceChange', setPace);
-    runTracker.on('splitRecorded', setSplits);
-<<<<<<< HEAD
-    runTracker.on('stopped', (finalResults) => {
-      const runData = {
-        id: Date.now(),
-=======
-    // Add listener for elevation changes
-    runTracker.on('elevationChange', setElevation);
-    runTracker.on('stopped', (finalResults) => {
-      const runData = {
-        id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
->>>>>>> Simple-updates
-        date: new Date().toLocaleDateString(),
-        splits: JSON.parse(JSON.stringify(finalResults.splits)), // clone splits obj
-        duration: finalResults.duration,
-        distance: finalResults.distance,
-<<<<<<< HEAD
-        pace: finalResults.pace
-      };
-
-      // todo: move this to utils
-      const existingRuns = JSON.parse(
-        localStorage.getItem('runHistory') || '[]'
-      );
-      const updatedRuns = [...existingRuns, runData];
-      localStorage.setItem('runHistory', JSON.stringify(updatedRuns));
-
-      // Store run locally for offline sync
-      storeRunLocally(runData);
-
-      setRunHistory((prev) => [...prev, runData]);
-      updateLastRun(runData);
-=======
-        pace: finalResults.pace,
-        // Include elevation data in saved run
-        elevation: finalResults.elevation || {
-          gain: 0,
-          loss: 0
-        }
-      };
-
-      // We'll update the UI immediately with the run data
-      updateLastRun(runData);
-
-      // Check for potential duplicates before adding
-      const existingRuns = JSON.parse(
-        localStorage.getItem('runHistory') || '[]'
-      );
-      
-      const isDuplicate = existingRuns.some(run => {
-        // Check if there's already a run with the same date, distance, and duration
-        // within a small margin of error (0.1km and 5 seconds)
-        return run.date === runData.date && 
-               Math.abs(run.distance - runData.distance) < 0.1 &&
-               Math.abs(run.duration - runData.duration) < 5;
-      });
-      
-      // Only add the run if it's not a duplicate
-      if (!isDuplicate) {
-        const updatedRuns = [...existingRuns, runData];
-        // Store the run data in localStorage
-        localStorage.setItem('runHistory', JSON.stringify(updatedRuns));
-        
-        // Store run locally for offline sync
-        storeRunLocally(runData);
-        
-        // Update the run history state
-        setRunHistory((prev) => [...prev, runData]);
-
-        // Dispatch a custom event to notify other components about run history changes
-        const runHistoryUpdateEvent = new CustomEvent('runHistoryUpdated', {
-          detail: { runData }
-        });
-        document.dispatchEvent(runHistoryUpdateEvent);
-      } else {
-        console.log('Duplicate run detected - not adding to history');
-      }
-      
->>>>>>> Simple-updates
-      setIsRunning(false);
-      setIsPaused(false);
-
-      setDistance(0);
-      setDuration(0);
-      setPace(0);
-      setSplits([]);
-    });
-
-    return () => {
-      runTracker.stop();
-    };
-  }, []);
-
-  useEffect(() => {
-    const storedProfile = localStorage.getItem('nostrProfile');
-    if (storedProfile) {
-      setUserProfile(JSON.parse(storedProfile));
-    }
-    loadRunHistory();
-  }, []);
-
-  const loadRunHistory = () => {
-    const storedRuns = JSON.parse(localStorage.getItem('runHistory') || '[]');
-    setRunHistory(storedRuns);
-<<<<<<< HEAD
-    if (storedRuns.length > 0) {
-=======
-    
-    // First check if there's a separate last run stored (this ensures immediate data consistency)
-    const storedLastRun = localStorage.getItem('lastRun');
-    if (storedLastRun) {
-      setLastRun(JSON.parse(storedLastRun));
-    } 
-    // If no separate last run, fall back to the last item in the run history
-    else if (storedRuns.length > 0) {
->>>>>>> Simple-updates
-      setLastRun(storedRuns[storedRuns.length - 1]);
-    }
-  };
-
-<<<<<<< HEAD
-  const startRun = () => {
-    setIsRunning(true);
-    setIsPaused(false);
-    runTracker.start();
-=======
   const initiateRun = () => {
     // Check if the user has already granted permissions
     const permissionsGranted = localStorage.getItem('permissionsGranted');
     
     if (permissionsGranted === 'true') {
-      // If permissions already granted, start the run immediately
-      startRun();
+      // If permissions already granted, start the countdown
+      startCountdown('start');
     } else {
       // If permissions haven't been granted yet, show a message
-      alert('Location permission is required for tracking runs. Please restart the app to grant permissions.');
+      alert('Location permission is required for tracking. Please restart the app to grant permissions.');
       // Set the flag to show permission dialog next time the app starts
       localStorage.removeItem('permissionsGranted');
     }
@@ -250,8 +167,6 @@ export const RunTracker = () => {
     // User has acknowledged the permission requirements
     localStorage.setItem('permissionsGranted', 'true');
     setShowPermissionDialog(false);
-    // Don't automatically start the run after permissions are granted
-    // startRun();
   };
 
   const handlePermissionCancel = () => {
@@ -275,13 +190,9 @@ export const RunTracker = () => {
             
             // Execute the appropriate action after countdown finishes
             if (type === 'start') {
-              setIsRunning(true);
-              setIsPaused(false);
-              runTracker.start();
+              startRun();
             } else if (type === 'stop') {
-              runTracker.stop();
-              setIsRunning(false);
-              setIsPaused(false);
+              stopRun();
             }
           }, 200);
           
@@ -292,438 +203,334 @@ export const RunTracker = () => {
     }, 1000);
   };
 
-  const startRun = () => {
-    startCountdown('start');
->>>>>>> Simple-updates
-  };
-
-  const pauseRun = () => {
-    setIsPaused(true);
-    runTracker.pause();
-  };
-
-  const resumeRun = () => {
-    setIsPaused(false);
-    runTracker.resume();
-  };
-
-  const stopRun = () => {
-<<<<<<< HEAD
-    runTracker.stop();
-    setIsRunning(false);
-    setIsPaused(false);
-=======
-    // Remove active run state from localStorage when manually stopping
-    localStorage.removeItem('activeRunState');
-    startCountdown('stop');
->>>>>>> Simple-updates
-  };
-
-  const updateLastRun = (runData) => {
-    setLastRun(runData);
-<<<<<<< HEAD
-=======
-    // Store the last run in localStorage separately to ensure immediate consistency
-    localStorage.setItem('lastRun', JSON.stringify(runData));
->>>>>>> Simple-updates
-  };
-
-  const toggleDistanceUnit = () => {
-    const newUnit = distanceUnit === 'km' ? 'mi' : 'km';
-    setDistanceUnit(newUnit);
-    localStorage.setItem('distanceUnit', newUnit);
-  };
-
-<<<<<<< HEAD
-=======
-  // Format elevation for display
-  const formatElevation = (meters) => {
-    if (meters === null || isNaN(meters)) return '--';
+  // Format pace for display
+  const formattedPace = formatPaceWithUnit(
+    pace,
+    distanceUnit
+  );
+  
+  // Helper function to determine time of day based on timestamp
+  const getTimeOfDay = (timestamp) => {
+    if (!timestamp) {
+      // For runs without timestamp, use a generic name
+      return "Regular";
+    }
     
-    if (distanceUnit === 'mi') {
-      // Convert to feet (1 meter = 3.28084 feet)
-      return `${Math.round(meters * 3.28084)} ft`;
-    } else {
-      return `${Math.round(meters)} m`;
-    }
+    const hours = new Date(timestamp).getHours();
+    
+    if (hours >= 5 && hours < 12) return "Morning";
+    if (hours >= 12 && hours < 17) return "Afternoon";
+    if (hours >= 17 && hours < 21) return "Evening";
+    return "Night";
   };
 
->>>>>>> Simple-updates
-  const handlePostToNostr = async (run) => {
-    if (!window.nostr) {
-      const confirmLogin = window.confirm(
-        'Please login with Nostr to share your run'
-      );
-      if (confirmLogin) {
-        navigate('/login');
-      }
-      return;
+  // Helper function to format the run date in a user-friendly way
+  const formatRunDate = (dateString) => {
+    if (!dateString) return "Unknown date";
+    
+    const runDate = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Check if the run was today
+    if (runDate.toDateString() === today.toDateString()) {
+      return "Today";
     }
+    
+    // Check if the run was yesterday
+    if (runDate.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    }
+    
+    // Otherwise return the actual date
+    return runDate.toLocaleDateString();
+  };
 
+  // Add handler for saving workout record
+  const handleSaveWorkoutRecord = async () => {
+    if (!recentRun) return;
+    
+    setIsSavingWorkout(true);
+    setWorkoutSaved(false);
+    
     try {
-      // Verify we can get the public key first
-      const pubkey = await window.nostr.getPublicKey();
-      if (!pubkey) {
-        throw new Error('Could not get Nostr public key');
-      }
-
-      // Format the content with emojis and proper spacing
-      const content = `
-<<<<<<< HEAD
-🏃‍♂️ Run Completed!
-⏱️ Duration: ${formatTime(run.duration)}
-📏 Distance: ${convertDistance(run.distance, distanceUnit)} ${distanceUnit}
-⚡️ Pace: ${formatPace(run.pace)} min/km
-=======
-Just completed a run with Runstr! 🏃‍♂️💨
-
-⏱️ Duration: ${formatTime(run.duration)}
-📏 Distance: ${convertDistance(run.distance, distanceUnit)} ${distanceUnit}
-⚡ Pace: ${formatPaceWithUnit(run.pace, distanceUnit)}
-${run.elevation ? `🏔️ Elevation Gain: ${formatElevation(run.elevation.gain)}\n📉 Elevation Loss: ${formatElevation(run.elevation.loss)}` : ''}
->>>>>>> Simple-updates
-${
-  run.splits.length > 0
-    ? '\n📊 Splits:\n' +
-      run.splits
-<<<<<<< HEAD
-        .map((split) => `Km ${split.km}: ${formatPace(split.pace)}`)
-=======
-        .map((split) => `${distanceUnit === 'km' ? `Km ${split.km}` : `Mile ${(split.km * 0.621371).toFixed(1)}`}: ${formatPace(split.pace, distanceUnit)}`)
->>>>>>> Simple-updates
-        .join('\n')
-    : ''
-}
-
-#Runstr #Running
-`.trim();
-
-      const event = {
-        kind: 1,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [
-          ['t', 'Runstr'],
-          ['t', 'Running'],
-          ['t', 'run']
-        ],
-        content: content,
-        pubkey: pubkey
-      };
-
-      console.log('Attempting to publish run to Nostr:', event);
-
-      // Show loading state
-      // const loadingToast = alert('Publishing your run...');
-
-      try {
-        await publishToNostr(event);
-        alert('Successfully posted your run to Nostr! 🎉');
-      } catch (error) {
-        console.error('Failed to publish to Nostr:', error);
-        if (error.message.includes('timeout')) {
-          alert(
-            'Publication is taking longer than expected. Your run may still be published.'
-          );
-        } else if (error.message.includes('No relays connected')) {
-          alert(
-            'Could not connect to Nostr relays. Please check your connection and try again.'
-          );
-        } else {
-          alert('Failed to post to Nostr. Please try again.');
-        }
+      // Create a workout event with kind 1301 format
+      const workoutEvent = createWorkoutEvent(recentRun, distanceUnit);
+      
+      // Use the existing createAndPublishEvent function
+      await createAndPublishEvent(workoutEvent);
+      
+      // Update UI to show success
+      setWorkoutSaved(true);
+      
+      // Show success message
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast('Workout record saved to Nostr!');
+      } else {
+        alert('Workout record saved to Nostr!');
       }
     } catch (error) {
-      console.error('Error in handlePostToNostr:', error);
-      if (error.message.includes('public key')) {
-        alert(
-          'Could not access your Nostr account. Please try logging in again.'
-        );
-        navigate('/login');
+      console.error('Error saving workout record:', error);
+      
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast('Failed to save workout record: ' + error.message);
       } else {
-        alert('An unexpected error occurred. Please try again.');
+        alert('Failed to save workout record: ' + error.message);
       }
+    } finally {
+      setIsSavingWorkout(false);
     }
   };
 
-<<<<<<< HEAD
-  return (
-    <div className="run-tracker">
-=======
-  // Listen for the runCompleted event to ensure LastRun is updated immediately
-  useEffect(() => {
-    const handleRunCompleted = () => {
-      console.log("Run completed event received");
+  // Add handler for deleting a run
+  const handleDeleteRun = async () => {
+    if (!recentRun) return;
+    
+    const confirmDelete = window.confirm("Are you sure you want to delete this run? This action cannot be undone.");
+    if (!confirmDelete) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Get current run history
+      const runHistory = JSON.parse(localStorage.getItem('runHistory') || '[]');
       
-      // Force reload the run history to ensure we have the latest data
-      setTimeout(() => {
-        loadRunHistory();
-      }, 100);
-    };
-    
-    document.addEventListener('runCompleted', handleRunCompleted);
-    
-    return () => {
-      document.removeEventListener('runCompleted', handleRunCompleted);
-    };
-  }, []);
-
-  // When distance unit changes, ensure all displayed data is updated correctly
-  useEffect(() => {
-    // Force refresh of last run display when unit changes
-    if (lastRun) {
-      const updatedLastRun = {...lastRun};
-      setLastRun(null);
-      setTimeout(() => {
-        setLastRun(updatedLastRun);
-      }, 0);
+      // Filter out the run to delete
+      const updatedRunHistory = runHistory.filter(run => run.id !== recentRun.id);
+      
+      // Save updated history back to localStorage
+      localStorage.setItem('runHistory', JSON.stringify(updatedRunHistory));
+      
+      // Show success message
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast('Run deleted successfully');
+      } else {
+        alert('Run deleted successfully');
+      }
+      
+      // If there are other runs, load the next most recent run
+      if (updatedRunHistory.length > 0) {
+        const sortedRuns = [...updatedRunHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+        setRecentRun(sortedRuns[0]);
+      } else {
+        // No more runs
+        setRecentRun(null);
+      }
+    } catch (error) {
+      console.error('Error deleting run:', error);
+      
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast('Failed to delete run: ' + error.message);
+      } else {
+        alert('Failed to delete run: ' + error.message);
+      }
+    } finally {
+      setIsDeleting(false);
     }
-  }, [distanceUnit]);
-
-  // Add cleanup on component mount to ensure no lingering tracking
-  useEffect(() => {
-    // Reset the distance display to zero immediately - this helps with the UI flashing issue
-    setDistance(0);
-    
-    // Initialize everything properly
-    const initializeTracker = async () => {
-      // Ensure any previous watchers are cleaned up
-      await runTracker.cleanupWatchers();
-      
-      // Reset state for a clean start
-      runTracker.distance = 0;
-      runTracker.duration = 0;
-      runTracker.pace = 0;
-    };
-    
-    initializeTracker();
-
-    // Cleanup when component unmounts
-    return () => {
-      runTracker.stop();
-    };
-  }, []);
+  };
 
   return (
-    <div className="run-tracker">
+    <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">
+      {/* Title Banner */}
+      <div className="bg-gradient-to-r from-indigo-800 to-purple-800 p-4 mb-6 text-center">
+        <h2 className="text-2xl font-bold text-white">{getActivityText('header')}</h2>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 gap-3 p-4">
+        {/* Distance Card */}
+        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+          <div className="flex items-center mb-2">
+            <div className="w-7 h-7 rounded-full bg-[#10B981]/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#10B981]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <span className="text-sm text-gray-400">Distance</span>
+          </div>
+          <div className="text-3xl font-bold">{convertDistance(distance, distanceUnit)}</div>
+          <div className="text-sm text-gray-400">{distanceUnit}</div>
+        </div>
+
+        {/* Time Card */}
+        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+          <div className="flex items-center mb-2">
+            <div className="w-7 h-7 rounded-full bg-[#3B82F6]/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#3B82F6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <span className="text-sm text-gray-400">Time</span>
+          </div>
+          <div className="text-3xl font-bold">{runDataService.formatTime(duration)}</div>
+        </div>
+
+        {/* Pace Card */}
+        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+          <div className="flex items-center mb-2">
+            <div className="w-7 h-7 rounded-full bg-[#F59E0B]/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#F59E0B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <span className="text-sm text-gray-400">Pace</span>
+          </div>
+          <div className="text-3xl font-bold">{formattedPace.split(' ')[0]}</div>
+          <div className="text-sm text-gray-400">{formattedPace.split(' ')[1]}</div>
+        </div>
+
+        {/* Elevation Card */}
+        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+          <div className="flex items-center mb-2">
+            <div className="w-7 h-7 rounded-full bg-[#F97316]/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#F97316]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            </div>
+            <span className="text-sm text-gray-400">Elevation</span>
+          </div>
+          <div className="text-3xl font-bold">{elevation ? formatElevation(elevation.gain, distanceUnit) : '0'}</div>
+          <div className="text-sm text-gray-400">{distanceUnit === 'mi' ? 'ft' : 'm'}</div>
+        </div>
+      </div>
+      
+      {/* Splits Table - Show only when tracking and splits exist */}
+      {isTracking && splits && splits.length > 0 && (
+        <div className="bg-[#1a222e] rounded-xl shadow-lg mt-2 mx-4 p-4 overflow-hidden">
+          <div className="flex items-center mb-2">
+            <div className="w-6 h-6 rounded-full bg-[#8B5CF6]/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <span className="text-sm font-medium text-gray-300">Split Times</span>
+          </div>
+          <div className="mt-2">
+            <SplitsTable splits={splits} distanceUnit={distanceUnit} />
+          </div>
+          {splits.length > 5 && (
+            <p className="text-xs text-gray-400 text-center mt-2">
+              Swipe to see more splits if needed
+            </p>
+          )}
+        </div>
+      )}
+      
+      {/* Start Activity Button */}
+      {!isTracking ? (
+        <button 
+          className="mx-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-xl shadow-lg flex items-center justify-center text-lg font-semibold my-4"
+          onClick={initiateRun}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {getActivityText('start')}
+        </button>
+      ) : (
+        <div className="flex justify-between px-4 my-4">
+          {isPaused ? (
+            <button 
+              className="bg-green-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold"
+              onClick={resumeRun}
+            >
+              Resume
+            </button>
+          ) : (
+            <button 
+              className="bg-yellow-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold"
+              onClick={pauseRun}
+            >
+              Pause
+            </button>
+          )}
+          <button 
+            className="bg-red-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 ml-2 font-semibold"
+            onClick={() => startCountdown('stop')}
+          >
+            Stop
+          </button>
+        </div>
+      )}
+      
+      {/* Recent Activities Section with New DashboardRunCard */}
+      {!isTracking && recentRun && (
+        <div className="mt-6 mx-4">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold">{getActivityText('recent')}</h3>
+            <span className="text-xs text-gray-400">See All</span>
+          </div>
+          
+          <DashboardRunCard
+            run={{
+              ...recentRun,
+              title: recentRun.title || `${getTimeOfDay(recentRun.timestamp)} ${recentRun.activityType === 'walk' ? 'Walk' : recentRun.activityType === 'cycle' ? 'Cycle' : 'Run'}`,
+              date: formatRunDate(recentRun.date)
+            }}
+            formatTime={runDataService.formatTime}
+            displayDistance={displayDistance}
+            distanceUnit={distanceUnit}
+            onShare={handlePostToNostr}
+            onSave={handleSaveWorkoutRecord}
+            onDelete={handleDeleteRun}
+            isSaving={isSavingWorkout}
+            isWorkoutSaved={workoutSaved}
+            isDeleting={isDeleting}
+          />
+        </div>
+      )}
+      
+      {/* Display permission dialog if needed */}
       {showPermissionDialog && (
-        <PermissionDialog 
+        <PermissionDialog
           onContinue={handlePermissionContinue}
           onCancel={handlePermissionCancel}
         />
       )}
-
->>>>>>> Simple-updates
-      {userProfile?.banner && (
-        <div className="dashboard-banner">
-          <img
-            src={userProfile.banner}
-            alt="Profile Banner"
-            className="banner-image"
-          />
-          {userProfile.picture && (
-            <img
-              src={userProfile.picture}
-              alt="Profile"
-              className="profile-overlay"
-            />
-          )}
-        </div>
-      )}
-
-<<<<<<< HEAD
-      <h2 className="page-title">Dashboard</h2>
-=======
-      <h2 className="page-title">DASHBOARD</h2>
-
+      
+      {/* Countdown overlay */}
       {isCountingDown && (
-        <div className="countdown-overlay">
-          <div className="countdown-container">
-            <div className="countdown-text">
-              {countdownType === 'start' ? 'Starting in' : 'Stopping in'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="flex flex-col items-center">
+            <div className="text-6xl font-bold mb-4">{countdown}</div>
+            <div className="text-xl">
+              {countdownType === 'start' ? 'Starting run...' : 'Stopping run...'}
             </div>
-            <div className="countdown-number">{countdown}</div>
           </div>
         </div>
       )}
->>>>>>> Simple-updates
-
-      <div className="time-display">{formatTime(duration)}</div>
-
-      <div className="distance-display">
-        {convertDistance(distance, distanceUnit)} {distanceUnit}
-      </div>
-
-      {isRunning && !isPaused && (
-        <div className="pace-display">
-<<<<<<< HEAD
-          Current Pace: {formatPace(pace)} min/km
-=======
-          Current Pace: {formatPaceWithUnit(pace, distanceUnit)}
-        </div>
-      )}
-
-      {/* Add elevation display */}
-      {isRunning && (
-        <div className="elevation-display">
-          <div className="elevation-current">
-            Current: {formatElevation(elevation.current)}
-          </div>
-          <div className="elevation-stats">
-            <div className="elevation-gain">↗️ {formatElevation(elevation.gain)}</div>
-            <div className="elevation-loss">↘️ {formatElevation(elevation.loss)}</div>
-          </div>
->>>>>>> Simple-updates
-        </div>
-      )}
-
-      {splits.length > 0 && (
-        <div className="splits-display">
-          <h3>Splits</h3>
-<<<<<<< HEAD
-          {splits.map((split, i) => (
-            <div key={i} className="split-item">
-              Km {split.km}: {formatPace(split.pace)}
-            </div>
-          ))}
-=======
-          {splits.map((split, i) => {
-            // Format the split number and ensure proper display for partial splits
-            let splitLabel;
-            
-            if (split.isPartial) {
-              // This is a partial split (the final segment of a run)
-              // Calculate just the partial distance (e.g., 0.49 instead of 1.49)
-              const wholeUnits = Math.floor(split.km);
-              const partialDistance = (split.km - wholeUnits).toFixed(2);
-              splitLabel = distanceUnit === 'km'
-                ? `Partial: ${partialDistance} km`
-                : `Partial: ${partialDistance} mi`;
-            } else if (Number.isInteger(split.km)) {
-              // For whole unit splits (Mile 1, Mile 2, etc.)
-              splitLabel = distanceUnit === 'km' 
-                ? `Km ${split.km}` 
-                : `Mile ${split.km}`;
-            } else {
-              // Fallback for any other case
-              splitLabel = distanceUnit === 'km'
-                ? `Km ${split.km.toFixed(1)}`
-                : `Mile ${split.km.toFixed(2)}`;
-            }
-            
-            return (
-              <div key={i} className="split-item">
-                {splitLabel}: {formatPace(split.pace, distanceUnit)}
-              </div>
-            );
-          })}
->>>>>>> Simple-updates
-        </div>
-      )}
-
-      {/* {locationError && (
-        <div className="error-message">GPS Error: {locationError}</div>
-      )} */}
-
-      <div className="controls-top">
-        {!isRunning ? (
-<<<<<<< HEAD
-          <button className="primary-btn" onClick={startRun}>
-=======
-          <button className="primary-btn" onClick={initiateRun}>
->>>>>>> Simple-updates
-            Start Run
-          </button>
-        ) : (
-          <>
-            {isPaused ? (
-              <button className="primary-btn" onClick={resumeRun}>
-                Resume
+      
+      {/* Post to Nostr modal */}
+      {showPostModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-[#1a222e] rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-semibold mb-4">Post Run to Nostr</h3>
+            <textarea
+              value={additionalContent}
+              onChange={(e) => setAdditionalContent(e.target.value)}
+              placeholder="Add any additional comments or hashtags..."
+              rows={4}
+              className="w-full bg-[#111827] border border-gray-700 rounded-lg p-3 mb-4 text-white"
+              disabled={isPosting}
+            />
+            <div className="flex justify-end space-x-3">
+              <button 
+                onClick={() => setShowPostModal(false)} 
+                disabled={isPosting}
+                className="px-4 py-2 rounded-lg border border-gray-600 text-gray-300"
+              >
+                Cancel
               </button>
-            ) : (
-              <button className="secondary-btn" onClick={pauseRun}>
-                Pause
+              <button 
+                onClick={handlePostSubmit} 
+                disabled={isPosting}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white"
+              >
+                {isPosting ? 'Posting...' : 'Post'}
               </button>
-            )}
-            <button className="danger-btn" onClick={stopRun}>
-              End Run
-            </button>
-          </>
-        )}
-      </div>
-
-      <div className="distance-unit-toggle">
-        <button
-          className={`unit-btn ${distanceUnit === 'km' ? 'active' : ''}`}
-          onClick={toggleDistanceUnit}
-        >
-          KM
-        </button>
-        <button
-          className={`unit-btn ${distanceUnit === 'mi' ? 'active' : ''}`}
-          onClick={toggleDistanceUnit}
-        >
-          MI
-        </button>
-      </div>
-
-      {lastRun && (
-        <div className="last-run">
-          <h3>Previous Run</h3>
-          <div className="last-run-details">
-            <span>Date: {lastRun.date}</span>
-            <span>Duration: {formatTime(lastRun.duration)}</span>
-            <span>
-              Distance: {convertDistance(lastRun.distance, distanceUnit)}{' '}
-              {distanceUnit}
-            </span>
-<<<<<<< HEAD
-            <span>Pace: {formatPace(lastRun.pace)} min/km</span>
-=======
-            <span>Pace: {formatPace(lastRun.pace, distanceUnit)} min/{distanceUnit}</span>
->>>>>>> Simple-updates
-          </div>
-          <div className="run-actions">
-            <button
-              className="view-history-btn"
-              onClick={() => setShowHistoryModal(true)}
-            >
-              View All Runs
-            </button>
-            <button
-              className="share-btn"
-              onClick={() => handlePostToNostr(lastRun)}
-            >
-              Share to Nostr
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showHistoryModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowHistoryModal(false)}
-        >
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>Run History</h2>
-            <div className="history-list">
-              {runHistory.map((run) => (
-                <div key={run.id} className="history-item">
-                  <div className="run-date">{run.date}</div>
-                  <div className="run-details">
-                    <span>Duration: {formatTime(run.duration)}</span>
-                    <span>
-                      Distance: {convertDistance(run.distance, distanceUnit)}{' '}
-                      {distanceUnit}
-                    </span>
-<<<<<<< HEAD
-                    <span>Pace: {formatPace(run.pace)} min/km</span>
-=======
-                    <span>Pace: {formatPace(run.pace, distanceUnit)} min/{distanceUnit}</span>
->>>>>>> Simple-updates
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </div>

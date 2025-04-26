@@ -1,5 +1,6 @@
 import { registerPlugin } from '@capacitor/core';
 import { EventEmitter } from 'tseep';
+import runDataService, { ACTIVITY_TYPES } from './RunDataService';
 
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
@@ -12,9 +13,6 @@ class RunTracker extends EventEmitter {
     this.pace = 0; // in seconds per meter
     this.splits = []; // Array to store split objects { km, time, pace }
     this.positions = [];
-<<<<<<< HEAD
-=======
-    this.distanceUnit = localStorage.getItem('distanceUnit') || 'km'; // Get user's preferred unit
     
     // Add elevation tracking data
     this.elevation = {
@@ -23,7 +21,6 @@ class RunTracker extends EventEmitter {
       loss: 0,
       lastAltitude: null
     };
->>>>>>> Simple-updates
 
     this.isTracking = false;
     this.isPaused = false;
@@ -31,10 +28,16 @@ class RunTracker extends EventEmitter {
     this.pausedTime = 0; // Total time paused in milliseconds
     this.lastPauseTime = 0; // Timestamp when the run was last paused
     this.lastSplitDistance = 0; // Track last split milestone
+    this.activityType = localStorage.getItem('activityMode') || ACTIVITY_TYPES.RUN; // Get current activity type
 
     this.watchId = null; // For geolocation watch id
     this.timerInterval = null; // For updating duration every second
     this.paceInterval = null; // For calculating pace at regular intervals
+  }
+
+  // Helper method to get the current distance unit from localStorage
+  getDistanceUnit() {
+    return localStorage.getItem('distanceUnit') || 'km';
   }
 
   toRadians(degrees) {
@@ -62,13 +65,10 @@ class RunTracker extends EventEmitter {
   }
 
   calculatePace(distance, duration) {
-    if (distance === 0) return 0;
-    return duration / distance; // Pace in seconds per meter
+    // Use the centralized pace calculation method
+    return runDataService.calculatePace(distance, duration, this.getDistanceUnit());
   }
 
-<<<<<<< HEAD
-  addPosition(newPosition) {
-=======
   updateElevation(altitude) {
     if (altitude === null || altitude === undefined || isNaN(altitude)) {
       return;
@@ -104,7 +104,6 @@ class RunTracker extends EventEmitter {
       return;
     }
     
->>>>>>> Simple-updates
     if (this.positions.length > 0) {
       const lastPosition = this.positions[this.positions.length - 1];
       const distanceIncrement = this.calculateDistance(
@@ -113,23 +112,10 @@ class RunTracker extends EventEmitter {
         newPosition.latitude,
         newPosition.longitude
       );
-<<<<<<< HEAD
-      this.distance += distanceIncrement;
-
-      this.emit('distanceChange', this.distance); // Emit distance change
-
-      // Check if a new full kilometer has been completed
-      if (
-        Math.floor(this.distance / 1000) >
-        Math.floor(this.lastSplitDistance / 1000)
-      ) {
-        // Calculate the current km split (e.g., 1, 2, 3, ...)
-        const currentKm = Math.floor(this.distance / 1000);
-=======
       
       // Add a minimum threshold to filter out GPS noise (e.g., 3 meters)
       // Only count movement if it's above the threshold
-      const MOVEMENT_THRESHOLD = 3; // 3 meters
+      const MOVEMENT_THRESHOLD = 1.5; // 1.5 meters (reduced from 3m)
       if (distanceIncrement >= MOVEMENT_THRESHOLD) {
         this.distance += distanceIncrement;
         this.emit('distanceChange', this.distance); // Emit distance change
@@ -143,16 +129,19 @@ class RunTracker extends EventEmitter {
         this.updateElevation(newPosition.altitude);
       }
 
+      // Get current distance unit
+      const distanceUnit = this.getDistanceUnit();
+      
       // Define the split distance in meters based on selected unit
-      const splitDistance = this.distanceUnit === 'km' ? 1000 : 1609.344; // 1km or 1mile in meters
+      const splitDistance = distanceUnit === 'km' ? 1000 : 1609.344; // 1km or 1mile in meters
       
       // Get the current distance in the selected unit (either km or miles)
-      const currentDistanceInUnits = this.distanceUnit === 'km' 
+      const currentDistanceInUnits = distanceUnit === 'km' 
         ? this.distance / 1000  // Convert meters to km
         : this.distance / 1609.344;  // Convert meters to miles
         
       // Get the last split distance in the selected unit
-      const lastSplitDistanceInUnits = this.distanceUnit === 'km'
+      const lastSplitDistanceInUnits = distanceUnit === 'km'
         ? this.lastSplitDistance / 1000
         : this.lastSplitDistance / 1609.344;
       
@@ -161,35 +150,20 @@ class RunTracker extends EventEmitter {
       if (Math.floor(currentDistanceInUnits) > Math.floor(lastSplitDistanceInUnits)) {
         // Calculate the current split number (1, 2, 3, etc.)
         const currentSplitNumber = Math.floor(currentDistanceInUnits);
->>>>>>> Simple-updates
 
         // Determine the elapsed time at the previous split (or 0 at start)
         const previousSplitTime = this.splits.length
           ? this.splits[this.splits.length - 1].time
           : 0;
-<<<<<<< HEAD
-        // Calculate the duration for this split (time difference)
-        const splitDuration = this.duration - previousSplitTime;
-        // For a full km, the split pace is simply the split duration divided by 1000 meters
-        const splitPace = this.calculatePace(1000, splitDuration); // seconds per km
-
-        // Record the split with the km count, cumulative time, and split pace
-        this.splits.push({
-          km: currentKm,
-          time: this.duration,
-          pace: splitPace
-        });
-        // Update lastSplitDistance to the current total distance
-        this.lastSplitDistance = this.distance;
-=======
         
         // Calculate the duration for this split (time difference)
         const splitDuration = this.duration - previousSplitTime;
         
         // Calculate pace for this split - pace is in time per distance unit
-        const splitPace = splitDuration / (splitDistance / 1000); // seconds per km or mile
+        // Pace should be in seconds per meter for proper formatting later
+        const splitPace = splitDuration / splitDistance; 
         
-        console.log(`Recording split at ${currentSplitNumber} ${this.distanceUnit}s with pace ${splitPace}`);
+        console.log(`Recording split at ${currentSplitNumber} ${distanceUnit}s with pace ${splitPace}`);
 
         // Record the split with the unit count, cumulative time, and split pace
         this.splits.push({
@@ -201,7 +175,6 @@ class RunTracker extends EventEmitter {
         
         // Update lastSplitDistance to the whole unit completed (in meters)
         this.lastSplitDistance = currentSplitNumber * splitDistance;
->>>>>>> Simple-updates
 
         // Emit an event with updated splits array
         this.emit('splitRecorded', this.splits);
@@ -232,8 +205,6 @@ class RunTracker extends EventEmitter {
 
   async startTracking() {
     try {
-<<<<<<< HEAD
-=======
       // We should have already requested permissions by this point
       const permissionsGranted = localStorage.getItem('permissionsGranted') === 'true';
       
@@ -245,15 +216,10 @@ class RunTracker extends EventEmitter {
       // First, ensure any existing watchers are cleaned up
       await this.cleanupWatchers();
       
->>>>>>> Simple-updates
       this.watchId = await BackgroundGeolocation.addWatcher(
         {
           backgroundMessage: 'Tracking your run...',
           backgroundTitle: 'Runstr',
-<<<<<<< HEAD
-          requestPermissions: true,
-          distanceFilter: 10
-=======
           // Never request permissions here - we've already done it in the permission dialog
           requestPermissions: false, 
           distanceFilter: 10,
@@ -261,27 +227,14 @@ class RunTracker extends EventEmitter {
           highAccuracy: true,
           // Increase stale location threshold to get fresher GPS data
           staleLocationThreshold: 30000 // 30 seconds
->>>>>>> Simple-updates
         },
         (location, error) => {
           if (error) {
             if (error.code === 'NOT_AUTHORIZED') {
-<<<<<<< HEAD
-              if (
-                window.confirm(
-                  'This app needs your location, ' +
-                    'but does not have permission.\n\n' +
-                    'Open settings now?'
-                )
-              ) {
-                BackgroundGeolocation.openSettings();
-              }
-=======
               // Permissions were revoked after being initially granted
               localStorage.setItem('permissionsGranted', 'false');
               alert('Location permission is required for tracking. Please enable it in your device settings.');
               BackgroundGeolocation.openSettings();
->>>>>>> Simple-updates
             }
             return console.error(error);
           }
@@ -294,11 +247,6 @@ class RunTracker extends EventEmitter {
     }
   }
 
-<<<<<<< HEAD
-  async start() {
-    if (this.isTracking && !this.isPaused) return;
-
-=======
   async cleanupWatchers() {
     try {
       // If we have an existing watchId, clean it up
@@ -315,11 +263,10 @@ class RunTracker extends EventEmitter {
 
   async start() {
     if (this.isTracking && !this.isPaused) return;
-
-    // Update distanceUnit from localStorage in case it changed
-    this.distanceUnit = localStorage.getItem('distanceUnit') || 'km';
     
->>>>>>> Simple-updates
+    // Update activityType from localStorage in case it changed
+    this.activityType = localStorage.getItem('activityMode') || ACTIVITY_TYPES.RUN;
+    
     this.isTracking = true;
     this.isPaused = false;
     this.startTime = Date.now();
@@ -330,8 +277,6 @@ class RunTracker extends EventEmitter {
     this.pace = 0;
     this.splits = [];
     this.lastSplitDistance = 0;
-<<<<<<< HEAD
-=======
     
     // Reset elevation data
     this.elevation = {
@@ -340,11 +285,13 @@ class RunTracker extends EventEmitter {
       loss: 0,
       lastAltitude: null
     };
->>>>>>> Simple-updates
 
     this.startTracking();
     this.startTimer(); // Start the timer
     this.startPaceCalculator(); // Start the pace calculator
+    
+    // Emit status change event
+    this.emit('statusChange', { isTracking: this.isTracking, isPaused: this.isPaused });
   }
 
   async pause() {
@@ -352,18 +299,15 @@ class RunTracker extends EventEmitter {
 
     this.isPaused = true;
     this.lastPauseTime = Date.now(); // Record the time when paused
-<<<<<<< HEAD
-    BackgroundGeolocation.removeWatcher({
-      id: this.watchId
-    });
-=======
     
     // Use our centralized method to clean up watchers
     await this.cleanupWatchers();
->>>>>>> Simple-updates
 
     clearInterval(this.timerInterval); // Stop the timer
     clearInterval(this.paceInterval); // Stop the pace calculator
+    
+    // Emit status change event
+    this.emit('statusChange', { isTracking: this.isTracking, isPaused: this.isPaused });
   }
 
   async resume() {
@@ -374,155 +318,62 @@ class RunTracker extends EventEmitter {
     this.startTracking();
     this.startTimer(); // Restart the timer
     this.startPaceCalculator(); // Restart the pace calculator
+    
+    // Emit status change event
+    this.emit('statusChange', { isTracking: this.isTracking, isPaused: this.isPaused });
   }
 
-<<<<<<< HEAD
-  stop() {
-    if (!this.isTracking) return;
-
-    this.isTracking = false;
-    BackgroundGeolocation.removeWatcher({
-      id: this.watchId
-    });
-
-    clearInterval(this.timerInterval); // Stop the timer
-    clearInterval(this.paceInterval); // Stop the pace calculator
-
-    // If there's an incomplete split (current split distance > 0), calculate its pace.
-    const incompleteSplitDistance = this.distance - this.lastSplitDistance;
-    if (incompleteSplitDistance > 0) {
-      const lastSplitTime = this.splits.length
-        ? this.splits[this.splits.length - 1].time
-        : 0;
-      const incompleteSplitTime = this.duration - lastSplitTime;
-      const incompleteSplitPace = this.calculatePace(
-        incompleteSplitDistance,
-        incompleteSplitTime
-      );
-
-      const currentKm = Math.ceil(this.distance / 1000);
-
-      this.splits.push({
-        km: currentKm,
-        time: this.duration,
-        pace: incompleteSplitPace
-      });
-    }
-
-    // Emit final values
-=======
   async stop() {
     if (!this.isTracking) return;
 
-    // Stop tracking location
-    await this.cleanupWatchers();
-
-    // Stop timers
-    clearInterval(this.timerInterval);
-    clearInterval(this.paceInterval);
-
-    // Calculate distance in selected units (km or miles)
-    const totalDistanceInUnits = this.distanceUnit === 'km' 
-      ? this.distance / 1000 
-      : this.distance / 1609.344;
-      
-    const lastSplitDistanceInUnits = this.distanceUnit === 'km'
-      ? this.lastSplitDistance / 1000
-      : this.lastSplitDistance / 1609.344;
-    
-    // If there's an incomplete split, record it
-    // This happens when we've gone past the last whole unit but haven't completed the next one
-    const completedUnits = Math.floor(totalDistanceInUnits);
-    const lastRecordedUnit = Math.floor(lastSplitDistanceInUnits);
-    
-    // Check if we have a partial distance beyond the last whole unit
-    const hasPartialDistance = totalDistanceInUnits > completedUnits && totalDistanceInUnits > lastRecordedUnit;
-    
-    // Also check if we've completed a whole unit that hasn't been recorded yet
-    const hasUnrecordedWholeUnit = completedUnits > lastRecordedUnit;
-    
-    if (hasPartialDistance || hasUnrecordedWholeUnit) {
-      // Get the distance of this final split (either partial or whole)
-      const finalSplitDistance = this.distance - this.lastSplitDistance;
-      
-      // Only process if we have a meaningful distance to record
-      if (finalSplitDistance > 10) { // More than 10 meters
-        const lastSplitTime = this.splits.length
-          ? this.splits[this.splits.length - 1].time
-          : 0;
-        const finalSplitDuration = this.duration - lastSplitTime;
-        
-        // Format the split number correctly
-        let splitNumber;
-        
-        if (hasUnrecordedWholeUnit) {
-          // If we completed a whole unit that wasn't recorded, use that unit number
-          splitNumber = completedUnits;
-        } else {
-          // For partial distances, we'll preserve the total distance for data integrity
-          // but add a flag to indicate it's a partial distance
-          splitNumber = parseFloat(totalDistanceInUnits.toFixed(2));
-        }
-        
-        // Calculate pace for this final split
-        const finalSplitPace = finalSplitDuration / (finalSplitDistance / 1000);
-        
-        console.log(`Recording final split at ${splitNumber} ${this.distanceUnit}s with pace ${finalSplitPace}`);
-  
-        this.splits.push({
-          km: splitNumber,
-          time: this.duration,
-          pace: finalSplitPace,
-          isPartial: hasPartialDistance && !hasUnrecordedWholeUnit // Flag to indicate this is a partial distance
-        });
-      }
-    }
-
-    // Reset state
     this.isTracking = false;
     this.isPaused = false;
-
-    // Emit final results
+    
+    // Final calculations
+    this.duration = Math.floor((Date.now() - this.startTime - this.pausedTime) / 1000);
+    
+    // Calculate speed and pace one last time
+    if (this.distance > 0 && this.duration > 0) {
+      this.pace = runDataService.calculatePace(this.distance, this.duration, this.getDistanceUnit());
+    }
+    
+    // If we have positions but no splits, calculate them now as a fallback
+    if (this.positions.length > 0 && (!this.splits || this.splits.length === 0)) {
+      // Use the RunDataService to calculate splits
+      const stats = runDataService.calculateStats(this.positions, this.duration);
+      if (stats.splits && stats.splits.length > 0) {
+        this.splits = stats.splits;
+        console.log(`Generated ${this.splits.length} splits on run completion`);
+      }
+    }
+    
+    // Create the final run data object
     const finalResults = {
       distance: this.distance,
       duration: this.duration,
       pace: this.pace,
-      splits: [...this.splits],
-      elevation: {
+      splits: this.splits,
+      elevation: { 
         gain: this.elevation.gain,
         loss: this.elevation.loss
-      }
+      },
+      unit: this.getDistanceUnit(),
+      activityType: this.activityType
     };
-
-    this.emit('stopped', finalResults);
-
-    // Dispatch a global event to ensure UI components update
-    // This helps ensure consistency across the app
-    try {
-      const runCompletedEvent = new CustomEvent('runCompleted', {
-        detail: { finalResults }
-      });
-      document.dispatchEvent(runCompletedEvent);
-    } catch (error) {
-      console.error('Error dispatching runCompleted event:', error);
-    }
-
-    // Reset tracked values
-    this.distance = 0;
-    this.duration = 0;
-    this.pace = 0;
-    this.splits = [];
-    this.positions = [];
-    this.startTime = 0;
-    this.pausedTime = 0;
-    this.lastPauseTime = 0;
-    this.lastSplitDistance = 0;
-    this.elevation = {
-      current: null,
-      gain: 0,
-      loss: 0,
-      lastAltitude: null
-    };
+    
+    // Save to run history using RunDataService instead of directly to localStorage
+    runDataService.saveRun(finalResults);
+    
+    // Clean up resources
+    this.stopTracking();
+    this.stopTimer();
+    this.stopPaceCalculator();
+    
+    // Emit status change and completed event
+    this.emit('statusChange', { isTracking: false, isPaused: false });
+    this.emit('runCompleted', finalResults);
+    
+    return finalResults;
   }
 
   // Restore an active tracking session that was not paused
@@ -536,6 +387,7 @@ class RunTracker extends EventEmitter {
       ...savedState.elevation,
       lastAltitude: savedState.elevation.current
     };
+    this.activityType = savedState.activityType || ACTIVITY_TYPES.RUN; // Add activity type or default
     
     // Calculate time difference since the run was saved
     const timeDifference = (new Date().getTime() - savedState.timestamp) / 1000;
@@ -558,19 +410,10 @@ class RunTracker extends EventEmitter {
     this.startPaceCalculator();
     
     // Emit updated values
->>>>>>> Simple-updates
     this.emit('distanceChange', this.distance);
     this.emit('durationChange', this.duration);
     this.emit('paceChange', this.pace);
     this.emit('splitRecorded', this.splits);
-<<<<<<< HEAD
-    this.emit('stopped', {
-      distance: this.distance,
-      duration: this.duration,
-      pace: this.pace,
-      splits: this.splits
-    });
-=======
     this.emit('elevationChange', {...this.elevation});
   }
   
@@ -585,6 +428,7 @@ class RunTracker extends EventEmitter {
       ...savedState.elevation,
       lastAltitude: savedState.elevation.current
     };
+    this.activityType = savedState.activityType || ACTIVITY_TYPES.RUN; // Add activity type or default
     
     // Set tracking state
     this.isTracking = true;
@@ -601,8 +445,18 @@ class RunTracker extends EventEmitter {
     this.emit('paceChange', this.pace);
     this.emit('splitRecorded', this.splits);
     this.emit('elevationChange', {...this.elevation});
->>>>>>> Simple-updates
+  }
+
+  // Make sure the off method is properly documented
+  // This is inherited from EventEmitter but we'll add a simple wrapper
+  // for clarity and to ensure it's not overridden
+  off(event, callback) {
+    return super.off(event, callback);
   }
 }
 
+// Create and export an instance of the tracker
 export const runTracker = new RunTracker();
+
+// Also export the class for type checking and testing
+export default RunTracker;

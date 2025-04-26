@@ -1,0 +1,97 @@
+.wavlake-zap-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.wavlake-zap-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.zap-icon {
+  margin-right: 4px;
+}
+
+/* Processing state styling */
+.zap-processing-state {
+  background-color: #2196f3 !important;
+  color: white !important;
+}
+
+.zap-processing {
+  display: flex;
+  align-items: center;
+  animation: zap-processing-pulse 2s infinite ease-in-out;
+}
+
+.zap-processing::after {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  margin-left: 0.5em;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes zap-processing-pulse {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+/* Success state styling */
+.zap-success-state {
+  background-color: #4caf50 !important;
+  color: white !important;
+}
+
+.zap-success-icon {
+  animation: zap-success-pulse 1.5s ease-in-out;
+}
+
+@keyframes zap-success-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* Error state styling */
+.zap-error-state {
+  background-color: #f44336 !important;
+  color: white !important;
+}
+
+.zap-error {
+  animation: zap-error-shake 0.5s ease-in-out;
+}
+
+@keyframes zap-error-shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-3px); }
+  100% { transform: translateX(0); }
+}
+
+/* Legacy spinner code - keeping for backward compatibility */
+.zap-loading-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+} 
