@@ -1,14 +1,15 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { AlbyWallet } from '../services/albyWallet';
+import { 
+  getWalletAPI,
+  getConnectionState, 
+  subscribeToConnectionChanges, 
+  CONNECTION_STATES,
+  initWalletService
+} from '../services/wallet/WalletPersistenceService';
 
-// Connection states
-export const CONNECTION_STATES = {
-  DISCONNECTED: 'disconnected',
-  CONNECTING: 'connecting',
-  CONNECTED: 'connected',
-  ERROR: 'error'
-};
+// Export connection states
+export { CONNECTION_STATES };
 
 // Create the context with initial values
 export const WalletContext = createContext({
@@ -34,66 +35,37 @@ export const WalletProvider = ({ children }) => {
   const [connectionState, setConnectionState] = useState(CONNECTION_STATES.DISCONNECTED);
   const [error, setError] = useState(null);
   const [balance, setBalance] = useState(null);
-  const [connectionCheckInterval, setConnectionCheckInterval] = useState(null);
 
-  // Initialize wallet instance
+  // Initialize wallet API
   useEffect(() => {
-    const walletInstance = new AlbyWallet();
-    setWallet(walletInstance);
+    console.log('[WalletContext] Initializing wallet provider');
     
-    // Try to reconnect using saved credentials
-    const savedAuthUrl = localStorage.getItem('nwcAuthUrl');
-    const savedConnectionString = localStorage.getItem('nwcConnectionString');
+    // Set the wallet API from our persistence service
+    const walletAPI = getWalletAPI();
+    setWallet(walletAPI);
     
-    if (savedAuthUrl || savedConnectionString) {
-      // Attempt to reconnect immediately on mount - removed the setTimeout delay
-      (async () => {
-        try {
-          setConnectionState(CONNECTION_STATES.CONNECTING);
-          await walletInstance.ensureConnected();
-          const isConnected = await walletInstance.checkConnection();
-          if (isConnected) {
-            console.log('[WalletContext] Successfully reconnected wallet on mount');
-            setConnectionState(CONNECTION_STATES.CONNECTED);
-            // Also get balance after successful connection
-            try {
-              const currentBalance = await walletInstance.getBalance();
-              setBalance(currentBalance);
-            } catch (balanceErr) {
-              console.error('Failed to fetch initial balance:', balanceErr);
-            }
-          } else {
-            console.log('[WalletContext] Could not reconnect wallet on mount');
-            setConnectionState(CONNECTION_STATES.DISCONNECTED);
-          }
-        } catch (err) {
-          console.error('Failed to reconnect on mount:', err);
-          setConnectionState(CONNECTION_STATES.DISCONNECTED);
-        }
-      })();
-    }
+    // Initialize the service (attempt to reconnect)
+    initWalletService().catch(err => {
+      console.error('[WalletContext] Error initializing wallet service:', err);
+      setError(err.message || 'Failed to initialize wallet service');
+    });
     
-    return () => {
-      if (connectionCheckInterval) {
-        clearInterval(connectionCheckInterval);
+    // Subscribe to connection state changes
+    const unsubscribe = subscribeToConnectionChanges((state) => {
+      console.log('[WalletContext] Connection state changed:', state);
+      setConnectionState(state);
+      
+      // If connected, refresh balance
+      if (state === CONNECTION_STATES.CONNECTED) {
+        refreshBalance();
       }
-      // Remove the disconnect call to keep wallet connected when navigating
-      // This allows the wallet to stay connected in the background
+    });
+    
+    // Cleanup subscription
+    return () => {
+      unsubscribe();
     };
   }, []);
-
-  // Set up periodic connection check
-  useEffect(() => {
-    if (wallet && connectionState === CONNECTION_STATES.CONNECTED) {
-      const interval = setInterval(() => {
-        checkConnection();
-      }, 30000); // Check every 30 seconds
-      
-      setConnectionCheckInterval(interval);
-      
-      return () => clearInterval(interval);
-    }
-  }, [wallet, connectionState]);
 
   /**
    * Reconnect using saved credentials from local storage
@@ -102,23 +74,17 @@ export const WalletProvider = ({ children }) => {
     if (!wallet) return false;
     
     try {
-      setConnectionState(CONNECTION_STATES.CONNECTING);
       setError(null);
-      
       const connected = await wallet.ensureConnected();
       
       if (connected) {
-        setConnectionState(CONNECTION_STATES.CONNECTED);
         refreshBalance();
-        return true;
-      } else {
-        setConnectionState(CONNECTION_STATES.DISCONNECTED);
-        return false;
       }
+      
+      return connected;
     } catch (err) {
-      console.error('Failed to reconnect wallet:', err);
+      console.error('[WalletContext] Failed to reconnect wallet:', err);
       setError(err.message || 'Failed to reconnect wallet');
-      setConnectionState(CONNECTION_STATES.ERROR);
       return false;
     }
   }, [wallet]);
@@ -131,23 +97,17 @@ export const WalletProvider = ({ children }) => {
     if (!wallet) return false;
     
     try {
-      setConnectionState(CONNECTION_STATES.CONNECTING);
       setError(null);
-      
       const connected = await wallet.connect(url);
       
       if (connected) {
-        setConnectionState(CONNECTION_STATES.CONNECTED);
         refreshBalance();
-        return true;
-      } else {
-        setConnectionState(CONNECTION_STATES.DISCONNECTED);
-        return false;
       }
+      
+      return connected;
     } catch (err) {
-      console.error('Failed to connect wallet:', err);
+      console.error('[WalletContext] Failed to connect wallet:', err);
       setError(err.message || 'Failed to connect wallet');
-      setConnectionState(CONNECTION_STATES.ERROR);
       return false;
     }
   }, [wallet]);
@@ -159,25 +119,13 @@ export const WalletProvider = ({ children }) => {
     if (!wallet) return false;
     
     try {
-      const isConnected = await wallet.checkConnection();
-      
-      if (isConnected) {
-        // Only update state if different to avoid re-renders
-        if (connectionState !== CONNECTION_STATES.CONNECTED) {
-          setConnectionState(CONNECTION_STATES.CONNECTED);
-        }
-        return true;
-      } else {
-        setConnectionState(CONNECTION_STATES.DISCONNECTED);
-        return false;
-      }
+      return await wallet.checkConnection();
     } catch (err) {
-      console.error('Wallet connection check failed:', err);
+      console.error('[WalletContext] Wallet connection check failed:', err);
       setError(err.message || 'Wallet connection check failed');
-      setConnectionState(CONNECTION_STATES.ERROR);
       return false;
     }
-  }, [wallet, connectionState]);
+  }, [wallet]);
 
   /**
    * Disconnect the wallet
@@ -187,11 +135,9 @@ export const WalletProvider = ({ children }) => {
     
     try {
       wallet.disconnect();
-      setConnectionState(CONNECTION_STATES.DISCONNECTED);
-      setError(null);
       setBalance(null);
     } catch (err) {
-      console.error('Failed to disconnect wallet:', err);
+      console.error('[WalletContext] Failed to disconnect wallet:', err);
       setError(err.message || 'Failed to disconnect wallet');
     }
   }, [wallet]);
@@ -202,16 +148,8 @@ export const WalletProvider = ({ children }) => {
    */
   const ensureConnected = useCallback(async () => {
     if (!wallet) return false;
-    
-    // If already connected, return true
-    if (connectionState === CONNECTION_STATES.CONNECTED) {
-      const isConnected = await checkConnection();
-      if (isConnected) return true;
-    }
-    
-    // Try to reconnect with saved credentials
-    return await reconnectWithSavedCredentials();
-  }, [wallet, connectionState, checkConnection, reconnectWithSavedCredentials]);
+    return await wallet.ensureConnected();
+  }, [wallet]);
 
   /**
    * Generate a zap invoice for the given amount
@@ -226,10 +164,9 @@ export const WalletProvider = ({ children }) => {
       const connected = await ensureConnected();
       if (!connected) throw new Error('Wallet not connected');
       
-      const invoice = await wallet.generateZapInvoice(pubkey, amount, comment);
-      return invoice;
+      return await wallet.generateZapInvoice(pubkey, amount, comment);
     } catch (err) {
-      console.error('Failed to generate zap invoice:', err);
+      console.error('[WalletContext] Failed to generate zap invoice:', err);
       // Handle specific error for zapping (HTTP 422)
       if (err.message && err.message.includes('422')) {
         throw new Error('Unable to generate invoice. Check your wallet connection and try again.');
@@ -252,7 +189,7 @@ export const WalletProvider = ({ children }) => {
       setBalance(currentBalance);
       return currentBalance;
     } catch (err) {
-      console.error('Failed to fetch wallet balance:', err);
+      console.error('[WalletContext] Failed to fetch wallet balance:', err);
       setError(err.message || 'Failed to fetch wallet balance');
       return 0;
     }

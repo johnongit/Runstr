@@ -1,10 +1,17 @@
 import { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { NostrContext } from '../contexts/NostrContext';
-import { AlbyWallet } from '../services/albyWallet';
+import { 
+  connectWallet, 
+  softDisconnectWallet, 
+  checkWalletConnection as checkWalletConnectionService,
+  getWalletAPI,
+  subscribeToConnectionChanges,
+  CONNECTION_STATES
+} from '../services/wallet/WalletPersistenceService';
 
 export const NWCWalletConnector = () => {
-  const { wallet, setWallet } = useAuth();
+  const { setWallet } = useAuth();
   const { defaultZapAmount, updateDefaultZapAmount } = useContext(NostrContext);
   const [nwcUrl, setNwcUrl] = useState('');
   const [connecting, setConnecting] = useState(false);
@@ -21,156 +28,114 @@ export const NWCWalletConnector = () => {
   // Function for reconnection - defined before it's used
   const reconnectWallet = useCallback(async () => {
     try {
-      // Try to reconnect with any saved credentials
-      if (wallet?.provider) {
-        const connected = await wallet.provider.ensureConnected();
-        setIsConnected(connected);
-        return connected;
-      } else {
-        // If no provider exists, create a new one and try to connect
-        const albyWallet = new AlbyWallet();
-        const connected = await albyWallet.ensureConnected();
-        
-        if (connected) {
-          setWallet({
-            provider: albyWallet,
-            isEnabled: () => albyWallet.isConnected,
-            makePayment: async (invoice) => {
-              return await albyWallet.makePayment(invoice);
-            },
-            sendPayment: async (invoice) => {
-              return await albyWallet.makePayment(invoice);
-            },
-            getBalance: async () => {
-              return await albyWallet.getBalance();
-            },
-            generateZapInvoice: async (pubkey, amount, content) => {
-              return await albyWallet.generateZapInvoice(pubkey, amount, content);
-            },
-            checkConnection: async () => {
-              return await albyWallet.checkConnection();
-            }
-          });
-          setIsConnected(true);
-          return true;
-        }
-      }
-      return false;
-    } catch (err) {
-      console.error('Failed to reconnect wallet:', err);
-      setIsConnected(false);
-      return false;
-    }
-  }, [wallet, setWallet]);
-
-  // Connection check function using useCallback to avoid circular dependencies
-  const checkWalletConnection = useCallback(async () => {
-    // Don't check if no wallet exists
-    if (!wallet?.provider) {
-      setIsConnected(false);
-      return false;
-    }
-    
-    try {
-      // Use the provider's connection check method
-      const connectionActive = await wallet.provider.checkConnection();
-      
-      // Update UI state based on connection check
-      setIsConnected(connectionActive);
-      
-      // If connection is lost, try to reconnect
-      if (!connectionActive) {
-        console.log('Connection lost, attempting to reconnect...');
-        await reconnectWallet();
-      }
-      
-      return isConnected;
-    } catch (err) {
-      console.error('Error checking wallet connection:', err);
-      setIsConnected(false);
-      return false;
-    }
-  }, [wallet, reconnectWallet, isConnected]);
-
-  // Setup periodic connection checks to maintain wallet health
-  const startConnectionChecks = useCallback(() => {
-    // Check every 60 seconds if wallet is still connected
-    connectionCheckInterval.current = setInterval(() => {
-      // Only check if we think we're connected
-      if (isConnected && wallet?.provider) {
-        console.log('Performing periodic wallet connection check');
-        checkWalletConnection();
-      }
-    }, 60000); // Check every minute
-  }, [isConnected, wallet, checkWalletConnection]);
-  
-  const stopConnectionChecks = useCallback(() => {
-    if (connectionCheckInterval.current) {
-      clearInterval(connectionCheckInterval.current);
-      connectionCheckInterval.current = null;
-    }
-  }, []);
-
-  const connectWallet = useCallback(async (connectionInput) => {
-    setConnecting(true);
-    setConnectionError('');
-    
-    try {
-      const albyWallet = new AlbyWallet();
-      const connected = await albyWallet.connect(connectionInput);
+      // Use the persistence service API
+      const walletAPI = getWalletAPI();
+      const connected = await walletAPI.ensureConnected();
       
       if (connected) {
-        // Set up wallet in context
+        // Update auth context with the wallet API
         setWallet({
-          provider: albyWallet,
-          isEnabled: () => albyWallet.isConnected,
+          provider: walletAPI,
+          isEnabled: () => true,
           makePayment: async (invoice) => {
-            return await albyWallet.makePayment(invoice);
+            return await walletAPI.makePayment(invoice);
           },
           sendPayment: async (invoice) => {
-            return await albyWallet.makePayment(invoice);
+            return await walletAPI.makePayment(invoice);
           },
           getBalance: async () => {
-            return await albyWallet.getBalance();
+            return await walletAPI.getBalance();
           },
           generateZapInvoice: async (pubkey, amount, content) => {
-            return await albyWallet.generateZapInvoice(pubkey, amount, content);
+            return await walletAPI.generateZapInvoice(pubkey, amount, content);
           },
           checkConnection: async () => {
-            return await albyWallet.checkConnection();
+            return await walletAPI.checkConnection();
           }
         });
         
         setIsConnected(true);
-        return true;
+      } else {
+        setIsConnected(false);
       }
-      return false;
-    } catch (err) {
-      console.error('Failed to connect wallet:', err);
-      setConnectionError(err.message || 'Failed to connect to wallet');
       
+      return connected;
+    } catch (err) {
+      console.error('[NWCWalletConnector] Failed to reconnect wallet:', err);
+      setIsConnected(false);
       return false;
-    } finally {
-      setConnecting(false);
     }
   }, [setWallet]);
 
-  // Check for saved connection on mount
-  useEffect(() => {
-    // Try to reconnect on mount
-    const tryReconnect = async () => {
-      const connected = await reconnectWallet();
-      if (connected) {
-        startConnectionChecks();
+  // Check wallet connection status
+  const checkWalletConnection = useCallback(async () => {
+    try {
+      const connectionActive = await checkWalletConnectionService();
+      setIsConnected(connectionActive);
+      
+      if (!connectionActive) {
+        console.log('[NWCWalletConnector] Connection lost, attempting to reconnect...');
+        await reconnectWallet();
       }
-    };
+      
+      return connectionActive;
+    } catch (err) {
+      console.error('[NWCWalletConnector] Error checking wallet connection:', err);
+      setIsConnected(false);
+      return false;
+    }
+  }, [reconnectWallet]);
+
+  // Setup initial state on mount
+  useEffect(() => {
+    // Subscribe to connection changes from the persistence service
+    const unsubscribe = subscribeToConnectionChanges((state) => {
+      setIsConnected(state === CONNECTION_STATES.CONNECTED);
+      
+      // When connection is established, update auth context with wallet API
+      if (state === CONNECTION_STATES.CONNECTED) {
+        const walletAPI = getWalletAPI();
+        setWallet({
+          provider: walletAPI,
+          isEnabled: () => true,
+          makePayment: async (invoice) => {
+            return await walletAPI.makePayment(invoice);
+          },
+          sendPayment: async (invoice) => {
+            return await walletAPI.makePayment(invoice);
+          },
+          getBalance: async () => {
+            return await walletAPI.getBalance();
+          },
+          generateZapInvoice: async (pubkey, amount, content) => {
+            return await walletAPI.generateZapInvoice(pubkey, amount, content);
+          },
+          checkConnection: async () => {
+            return await walletAPI.checkConnection();
+          }
+        });
+      } else if (state === CONNECTION_STATES.DISCONNECTED) {
+        // If we're disconnected in the service but the UI shows connected,
+        // try to reconnect
+        if (isConnected) {
+          reconnectWallet();
+        }
+      }
+    });
     
-    tryReconnect();
+    // Setup check interval for UI purposes
+    connectionCheckInterval.current = setInterval(() => {
+      checkWalletConnection();
+    }, 60000); // Check every minute
     
     return () => {
-      stopConnectionChecks();
+      unsubscribe();
+      if (connectionCheckInterval.current) {
+        clearInterval(connectionCheckInterval.current);
+        connectionCheckInterval.current = null;
+      }
     };
-  }, [reconnectWallet, startConnectionChecks, stopConnectionChecks]);
+  }, [checkWalletConnection, reconnectWallet, setWallet, isConnected]);
 
   // Update zapAmountInput when defaultZapAmount changes
   useEffect(() => {
@@ -178,72 +143,77 @@ export const NWCWalletConnector = () => {
   }, [defaultZapAmount]);
 
   const handleConnect = useCallback(() => {
-    if (nwcUrl.trim()) {
-      connectWallet(nwcUrl.trim());
-    }
-  }, [nwcUrl, connectWallet]);
+    if (!nwcUrl.trim()) return;
+    
+    setConnecting(true);
+    setConnectionError('');
+    
+    connectWallet(nwcUrl.trim())
+      .then(connected => {
+        if (connected) {
+          // Connection is now managed by the persistence service
+          // The auth context will be updated via the subscription
+          console.log('[NWCWalletConnector] Wallet connected successfully');
+        } else {
+          setConnectionError('Failed to connect wallet');
+        }
+      })
+      .catch(err => {
+        console.error('[NWCWalletConnector] Connection error:', err);
+        setConnectionError(err.message || 'Failed to connect wallet');
+      })
+      .finally(() => {
+        setConnecting(false);
+      });
+  }, [nwcUrl]);
 
   const handleAuthUrlConnect = useCallback(async () => {
     try {
       const authUrl = prompt("Enter wallet authorization URL", "https://");
       if (authUrl && authUrl.startsWith('https://')) {
         setNwcUrl(authUrl);
-        await connectWallet(authUrl);
+        
+        setConnecting(true);
+        setConnectionError('');
+        
+        try {
+          const connected = await connectWallet(authUrl);
+          if (!connected) {
+            setConnectionError('Failed to connect with authorization URL');
+          }
+        } catch (err) {
+          console.error('[NWCWalletConnector] Auth URL connection error:', err);
+          setConnectionError(err.message || 'Failed to connect with authorization URL');
+        } finally {
+          setConnecting(false);
+        }
       } else if (authUrl) {
         setConnectionError("Invalid authorization URL. Must start with https://");
       }
     } catch (err) {
-      console.error("Error with auth URL connection:", err);
+      console.error("[NWCWalletConnector] Error with auth URL connection:", err);
       setConnectionError(err.message || "Failed to connect with authorization URL");
+      setConnecting(false);
     }
-  }, [connectWallet]);
+  }, []);
 
   const handleDisconnect = useCallback(async () => {
     try {
-      if (wallet?.provider) {
-        await wallet.provider.disconnect();
-      }
+      // Use softDisconnectWallet to retain credentials in localStorage
+      await softDisconnectWallet();
+      
+      // Update auth context wallet state
       setWallet(null);
+      
+      // Update UI
       setIsConnected(false);
-      localStorage.removeItem('nwcConnectionString');
-      localStorage.removeItem('nwcAuthUrl');
       setNwcUrl('');
+      
+      console.log('[NWCWalletConnector] Wallet disconnected visually (credentials retained)');
     } catch (err) {
-      console.error('Error disconnecting wallet:', err);
+      console.error('[NWCWalletConnector] Error disconnecting wallet:', err);
     }
-  }, [wallet, setWallet]);
-
-  // Add effect to recheck connection when the component is focused
-  useEffect(() => {
-    // Set up event handlers for various page events
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkWalletConnection();
-      }
-    };
-    
-    // Define the pageshow handler outside of the addEventListener to allow proper cleanup
-    const handlePageShow = (event) => {
-      if (event.persisted) {
-        checkWalletConnection();
-      }
-    };
-    
-    // When page becomes visible (user switches tabs)
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // When user navigates back to this page
-    window.addEventListener('focus', checkWalletConnection);
-    
-    // Additional listener for mobile browsers
-    window.addEventListener('pageshow', handlePageShow);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', checkWalletConnection);
-      window.removeEventListener('pageshow', handlePageShow);
-    };
-  }, [checkWalletConnection]); // Only depends on checkWalletConnection
+  }, [setWallet]);
 
   const handleUpdateZapAmount = () => {
     if (zapAmountInput && parseInt(zapAmountInput, 10) > 0) {
@@ -256,7 +226,9 @@ export const NWCWalletConnector = () => {
   };
 
   const handleDonate = async (lightning, name) => {
-    if (!wallet) {
+    const walletAPI = getWalletAPI();
+    
+    if (!walletAPI) {
       setDonationStatus({ 
         message: 'Wallet not connected. Please connect your wallet first.', 
         isError: true 
@@ -269,8 +241,9 @@ export const NWCWalletConnector = () => {
 
     try {
       // Check connection before attempting donation
-      if (wallet.checkConnection && !(await wallet.checkConnection())) {
-        const reconnected = await reconnectWallet();
+      const isConnected = await walletAPI.checkConnection();
+      if (!isConnected) {
+        const reconnected = await walletAPI.ensureConnected();
         if (!reconnected) {
           throw new Error('Wallet connection is not active. Please reconnect.');
         }
@@ -336,10 +309,7 @@ export const NWCWalletConnector = () => {
 
       // Add lnurl parameter if needed (required for NIP-57 compatibility)
       if (lightning.includes('@')) {
-        // If we have a lightning address, add it as lnurl parameter (bech32 encoded)
-        // This is just a basic compatibility step - in a real implementation you'd
-        // properly encode this as per LUD-01, but we're assuming most LNURL servers
-        // will work without this parameter in the donation flow
+        // If we have a lightning address, add it as lnurl parameter
         callbackUrl.searchParams.append('lnurl', lightning);
       }
 
@@ -386,7 +356,7 @@ export const NWCWalletConnector = () => {
       }
 
       // Pay using the wallet
-      await wallet.makePayment(invoiceData.pr);
+      await walletAPI.makePayment(invoiceData.pr);
 
       setDonationStatus({ message: `Successfully donated ${defaultZapAmount} sats to ${name}! ⚡️`, isError: false });
       setTimeout(() => {

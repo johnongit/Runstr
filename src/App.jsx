@@ -11,26 +11,14 @@ import { WalletProvider } from './contexts/WalletContext';
 import { MenuBar } from './components/MenuBar';
 import { initializeNostr } from './utils/nostr';
 import './App.css';
+import ErrorFallback from './components/ErrorFallback';
+import { directFetchRunningPosts } from './utils/feedFetcher';
+import { lightweightProcessPosts } from './utils/feedProcessor';
+import { storeFeedCache, getFeedCache, isCacheFresh } from './utils/feedCache';
 
 console.log("App.jsx is loading");
 
 // Improved error boundary fallback
-const ErrorFallback = () => (
-  <div className="p-6 bg-red-900/30 border border-red-800 rounded-lg m-4">
-    <h2 className="text-2xl font-bold text-white mb-4">App Loading Error</h2>
-    <p className="text-red-300 mb-4">
-      There was a problem loading the app. This could be due to network issues or a problem with the app itself.
-    </p>
-    <button 
-      onClick={() => window.location.reload()}
-      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500"
-    >
-      Reload App
-    </button>
-  </div>
-);
-
-// Enhanced loading component with timeout detection
 const EnhancedLoadingFallback = () => {
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
   
@@ -87,15 +75,56 @@ const App = () => {
         console.log('Preloading Nostr connection on app launch');
         await initializeNostr();
         
-        // Prefetch run feed data using dynamic import to avoid circular dependencies
-        try {
-          const { fetchRunningPosts } = await import('./utils/nostr');
-          console.log('Preloading feed data in background');
-          fetchRunningPosts(10).catch(err => 
-            console.error('Error preloading feed data:', err)
-          );
-        } catch (error) {
-          console.error('Error importing feed functions:', error);
+        // First check if we have a fresh cache that can be used immediately
+        const cachedFeed = getFeedCache(30); // Get cache if less than 30 minutes old
+        
+        // If cache isn't fresh enough, use optimized feed fetcher for fast initial load
+        if (!isCacheFresh(5) && !window.__FEED_LOADING) {
+          window.__FEED_LOADING = true;
+          
+          console.log('Starting background feed preload');
+          // Use the new direct fetch with aggressive timeout
+          directFetchRunningPosts(10, 7)
+            .then(posts => {
+              if (posts && posts.length > 0) {
+                console.log(`Preloaded ${posts.length} posts, processing...`);
+                
+                // Use lightweight processor for fast processing
+                const processedPosts = lightweightProcessPosts(posts);
+                
+                // Cache the results for immediate use when user navigates to feed
+                storeFeedCache(processedPosts, 30);
+                
+                // Store in global context for immediate access
+                window.__PRELOADED_FEED = processedPosts;
+                
+                // Now that we have basic data displayed, fetch supplementary data in background
+                // We'll use dynamic import to avoid circular dependencies
+                import('./utils/nostr').then(({ loadSupplementaryData, processPostsWithData }) => {
+                  console.log('Loading supplementary data in background...');
+                  loadSupplementaryData(posts)
+                    .then(supplementaryData => {
+                      // Process the full data
+                      return processPostsWithData(posts, supplementaryData);
+                    })
+                    .then(enrichedPosts => {
+                      // Cache the enriched posts
+                      storeFeedCache(enrichedPosts, 60);
+                      // Update the global reference
+                      window.__PRELOADED_FEED = enrichedPosts;
+                      console.log('Background feed enrichment completed');
+                    })
+                    .catch(err => console.error('Background enrichment error:', err))
+                    .finally(() => {
+                      window.__FEED_LOADING = false;
+                    });
+                });
+              }
+            })
+            .catch(err => {
+              console.error('Error preloading feed data:', err);
+              window.__FEED_LOADING = false;
+            });
         }
       } catch (error) {
         console.error('Error in preloadNostr:', error);
