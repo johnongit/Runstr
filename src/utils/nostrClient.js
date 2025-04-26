@@ -10,7 +10,7 @@ const pool = new SimplePool({
 });
 
 // Focus on a smaller set of the most reliable relays
-const relays = [
+export const relays = [
   'wss://relay.damus.io',
   'wss://nos.lol',
   'wss://relay.nostr.band',
