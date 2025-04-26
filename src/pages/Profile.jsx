@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRunProfile } from '../hooks/useRunProfile';
 import { publishHealthProfile } from '../utils/nostrHealth';
@@ -9,25 +9,16 @@ export const Profile = () => {
   
   // State for Nostr publishing
   const [isPublishing, setIsPublishing] = useState(false);
-  const [unitPreferences, setUnitPreferences] = useState({
-    weight: 'kg',
-    height: 'metric'
-  });
+  const [showConfirmation, setShowConfirmation] = useState(false);
   
   // Get user profile from custom hook
   const { 
     userProfile: profile,
     handleProfileChange, 
-    handleProfileSubmit: saveProfile
+    handleProfileSubmit: saveProfile,
+    unitPreferences,
+    handleUnitChange
   } = useRunProfile();
-
-  // Handle unit toggle
-  const handleUnitChange = useCallback((metric, value) => {
-    setUnitPreferences(prev => ({
-      ...prev,
-      [metric]: value
-    }));
-  }, []);
 
   // Custom submit handler that navigates back after saving
   const handleProfileSubmit = () => {
@@ -35,8 +26,19 @@ export const Profile = () => {
     navigate('/history'); // Navigate back to RunHistory after saving
   };
 
-  // Handle publishing health profile to Nostr
+  // Show confirmation dialog before publishing
+  const handlePublishRequest = () => {
+    setShowConfirmation(true);
+  };
+
+  // Cancel publishing
+  const handleCancel = () => {
+    setShowConfirmation(false);
+  };
+
+  // Handle publishing health profile to Nostr after confirmation
   const handlePublishToNostr = async () => {
+    setShowConfirmation(false);
     setIsPublishing(true);
     
     try {
@@ -93,7 +95,8 @@ export const Profile = () => {
             id="weight"
             type="number"
             value={profile.weight}
-            onChange={(e) => handleProfileChange('weight', Number(e.target.value))}
+            onChange={(e) => handleProfileChange('weight', e.target.value)}
+            placeholder={unitPreferences.weight === 'kg' ? "Weight in kg" : "Weight in lb"}
           />
         </div>
         
@@ -117,30 +120,48 @@ export const Profile = () => {
               </button>
             </div>
           </div>
-          <div className="height-fields">
+          
+          {unitPreferences.height === 'metric' ? (
+            // Metric height input (cm)
             <div className="height-field">
               <input
-                id="heightFeet"
+                id="heightCm"
                 type="number"
-                min="0"
-                max="8"
-                value={profile.heightFeet}
-                onChange={(e) => handleProfileChange('heightFeet', Number(e.target.value))}
+                value={profile.heightCm}
+                onChange={(e) => handleProfileChange('heightCm', e.target.value)}
+                placeholder="Height in cm"
               />
-              <label htmlFor="heightFeet">ft</label>
+              <label htmlFor="heightCm">cm</label>
             </div>
-            <div className="height-field">
-              <input
-                id="heightInches"
-                type="number"
-                min="0"
-                max="11"
-                value={profile.heightInches}
-                onChange={(e) => handleProfileChange('heightInches', Number(e.target.value))}
-              />
-              <label htmlFor="heightInches">in</label>
+          ) : (
+            // Imperial height input (feet/inches)
+            <div className="height-fields">
+              <div className="height-field">
+                <input
+                  id="heightFeet"
+                  type="number"
+                  min="0"
+                  max="8"
+                  value={profile.heightFeet}
+                  onChange={(e) => handleProfileChange('heightFeet', e.target.value)}
+                  placeholder="ft"
+                />
+                <label htmlFor="heightFeet">ft</label>
+              </div>
+              <div className="height-field">
+                <input
+                  id="heightInches"
+                  type="number"
+                  min="0"
+                  max="11"
+                  value={profile.heightInches}
+                  onChange={(e) => handleProfileChange('heightInches', e.target.value)}
+                  placeholder="in"
+                />
+                <label htmlFor="heightInches">in</label>
+              </div>
             </div>
-          </div>
+          )}
         </div>
         
         <div className="form-group">
@@ -163,7 +184,8 @@ export const Profile = () => {
             id="age"
             type="number"
             value={profile.age}
-            onChange={(e) => handleProfileChange('age', Number(e.target.value))}
+            onChange={(e) => handleProfileChange('age', e.target.value)}
+            placeholder="Age in years"
           />
         </div>
         
@@ -189,7 +211,7 @@ export const Profile = () => {
           </button>
           <button 
             className="nostr-button"
-            onClick={handlePublishToNostr}
+            onClick={handlePublishRequest}
             disabled={isPublishing}
           >
             {isPublishing ? 'Publishing...' : 'Save Health Profile to Nostr'}
@@ -202,6 +224,56 @@ export const Profile = () => {
           </button>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      {showConfirmation && (
+        <div className="confirmation-overlay">
+          <div className="confirmation-dialog">
+            <h3 className="dialog-title">Publish Health Profile</h3>
+            
+            <div className="dialog-content">
+              <p>You are about to publish your health profile data to Nostr. Please consider:</p>
+              
+              <ul className="privacy-list">
+                <li>
+                  <strong>Public Data:</strong> This health information will be published to public relays 
+                  and can be accessed by anyone.
+                </li>
+                <li>
+                  <strong>Permanent Record:</strong> While individual relays may delete data, once published, 
+                  it may be stored indefinitely on some relays.
+                </li>
+                <li>
+                  <strong>Separate Events:</strong> Each health metric (weight, height, age, etc.) will be 
+                  published as a separate event, allowing selective access by other applications.
+                </li>
+                <li>
+                  <strong>Identifiable Information:</strong> This data will be linked to your Nostr public key.
+                </li>
+              </ul>
+              
+              <p className="privacy-question">
+                Are you sure you want to publish your health profile to Nostr?
+              </p>
+            </div>
+            
+            <div className="dialog-buttons">
+              <button 
+                className="cancel-button"
+                onClick={handleCancel}
+              >
+                Cancel
+              </button>
+              <button 
+                className="confirm-button"
+                onClick={handlePublishToNostr}
+              >
+                Publish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }; 

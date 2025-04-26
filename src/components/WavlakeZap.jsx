@@ -28,6 +28,8 @@ const WavlakeZap = ({
   const { wallet, isConnected, ensureConnected } = useContext(WalletContext);
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasErrored, setHasErrored] = useState(false);
+  // Add payment state to track the current step in the payment process
+  const [paymentState, setPaymentState] = useState('idle'); // idle, connecting, fetching, processing, success, error
 
   const handleZap = async () => {
     if (!trackId) {
@@ -42,18 +44,18 @@ const WavlakeZap = ({
       return;
     }
 
-    // Immediately assume success (optimistic UI)
+    // Set initial processing state
     setIsProcessing(true);
     setHasErrored(false);
+    setPaymentState('connecting');
     
-    // If onSuccess callback is provided, call it immediately for parent components to update UI
-    if (onSuccess && typeof onSuccess === 'function') {
-      onSuccess({ optimistic: true });
-    }
+    // Note: We're not using optimistic UI updates anymore
+    // We'll only notify of success when the payment is actually complete
 
     try {
-      // Run the payment process in the background
+      // Run the payment process with proper status updates
       // First ensure wallet is connected
+      setPaymentState('connecting');
       if (!isConnected) {
         console.log('[WavlakeZap] Wallet not connected, attempting to connect...');
         const connected = await ensureConnected();
@@ -63,6 +65,7 @@ const WavlakeZap = ({
       }
       
       // 1. Get LNURL for track
+      setPaymentState('fetching');
       console.log('[WavlakeZap] Getting LNURL for track:', trackId);
       const lnurl = await getLnurlForTrack(trackId);
       
@@ -71,19 +74,24 @@ const WavlakeZap = ({
       }
       
       // 2. Process the payment
+      setPaymentState('processing');
       console.log('[WavlakeZap] Processing payment with amount:', amount);
       const result = await processWavlakeLnurlPayment(lnurl, wallet, amount);
       
       console.log('[WavlakeZap] Payment successful:', result);
       
-      // Call success callback again with actual result (for components that might need the real response)
+      // Update state to success
+      setPaymentState('success');
+      
+      // Call success callback with result
       if (onSuccess && typeof onSuccess === 'function') {
-        onSuccess({ ...result, optimistic: false });
+        onSuccess(result);
       }
     } catch (error) {
       console.error('[WavlakeZap] Zap failed:', error);
       
-      // Revert optimistic UI update
+      // Update error state
+      setPaymentState('error');
       setHasErrored(true);
       
       // Call error callback if provided
@@ -91,30 +99,46 @@ const WavlakeZap = ({
         onError(error);
       }
     } finally {
-      setIsProcessing(false);
+      // Only stop processing on success or error
+      if (paymentState === 'success' || paymentState === 'error') {
+        setTimeout(() => {
+          setIsProcessing(false);
+          // Reset to idle state after showing success/error for a moment
+          setTimeout(() => {
+            if (paymentState === 'success') {
+              setPaymentState('idle');
+            }
+          }, 2000);
+        }, 1000);
+      }
     }
   };
 
   // Different button states
   const buttonContent = () => {
-    if (hasErrored) {
-      return <span className="zap-error">⚠️</span>;
+    switch(paymentState) {
+      case 'connecting':
+        return <span className="zap-processing">Connecting...</span>;
+      case 'fetching':
+        return <span className="zap-processing">Preparing...</span>;
+      case 'processing':
+        return <span className="zap-processing">Processing...</span>;
+      case 'success':
+        return <span className="zap-success-icon">⚡</span>;
+      case 'error':
+        return <span className="zap-error">⚠️</span>;
+      default:
+        return (
+          <>
+            <span className="zap-icon">⚡</span> {buttonText}
+          </>
+        );
     }
-    
-    if (isProcessing) {
-      return <span className="zap-success-icon">⚡</span>;
-    }
-    
-    return (
-      <>
-        <span className="zap-icon">⚡</span> {buttonText}
-      </>
-    );
   };
 
   return (
     <button
-      className={`wavlake-zap-button ${buttonClass} ${hasErrored ? 'zap-error-state' : ''} ${isProcessing ? 'zap-success-state' : ''}`}
+      className={`wavlake-zap-button ${buttonClass} ${hasErrored ? 'zap-error-state' : ''} ${isProcessing ? 'zap-processing-state' : ''} ${paymentState === 'success' ? 'zap-success-state' : ''}`}
       onClick={handleZap}
       disabled={isProcessing}
     >

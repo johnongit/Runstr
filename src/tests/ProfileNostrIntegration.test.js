@@ -58,10 +58,42 @@ describe('Profile Nostr Integration', () => {
     expect(screen.getByText('Save Health Profile to Nostr')).toBeInTheDocument();
   });
 
-  test('publishes health profile to Nostr when button is clicked', async () => {
+  test('shows confirmation dialog when Nostr button is clicked', () => {
     // Find and click the Nostr publish button
     const publishButton = screen.getByText('Save Health Profile to Nostr');
     fireEvent.click(publishButton);
+
+    // Verify that the confirmation dialog is shown
+    expect(screen.getByText('Publish Health Profile')).toBeInTheDocument();
+    expect(screen.getByText('Are you sure you want to publish your health profile to Nostr?')).toBeInTheDocument();
+    expect(screen.getByText('Public Data:')).toBeInTheDocument();
+    expect(screen.getByText('Permanent Record:')).toBeInTheDocument();
+  });
+
+  test('cancels publishing when Cancel button is clicked in dialog', () => {
+    // Find and click the Nostr publish button to show the dialog
+    const publishButton = screen.getByText('Save Health Profile to Nostr');
+    fireEvent.click(publishButton);
+
+    // Click the Cancel button in the dialog
+    const cancelButton = screen.getAllByText('Cancel')[1]; // Second Cancel button is in the dialog
+    fireEvent.click(cancelButton);
+
+    // Verify the dialog is closed
+    expect(screen.queryByText('Publish Health Profile')).not.toBeInTheDocument();
+    
+    // Verify publishHealthProfile was not called
+    expect(publishHealthProfile).not.toHaveBeenCalled();
+  });
+
+  test('publishes health profile to Nostr when confirmed', async () => {
+    // Find and click the Nostr publish button to show the dialog
+    const publishButton = screen.getByText('Save Health Profile to Nostr');
+    fireEvent.click(publishButton);
+
+    // Click the Publish button in the dialog
+    const confirmButton = screen.getByText('Publish');
+    fireEvent.click(confirmButton);
 
     // Verify that the button shows publishing state
     expect(screen.getByText('Publishing...')).toBeInTheDocument();
@@ -85,9 +117,13 @@ describe('Profile Nostr Integration', () => {
     // Mock the publishHealthProfile to reject with an error
     publishHealthProfile.mockRejectedValueOnce(new Error('Network error'));
 
-    // Find and click the Nostr publish button
+    // Find and click the Nostr publish button to show the dialog
     const publishButton = screen.getByText('Save Health Profile to Nostr');
     fireEvent.click(publishButton);
+
+    // Click the Publish button in the dialog
+    const confirmButton = screen.getByText('Publish');
+    fireEvent.click(confirmButton);
 
     // Wait for the error handling to complete
     await waitFor(() => {

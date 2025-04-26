@@ -1,5 +1,6 @@
 import { nip98 } from 'nostr-tools';
 import { bech32 } from 'bech32';
+import { getLnurlFromCache, storeLnurlInCache } from '../services/lnurlCacheService';
 
 // todo: move this to env variables
 const WAVLAKE_CATALOG_API_BASE_URL = 'https://catalog.wavlake.com/v1';
@@ -106,6 +107,13 @@ export const getTrackById = async (trackId) => {
 export const getLnurlForTrack = async (trackId) => {
   if (!trackId) throw new Error('Track ID is required');
   
+  // Check cache first
+  const cachedLnurl = getLnurlFromCache(trackId);
+  if (cachedLnurl) {
+    console.log('[WavlakeZap] Using cached LNURL for track:', trackId);
+    return cachedLnurl;
+  }
+  
   try {
     // Using appId 'runstr2025' as requested
     const appId = 'runstr2025';
@@ -114,6 +122,9 @@ export const getLnurlForTrack = async (trackId) => {
     if (!data || !data.lnurl) {
       throw new Error('Invalid LNURL response from server');
     }
+    
+    // Store in cache before returning
+    storeLnurlInCache(trackId, data.lnurl);
     
     return data.lnurl;
   } catch (error) {
@@ -135,22 +146,9 @@ export const processWavlakeLnurlPayment = async (lnurl, wallet, amount = null) =
   if (!wallet) throw new Error('Wallet is required');
   
   try {
-    // First, decode the LNURL (bech32 encoded URL)
-    // For most wallet implementations, they can handle the LNURL directly
-    // If the wallet has direct LNURL support, use it
-    if (wallet.makePayment && typeof wallet.makePayment === 'function') {
-      try {
-        console.log('[WavlakeZap] Attempting direct LNURL payment');
-        const result = await wallet.makePayment(lnurl);
-        return result;
-      } catch (directError) {
-        console.error('[WavlakeZap] Direct LNURL payment failed:', directError);
-        // Continue to manual flow if direct payment fails
-      }
-    }
-    
-    // Manual LNURL-pay flow if direct payment isn't supported
-    console.log('[WavlakeZap] Falling back to manual LNURL-pay flow');
+    // Use NWC wallet with manual LNURL flow by default
+    // This is more reliable for mobile apps than trying direct LNURL first
+    console.log('[WavlakeZap] Using manual LNURL-pay flow with NWC wallet');
     
     // 1. Make HTTP request to the LNURL
     // The LNURL is a bech32-encoded URL that we need to decode
@@ -168,7 +166,7 @@ export const processWavlakeLnurlPayment = async (lnurl, wallet, amount = null) =
     
     // 2. Fetch the LNURL-pay parameters
     const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 10000);
+    const timeoutId = setTimeout(() => abortController.abort(), 5000); // Reduced timeout to 5 seconds
     
     try {
       const response = await fetch(lnurlDecoded, { 
@@ -211,7 +209,7 @@ export const processWavlakeLnurlPayment = async (lnurl, wallet, amount = null) =
       
       // Get invoice
       const invoiceAbortController = new AbortController();
-      const invoiceTimeoutId = setTimeout(() => invoiceAbortController.abort(), 10000);
+      const invoiceTimeoutId = setTimeout(() => invoiceAbortController.abort(), 5000); // Reduced timeout to 5 seconds
       
       try {
         const invoiceResponse = await fetch(callbackUrl.toString(), {
@@ -244,6 +242,20 @@ export const processWavlakeLnurlPayment = async (lnurl, wallet, amount = null) =
     } catch (lnurlFetchError) {
       clearTimeout(timeoutId);
       console.error('[WavlakeZap] LNURL fetch error:', lnurlFetchError);
+      
+      // Only attempt direct LNURL payment as a fallback if manual flow fails
+      // and the wallet supports direct LNURL payments
+      if (wallet.makePayment && typeof wallet.makePayment === 'function') {
+        try {
+          console.log('[WavlakeZap] Manual flow failed, attempting direct LNURL payment as fallback');
+          const result = await wallet.makePayment(lnurl);
+          return result;
+        } catch (directError) {
+          console.error('[WavlakeZap] Direct LNURL payment also failed:', directError);
+          // Continue to throw the original error
+        }
+      }
+      
       throw lnurlFetchError;
     }
   } catch (error) {
