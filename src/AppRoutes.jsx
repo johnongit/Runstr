@@ -43,6 +43,7 @@ const NWC = safeLazy(() => import('./pages/NWC'), 'NWC');
 const Goals = safeLazy(() => import('./pages/Goals'), 'Goals');
 const TeamDetail = safeLazy(() => import('./pages/TeamDetail'), 'TeamDetail');
 const Events = safeLazy(() => import('./pages/Events'), 'Events');
+const EventDetail = safeLazy(() => import('./pages/EventDetail'), 'EventDetail');
 const Profile = safeLazy(() => import('./pages/Profile'), 'Profile');
 const About = safeLazy(() => import('./pages/About'), 'About');
 const GroupDiscoveryScreen = safeLazy(() => import('./components/GroupDiscoveryScreen'), 'GroupDiscoveryScreen');
@@ -84,6 +85,7 @@ const AppRoutes = () => {
         <Route path="/music" element={<Music />} />
         <Route path="/goals" element={<Goals />} />
         <Route path="/events" element={<Events />} />
+        <Route path="/event/:eventId" element={<EventDetail />} />
         <Route path="/about" element={<About />} />
         
         {/* Teams routes */}

@@ -8,6 +8,9 @@ import { formatPaceWithUnit, displayDistance, convertDistance, formatElevation }
 import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
 import SplitsTable from './SplitsTable';
 import DashboardRunCard from './DashboardRunCard';
+import AchievementCard from './AchievementCard';
+import EventBanner from './EventBanner';
+import { validateEventRun } from '../services/EventService';
 
 export const RunTracker = () => {
   const { 
@@ -50,6 +53,26 @@ export const RunTracker = () => {
             // Sort runs by date (most recent first)
             const sortedRuns = [...parsedRuns].sort((a, b) => new Date(b.date) - new Date(a.date));
             setRecentRun(sortedRuns[0]);
+            
+            // Check if the most recent run qualifies for any events
+            const userPubkey = localStorage.getItem('nostrPublicKey');
+            if (userPubkey && sortedRuns[0]) {
+              const qualifyingEvents = validateEventRun(sortedRuns[0], userPubkey);
+              
+              // Notify user if their run qualified for an event
+              if (qualifyingEvents && qualifyingEvents.length > 0) {
+                const eventNames = qualifyingEvents.map(e => e.title).join(', ');
+                const message = `Your run qualified for: ${eventNames}!`;
+                
+                if (window.Android && window.Android.showToast) {
+                  window.Android.showToast(message);
+                } else {
+                  // Use a less intrusive way to notify
+                  console.log(message);
+                  // Could use a toast or notification component here
+                }
+              }
+            }
           }
         } catch (error) {
           console.error('Error loading recent run:', error);
@@ -332,6 +355,9 @@ ${additionalContent ? `\n${additionalContent}` : ''}
 
   return (
     <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">
+      {/* Event Banner - Added at the top */}
+      <EventBanner />
+      
       {/* Title Banner */}
       <div className="bg-gradient-to-r from-indigo-800 to-purple-800 p-4 mb-6 text-center">
         <h2 className="text-2xl font-bold text-white">{getActivityText('header')}</h2>
@@ -453,6 +479,34 @@ ${additionalContent ? `\n${additionalContent}` : ''}
           >
             Stop
           </button>
+        </div>
+      )}
+      
+      {/* Achievements & Rewards Card - Show only when not tracking */}
+      {!isTracking && (
+        <div className="mx-4">
+          <AchievementCard 
+            currentStreak={
+              // Calculate streak based on recent runs - fallback to 0 if not available
+              recentRun?.streak || localStorage.getItem('currentStreak') ? 
+                parseInt(localStorage.getItem('currentStreak')) : 0
+            } 
+            runHistory={
+              // Pass run history for leaderboard calculation
+              (() => {
+                try {
+                  return JSON.parse(localStorage.getItem('runHistory') || '[]');
+                } catch (error) {
+                  console.error('Error parsing run history:', error);
+                  return [];
+                }
+              })()
+            }
+            stats={
+              // Get stats from the most recent run or empty object
+              recentRun?.stats || {}
+            }
+          />
         </div>
       )}
       

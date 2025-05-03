@@ -3,6 +3,7 @@
 @import './streakRewards.css';
 @import './leaderboard.css';
 @import './bitcoinTransactions.css';
+@import './achievements.css';
 
 /* Global styles */
 body {

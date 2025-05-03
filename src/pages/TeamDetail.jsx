@@ -508,30 +508,57 @@ export const TeamDetail = () => {
             >
               Pinned Messages ({pinnedMessages.length})
             </button>
+            <button
+              className={`tab-button py-2 px-4 relative ${
+                activeTab === 'events' ? 'active text-blue-400' : 'text-gray-400'
+              }`}
+              onClick={() => setActiveTab('events')}
+            >
+              Events
+            </button>
           </div>
         </div>
         
         <div className="tab-content bg-gray-800 rounded-lg">
           {activeTab === 'chat' ? (
             <>
-              {/* Chat Messages */}
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4 h-96 overflow-y-auto">
-                {messages.length === 0 ? (
-                  <div className="flex justify-center items-center h-full">
-                    <p className="text-gray-500">
-                      No messages yet. Group messaging functionality coming soon!
-                    </p>
+              {/* Pinned Messages Display when in Chat tab */}
+              {pinnedMessages.length > 0 && (
+                <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-lg p-3 mb-4">
+                  <h3 className="text-sm font-medium text-yellow-400 mb-2">
+                    Pinned Messages
+                  </h3>
+                  <div className="max-h-32 overflow-y-auto space-y-2">
+                    {pinnedMessages.slice(0, 2).map((message) => (
+                      <div key={message.id} className="text-sm text-yellow-200">
+                        "{message.content.length > 100 
+                          ? message.content.substring(0, 100) + '...' 
+                          : message.content}"
+                      </div>
+                    ))}
+                    {pinnedMessages.length > 2 && (
+                      <div className="text-xs text-yellow-400">
+                        +{pinnedMessages.length - 2} more pinned messages
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {messages.map((message) => (
+                </div>
+              )}
+              
+              {/* Chat Messages */}
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4">
+                <div className="overflow-y-auto max-h-[50vh] space-y-4">
+                  {messages.length === 0 ? (
+                    <div className="flex justify-center items-center h-32">
+                      <p className="text-gray-500">No messages yet. Start the conversation!</p>
+                    </div>
+                  ) : (
+                    messages.map((message) => (
                       <div 
                         key={message.id} 
-                        className={`p-3 rounded-lg ${
-                          message.pubkey === publicKey
-                            ? 'bg-blue-900/20 ml-8'
-                            : 'bg-gray-700/50 mr-8'
-                        }`}
+                        className={`${
+                          message.pubkey === publicKey ? 'bg-blue-800/30' : 'bg-gray-700/50'
+                        } p-3 rounded-lg relative group`}
                       >
                         <div className="flex justify-between mb-1">
                           <span className="text-xs text-gray-400">
@@ -541,33 +568,51 @@ export const TeamDetail = () => {
                             {formatTimestamp(message.created_at)}
                           </span>
                         </div>
-                        <p className="text-gray-200 break-words">{message.content}</p>
+                        <p className="text-white whitespace-pre-wrap break-words">{message.content}</p>
                         
-                        {/* Only show pin option for other people's messages */}
-                        {message.pubkey !== publicKey && !pinnedMessages.some(pm => pm.id === message.id) && (
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              pinMessage(message, teamId);
-                            }}
-                            className="text-xs text-gray-500 mt-1 hover:text-blue-400"
-                          >
-                            Pin Message
-                          </button>
-                        )}
+                        {/* Pin button - only shown on hover */}
+                        <button
+                          className="absolute top-1 right-1 p-1 text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800/70 rounded"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            pinMessage(message, teamId);
+                          }}
+                          title="Pin message"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                          </svg>
+                        </button>
                       </div>
-                    ))}
-                    <div ref={chatEndRef} />
-                  </div>
-                )}
-              </div>
-              
-              {/* Coming Soon message instead of chat input */}
-              <div className="bg-gray-700/30 rounded-lg p-3 text-center">
-                <p className="text-gray-400">Group messaging functionality coming soon!</p>
+                    ))
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+                
+                {/* Message Input */}
+                <form onSubmit={handleSendMessage} className="mt-4 flex">
+                  <input
+                    type="text"
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 bg-gray-700 border border-gray-600 rounded-l-lg px-4 py-2 text-white focus:outline-none"
+                    disabled={isSending}
+                  />
+                  <button
+                    type="submit"
+                    className={`bg-blue-600 text-white px-4 rounded-r-lg ${
+                      isSending ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+                    }`}
+                    disabled={isSending || !messageText.trim()}
+                  >
+                    {isSending ? 'Sending...' : 'Send'}
+                  </button>
+                </form>
               </div>
             </>
-          ) : (
+          ) : activeTab === 'pinned' ? (
             /* Pinned Messages Tab */
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4 min-h-[300px]">
               {pinnedMessages.length === 0 ? (
@@ -605,6 +650,12 @@ export const TeamDetail = () => {
                   ))}
                 </div>
               )}
+            </div>
+          ) : (
+            /* Events Tab */
+            <div className="events-placeholder p-4 text-center bg-gray-700 rounded-md">
+              <h3 className="font-medium text-lg mb-2 text-white">Event Creation Coming Soon</h3>
+              <p className="text-gray-300">Run club managers will be able to create and manage events for their community.</p>
             </div>
           )}
         </div>

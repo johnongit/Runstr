@@ -1,20 +1,34 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useRunStats } from '../hooks/useRunStats';
 import runDataService from '../services/RunDataService';
 import LeaderboardTabs from '../components/LeaderboardTabs';
+import EventCard from '../components/EventCard';
+import { getAllEvents, initializeEvents } from '../services/EventService';
 
 const Events = () => {
   const [runHistory, setRunHistory] = useState([]);
+  const [events, setEvents] = useState([]);
   const [activeTab, setActiveTab] = useState('leaderboards');
+  const navigate = useNavigate();
   
-  // Load run history from local storage
+  // Load run history and events from local storage
   useEffect(() => {
     try {
+      // Initialize events
+      initializeEvents();
+      
+      // Load run history
       const runs = runDataService.getAllRuns();
       setRunHistory(runs);
+      
+      // Load events
+      const eventsData = getAllEvents();
+      setEvents(eventsData);
     } catch (error) {
-      console.error('Error loading run history:', error);
+      console.error('Error loading data:', error);
       setRunHistory([]);
+      setEvents([]);
     }
   }, []);
   
@@ -53,11 +67,21 @@ const Events = () => {
         </div>
       ) : (
         <div className="events-section">
-          <div className="coming-soon">
-            <h3>Coming Soon!</h3>
-            <p>We're working on exciting running events and challenges.</p>
-            <p>Check back later for virtual races, challenges, and community events!</p>
-          </div>
+          {events.length > 0 ? (
+            <div className="events-list">
+              {events.map(event => (
+                <EventCard 
+                  key={event.id}
+                  event={event}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="no-events">
+              <p>No active events at the moment.</p>
+              <p>Check back soon for upcoming events!</p>
+            </div>
+          )}
         </div>
       )}
     </div>

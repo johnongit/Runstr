@@ -10,6 +10,7 @@ import { SettingsProvider } from './contexts/SettingsContext';
 import { WalletProvider } from './contexts/WalletContext';
 import { MenuBar } from './components/MenuBar';
 import { initializeNostr } from './utils/nostr';
+import { initializeEvents } from './services/EventService';
 import './App.css';
 import ErrorFallback from './components/ErrorFallback';
 import { directFetchRunningPosts } from './utils/feedFetcher';
@@ -68,11 +69,16 @@ const AppRoutes = lazy(() =>
 const App = () => {
   const [hasError, setHasError] = useState(false);
   
-  // Initialize Nostr connection as soon as the app launches
+  // Initialize app services
   useEffect(() => {
-    const preloadNostr = async () => {
+    const initializeApp = async () => {
       try {
-        console.log('Preloading Nostr connection on app launch');
+        console.log('Initializing app services');
+        
+        // Initialize events with test event
+        initializeEvents();
+        
+        // Initialize Nostr connection
         await initializeNostr();
         
         // First check if we have a fresh cache that can be used immediately
@@ -127,11 +133,11 @@ const App = () => {
             });
         }
       } catch (error) {
-        console.error('Error in preloadNostr:', error);
+        console.error('Error initializing app:', error);
       }
     };
     
-    preloadNostr();
+    initializeApp();
   }, []);
   
   // Global error handler
