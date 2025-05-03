@@ -3,16 +3,18 @@ import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useNostr } from '../hooks/useNostr';
 import { displayDistance } from '../utils/formatters';
 import { useSettings } from '../contexts/SettingsContext';
+import '../assets/styles/leaderboard.css';
+import PropTypes from 'prop-types';
 
 /**
  * Leaderboard component with tabs for different leaderboard types
  */
 const LeaderboardTabs = ({ runHistory, stats, showSettings = true }) => {
-  const { publicKey } = useNostr();
-  const { profiles } = useNostr();
+  const { publicKey, profiles = new Map() } = useNostr();
   const { distanceUnit } = useSettings();
   const [activeTab, setActiveTab] = useState('distance');
   
+  // Always call hooks, even if we might not use their results
   const { 
     participating,
     toggleParticipation,
@@ -21,7 +23,19 @@ const LeaderboardTabs = ({ runHistory, stats, showSettings = true }) => {
     distanceLeaderboard,
     streakLeaderboard,
     improvementLeaderboard
-  } = useLeaderboard(publicKey, profiles, runHistory, stats);
+  } = useLeaderboard(publicKey, profiles, runHistory || [], stats || {});
+  
+  // Safety check - if essential data is missing, show a fallback UI
+  if (!runHistory || !stats) {
+    return (
+      <div className="leaderboard-container">
+        <div className="leaderboard-error">
+          <h3>Leaderboard Unavailable</h3>
+          <p>We couldn&apos;t load your running data. Please try again later or complete a run to join the leaderboards.</p>
+        </div>
+      </div>
+    );
+  }
   
   // Handle tab changes
   const handleTabChange = (tabName) => {
@@ -219,6 +233,13 @@ const LeaderboardTabs = ({ runHistory, stats, showSettings = true }) => {
       </div>
     </div>
   );
+};
+
+// Add prop validations
+LeaderboardTabs.propTypes = {
+  runHistory: PropTypes.array,
+  stats: PropTypes.object,
+  showSettings: PropTypes.bool
 };
 
 export default LeaderboardTabs; 

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useRunStats } from '../hooks/useRunStats';
 import runDataService from '../services/RunDataService';
 import LeaderboardTabs from '../components/LeaderboardTabs';
@@ -10,25 +9,32 @@ const Events = () => {
   const [runHistory, setRunHistory] = useState([]);
   const [events, setEvents] = useState([]);
   const [activeTab, setActiveTab] = useState('leaderboards');
-  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   // Load run history and events from local storage
   useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
       // Initialize events
       initializeEvents();
       
       // Load run history
       const runs = runDataService.getAllRuns();
-      setRunHistory(runs);
+      setRunHistory(runs || []);
       
       // Load events
       const eventsData = getAllEvents();
-      setEvents(eventsData);
+      setEvents(eventsData || []);
     } catch (error) {
       console.error('Error loading data:', error);
+      setError('There was a problem loading the leaderboard data. Please try again later.');
       setRunHistory([]);
       setEvents([]);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
   
@@ -38,6 +44,29 @@ const Events = () => {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
   };
+  
+  if (isLoading) {
+    return (
+      <div className="events-page loading">
+        <h2>Events & Leaderboards</h2>
+        <div className="loading-indicator">
+          <p>Loading leaderboards...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="events-page error">
+        <h2>Events & Leaderboards</h2>
+        <div className="error-message">
+          <p>{error}</p>
+          <button onClick={() => window.location.reload()}>Try Again</button>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="events-page">
@@ -62,7 +91,7 @@ const Events = () => {
         <div className="leaderboards-section">
           <LeaderboardTabs 
             runHistory={runHistory} 
-            stats={stats}
+            stats={stats || {}}
           />
         </div>
       ) : (

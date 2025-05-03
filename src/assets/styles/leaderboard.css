@@ -212,33 +212,65 @@ input:checked + .toggle-slider:before {
   color: #dc3545;
 }
 
-/* No Entries Message */
+/* Error and Loading States */
+.leaderboard-error, 
+.loading-indicator,
+.error-message,
 .no-entries {
-  text-align: center;
   padding: 20px;
-  color: rgba(255, 255, 255, 0.6);
-  font-style: italic;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
 }
 
-/* Rewards Info */
+.leaderboard-error h3,
+.error-message h3 {
+  color: var(--primary-color);
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+}
+
+.leaderboard-error p,
+.error-message p,
+.loading-indicator p {
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.error-message button,
+.leaderboard-error button {
+  background-color: var(--primary-color);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.error-message button:hover,
+.leaderboard-error button:hover {
+  background-color: rgba(58, 134, 255, 0.8);
+}
+
+/* Leaderboard Rewards Info */
 .leaderboard-rewards-info {
-  background: rgba(247, 147, 26, 0.1);
+  background-color: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
-  padding: 12px;
+  padding: 12px 16px;
   margin-top: 16px;
 }
 
 .leaderboard-rewards-info h4 {
-  color: #f7931a;
-  margin-top: 0;
+  color: var(--primary-color);
+  font-size: 0.95rem;
   margin-bottom: 8px;
-  font-size: 1rem;
 }
 
 .leaderboard-rewards-info p {
-  margin: 0 0 8px;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 8px;
 }
 
 .leaderboard-rewards-info ul {
@@ -247,7 +279,7 @@ input:checked + .toggle-slider:before {
 }
 
 .leaderboard-rewards-info li {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.8);
   margin-bottom: 4px;
 }
