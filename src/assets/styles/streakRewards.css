@@ -1,0 +1,245 @@
+/* Streak Rewards Card Styling */
+.streak-rewards-card {
+  background: var(--bg-dark);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.streak-rewards-header h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: var(--primary-color);
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+/* Current streak display */
+.streak-status {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.current-streak {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.streak-flames {
+  font-size: 2rem;
+  margin-bottom: 4px;
+}
+
+.streak-days {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--primary-color);
+}
+
+.streak-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Eligible rewards section */
+.eligible-rewards {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.eligible-rewards h4, 
+.no-eligible-rewards h4,
+.all-milestones h4 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.reward-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reward-item:last-child {
+  border-bottom: none;
+}
+
+.reward-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.days-milestone {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.sats-amount {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sats-highlight {
+  color: #f7931a; /* Bitcoin orange */
+  font-weight: 600;
+}
+
+.claim-button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.claim-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.claim-button:disabled {
+  background-color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Next milestone progress */
+.next-milestone {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.milestone-info p {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.milestone-progress {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(to right, #3a86ff, #ff006e);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* All milestones grid */
+.milestones-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.milestone-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.milestone-item.claimed {
+  background: rgba(40, 167, 69, 0.1);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.milestone-item.eligible {
+  background: rgba(58, 134, 255, 0.1);
+  border: 1px solid rgba(58, 134, 255, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(58, 134, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(58, 134, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(58, 134, 255, 0);
+  }
+}
+
+.milestone-day {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--primary-color);
+}
+
+.milestone-reward {
+  font-size: 0.9rem;
+  color: #f7931a;
+  margin: 4px 0;
+}
+
+.milestone-status {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Success and error messages */
+.claim-success, 
+.claim-error {
+  text-align: center;
+  padding: 10px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.claim-success {
+  background: rgba(40, 167, 69, 0.1);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+  color: #28a745;
+}
+
+.claim-error {
+  background: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: #dc3545;
+}
+
+.streak-message {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  margin: 16px 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .milestones-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .eligible-rewards h4, 
+  .no-eligible-rewards h4,
+  .all-milestones h4 {
+    text-align: center;
+  }
+} 

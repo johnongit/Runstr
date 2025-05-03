@@ -1,0 +1,198 @@
+/* Bitcoin Transaction History Styling */
+.bitcoin-transaction-history {
+  background: var(--bg-dark);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.transaction-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.transaction-header h3 {
+  margin: 0;
+  color: var(--bitcoin-orange);
+  font-size: 1.2rem;
+}
+
+.sync-button {
+  background-color: var(--bitcoin-orange);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sync-button:hover {
+  background-color: #e67e00;
+  transform: translateY(-2px);
+}
+
+.sync-button:disabled {
+  background-color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.sync-message {
+  background: var(--bitcoin-orange-light);
+  color: var(--bitcoin-orange);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: var(--spacing-md);
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.sync-message.syncing {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.loading-transactions {
+  text-align: center;
+  padding: var(--spacing-lg);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.error-message {
+  background: var(--danger-color);
+  color: white;
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  margin-top: var(--spacing-sm);
+  text-align: center;
+}
+
+.no-transactions {
+  text-align: center;
+  padding: var(--spacing-lg);
+  color: var(--text-secondary);
+}
+
+.transactions-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: var(--spacing-sm);
+}
+
+.transaction-item {
+  background: var(--bg-highlight);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  transition: all 0.2s ease;
+}
+
+.transaction-item:hover {
+  transform: translateX(2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.transaction-info {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1.5fr;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.transaction-type {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.transaction-amount {
+  font-weight: 700;
+  color: var(--bitcoin-orange);
+  text-align: center;
+}
+
+.transaction-status {
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-transform: capitalize;
+}
+
+.status-completed {
+  background: rgba(40, 167, 69, 0.2);
+  color: var(--success-color);
+}
+
+.status-pending {
+  background: rgba(255, 193, 7, 0.2);
+  color: var(--warning-color);
+}
+
+.status-failed {
+  background: rgba(220, 53, 69, 0.2);
+  color: var(--danger-color);
+}
+
+.transaction-date {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.transaction-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  border-top: 1px solid var(--border-color);
+  padding-top: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+}
+
+.transaction-reason {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.transaction-id {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.transaction-error {
+  font-size: 0.8rem;
+  color: var(--danger-color);
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .transaction-info {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+  }
+  
+  .transaction-date {
+    text-align: left;
+    grid-column: 1 / 3;
+  }
+} 

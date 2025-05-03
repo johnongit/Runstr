@@ -9,6 +9,7 @@ import SplitsTable from '../components/SplitsTable';
 import { useActivityMode } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { RunHistoryCard } from '../components/RunHistoryCard';
+import StreakRewardsCard from '../components/StreakRewardsCard';
 
 export const RunHistory = () => {
   const navigate = useNavigate();
@@ -464,6 +465,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
           </div>
         </div>
       </div>
+
+      <StreakRewardsCard currentStreak={stats.currentStreak} />
 
       <h2>Run History</h2>
       {filteredHistory.length === 0 ? (

@@ -23,6 +23,9 @@ export const useRunStats = (runHistory, userProfile) => {
     thisMonthDistance: 0,
     totalCaloriesBurned: 0,
     averageCaloriesPerKm: 0,
+    previousWeekDistance: 0,
+    weeklyImprovementRate: 0,
+    leaderboardParticipation: true,
     personalBests: {
       '5k': 0,
       '10k': 0,
@@ -66,8 +69,11 @@ export const useRunStats = (runHistory, userProfile) => {
       bestStreak: 0,
       thisWeekDistance: 0,
       thisMonthDistance: 0,
+      previousWeekDistance: 0,
+      weeklyImprovementRate: 0,
       totalCaloriesBurned: 0,
       averageCaloriesPerKm: 0,
+      leaderboardParticipation: true,
       personalBests: {
         '5k': 99999,
         '10k': 99999,
@@ -90,71 +96,109 @@ export const useRunStats = (runHistory, userProfile) => {
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
     
+    // Get the start of last week
+    const startOfLastWeek = new Date(startOfWeek);
+    startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+    
     // Get the start of this month
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     startOfMonth.setHours(0, 0, 0, 0);
+    
+    // Get unique dates for streak calculation
+    const dates = [];
 
-    // Process each run for other stats
+    // Process each run
     runs.forEach((run) => {
       // Skip runs with invalid data
-      if (!run || isNaN(run.distance) || run.distance <= 0 || 
-          isNaN(run.duration) || run.duration <= 0) {
-        return;
-      }
+      if (!run.distance || !run.duration) return;
       
-      // Total distance
+      // Add to total distance (convert to km for consistent calculation)
       newStats.totalDistance += run.distance;
-
-      // Longest run
-      if (run.distance > newStats.longestRun) {
-        newStats.longestRun = run.distance;
+      
+      // Check for longest run
+      newStats.longestRun = Math.max(newStats.longestRun, run.distance);
+      
+      // Calculate pace (minutes per km or mile)
+      const distanceInUnit = distanceUnit === 'km' 
+        ? run.distance / 1000 
+        : run.distance / 1609.344;
+        
+      if (distanceInUnit > 0) {
+        const paceInMinutes = (run.duration / 60) / distanceInUnit;
+        
+        // Only include valid pace values
+        if (paceInMinutes > 0 && paceInMinutes < 60) { // Filter out extreme values
+          totalPace += paceInMinutes;
+          validPaceCount++;
+          
+          // Update fastest pace
+          if (paceInMinutes < newStats.fastestPace) {
+            newStats.fastestPace = paceInMinutes;
+          }
+          
+          // Calculate personal bests for standard distances
+          const distanceInKm = run.distance / 1000;
+          
+          // 5K
+          if (distanceInKm >= 5) {
+            const timeFor5K = (5 * paceInMinutes * 60); // seconds
+            if (timeFor5K < newStats.personalBests['5k'] || newStats.personalBests['5k'] === 99999) {
+              newStats.personalBests['5k'] = timeFor5K;
+            }
+          }
+          
+          // 10K
+          if (distanceInKm >= 10) {
+            const timeFor10K = (10 * paceInMinutes * 60); // seconds
+            if (timeFor10K < newStats.personalBests['10k'] || newStats.personalBests['10k'] === 99999) {
+              newStats.personalBests['10k'] = timeFor10K;
+            }
+          }
+          
+          // Half Marathon (21.1km)
+          if (distanceInKm >= 21.1) {
+            const timeForHalfMarathon = (21.1 * paceInMinutes * 60); // seconds
+            if (timeForHalfMarathon < newStats.personalBests['halfMarathon'] || newStats.personalBests['halfMarathon'] === 99999) {
+              newStats.personalBests['halfMarathon'] = timeForHalfMarathon;
+            }
+          }
+          
+          // Marathon (42.2km)
+          if (distanceInKm >= 42.2) {
+            const timeForMarathon = (42.2 * paceInMinutes * 60); // seconds
+            if (timeForMarathon < newStats.personalBests['marathon'] || newStats.personalBests['marathon'] === 99999) {
+              newStats.personalBests['marathon'] = timeForMarathon;
+            }
+          }
+        }
+      }
+      
+      // Process date information for streak calculation
+      let runDate = new Date(run.date);
+      
+      // For older runs that stored date as milliseconds
+      if (isNaN(runDate.getTime()) && !isNaN(parseInt(run.date))) {
+        runDate = new Date(parseInt(run.date));
       }
 
-      // Pace calculations using RunDataService
-      // Calculate pace in minutes per unit (km or mi)
-      const pace = runDataService.calculatePace(run.distance, run.duration, distanceUnit);
-      
-      // Apply reasonable limits (2-20 min/unit)
-      const validPace = !isNaN(pace) && pace >= 2 && pace <= 20;
-      
-      if (validPace) {
-        totalPace += pace;
-        validPaceCount++;
-        
-        if (pace < newStats.fastestPace) {
-          newStats.fastestPace = pace;
-        }
-        
-        // Personal bests by distance
-        const fiveKmInMeters = 5000;
-        const tenKmInMeters = 10000;
-        const halfMarathonInMeters = 21097.5;
-        const marathonInMeters = 42195;
-        
-        if (run.distance >= fiveKmInMeters && pace < newStats.personalBests['5k']) {
-          newStats.personalBests['5k'] = pace;
-        }
-        if (run.distance >= tenKmInMeters && pace < newStats.personalBests['10k']) {
-          newStats.personalBests['10k'] = pace;
-        }
-        if (run.distance >= halfMarathonInMeters && pace < newStats.personalBests['halfMarathon']) {
-          newStats.personalBests['halfMarathon'] = pace;
-        }
-        if (run.distance >= marathonInMeters && pace < newStats.personalBests['marathon']) {
-          newStats.personalBests['marathon'] = pace;
-        }
-      }
-      
-      // This week and month distances
-      const runDate = new Date(run.date);
       if (!isNaN(runDate.getTime())) {
         // Format the date as YYYY-MM-DD for consistent grouping
         const dateKey = runDate.toISOString().split('T')[0];
         runsByDate[dateKey] = true;
         
+        // Add to dates array for streak calculation
+        if (!dates.includes(dateKey)) {
+          dates.push(dateKey);
+        }
+        
         // Check if run is from this week
         if (runDate >= startOfWeek) {
           newStats.thisWeekDistance += run.distance;
+        }
+        
+        // Check if run is from last week
+        if (runDate >= startOfLastWeek && runDate < startOfWeek) {
+          newStats.previousWeekDistance += run.distance;
         }
         
         // Check if run is from this month
@@ -185,8 +229,15 @@ export const useRunStats = (runHistory, userProfile) => {
     if (newStats.personalBests['halfMarathon'] === 99999) newStats.personalBests['halfMarathon'] = 0;
     if (newStats.personalBests['marathon'] === 99999) newStats.personalBests['marathon'] = 0;
     
+    // Calculate improvement rate
+    if (newStats.previousWeekDistance > 0) {
+      newStats.weeklyImprovementRate = ((newStats.thisWeekDistance - newStats.previousWeekDistance) / 
+                                       newStats.previousWeekDistance) * 100;
+    } else if (newStats.thisWeekDistance > 0) {
+      newStats.weeklyImprovementRate = 100; // First week with data, assume 100% improvement
+    }
+    
     // Calculate streaks
-    const dates = Object.keys(runsByDate).sort();
     if (dates.length > 0) {
       // Convert date strings to timestamps for easier comparison
       const timestamps = dates.map(d => new Date(d).getTime());
@@ -236,7 +287,24 @@ export const useRunStats = (runHistory, userProfile) => {
       newStats.bestStreak = bestStreak;
     }
     
+    // Load any persistent settings from localStorage
+    try {
+      const participationSetting = localStorage.getItem('leaderboardParticipation');
+      if (participationSetting !== null) {
+        newStats.leaderboardParticipation = JSON.parse(participationSetting);
+      }
+    } catch (err) {
+      console.error('Error loading leaderboard participation setting:', err);
+    }
+    
     setStats(newStats);
+    
+    // Save current stats to localStorage for other components to use
+    try {
+      localStorage.setItem('runStats', JSON.stringify(newStats));
+    } catch (err) {
+      console.error('Error saving run stats to localStorage:', err);
+    }
   }, [distanceUnit, calculateCaloriesBurned]);
 
   return {

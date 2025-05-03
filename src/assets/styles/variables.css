@@ -1,0 +1,52 @@
+:root {
+  /* Color variables */
+  --primary-color: #3a86ff;
+  --secondary-color: #ff006e;
+  --success-color: #28a745;
+  --danger-color: #dc3545;
+  --warning-color: #ffc107;
+  --info-color: #17a2b8;
+  
+  /* Bitcoin colors */
+  --bitcoin-orange: #f7931a;
+  --bitcoin-orange-light: rgba(247, 147, 26, 0.1);
+  
+  /* Background colors */
+  --bg-dark: #121212;
+  --bg-darker: #0a0a0a;
+  --bg-light: #1e1e1e;
+  --bg-highlight: rgba(255, 255, 255, 0.05);
+  
+  /* Text colors */
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.5);
+  
+  /* Border colors */
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-color-active: rgba(255, 255, 255, 0.3);
+  
+  /* Animation durations */
+  --animation-speed-fast: 0.2s;
+  --animation-speed-normal: 0.3s;
+  --animation-speed-slow: 0.5s;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  /* Border radius */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-pill: 9999px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
+} 

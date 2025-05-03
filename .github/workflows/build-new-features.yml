@@ -3,7 +3,7 @@ name: Build and Release New-Features Debug Apk
 on:
   push:
     branches:
-      - new-features
+      - update-beta
   workflow_dispatch:  # Allows manual triggering
 
 jobs:

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useRunProfile } from '../hooks/useRunProfile';
 import { publishHealthProfile } from '../utils/nostrHealth';
 import '../assets/styles/profile.css';
+import BitcoinTransactionHistory from '../components/BitcoinTransactionHistory';
 
 export const Profile = () => {
   const navigate = useNavigate();
@@ -274,6 +275,9 @@ export const Profile = () => {
           </div>
         </div>
       )}
+
+      {/* Add Bitcoin transaction history */}
+      <BitcoinTransactionHistory />
     </div>
   );
 }; 
