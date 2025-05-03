@@ -22,7 +22,7 @@ const EventBanner = () => {
     const sortedEvents = activeEvents.sort((a, b) => {
       if (a.status === 'active' && b.status !== 'active') return -1;
       if (a.status !== 'active' && b.status === 'active') return 1;
-      return new Date(a.startDate) - new Date(b.startDate);
+      return new Date(a.startDate) - new Date(a.startDate);
     });
     
     if (sortedEvents.length > 0) {
@@ -55,10 +55,10 @@ const EventBanner = () => {
   const dateDisplay = startDate === endDate ? startDate : `${startDate} - ${endDate}`;
   
   return (
-    <div className="relative bg-indigo-600 text-white px-4 py-3 mb-4 rounded-md shadow-md">
+    <div className="relative bg-gradient-to-r from-indigo-700 to-purple-700 text-white px-4 py-3 mb-4 rounded-md shadow-lg mx-4 border border-indigo-500">
       <button 
         onClick={handleDismiss}
-        className="absolute top-2 right-2 text-white"
+        className="absolute top-2 right-2 text-white hover:text-gray-200 transition-colors"
         aria-label="Dismiss"
       >
         ✕
@@ -70,15 +70,15 @@ const EventBanner = () => {
             <img 
               src={event.hostClub.avatar} 
               alt={event.hostClub.name || 'Event host'} 
-              className="h-10 w-10 rounded-full"
+              className="h-10 w-10 rounded-full border-2 border-white"
             />
           )}
         </div>
         
         <div>
-          <div className="font-bold">{event.title}</div>
-          <div className="text-sm flex items-center">
-            <span className="mr-2">{dateDisplay}</span>
+          <div className="font-bold text-lg">{event.title}</div>
+          <div className="text-sm flex items-center text-indigo-100">
+            <span className="mr-2">📅 {dateDisplay}</span>
             {event.hostClub?.name && (
               <span>Hosted by {event.hostClub.name}</span>
             )}
@@ -86,8 +86,8 @@ const EventBanner = () => {
         </div>
         
         <div className="ml-auto">
-          <span className="bg-white text-indigo-600 px-3 py-1 rounded-full text-sm font-medium">
-            {event.status === 'active' ? 'ACTIVE' : 'UPCOMING'}
+          <span className="bg-white text-indigo-600 px-3 py-1 rounded-full text-sm font-medium shadow-sm">
+            {event.status === 'active' ? '🔴 LIVE NOW' : '⏰ UPCOMING'}
           </span>
         </div>
       </div>

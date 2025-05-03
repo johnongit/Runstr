@@ -2,12 +2,12 @@
 const EVENT_STORAGE_KEY = 'events';
 const EVENT_REGISTRATION_KEY = 'eventRegistrations';
 
-// Hard-coded first event for testing
+// Hard-coded first event for testing - Updated to be an active 5K event for May 4th
 const initialTestEvent = {
   id: "event_001",
-  title: "RUNSTR 5K Test Event",
-  description: "Join our first-ever 5K event to test the new event functionality!",
-  rules: "Complete a 5k run on Sunday, May 4th to compete for prizes",
+  title: "RUNSTR 5K Race",
+  description: "Join our official 5K race event with leaderboard and prizes!",
+  rules: "Complete a 5k run on Sunday, May 4th to compete for prizes. Winners will be displayed on the leaderboard.",
   startDate: "2024-05-04T00:00:00Z", 
   endDate: "2024-05-04T23:59:59Z",
   entryFee: 5000, // in sats
@@ -20,7 +20,7 @@ const initialTestEvent = {
   },
   participants: [], // array of participant pubkeys
   runs: [], // array of qualifying run data
-  status: "upcoming" // upcoming, active, completed
+  status: "active" // Set to active to ensure it shows
 };
 
 export const initializeEvents = () => {
@@ -30,6 +30,19 @@ export const initializeEvents = () => {
   if (!existingEvents.some(e => e.id === initialTestEvent.id)) {
     existingEvents.push(initialTestEvent);
     localStorage.setItem(EVENT_STORAGE_KEY, JSON.stringify(existingEvents));
+  } else {
+    // Update existing event to ensure it's active
+    const eventIndex = existingEvents.findIndex(e => e.id === initialTestEvent.id);
+    if (eventIndex !== -1) {
+      existingEvents[eventIndex] = {
+        ...existingEvents[eventIndex],
+        title: initialTestEvent.title,
+        description: initialTestEvent.description,
+        rules: initialTestEvent.rules,
+        status: "active" // Force it to be active
+      };
+      localStorage.setItem(EVENT_STORAGE_KEY, JSON.stringify(existingEvents));
+    }
   }
   
   // Update event status based on current date
