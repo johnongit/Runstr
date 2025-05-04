@@ -109,34 +109,6 @@ const EventDetail = ({ profiles = new Map(), userPublicKey = null }) => {
         </div>
       </div>
       
-      {!isRegistered && event.status !== 'completed' && (
-        <div className="event-registration mb-4">
-          <button
-            onClick={handleRegister}
-            disabled={event.status === 'completed'}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 transition-colors"
-          >
-            Register for {event.entryFee.toLocaleString()} sats
-          </button>
-        </div>
-      )}
-      
-      {isRegistered && (
-        <div className="mb-4 p-3 bg-indigo-900/50 border border-indigo-700 rounded-md">
-          <div className="font-medium text-indigo-300">You&apos;re registered for this event!</div>
-          {event.status === 'upcoming' && (
-            <div className="text-sm text-indigo-200">
-              The event will begin on {formatDate(event.startDate)}. Be ready to run!
-            </div>
-          )}
-          {event.status === 'active' && (
-            <div className="text-sm text-indigo-200">
-              This event is active! Go for a run to participate.
-            </div>
-          )}
-        </div>
-      )}
-      
       {/* Tab Navigation */}
       <div className="tabs-container mb-4">
         <div className="flex border-b border-gray-700">
@@ -169,6 +141,16 @@ const EventDetail = ({ profiles = new Map(), userPublicKey = null }) => {
             onClick={() => setActiveTab('rules')}
           >
             Rules
+          </button>
+          <button
+            className={`py-2 px-4 font-medium text-sm ${
+              activeTab === 'register'
+                ? 'border-b-2 border-indigo-500 text-indigo-300'
+                : 'text-gray-400 hover:text-gray-300'
+            }`}
+            onClick={() => setActiveTab('register')}
+          >
+            Register
           </button>
         </div>
       </div>
@@ -216,7 +198,7 @@ const EventDetail = ({ profiles = new Map(), userPublicKey = null }) => {
                 <h2 className="text-lg font-semibold mb-2 text-indigo-300">How It Works</h2>
                 <div className="bg-gray-800 p-4 rounded-md text-gray-300">
                   <p className="mb-2">{event.description}</p>
-                  <p>Complete a 5K run (3.1 miles) on the specified date to compete for prizes. Your time will be automatically recorded and displayed on the leaderboard.</p>
+                  <p>Complete a 5K run (3.1 miles) during the event period to compete for prizes. Your time will be automatically recorded and displayed on the leaderboard.</p>
                 </div>
               </div>
             </div>
@@ -242,7 +224,7 @@ const EventDetail = ({ profiles = new Map(), userPublicKey = null }) => {
               <ol className="list-decimal pl-4 space-y-2">
                 <li>To participate, you must register for the event before it ends.</li>
                 <li>The race distance is exactly 5 kilometers (3.1 miles).</li>
-                <li>Your run must be completed within the event time window (May 4th, 2024).</li>
+                <li>Your run must be completed within the event time window (May 10 - June 10, 2024).</li>
                 <li>The run must be tracked using the RUNSTR app.</li>
                 <li>Winners will be determined by the fastest completion time.</li>
                 <li>All decisions by the event organizers are final.</li>
@@ -252,6 +234,50 @@ const EventDetail = ({ profiles = new Map(), userPublicKey = null }) => {
                 Additional details: {event.rules}
               </div>
             </div>
+          </div>
+        )}
+        
+        {/* Add Register tab content */}
+        {activeTab === 'register' && (
+          <div className="event-registration mb-6">
+            <h2 className="text-lg font-semibold mb-2 text-indigo-300">Register for Event</h2>
+            
+            {isRegistered ? (
+              <div className="p-4 bg-indigo-900/50 border border-indigo-700 rounded-md">
+                <div className="font-medium text-indigo-300 mb-2">You&apos;re registered for this event!</div>
+                {event.status === 'upcoming' && (
+                  <div className="text-sm text-indigo-200">
+                    The event will begin on {formatDate(event.startDate)}. Be ready to run!
+                  </div>
+                )}
+                {event.status === 'active' && (
+                  <div className="text-sm text-indigo-200">
+                    This event is active! Go for a run to participate.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-gray-800 p-4 rounded-md text-gray-300">
+                <p className="mb-4">
+                  Join the RUNSTR 5K Race event to compete with other runners and earn prizes!
+                </p>
+                <div className="mb-4">
+                  <span className="font-medium text-indigo-200">Entry Fee:</span> {event.entryFee.toLocaleString()} sats
+                </div>
+                {event.prizePool > 0 && (
+                  <div className="mb-4">
+                    <span className="font-medium text-indigo-200">Current Prize Pool:</span> {event.prizePool.toLocaleString()} sats
+                  </div>
+                )}
+                <button
+                  onClick={handleRegister}
+                  disabled={event.status === 'completed'}
+                  className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 transition-colors w-full"
+                >
+                  Register for {event.entryFee.toLocaleString()} sats
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

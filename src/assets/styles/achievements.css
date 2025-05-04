@@ -73,6 +73,129 @@
   font-size: 18px;
 }
 
+/* Modern Achievement Card Styles */
+.achievement-card.modern {
+  background: rgba(46, 51, 64, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(142, 154, 255, 0.1);
+  padding: 20px;
+  transition: all 0.2s ease;
+}
+
+.achievement-card.modern .achievement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.achievement-card.modern .achievement-header h3 {
+  font-size: 16px;
+  margin: 0;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.view-details-button {
+  background: transparent;
+  border: none;
+  color: #8e9aff;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-details-button:hover {
+  opacity: 0.8;
+}
+
+.view-details-button .chevron-right {
+  margin-left: 4px;
+  font-size: 14px;
+}
+
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.achievement-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.achievement-item.full-width {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.icon-container {
+  background: rgba(142, 154, 255, 0.1);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon {
+  font-size: 16px;
+}
+
+.item-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.item-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 2px;
+}
+
+.item-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.reward-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reward-progress {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.achievement-item.full-width .reward-progress-bar {
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+
+.achievement-item.full-width .reward-text {
+  font-size: 13px;
+  color: #ffa26b;
+  align-self: flex-start;
+}
+
 /* Achievement Modal Styles */
 .achievement-modal {
   position: fixed;
@@ -178,5 +301,9 @@
   .tab-button {
     font-size: 12px;
     padding: 10px 5px;
+  }
+  
+  .achievement-grid {
+    grid-template-columns: 1fr;
   }
 } 

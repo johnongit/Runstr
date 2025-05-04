@@ -70,12 +70,6 @@ const EventBanner = () => {
             )}
           </div>
         </div>
-        
-        <div className="ml-auto">
-          <span className="bg-white text-indigo-600 px-4 py-1 rounded-full text-sm font-medium shadow-sm">
-            {event.status === 'active' ? '🔴 LIVE NOW' : '⏰ UPCOMING'}
-          </span>
-        </div>
       </div>
     </div>
   );

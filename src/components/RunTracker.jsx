@@ -361,8 +361,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
 
   return (
     <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">
-      {/* Event Banner - Added at the top with high visibility */}
-      <div className="sticky top-0 z-10">
+      {/* Event Banner - No longer sticky */}
+      <div>
         <EventBanner />
       </div>
       

@@ -2,14 +2,14 @@
 const EVENT_STORAGE_KEY = 'events';
 const EVENT_REGISTRATION_KEY = 'eventRegistrations';
 
-// Hard-coded May 4th 5K event
+// Hard-coded May 10 - June 10 5K event
 const runstrEvent = {
   id: "event_001",
   title: "RUNSTR 5K Race",
   description: "Join our official 5K race event with leaderboard and prizes!",
-  rules: "Complete a 5k run on Sunday, May 4th to compete for prizes. Winners will be displayed on the leaderboard.",
-  startDate: "2024-05-04T00:00:00Z", // Fixed date for May 4th
-  endDate: "2024-05-04T23:59:59Z", // End of May 4th
+  rules: "Complete a 5k run between May 10th and June 10th to compete for prizes. Winners will be displayed on the leaderboard.",
+  startDate: "2024-05-10T00:00:00Z", // Start date: May 10th
+  endDate: "2024-06-10T23:59:59Z", // End date: June 10th
   entryFee: 5000, // in sats
   prizePool: 0, // increases with registrations
   prizeDistribution: [0.6, 0.3, 0.1], // 60% to 1st, 30% to 2nd, 10% to 3rd
