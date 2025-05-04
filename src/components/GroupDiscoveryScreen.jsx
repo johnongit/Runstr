@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUserPublicKey, fetchGroupMetadataByNaddr } from '../utils/nostrClient';
-import { nip19 } from 'nostr-tools';
+import { 
+  getUserPublicKey, 
+  fetchGroupMetadataByNaddr, 
+  hasJoinedGroupWS,
+  joinGroupWS 
+} from '../utils/nostrClient';
+import * as nip19 from 'nostr-tools/nip19';
 
 console.log("GroupDiscoveryScreen is loading");
 
@@ -149,6 +154,10 @@ const GroupDiscoveryScreen = () => {
   const [error, setError] = useState(null);
   const [groupsLoading, setGroupsLoading] = useState({});
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinErrorMessage, setJoinErrorMessage] = useState('');
+  const [joinSuccessGroup, setJoinSuccessGroup] = useState(null);
+  const [currentAction, setCurrentAction] = useState('');
 
   // Fetch group metadata on component mount
   useEffect(() => {
@@ -183,7 +192,7 @@ const GroupDiscoveryScreen = () => {
                   metadata
                 };
               }
-            } catch (_) {
+            } catch (error) { // eslint-disable-line no-unused-vars
               console.log(`Standard fetch method failed for ${group.naddr}, trying WebSocket approach`);
             }
             
@@ -248,7 +257,10 @@ const GroupDiscoveryScreen = () => {
       // Check join status for each group
     for (const group of FEATURED_GROUPS) {
         try {
-          statusMap[group.naddr] = await hasJoinedGroup(group.naddr);
+          console.log(`Checking join status for group: ${group.naddr}`);
+          // Use the WebSocket implementation instead of SimplePool
+          statusMap[group.naddr] = await hasJoinedGroupWS(group.naddr);
+          console.log(`Join status for ${group.naddr}: ${statusMap[group.naddr]}`);
         } catch (innerError) {
           console.error(`Error checking join status for group:`, innerError);
           statusMap[group.naddr] = false; // Assume not joined if error
@@ -281,10 +293,39 @@ const GroupDiscoveryScreen = () => {
     }
   };
 
-  // Join a group
-  const handleJoinGroup = async (e) => {
-    e.stopPropagation(); // Prevent triggering the parent's onClick
-    setShowComingSoonModal(true);
+  // Handle joining a group
+  const handleJoinGroup = async (naddr, e) => {
+    if (e) e.preventDefault(); // Prevent form submission if event is provided
+    
+    try {
+      setIsJoining(true);
+      setCurrentAction(`Joining group...`);
+      
+      console.log(`Joining group with naddr: ${naddr}`);
+      // Use the WebSocket implementation instead of SimplePool
+      const success = await joinGroupWS(naddr);
+      
+      if (success) {
+        console.log('Successfully joined group');
+        // Update the UI to show the group as joined
+        setJoinedGroups(prev => ({
+          ...prev,
+          [naddr]: true
+        }));
+        setCurrentAction('Successfully joined!');
+        setTimeout(() => setCurrentAction(''), 3000);
+      } else {
+        console.error('Failed to join group');
+        setCurrentAction('Failed to join group. Please try again.');
+        setTimeout(() => setCurrentAction(''), 5000);
+      }
+    } catch (error) {
+      console.error('Error joining group:', error);
+      setCurrentAction('Error joining group. Please try again.');
+      setTimeout(() => setCurrentAction(''), 5000);
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   // Helper to render tags (if available)
@@ -318,12 +359,61 @@ const GroupDiscoveryScreen = () => {
     <div className="px-4 pt-6 pb-20">
       <h1 className="text-2xl font-bold mb-6 text-center">Teams</h1>
       
-      {/* Coming Soon Modal */}
+      {/* Join Success Modal */}
+      {joinSuccessGroup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-gray-700">
+            <h2 className="text-xl font-bold text-white mb-4">
+              {joinSuccessGroup.alreadyJoined ? 'Already Joined' : 'Successfully Joined'}
+            </h2>
+            <p className="text-gray-300 mb-6">
+              {joinSuccessGroup.alreadyJoined 
+                ? `You are already a member of "${joinSuccessGroup.metadata?.metadata?.name || 'this group'}".` 
+                : `You have joined "${joinSuccessGroup.metadata?.metadata?.name || 'the group'}" successfully!`}
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setJoinSuccessGroup(null)}
+                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => {
+                  setJoinSuccessGroup(null);
+                  handleGroupPress(joinSuccessGroup);
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Go to Group
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Join Error Modal */}
+      {joinErrorMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-red-800">
+            <h2 className="text-xl font-bold text-white mb-4">Error Joining Group</h2>
+            <p className="text-red-400 mb-6">{joinErrorMessage}</p>
+            <button 
+              onClick={() => setJoinErrorMessage('')}
+              className="w-full px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Coming Soon Modal - keep for other features */}
       {showComingSoonModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-gray-700">
             <h2 className="text-xl font-bold text-white mb-4">Coming Soon</h2>
-            <p className="text-gray-300 mb-6">Team joining functionality is coming soon. Stay tuned for updates!</p>
+            <p className="text-gray-300 mb-6">This feature is coming soon. Stay tuned for updates!</p>
             <button 
               onClick={() => setShowComingSoonModal(false)}
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -375,7 +465,6 @@ const GroupDiscoveryScreen = () => {
         const metadata = group.metadata?.metadata || group.metadata || {};
         const name = metadata.name || 'Unnamed Group';
         const about = metadata.about || 'No description available';
-        const picture = metadata.picture || metadata.image; // Try both picture and image fields
         
         // Parse tags from about or use empty array
         let tags = [];
@@ -386,9 +475,12 @@ const GroupDiscoveryScreen = () => {
           }
         }
         
+        // Check if user has joined this group
+        const hasJoined = joinedGroups[group.naddr] === true;
+        
         return (
           <div 
-          key={index} 
+            key={index} 
             className="bg-gray-800 rounded-lg p-4 mb-4 border border-gray-700 cursor-pointer hover:bg-gray-750"
             onClick={() => handleGroupPress(group)}
           >
@@ -405,10 +497,21 @@ const GroupDiscoveryScreen = () => {
             
             <div className="border-t border-gray-700 pt-3 mt-1">
               <button 
-                onClick={handleJoinGroup}
-                className="px-4 py-2 rounded-md bg-gray-700 float-right text-blue-400 hover:bg-gray-600"
+                onClick={(e) => handleJoinGroup(group.naddr, e)}
+                className={`px-4 py-2 rounded-md float-right 
+                  ${hasJoined 
+                    ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50' 
+                    : 'bg-gray-700 text-blue-400 hover:bg-gray-600'}`}
+                disabled={isJoining}
               >
-                Join Group
+                {isJoining ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                    <span>{currentAction}</span>
+                  </div>
+                ) : (
+                  hasJoined ? 'Joined ✓' : 'Join Group'
+                )}
               </button>
             </div>
           </div>

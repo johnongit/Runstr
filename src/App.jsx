@@ -15,7 +15,7 @@ import './App.css';
 import ErrorFallback from './components/ErrorFallback';
 import { directFetchRunningPosts } from './utils/feedFetcher';
 import { lightweightProcessPosts } from './utils/feedProcessor';
-import { storeFeedCache, getFeedCache, isCacheFresh } from './utils/feedCache';
+import { storeFeedCache, isCacheFresh } from './utils/feedCache';
 
 console.log("App.jsx is loading");
 
@@ -75,14 +75,18 @@ const App = () => {
       try {
         console.log('Initializing app services');
         
-        // Initialize events with test event
+        // Initialize events with test event - moved higher in init sequence
+        // and clearing any potential dismiss flags to ensure visibility
+        localStorage.removeItem('eventBannerDismissedUntil');
         initializeEvents();
+        console.log('Events initialized');
         
         // Initialize Nostr connection
         await initializeNostr();
         
         // First check if we have a fresh cache that can be used immediately
-        const cachedFeed = getFeedCache(30); // Get cache if less than 30 minutes old
+        // Note: We check for cache freshness but don't need to assign the variable if not using it
+        isCacheFresh(30); // Check if cache is less than 30 minutes old
         
         // If cache isn't fresh enough, use optimized feed fetcher for fast initial load
         if (!isCacheFresh(5) && !window.__FEED_LOADING) {

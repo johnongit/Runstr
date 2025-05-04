@@ -10,7 +10,7 @@ import SplitsTable from './SplitsTable';
 import DashboardRunCard from './DashboardRunCard';
 import AchievementCard from './AchievementCard';
 import EventBanner from './EventBanner';
-import { validateEventRun } from '../services/EventService';
+import { validateEventRun, initializeEvents } from '../services/EventService';
 
 export const RunTracker = () => {
   const { 
@@ -41,6 +41,12 @@ export const RunTracker = () => {
   const [workoutSaved, setWorkoutSaved] = useState(false);
   const [isSavingWorkout, setIsSavingWorkout] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Initialize events when the component mounts
+  useEffect(() => {
+    // Initialize events when the component mounts
+    initializeEvents();
+  }, []);
 
   // Load the most recent run
   useEffect(() => {
@@ -355,8 +361,10 @@ ${additionalContent ? `\n${additionalContent}` : ''}
 
   return (
     <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">
-      {/* Event Banner - Added at the top */}
-      <EventBanner />
+      {/* Event Banner - Added at the top with high visibility */}
+      <div className="sticky top-0 z-10">
+        <EventBanner />
+      </div>
       
       {/* Title Banner */}
       <div className="bg-gradient-to-r from-indigo-800 to-purple-800 p-4 mb-6 text-center">

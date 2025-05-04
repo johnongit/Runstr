@@ -4,8 +4,9 @@ import { NostrContext } from '../contexts/NostrContext';
 import { 
   parseNaddr, 
   fetchGroupMetadataByNaddr, 
-  fetchGroupMessages,
-  subscribe
+  fetchGroupMessagesWS,
+  sendGroupMessageWS,
+  subscribeToGroupMessagesWS
 } from '../utils/nostrClient';
 import '../components/RunClub.css';
 
@@ -235,26 +236,29 @@ export const TeamDetail = () => {
     console.log("Subscription filter:", filter);
     
     try {
-      // Subscribe to new messages
-      const sub = subscribe(filter);
-      
-      if (sub) {
-        console.log("Subscription created successfully");
-        
-        // Handle incoming events
-        sub.on('event', (event) => {
+      // Subscribe to new messages using WebSocket implementation
+      const sub = subscribeToGroupMessagesWS(
+        groupIdentifier, 
+        (event) => {
+          // Handle incoming events
           console.log('New message received:', event);
           
           // Check if we already have this message to avoid duplicates
           if (!messages.some(msg => msg.id === event.id)) {
             setMessages((prevMessages) => [...prevMessages, event]);
           }
-        });
-        
-        // Store the subscription for cleanup
+        },
+        (error) => {
+          console.error('Subscription error:', error);
+        }
+      );
+      
+      // Store the subscription for cleanup
+      if (sub) {
+        console.log("WebSocket subscription created successfully");
         subscriptionRef.current = sub;
       } else {
-        console.warn("Failed to create subscription - subscribe returned null/undefined");
+        console.warn("Failed to create WebSocket subscription");
       }
     } catch (error) {
       console.error('Error setting up subscription:', error);
@@ -272,7 +276,8 @@ export const TeamDetail = () => {
       const relays = groupData.relays.length > 0 ? groupData.relays : ['wss://groups.0xchat.com'];
       console.log("Using relays:", relays);
       
-      const messages = await fetchGroupMessages(groupId, relays);
+      // Use WebSocket implementation to avoid SimplePool issues
+      const messages = await fetchGroupMessagesWS(groupId, relays);
       console.log("Received messages:", messages);
       
       setMessages(messages);
@@ -361,7 +366,8 @@ export const TeamDetail = () => {
     
     try {
       console.log("Sending message to group:", groupInfo);
-      const sentMessage = await sendGroupMessage(groupInfo, messageText.trim());
+      // Use WebSocket implementation to send message
+      const sentMessage = await sendGroupMessageWS(groupInfo, messageText.trim());
       
       if (sentMessage) {
         console.log("Message sent successfully:", sentMessage);
@@ -371,7 +377,7 @@ export const TeamDetail = () => {
         // Scroll to bottom after sending
         setTimeout(scrollToBottom, 100);
       } else {
-        console.error("sendGroupMessage returned falsy value");
+        console.error("sendGroupMessageWS returned falsy value");
         setError('Failed to send message');
       }
     } catch (error) {

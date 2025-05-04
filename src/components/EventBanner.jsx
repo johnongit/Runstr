@@ -4,46 +4,50 @@ import { getActiveEvents } from '../services/EventService';
 
 const EventBanner = () => {
   const [event, setEvent] = useState(null);
-  const [dismissed, setDismissed] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
   
   useEffect(() => {
-    // Check if banner was recently dismissed
-    const dismissedUntil = localStorage.getItem('eventBannerDismissedUntil');
-    if (dismissedUntil && new Date(dismissedUntil) > new Date()) {
-      setDismissed(true);
-      return;
-    }
-    
-    // Get active events
-    const activeEvents = getActiveEvents();
-    
-    // Sort events: active first, then by start date
-    const sortedEvents = activeEvents.sort((a, b) => {
-      if (a.status === 'active' && b.status !== 'active') return -1;
-      if (a.status !== 'active' && b.status === 'active') return 1;
-      return new Date(a.startDate) - new Date(a.startDate);
-    });
-    
-    if (sortedEvents.length > 0) {
-      setEvent(sortedEvents[0]);
+    try {
+      // Get active events
+      const activeEvents = getActiveEvents();
+      console.log('Active events for banner:', activeEvents);
+      
+      if (!activeEvents || activeEvents.length === 0) {
+        console.log('No active events found for banner');
+        return;
+      }
+      
+      // Sort events: active first, then by start date
+      const sortedEvents = activeEvents.sort((a, b) => {
+        if (a.status === 'active' && b.status !== 'active') return -1;
+        if (a.status !== 'active' && b.status === 'active') return 1;
+        return new Date(a.startDate) - new Date(b.startDate); // Fixed comparison
+      });
+      
+      if (sortedEvents.length > 0) {
+        setEvent(sortedEvents[0]);
+      }
+    } catch (err) {
+      console.error('Error loading events for banner:', err);
+      setError(err.message);
     }
   }, []);
   
-  if (!event || dismissed) return null;
+  if (error) {
+    console.error('Error in EventBanner:', error);
+    return null; // Don't show banner if there's an error
+  }
+  
+  if (!event) return null;
   
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
-  };
-  
-  const handleDismiss = (e) => {
-    e.stopPropagation();
-    // Dismiss for 24 hours
-    const dismissUntil = new Date();
-    dismissUntil.setHours(dismissUntil.getHours() + 24);
-    localStorage.setItem('eventBannerDismissedUntil', dismissUntil.toISOString());
-    setDismissed(true);
+    // Format as Month/Day (e.g., May 4)
+    return date.toLocaleDateString(undefined, { 
+      month: 'long', 
+      day: 'numeric'
+    });
   };
   
   const handleClick = () => {
@@ -55,26 +59,8 @@ const EventBanner = () => {
   const dateDisplay = startDate === endDate ? startDate : `${startDate} - ${endDate}`;
   
   return (
-    <div className="relative bg-gradient-to-r from-indigo-700 to-purple-700 text-white px-4 py-3 mb-4 rounded-md shadow-lg mx-4 border border-indigo-500">
-      <button 
-        onClick={handleDismiss}
-        className="absolute top-2 right-2 text-white hover:text-gray-200 transition-colors"
-        aria-label="Dismiss"
-      >
-        ✕
-      </button>
-      
+    <div className="relative bg-gradient-to-r from-indigo-700 to-purple-700 text-white px-4 py-3 mb-4 rounded-md shadow-lg mx-4 border-2 border-indigo-400">
       <div className="flex items-center cursor-pointer" onClick={handleClick}>
-        <div className="flex-shrink-0 mr-3">
-          {event.hostClub?.avatar && (
-            <img 
-              src={event.hostClub.avatar} 
-              alt={event.hostClub.name || 'Event host'} 
-              className="h-10 w-10 rounded-full border-2 border-white"
-            />
-          )}
-        </div>
-        
         <div>
           <div className="font-bold text-lg">{event.title}</div>
           <div className="text-sm flex items-center text-indigo-100">
@@ -86,7 +72,7 @@ const EventBanner = () => {
         </div>
         
         <div className="ml-auto">
-          <span className="bg-white text-indigo-600 px-3 py-1 rounded-full text-sm font-medium shadow-sm">
+          <span className="bg-white text-indigo-600 px-4 py-1 rounded-full text-sm font-medium shadow-sm">
             {event.status === 'active' ? '🔴 LIVE NOW' : '⏰ UPCOMING'}
           </span>
         </div>

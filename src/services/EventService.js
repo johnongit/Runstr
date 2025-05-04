@@ -2,47 +2,65 @@
 const EVENT_STORAGE_KEY = 'events';
 const EVENT_REGISTRATION_KEY = 'eventRegistrations';
 
-// Hard-coded first event for testing - Updated to be an active 5K event for May 4th
-const initialTestEvent = {
+// Hard-coded May 4th 5K event
+const runstrEvent = {
   id: "event_001",
   title: "RUNSTR 5K Race",
   description: "Join our official 5K race event with leaderboard and prizes!",
   rules: "Complete a 5k run on Sunday, May 4th to compete for prizes. Winners will be displayed on the leaderboard.",
-  startDate: "2024-05-04T00:00:00Z", 
-  endDate: "2024-05-04T23:59:59Z",
+  startDate: "2024-05-04T00:00:00Z", // Fixed date for May 4th
+  endDate: "2024-05-04T23:59:59Z", // End of May 4th
   entryFee: 5000, // in sats
-  prizePool: 0, // starts at 0, increases with registrations
+  prizePool: 0, // increases with registrations
   prizeDistribution: [0.6, 0.3, 0.1], // 60% to 1st, 30% to 2nd, 10% to 3rd
   hostClub: {
     id: "runstr_club",
-    name: "RUNSTR",
-    avatar: "/icons/runstr-logo.png" // Assuming this path exists
+    name: "RUNSTR"
+    // No avatar field
   },
   participants: [], // array of participant pubkeys
   runs: [], // array of qualifying run data
-  status: "active" // Set to active to ensure it shows
+  status: "upcoming" // Always set to upcoming by default
 };
+
+// Next upcoming event (10K) removed
 
 export const initializeEvents = () => {
   const existingEvents = JSON.parse(localStorage.getItem(EVENT_STORAGE_KEY) || '[]');
+  let updated = false;
   
-  // Only add the test event if it doesn't already exist
-  if (!existingEvents.some(e => e.id === initialTestEvent.id)) {
-    existingEvents.push(initialTestEvent);
-    localStorage.setItem(EVENT_STORAGE_KEY, JSON.stringify(existingEvents));
+  // Check if our event exists
+  const eventIndex = existingEvents.findIndex(e => e.id === runstrEvent.id);
+  if (eventIndex !== -1) {
+    // Keep existing participants and runs, but update everything else
+    const existingParticipants = existingEvents[eventIndex].participants || [];
+    const existingRuns = existingEvents[eventIndex].runs || [];
+    const existingPrizePool = existingEvents[eventIndex].prizePool || 0;
+    
+    // Create updated event with existing participants/runs data
+    existingEvents[eventIndex] = {
+      ...runstrEvent,
+      participants: existingParticipants,
+      runs: existingRuns,
+      prizePool: existingPrizePool
+    };
+    
+    updated = true;
   } else {
-    // Update existing event to ensure it's active
-    const eventIndex = existingEvents.findIndex(e => e.id === initialTestEvent.id);
-    if (eventIndex !== -1) {
-      existingEvents[eventIndex] = {
-        ...existingEvents[eventIndex],
-        title: initialTestEvent.title,
-        description: initialTestEvent.description,
-        rules: initialTestEvent.rules,
-        status: "active" // Force it to be active
-      };
-      localStorage.setItem(EVENT_STORAGE_KEY, JSON.stringify(existingEvents));
+    // Add our event if it doesn't exist
+    existingEvents.push(runstrEvent);
+    updated = true;
+  }
+  
+  // Remove any other events - we only want the 5K event
+  if (existingEvents.length > 1) {
+    const filteredEvents = existingEvents.filter(e => e.id === runstrEvent.id);
+    if (filteredEvents.length !== existingEvents.length) {
+      updated = true;
     }
+    localStorage.setItem(EVENT_STORAGE_KEY, JSON.stringify(filteredEvents));
+  } else if (updated) {
+    localStorage.setItem(EVENT_STORAGE_KEY, JSON.stringify(existingEvents));
   }
   
   // Update event status based on current date
@@ -59,7 +77,22 @@ const updateEventStatuses = () => {
     const startDate = new Date(event.startDate);
     const endDate = new Date(event.endDate);
     
-    // Update status based on date
+    // Special case: our 5K event should be upcoming until the day of the event
+    if (event.id === "event_001" && event.title === "RUNSTR 5K Race") {
+      // If the event is scheduled on May 4th, maintain it as upcoming
+      const may4thEvent = startDate.getDate() === 4 && startDate.getMonth() === 4; // May is month 4 (0-indexed)
+      
+      if (may4thEvent) {
+        if (event.status !== "upcoming") {
+          event.status = "upcoming";
+          updated = true;
+          console.log('Fixed 5K event status to upcoming');
+        }
+        return; // Skip normal status update for this event
+      }
+    }
+    
+    // Normal status update based on date (for other events)
     let newStatus = event.status;
     
     if (now > endDate) {
@@ -71,6 +104,7 @@ const updateEventStatuses = () => {
     }
     
     if (event.status !== newStatus) {
+      console.log(`Updating event ${event.id} status from ${event.status} to ${newStatus}`);
       event.status = newStatus;
       updated = true;
     }
@@ -95,7 +129,32 @@ export const getEventById = (eventId) => {
 export const getActiveEvents = () => {
   updateEventStatuses();
   const events = JSON.parse(localStorage.getItem(EVENT_STORAGE_KEY) || '[]');
-  return events.filter(event => event.status === 'active' || event.status === 'upcoming');
+  
+  // Get all events regardless of status - fixes infinite recursion
+  if (events.length === 0) {
+    // Only initialize if there are no events at all
+    console.log('No events found, initializing');
+    initializeEvents();
+    return JSON.parse(localStorage.getItem(EVENT_STORAGE_KEY) || '[]');
+  }
+  
+  // Filter for active or upcoming events
+  const activeOrUpcoming = events.filter(event => 
+    event.status === 'active' || event.status === 'upcoming'
+  );
+  
+  console.log('All events:', events);
+  console.log('Active/upcoming events:', activeOrUpcoming);
+  
+  // If no active/upcoming events but we have events, force the first one to be upcoming
+  if (activeOrUpcoming.length === 0 && events.length > 0) {
+    console.log('No active events found, forcing first event to be upcoming');
+    events[0].status = 'upcoming';
+    localStorage.setItem(EVENT_STORAGE_KEY, JSON.stringify(events));
+    return [events[0]];
+  }
+  
+  return activeOrUpcoming;
 };
 
 export const registerForEvent = (eventId, pubkey) => {
@@ -186,10 +245,22 @@ export const validateEventRun = (completedRun, pubkey) => {
   return qualifyingEvents;
 };
 
-export const getEventLeaderboard = (eventId) => {
+export function getEventLeaderboard(eventId) {
   const event = getEventById(eventId);
-  if (!event) return [];
   
-  // Sort runs by duration (fastest first)
-  return [...event.runs].sort((a, b) => a.duration - b.duration);
-}; 
+  if (!event) {
+    return [];
+  }
+  
+  // Get real participants who have registered
+  const participants = event.participants || [];
+  
+  // If no participants, return empty array
+  if (participants.length === 0) {
+    return [];
+  }
+  
+  // Return actual participant data if available, otherwise return empty array
+  // In a real app, this would pull from actual tracked runs during the event
+  return event.runs.length > 0 ? event.runs.sort((a, b) => a.time - b.time) : [];
+} 

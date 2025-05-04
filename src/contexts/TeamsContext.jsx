@@ -1,7 +1,12 @@
 import { createContext, useState, useEffect, useCallback, useContext } from 'react';
 import PropTypes from 'prop-types';
 import { NostrContext } from './NostrContext';
-import { fetchUserGroupList, initializeNostr, setAmberUserPubkey } from '../utils/nostrClient';
+import { 
+  fetchUserGroupList, 
+  fetchUserGroupListWS,
+  initializeNostr, 
+  setAmberUserPubkey
+} from '../utils/nostrClient';
 
 // Create context
 export const TeamsContext = createContext();
@@ -26,13 +31,14 @@ export const TeamsProvider = ({ children }) => {
   
   // General state
   const [error, setError] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
 
   // Initialize Nostr when component mounts
   useEffect(() => {
     const initNostr = async () => {
       try {
+        console.log('TeamsContext: Initializing Nostr...');
         const initialized = await initializeNostr();
+        console.log('TeamsContext: Nostr initialized result:', initialized);
         setNostrInitialized(initialized);
         if (!initialized) {
           setError('Failed to connect to Nostr network');
@@ -54,32 +60,48 @@ export const TeamsProvider = ({ children }) => {
         return;
       }
 
-      setLoadingNostrGroups(true);
-      setError(null);
-      
       try {
-        // Set the pubkey in nostrClient for Amber authentication
+        setLoadingNostrGroups(true);
+        setError(null);
+        
+        // Set Amber public key for nostrClient.js
         setAmberUserPubkey(nostrPublicKey);
-        setCurrentUser(nostrPublicKey);
+
+        console.log('TeamsContext: Fetching user groups for pubkey:', nostrPublicKey);
         
-        // Fetch groups from all configured relays
-        const groups = await fetchUserGroupList(nostrPublicKey);
-        
-        if (groups && Array.isArray(groups)) {
-          setMyNostrGroups(groups);
-        } else {
-          setMyNostrGroups([]);
+        try {
+          // Use WebSocket implementation to avoid SimplePool issues
+          const groups = await fetchUserGroupListWS(nostrPublicKey);
+          console.log('TeamsContext: Fetched groups using WebSocket:', groups);
+          setMyNostrGroups(groups || []);
+        } catch (wsErr) {
+          console.error('WebSocket approach failed, trying fallback:', wsErr);
+          
+          try {
+            // Fallback to original implementation if WebSocket fails
+            const groups = await fetchUserGroupList(nostrPublicKey);
+            console.log('TeamsContext: Fetched groups using fallback:', groups);
+            setMyNostrGroups(groups || []);
+          } catch (fallbackErr) {
+            console.error('Error in fallback approach:', fallbackErr);
+            setError('Failed to fetch Nostr groups');
+            setMyNostrGroups([]);
+          }
         }
       } catch (err) {
-        console.error('Error loading Nostr clubs:', err);
-        setError('Failed to load your Nostr clubs');
+        console.error('Error in overall fetch process:', err);
+        setError('Failed to fetch Nostr groups');
         setMyNostrGroups([]);
       } finally {
         setLoadingNostrGroups(false);
       }
     };
 
-    fetchNostrGroups();
+    // Fetch groups whenever nostrPublicKey changes and Nostr is initialized
+    if (nostrInitialized) {
+      console.log('TeamsContext: nostrPublicKey changed, fetching groups...');
+      fetchNostrGroups();
+    }
   }, [nostrPublicKey, nostrInitialized]);
 
   // Clear error
@@ -92,7 +114,6 @@ export const TeamsProvider = ({ children }) => {
     myNostrGroups,
     loadingNostrGroups,
     error,
-    currentUser,
     clearError,
     nostrInitialized
   };

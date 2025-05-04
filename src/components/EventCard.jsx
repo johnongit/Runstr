@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import { isUserRegisteredForEvent } from '../services/EventService';
 
 const EventCard = ({ event }) => {
@@ -24,13 +25,6 @@ const EventCard = ({ event }) => {
       onClick={handleClick}
     >
       <div className="flex items-center mb-2">
-        {event.hostClub?.avatar && (
-          <img 
-            src={event.hostClub.avatar} 
-            alt={event.hostClub.name || 'Event host'} 
-            className="h-8 w-8 rounded-full mr-2"
-          />
-        )}
         <h3 className="text-lg font-semibold">{event.title}</h3>
         {isRegistered && (
           <span className="ml-auto bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
@@ -61,6 +55,19 @@ const EventCard = ({ event }) => {
       <div className="text-sm">{event.description.substring(0, 100)}...</div>
     </div>
   );
+};
+
+EventCard.propTypes = {
+  event: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    title: PropTypes.string.isRequired,
+    description: PropTypes.string,
+    startDate: PropTypes.string.isRequired,
+    endDate: PropTypes.string.isRequired,
+    status: PropTypes.string.isRequired,
+    entryFee: PropTypes.number.isRequired,
+    prizePool: PropTypes.number
+  }).isRequired
 };
 
 export default EventCard; 
