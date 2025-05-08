@@ -4,7 +4,7 @@
  * without modifying existing Nostr functionality
  */
 import { ndk } from './nostr';
-import { relays } from './nostrClient';
+import { relays } from '../config/relays.js';
 
 /**
  * Get fastest relays based on performance metrics

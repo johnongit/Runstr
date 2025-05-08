@@ -7,7 +7,10 @@ import bitvoraRewardsService from '../services/bitvoraRewardsService';
  * Component for displaying Bitcoin transaction history
  */
 const BitcoinTransactionHistory = () => {
-  const { publicKey } = useNostr();
+  // Handle case where NostrContext might not be fully initialized yet
+  const nostrContext = useNostr();
+  const publicKey = nostrContext?.publicKey || null;
+  
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

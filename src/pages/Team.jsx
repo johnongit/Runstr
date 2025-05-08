@@ -1,42 +1,43 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { NostrContext } from '../contexts/NostrContext';
-import { ndk, initializeNostr } from '../utils/nostr';
+import { useNavigate } from 'react-router-dom';
+import { NostrContext, initNdk } from '../contexts/NostrContext';
+import { ndk } from '../contexts/NostrContext';
+import { nip19, generateSecretKey } from 'nostr-tools';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 
 export const Team = () => {
   const navigate = useNavigate();
-  const { teamId } = useParams();
-  const { pubkey } = useContext(NostrContext);
+  const { pubkey, isInitialized: isNdkInitialized, ndkError: ndkInitError } = useContext(NostrContext);
   
-  // State variables
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('myTeams'); // 'myTeams', 'create', 'join', 'teamProfile'
+  const [activeTab, setActiveTab] = useState('myTeams');
   const [myTeams, setMyTeams] = useState([]);
-  const [currentTeam, setCurrentTeam] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [messageText, setMessageText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [profiles, setProfiles] = useState(new Map());
   
-  // New team form data
   const [newTeamData, setNewTeamData] = useState({
     name: '',
     description: '',
-    isPublic: true,
-    invitees: []
+    picture: '',
+    isPublic: true
   });
   
-  // Load user profiles for team members
   const loadProfiles = useCallback(async (pubkeys) => {
     try {
-      if (!pubkeys.length) return;
+      const uniquePubkeys = [...new Set(pubkeys)].filter(Boolean);
+      if (!uniquePubkeys.length) return;
       
+      console.log('Team.jsx: Loading profiles for pubkeys:', uniquePubkeys);
+      if (!isNdkInitialized) {
+          console.log("Waiting for NDK to initialize before fetching profiles...");
+          await initNdk();
+      }
+
       const profileEvents = await ndk.fetchEvents({
         kinds: [0],
-        authors: pubkeys
+        authors: uniquePubkeys
       });
       
       const newProfiles = new Map(profiles);
@@ -47,7 +48,7 @@ export const Team = () => {
           newProfiles.set(profile.pubkey, content);
         } catch (err) {
           console.error('Error parsing profile:', err);
-          newProfiles.set(profile.pubkey, { name: 'Unknown Runner' });
+          newProfiles.set(profile.pubkey, { name: 'Unknown User' });
         }
       });
       
@@ -55,544 +56,329 @@ export const Team = () => {
     } catch (err) {
       console.error('Error loading profiles:', err);
     }
-  }, [profiles]);
+  }, [profiles, isNdkInitialized]);
   
-  // Load team messages (NIP-28 kind 42 events for channel messages)
-  const loadTeamMessages = useCallback(async (teamId) => {
+  const loadUserTeams = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      // Fetch channel messages (kind 42)
-      const messageEvents = await ndk.fetchEvents({
-        kinds: [42], // Channel messages
-        '#e': [teamId] // Reference to the channel/team
-      });
-      
-      // Process messages
-      const processedMessages = Array.from(messageEvents).map(event => {
-        return {
-          id: event.id,
-          pubkey: event.pubkey,
-          content: event.content,
-          created_at: event.created_at
-        };
-      });
-      
-      // Sort messages by created_at timestamp
-      processedMessages.sort((a, b) => a.created_at - b.created_at);
-      
-      setMessages(processedMessages);
-      
-      // Load profiles for message authors
-      const messagePubkeys = [...new Set(processedMessages.map(msg => msg.pubkey))];
-      await loadProfiles(messagePubkeys);
-    } catch (err) {
-      console.error('Error loading team messages:', err);
-    }
-  }, [loadProfiles]);
-  
-  // Load specific team data
-  const loadTeam = useCallback(async (id) => {
-    try {
-      setLoading(true);
-      
-      // Fetch team/channel creation event (kind 40)
-      const teamEvent = await ndk.fetchEvent(id);
-      
-      if (!teamEvent) {
-        setError('Team not found.');
+      if (!pubkey) {
+        console.log('loadUserTeams: No pubkey, cannot load teams.');
         setLoading(false);
+        setMyTeams([]);
         return;
       }
       
-      // Fetch latest channel metadata if available (kind 41)
-      const metadataEvents = await ndk.fetchEvents({
-        kinds: [41],
-        '#e': [id] // Reference to the channel creation event
-      });
-      
-      // Use the latest metadata or the original event data
-      let teamData;
-      let finalEvent = teamEvent;
-      
-      if (metadataEvents && metadataEvents.size > 0) {
-        // Find the most recent metadata event
-        const latestMetadata = Array.from(metadataEvents).sort((a, b) => 
-          b.created_at - a.created_at
-        )[0];
-        
-        teamData = JSON.parse(latestMetadata.content);
-        finalEvent = latestMetadata;
-      } else {
-        try {
-          teamData = JSON.parse(teamEvent.content);
-        } catch (err) {
-          console.error('Error parsing team data:', err);
-          setError('Invalid team data.');
-          return;
-        }
-      }
-      
-      // Get member references from p tags
-      const members = finalEvent.tags
-        .filter(tag => tag[0] === 'p')
-        .map(tag => tag[1]);
-      
-      // Include the creator if not already in members
-      if (!members.includes(teamEvent.pubkey)) {
-        members.push(teamEvent.pubkey);
-      }
-      
-      const team = {
-        id: teamEvent.id,
-        pubkey: teamEvent.pubkey,
-        created_at: teamEvent.created_at,
-        name: teamData.name || 'Unnamed Team',
-        description: teamData.description || '',
-        isPublic: teamData.isPublic !== false, // Default to public
-        members: [...new Set(members)]
+      console.log(`loadUserTeams: Fetching NIP-29 groups for user ${pubkey}`);
+
+      const createdFilter = {
+        kinds: [39000],
+        authors: [pubkey],
       };
+      const createdEvents = await ndk.fetchEvents(createdFilter);
+      console.log(`loadUserTeams: Found ${createdEvents.size} groups created by user.`);
+
+      const memberFilter = {
+        kinds: [9002],
+        '#p': [pubkey],
+      };
+      const memberEvents = await ndk.fetchEvents(memberFilter);
+      console.log(`loadUserTeams: Found ${memberEvents.size} AddMember events for user.`);
+
+      const potentialGroupIds = new Set();
+      const groupIdToLatestAdd = new Map();
+      memberEvents.forEach(event => {
+        const hTag = event.tags.find(tag => tag[0] === 'h');
+        if (hTag && hTag[1]) {
+          const groupId = hTag[1];
+          potentialGroupIds.add(groupId);
+          if (!groupIdToLatestAdd.has(groupId) || event.created_at > groupIdToLatestAdd.get(groupId)) {
+            groupIdToLatestAdd.set(groupId, event.created_at);
+          }
+        }
+      });
+      console.log('loadUserTeams: Potential Group IDs user was added to:', potentialGroupIds);
+
+      let removedGroupIds = new Set();
+      if (potentialGroupIds.size > 0) {
+          const removeFilter = {
+              kinds: [9003],
+              '#p': [pubkey],
+              '#h': Array.from(potentialGroupIds),
+          };
+          const removeEvents = await ndk.fetchEvents(removeFilter);
+          console.log(`loadUserTeams: Found ${removeEvents.size} RemoveMember events for user.`);
+          
+          removeEvents.forEach(event => {
+             const hTag = event.tags.find(tag => tag[0] === 'h');
+             if (hTag && hTag[1]) {
+                 const groupId = hTag[1];
+                 const lastAddTimestamp = groupIdToLatestAdd.get(groupId);
+                 if (lastAddTimestamp === undefined || event.created_at > lastAddTimestamp) {
+                     removedGroupIds.add(groupId);
+                 }
+             }
+          });
+          console.log('loadUserTeams: Group IDs user was removed from after last add:', removedGroupIds);
+      }
       
-      setCurrentTeam(team);
+      const finalMemberGroupIds = new Set(
+          [...potentialGroupIds].filter(id => !removedGroupIds.has(id))
+      );
+      console.log('loadUserTeams: Final confirmed member group IDs:', finalMemberGroupIds);
+
+      let metadataForMemberGroups = new Map();
+      if (finalMemberGroupIds.size > 0) {
+          const metadataFilter = {
+              kinds: [39000],
+              '#d': Array.from(finalMemberGroupIds),
+          };
+          const metadataEvents = await ndk.fetchEvents(metadataFilter);
+          metadataEvents.forEach(event => {
+             const dTag = event.tags.find(tag => tag[0] === 'd');
+             if (dTag && dTag[1]) {
+                 metadataForMemberGroups.set(dTag[1], event);
+             }
+          });
+          console.log(`loadUserTeams: Fetched metadata for ${metadataForMemberGroups.size} groups user is confirmed member of.`);
+      }
       
-      // Load profiles for team members
-      await loadProfiles(team.members);
-      
-      // Load team messages
-      await loadTeamMessages(id);
-      
-      setLoading(false);
-    } catch (err) {
-      console.error('Error loading team:', err);
-      setError('Failed to load team data. Please try again later.');
-      setLoading(false);
-    }
-  }, [loadProfiles, loadTeamMessages]);
-  
-  // Load user's teams
-  const loadUserTeams = useCallback(async () => {
-    try {
-      if (!pubkey) return;
-      
-      // Fetch teams (channels) where user is a member
-      // NIP-28 uses kind 40 for channel creation
-      const teamEvents = await ndk.fetchEvents({
-        kinds: [40],
-        authors: [pubkey] // Teams created by the user
+      const allGroupsMap = new Map();
+
+      createdEvents.forEach(event => {
+        const dTag = event.tags.find(tag => tag[0] === 'd');
+        if (dTag && dTag[1]) {
+          allGroupsMap.set(dTag[1], event);
+        }
       });
 
-      // Also fetch team metadata events that reference the user
-      const teamMetadataEvents = await ndk.fetchEvents({
-        kinds: [41], // Channel metadata
-        '#p': [pubkey] // Teams that mention the user
+      metadataForMemberGroups.forEach((event, groupId) => {
+         if (!allGroupsMap.has(groupId)) {
+            allGroupsMap.set(groupId, event);
+         }
       });
-      
-      // Combine teams and process
-      const allTeamEvents = new Set([...teamEvents, ...teamMetadataEvents]);
-      
-      // Process team events
-      const userTeams = Array.from(allTeamEvents).map(event => {
+
+      const userTeams = Array.from(allGroupsMap.values()).map(event => {
+        const dTag = event.tags.find(tag => tag[0] === 'd');
+        const groupId = dTag ? dTag[1] : null;
+        if (!groupId) return null;
+        
+        let metadata = {};
         try {
-          const teamData = JSON.parse(event.content);
-          
-          // Get member references from p tags
-          const members = event.tags
-            .filter(tag => tag[0] === 'p')
-            .map(tag => tag[1]);
-          
-          return {
-            id: event.id,
-            pubkey: event.pubkey,
-            created_at: event.created_at,
-            name: teamData.name || 'Unnamed Team',
-            description: teamData.description || '',
-            isPublic: teamData.isPublic !== false, // Default to public
-            members: [...new Set([event.pubkey, ...members])] // Include creator and members
-          };
-        } catch (err) {
-          console.error('Error processing team event:', err);
-          return null;
-        }
-      }).filter(Boolean); // Remove any null entries
-      
+          metadata = JSON.parse(event.content);
+        } catch { /* ignore parse error */ }
+        
+        return {
+          groupId: groupId,
+          id: event.id,
+          pubkey: event.pubkey,
+          created_at: event.created_at,
+          kind: event.kind,
+          tags: event.tags,
+          metadata: metadata, 
+        };
+      }).filter(Boolean);
+
+      console.log("loadUserTeams: Final combined user teams for display:", userTeams);
       setMyTeams(userTeams);
       
-      // Load profiles for team members
-      const allMembers = [...new Set(userTeams.flatMap(team => team.members))];
-      await loadProfiles(allMembers);
+      const creatorPubkeys = [...new Set(userTeams.map(team => team.pubkey))];
+      await loadProfiles(creatorPubkeys);
       
-      setLoading(false);
     } catch (err) {
-      console.error('Error loading teams:', err);
+      console.error('Error loading NIP-29 teams:', err);
       setError('Failed to load your teams. Please try again later.');
+      setMyTeams([]);
+    } finally {
       setLoading(false);
     }
-  }, [pubkey, loadProfiles]);
+  }, [pubkey, loadProfiles, isNdkInitialized]);
   
-  // Initialize Nostr connection and load user's teams
   useEffect(() => {
     const setup = async () => {
       try {
-        const connected = await initializeNostr();
-        if (!connected) {
-          throw new Error('Failed to connect to Nostr relays');
+        if (!isNdkInitialized) {
+            console.log("Team.jsx: Waiting for NDK initialization...");
+            await initNdk();
+            const { connected } = await initNdk();
+             if (!connected) {
+                throw new Error(ndkInitError || 'NDK failed to initialize.');
+            }
         }
-        
-        if (teamId) {
-          // If teamId is provided in URL, try to join that team
-          setActiveTab('teamProfile');
-          await loadTeam(teamId);
-        } else {
-          // Otherwise load user's teams
-          await loadUserTeams();
-        }
-        
-        setLoading(false);
+        console.log("Team.jsx: NDK initialized, loading user teams.");
+        await loadUserTeams();
+
       } catch (err) {
-        console.error('Setup error:', err);
-        setError('Failed to connect to Nostr network. Please try again later.');
+        console.error('Team.jsx Setup error:', err);
+        setError(err.message || 'Failed to connect to Nostr network or load teams.');
         setLoading(false);
       }
     };
     
     setup();
-  }, [teamId, pubkey, loadTeam, loadUserTeams]);
+  }, [isNdkInitialized, pubkey, loadUserTeams, ndkInitError]);
   
-  // Create a new team (NIP-28 kind 40 for channel creation)
   const createTeam = async () => {
     try {
       if (!pubkey) {
-        setError('You must be logged in to create a team.');
+        setError('You must be logged in to create a group.');
         return;
       }
-      
+      if (!ndk.signer) {
+        setError('Nostr signer not available.');
+        console.error('createTeam: NDK signer is missing.');
+        return;
+      }
       if (!newTeamData.name) {
-        setError('Team name is required.');
+        setError('Group name is required.');
         return;
       }
       
-      // Create a channel creation event (kind 40)
+      const groupId = generateSecretKey().toString('hex');
+      console.log(`createTeam: Creating group with ID: ${groupId}`);
+
       const event = new NDKEvent(ndk);
-      event.kind = 40; // Channel creation
+      event.kind = 39000;
       
-      // Set team data in content
       event.content = JSON.stringify({
         name: newTeamData.name,
-        description: newTeamData.description,
-        isPublic: newTeamData.isPublic,
-        picture: '', // Optional channel picture URL
-        created_at: Math.floor(Date.now() / 1000)
+        about: newTeamData.description,
+        picture: newTeamData.picture || '', 
       });
       
-      // Add team members as 'p' tags
-      const members = [...newTeamData.invitees].filter(Boolean);
-      members.forEach(member => {
-        event.tags.push(['p', member]);
-      });
-      
-      // Sign and publish the event
+      event.tags.push(['d', groupId]); 
+      event.tags.push(['p', pubkey, 'admin']);
+
+      console.log('createTeam: Publishing Kind 39000 event:', event.rawEvent());
       await event.publish();
+      console.log(`createTeam: Group metadata event ${event.id} published.`);
       
-      // Reset form and refresh teams
       setNewTeamData({
         name: '',
         description: '',
+        picture: '',
         isPublic: true,
-        invitees: []
       });
       
-      // Navigate to the new team's profile
       setActiveTab('myTeams');
-      await loadUserTeams();
+      await loadUserTeams(); 
       
     } catch (err) {
-      console.error('Error creating team:', err);
-      setError('Failed to create team. Please try again later.');
+      console.error('Error creating NIP-29 group:', err);
+      setError(`Failed to create group: ${err.message}`);
     }
   };
-  
-  // Join a team by creating a metadata event that references it and includes the user
-  const joinTeam = async (teamId) => {
-    try {
-      if (!pubkey) {
-        setError('You must be logged in to join a team.');
-        return;
-      }
-      
-      // Fetch team event
-      const teamEvent = await ndk.fetchEvent(teamId);
-      
-      if (!teamEvent) {
-        setError('Team not found.');
-        return;
-      }
-      
-      // Parse team data
-      let teamData;
-      try {
-        teamData = JSON.parse(teamEvent.content);
-      } catch (err) {
-        console.error('Error parsing team data:', err);
-        setError('Invalid team data.');
-        return;
-      }
-      // Create a new metadata event for the channel (kind 41)
-      const metadataEvent = new NDKEvent(ndk);
-      metadataEvent.kind = 41; // Channel metadata
-      
-      // Copy the team data
-      metadataEvent.content = JSON.stringify({
-        ...teamData,
-        updated_at: Math.floor(Date.now() / 1000)
-      });
-      
-      // Add reference to original channel
-      metadataEvent.tags.push(['e', teamId]);
-      
-      // Copy existing member tags
-      teamEvent.tags.forEach(tag => {
-        if (tag[0] === 'p') {
-          metadataEvent.tags.push(tag);
-        }
-      });
-      
-      // Add user as member if not already a member
-      const isAlreadyMember = teamEvent.tags.some(tag => 
-        tag[0] === 'p' && tag[1] === pubkey
-      );
-      
-      if (!isAlreadyMember) {
-        metadataEvent.tags.push(['p', pubkey]);
-      }
-      
-      // Sign and publish the updated event
-      await metadataEvent.publish();
-      
-      // Navigate to the team profile
-      navigate(`/team/profile/${teamId}`);
-      
-    } catch (err) {
-      console.error('Error joining team:', err);
-      setError('Failed to join team. Please try again later.');
-    }
-  };
-  
-  // Leave a team
-  const leaveTeam = async (teamId) => {
-    try {
-      if (!pubkey) {
-        setError('You must be logged in to leave a team.');
-        return;
-      }
-      
-      // Fetch team event
-      const teamEvent = await ndk.fetchEvent(teamId);
-      
-      if (!teamEvent) {
-        setError('Team not found.');
-        return;
-      }
-      
-      // Parse team data
-      let teamData;
-      try {
-        teamData = JSON.parse(teamEvent.content);
-      } catch (err) {
-        console.error('Error parsing team data:', err);
-        setError('Invalid team data.');
-        return;
-      }
-      
-      // Create a new metadata event for the channel (kind 41)
-      const metadataEvent = new NDKEvent(ndk);
-      metadataEvent.kind = 41; // Channel metadata
-      
-      // Copy the team data
-      metadataEvent.content = JSON.stringify({
-        ...teamData,
-        updated_at: Math.floor(Date.now() / 1000)
-      });
-      // Add reference to original channel
-      metadataEvent.tags.push(['e', teamId]);
-      
-      // Copy existing tags except the user's 'p' tag
-      teamEvent.tags.forEach(tag => {
-        if (!(tag[0] === 'p' && tag[1] === pubkey)) {
-          metadataEvent.tags.push(tag);
-        }
-      });
-      
-      // Sign and publish the updated event
-      await metadataEvent.publish();
-      
-      // Navigate back to team list
-      setActiveTab('myTeams');
-      await loadUserTeams();
-      
-    } catch (err) {
-      console.error('Error leaving team:', err);
-      setError('Failed to leave team. Please try again later.');
-    }
-  };
-  
-  // Send a message to the team chat (NIP-28 kind 42 for channel message)
-  const sendMessage = async () => {
-    try {
-      if (!pubkey || !currentTeam || !messageText.trim()) {
-        return;
-      }
-      
-      // Create a channel message event (kind 42)
-      const event = new NDKEvent(ndk);
-      event.kind = 42; // Channel message
-      
-      // Set message content
-      event.content = messageText;
-      
-      // Add reference to the channel
-      event.tags.push(['e', currentTeam.id, '', 'root']);
-      
-      // Sign and publish the event
-      await event.publish();
-      
-      // Clear the message input
-      setMessageText('');
-      
-      // Reload team messages
-      await loadTeamMessages(currentTeam.id);
-      
-    } catch (err) {
-      console.error('Error sending message:', err);
-      setError('Failed to send message. Please try again later.');
-    }
-  };
-  
-  // Search for teams
+
   const searchTeams = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      if (!searchQuery.trim()) {
+       if (!searchQuery.trim()) {
         setSearchResults([]);
+        setLoading(false);
         return;
       }
-      
-      // Fetch public teams/channels (kind 40)
+      console.log(`searchTeams: Searching for groups with query: ${searchQuery}`);
+
+      if (!isNdkInitialized) await initNdk();
+
       const teamEvents = await ndk.fetchEvents({
-        kinds: [40], // Channel creation events
-        limit: 20
+        kinds: [39000],
+        search: searchQuery,
+        limit: 20 
+      });
+      console.log(`searchTeams: Found ${teamEvents.size} potential groups from search.`);
+
+      const results = [];
+      const creatorPubkeys = new Set();
+      
+      teamEvents.forEach(event => {
+        try {
+          const metadata = JSON.parse(event.content);
+          const dTag = event.tags.find(tag => tag[0] === 'd');
+          const groupId = dTag ? dTag[1] : null;
+
+          if (!groupId) return;
+
+          const nameMatch = metadata.name?.toLowerCase().includes(searchQuery.toLowerCase());
+          const descMatch = metadata.about?.toLowerCase().includes(searchQuery.toLowerCase());
+          
+          if (nameMatch || descMatch) {
+              results.push({
+                  groupId: groupId,
+                  id: event.id,
+                  pubkey: event.pubkey,
+                  created_at: event.created_at,
+                  kind: event.kind,
+                  tags: event.tags,
+                  metadata: metadata, 
+              });
+              creatorPubkeys.add(event.pubkey);
+          }
+        } catch (err) {
+          console.error('Error processing search result event:', err);
+        }
       });
       
-      // Filter and process teams that match the search query
-      const searchResults = Array.from(teamEvents)
-        .map(event => {
-          try {
-            const teamData = JSON.parse(event.content);
-            
-            // Get member references from p tags
-            const members = event.tags
-              .filter(tag => tag[0] === 'p')
-              .map(tag => tag[1]);
-            
-            // Include creator in members list
-            if (!members.includes(event.pubkey)) {
-              members.push(event.pubkey);
-            }
-            
-            return {
-              id: event.id,
-              pubkey: event.pubkey,
-              created_at: event.created_at,
-              name: teamData.name || 'Unnamed Team',
-              description: teamData.description || '',
-              isPublic: teamData.isPublic !== false, // Default to public
-              members: [...new Set(members)]
-            };
-          } catch (err) {
-            console.error('Error parsing team data:', err);
-            return null;
-          }
-        })
-        .filter(team => 
-          team && 
-          team.isPublic && 
-          (team.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-           team.description.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
+      console.log(`searchTeams: Filtered results:`, results);
+      setSearchResults(results);
       
-      setSearchResults(searchResults);
-      
-      // Load profiles for team creators and members
-      const allPubkeys = [...new Set([
-        ...searchResults.map(team => team.pubkey),
-        ...searchResults.flatMap(team => team.members)
-      ])];
-      
-      await loadProfiles(allPubkeys);
+      await loadProfiles(Array.from(creatorPubkeys));
       
     } catch (err) {
-      console.error('Error searching teams:', err);
-      setError('Failed to search teams. Please try again later.');
+        console.error('Error searching for NIP-29 groups:', err);
+        setError(`Failed to search for groups: ${err.message}`);
+        setSearchResults([]);
+    } finally {
+        setLoading(false);
     }
   };
   
-  // Add an invitee to the new team form
-  const addInvitee = (inviteePubkey) => {
-    if (!inviteePubkey || newTeamData.invitees.includes(inviteePubkey)) {
-      return;
+  const renderTeamItem = (team, isUserTeam = false) => {
+    const { groupId, pubkey: creatorPubkey, metadata } = team;
+    
+    let naddr = '';
+    try {
+      naddr = nip19.naddrEncode({
+        identifier: groupId,
+        pubkey: creatorPubkey,
+        kind: 39000, 
+        relays: ['wss://groups.0xchat.com']
+      });
+    } catch (err) {
+        console.error("Failed to encode naddr for team:", team, err);
+        return null;
     }
     
-    setNewTeamData({
-      ...newTeamData,
-      invitees: [...newTeamData.invitees, inviteePubkey]
-    });
-  };
-  
-  // Remove an invitee from the new team form
-  const removeInvitee = (inviteePubkey) => {
-    setNewTeamData({
-      ...newTeamData,
-      invitees: newTeamData.invitees.filter(pubkey => pubkey !== inviteePubkey)
-    });
-  };
-  
-  // Render team list item
-  const renderTeamItem = (team, isUserTeam = false) => {
+    const creatorProfile = profiles.get(creatorPubkey);
+    const creatorName = creatorProfile?.name || creatorPubkey?.substring(0, 10) + '...';
+    
     return (
-      <div key={team.id} className="team-item">
-        <div className="team-info">
-          <h3>{team.name}</h3>
-          <p>{team.description}</p>
-          <div className="team-members">
-            {team.members.slice(0, 4).map(memberPubkey => {
-              const profile = profiles.get(memberPubkey) || {};
-              return (
-                <div key={memberPubkey} className="team-member-avatar">
-                  <img
-                    src={profile.picture || '/default-avatar.png'}
-                    alt={profile.name || 'Team Member'}
-                    title={profile.name || 'Team Member'}
-                  />
-                </div>
-              );
-            })}
-            <span>{team.members.length} members</span>
+      <div 
+        key={naddr}
+        className="team-item bg-gray-800 p-4 rounded-lg shadow hover:bg-gray-700 transition duration-150 cursor-pointer"
+        onClick={() => navigate(`/teams/${encodeURIComponent(naddr)}`)}
+      >
+        <div className="flex items-center space-x-4">
+          <img 
+            src={metadata?.picture || 'default-avatar.png'} 
+            alt={metadata?.name || 'Group'} 
+            className="w-12 h-12 rounded-full object-cover bg-gray-600"
+          />
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-white">{metadata?.name || 'Unnamed Group'}</h3>
+            <p className="text-sm text-gray-400 truncate">{metadata?.about || 'No description'}</p>
+            <p className="text-xs text-gray-500 mt-1">Created by: {creatorName}</p>
           </div>
-        </div>
-        <div className="team-actions">
-          {isUserTeam ? (
-            <button
-              className="view-team-btn"
-              onClick={() => {
-                setCurrentTeam(team);
-                setActiveTab('teamProfile');
-                loadTeam(team.id);
+          {!isUserTeam && (
+            <button 
+              className="join-button bg-blue-600 hover:bg-blue-500 text-white text-sm px-3 py-1 rounded"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/teams/${encodeURIComponent(naddr)}`);
               }}
             >
-              View Team
-            </button>
-          ) : (
-            <button
-              className="join-team-btn"
-              onClick={() => joinTeam(team.id)}
-            >
-              Join Team
+              View
             </button>
           )}
         </div>
@@ -600,322 +386,138 @@ export const Team = () => {
     );
   };
   
-  // Render Create Team Tab
   const renderCreateTeamTab = () => {
     return (
-      <div className="create-team-tab">
-        <h3>Create a New Team</h3>
-        <div className="form-group">
-          <label htmlFor="team-name">Team Name</label>
-          <input
-            id="team-name"
-            type="text"
-            placeholder="Enter team name"
-            value={newTeamData.name}
-            onChange={(e) => setNewTeamData({...newTeamData, name: e.target.value})}
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="team-description">Team Description</label>
-          <textarea
-            id="team-description"
-            placeholder="Describe your team"
-            value={newTeamData.description}
-            onChange={(e) => setNewTeamData({...newTeamData, description: e.target.value})}
-          />
-        </div>
-        
-        <div className="form-group">
-          <label>Team Privacy</label>
-          <div className="radio-group">
-            <label>
-              <input
-                type="radio"
-                name="team-privacy"
-                checked={newTeamData.isPublic}
-                onChange={() => setNewTeamData({...newTeamData, isPublic: true})}
-              />
-              Public (Anyone can find and join)
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="team-privacy"
-                checked={!newTeamData.isPublic}
-                onChange={() => setNewTeamData({...newTeamData, isPublic: false})}
-              />
-              Private (By invitation only)
-            </label>
-          </div>
-        </div>
-        
-        <div className="form-group">
-          <label>Invite Team Members (Optional)</label>
-          <div className="invite-input-group">
-            <input
-              type="text"
-              placeholder="Enter Nostr pubkey"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <button
-              onClick={() => addInvitee(searchQuery)}
-              disabled={!searchQuery.trim()}
-            >
-              Add
-            </button>
-          </div>
-          
-          {newTeamData.invitees.length > 0 && (
-            <div className="invitees-list">
-              <h4>Invited Members:</h4>
-              {newTeamData.invitees.map(invitee => {
-                const profile = profiles.get(invitee) || {};
-                return (
-                  <div key={invitee} className="invitee-item">
-                    <img
-                      src={profile.picture || '/default-avatar.png'}
-                      alt={profile.name || 'Invited Member'}
-                    />
-                    <span>{profile.name || invitee.substring(0, 10) + '...'}</span>
-                    <button onClick={() => removeInvitee(invitee)}>Remove</button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        
-        <div className="team-form-actions">
-          <button
-            className="create-team-btn"
+      <div className="create-team-tab space-y-4">
+        <h3 className="text-xl font-semibold text-white">Create New Group</h3>
+        <input
+          type="text"
+          placeholder="Group Name"
+          className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500"
+          value={newTeamData.name}
+          onChange={(e) => setNewTeamData({ ...newTeamData, name: e.target.value })}
+        />
+        <textarea
+          placeholder="Group Description (About)"
+          className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500 h-24"
+          value={newTeamData.description}
+          onChange={(e) => setNewTeamData({ ...newTeamData, description: e.target.value })}
+        />
+         <input
+          type="text"
+          placeholder="Group Picture URL (Optional)"
+          className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500"
+          value={newTeamData.picture}
+          onChange={(e) => setNewTeamData({ ...newTeamData, picture: e.target.value })}
+        />
+        <button 
             onClick={createTeam}
-            disabled={!newTeamData.name.trim()}
-          >
-            Create Team
-          </button>
-          <button
-            className="cancel-btn"
-            onClick={() => setActiveTab('myTeams')}
-          >
-            Cancel
-          </button>
-        </div>
+            className="w-full py-2 px-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded disabled:opacity-50"
+            disabled={loading || !newTeamData.name}
+        >
+            {loading ? 'Creating...' : 'Create Group'}
+        </button>
       </div>
     );
   };
   
-  // Render Join Team Tab
   const renderJoinTeamTab = () => {
     return (
-      <div className="join-team-tab">
-        <h3>Find Teams to Join</h3>
-        <div className="search-teams">
+      <div className="join-team-tab space-y-4">
+        <h3 className="text-xl font-semibold text-white">Find Groups</h3>
+        <div className="search-teams flex space-x-2">
           <input
             type="text"
-            placeholder="Search for teams by name"
+            placeholder="Search groups by name or description"
+            className="flex-grow p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && searchTeams()}
           />
-          <button onClick={searchTeams}>Search</button>
+          <button 
+            onClick={searchTeams} 
+            className="py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded disabled:opacity-50"
+            disabled={loading || !searchQuery.trim()}
+          >
+            {loading ? 'Searching...' : 'Search'}
+          </button>
         </div>
         
-        <div className="teams-list">
-          {searchResults.length === 0 ? (
-            <p>No teams found. Try a different search term.</p>
-          ) : (
-            searchResults.map(team => renderTeamItem(team, false))
+        <div className="teams-list space-y-3">
+          {searchResults.length === 0 && !loading && (
+            <p className="text-gray-500 text-center pt-4">No public groups found matching your search.</p>
           )}
+          {searchResults.map(team => renderTeamItem(team, false))}
         </div>
       </div>
     );
   };
   
-  // Render My Teams Tab
   const renderMyTeamsTab = () => {
     return (
-      <div className="my-teams-tab">
-        <h3>My Teams</h3>
+      <div className="my-teams-tab space-y-4">
+        <h3 className="text-xl font-semibold text-white">My Groups</h3>
         
-        <div className="my-teams-actions">
-          <button
-            className="create-team-btn"
-            onClick={() => setActiveTab('create')}
-          >
-            Create New Team
-          </button>
-          <button
-            className="join-team-btn"
-            onClick={() => setActiveTab('join')}
-          >
-            Join a Team
-          </button>
-        </div>
-        
-        <div className="teams-list">
-          {myTeams.length === 0 ? (
-            <p>You&apos;re not part of any teams yet. Create or join a team to get started!</p>
-          ) : (
-            myTeams.map(team => renderTeamItem(team, true))
+        <div className="teams-list space-y-3">
+          {myTeams.length === 0 && !loading && (
+            <p className="text-gray-500 text-center pt-4">You haven&apos;t created or joined any groups yet.</p>
           )}
+          {myTeams.map(team => renderTeamItem(team, true))}
         </div>
       </div>
     );
   };
-  
-  // Render Team Profile Tab
-  const renderTeamProfileTab = () => {
-    if (!currentTeam) {
-      return <div>Team not found.</div>;
-    }
-    
-    return (
-      <div className="team-profile-tab">
-        <div className="team-header">
-          <button
-            className="back-btn"
-            onClick={() => setActiveTab('myTeams')}
-          >
-            ← Back to Teams
-          </button>
-          <h2>{currentTeam.name}</h2>
-          <p>{currentTeam.description}</p>
-        </div>
-        
-        <div className="team-content">
-          <div className="team-members-section">
-            <h3>Team Members ({currentTeam.members.length})</h3>
-            <div className="team-members-list">
-              {currentTeam.members.map(memberPubkey => {
-                const profile = profiles.get(memberPubkey) || {};
-                const isCreator = memberPubkey === currentTeam.pubkey;
-                
-                return (
-                  <div key={memberPubkey} className="team-member-item">
-                    <img
-                      src={profile.picture || '/default-avatar.png'}
-                      alt={profile.name || 'Team Member'}
-                      className="member-avatar"
-                    />
-                    <div className="member-info">
-                      <h4>{profile.name || memberPubkey.substring(0, 10) + '...'}</h4>
-                      {isCreator && <span className="creator-badge">Creator</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          
-          <div className="team-chat-section">
-            <h3>Team Chat</h3>
-            <div className="chat-messages">
-              {messages.length === 0 ? (
-                <p className="no-messages">No messages yet. Be the first to say hello!</p>
-              ) : (
-                messages.map(message => {
-                  const profile = profiles.get(message.pubkey) || {};
-                  const isCurrentUser = message.pubkey === pubkey;
-                  
-                  return (
-                    <div
-                      key={message.id}
-                      className={`chat-message ${isCurrentUser ? 'current-user' : ''}`}
-                    >
-                      <img
-                        src={profile.picture || '/default-avatar.png'}
-                        alt={profile.name || 'Team Member'}
-                        className="message-avatar"
-                      />
-                      <div className="message-content">
-                        <div className="message-header">
-                          <h4>{profile.name || message.pubkey.substring(0, 10) + '...'}</h4>
-                          <span>{new Date(message.created_at * 1000).toLocaleString()}</span>
-                        </div>
-                        <p>{message.content}</p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-            
-            <div className="chat-input">
-              <textarea
-                placeholder="Type a message..."
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-              />
-              <button
-                onClick={sendMessage}
-                disabled={!messageText.trim()}
-              >
-                Send
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        <div className="team-actions">
-          {currentTeam.pubkey === pubkey ? (
-            <button className="manage-team-btn">
-              Manage Team
-            </button>
-          ) : (
-            <button
-              className="leave-team-btn"
-              onClick={() => leaveTeam(currentTeam.id)}
-            >
-              Leave Team
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
+
+  if (ndkInitError) {
+    return <div className="container error-message">Error initializing Nostr: {ndkInitError}</div>;
+  }
   
   return (
-    <div className="team-container">
-      <h2>RUN CLUB</h2>
+    <div className="container run-club-theme p-4">
+      <h2 className="text-2xl font-bold text-white mb-6">Groups</h2>
       
-      {loading ? (
-        <div>Loading...</div>
-      ) : error ? (
-        <div className="error-message">{error}</div>
-      ) : (
-        <>
-          {!teamId && (
-            <div className="team-tabs">
-              <button
-                className={activeTab === 'myTeams' ? 'active' : ''}
-                onClick={() => setActiveTab('myTeams')}
-              >
-                My Teams
-              </button>
-              <button
-                className={activeTab === 'create' ? 'active' : ''}
-                onClick={() => setActiveTab('create')}
-              >
-                Create Team
-              </button>
-              <button
-                className={activeTab === 'join' ? 'active' : ''}
-                onClick={() => setActiveTab('join')}
-              >
-                Join Team
-              </button>
-            </div>
-          )}
-          
-          <div className="team-content">
-            {activeTab === 'myTeams' && renderMyTeamsTab()}
-            {activeTab === 'create' && renderCreateTeamTab()}
-            {activeTab === 'join' && renderJoinTeamTab()}
-            {activeTab === 'teamProfile' && renderTeamProfileTab()}
-          </div>
-        </>
+      {error && (
+        <div className="bg-red-900/30 border border-red-700 text-red-300 p-3 rounded-lg mb-4">
+          Error: {error}
+        </div>
       )}
+
+      <div className="mb-6 flex space-x-1 border-b border-gray-700">
+         <button
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg ${activeTab === 'myTeams' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
+            onClick={() => setActiveTab('myTeams')}
+         >
+             My Groups
+         </button>
+         <button
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg ${activeTab === 'join' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
+            onClick={() => setActiveTab('join')}
+         >
+             Find Groups
+         </button>
+         <button
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg ${activeTab === 'create' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
+            onClick={() => setActiveTab('create')}
+         >
+             Create Group
+         </button>
+      </div>
+
+      {loading && (
+         <div className="flex justify-center items-center py-10">
+           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+         </div>
+      )}
+
+      <div className="tab-content-area">
+        {!loading && (
+            <> 
+                {activeTab === 'myTeams' && renderMyTeamsTab()}
+                {activeTab === 'create' && renderCreateTeamTab()}
+                {activeTab === 'join' && renderJoinTeamTab()}
+            </>
+        )}
+      </div>
     </div>
   );
 }; 

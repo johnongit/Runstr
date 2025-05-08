@@ -1,12 +1,6 @@
 import { createContext, useState, useEffect, useCallback, useContext } from 'react';
 import PropTypes from 'prop-types';
 import { NostrContext } from './NostrContext';
-import { 
-  fetchUserGroupList, 
-  fetchUserGroupListWS,
-  initializeNostr, 
-  setAmberUserPubkey
-} from '../utils/nostrClient';
 
 // Create context
 export const TeamsContext = createContext();
@@ -21,87 +15,60 @@ export const useTeams = () => {
 };
 
 export const TeamsProvider = ({ children }) => {
-  // Get Nostr context
-  const { publicKey: nostrPublicKey } = useContext(NostrContext);
+  // Get Nostr context state - This is now the source of truth
+  const { 
+      publicKey: nostrPublicKey, 
+      isInitialized: nostrInitialized, // Use this flag
+      // eslint-disable-next-line no-unused-vars
+      ndk // Use the NDK instance from NostrContext - Added eslint disable for now
+  } = useContext(NostrContext);
   
-  // State for Nostr groups
+  // State for Nostr groups fetched via NDK
   const [myNostrGroups, setMyNostrGroups] = useState([]);
   const [loadingNostrGroups, setLoadingNostrGroups] = useState(false);
-  const [nostrInitialized, setNostrInitialized] = useState(false);
   
   // General state
   const [error, setError] = useState(null);
 
-  // Initialize Nostr when component mounts
+  // Fetch groups using NDK when NostrContext is ready
   useEffect(() => {
-    const initNostr = async () => {
-      try {
-        console.log('TeamsContext: Initializing Nostr...');
-        const initialized = await initializeNostr();
-        console.log('TeamsContext: Nostr initialized result:', initialized);
-        setNostrInitialized(initialized);
-        if (!initialized) {
-          setError('Failed to connect to Nostr network');
-        }
-      } catch (err) {
-        console.error('Error initializing Nostr:', err);
-        setError('Failed to initialize Nostr connection');
-      }
-    };
-
-    initNostr();
-  }, []); // Run once on mount
-
-  // Update currentUser and fetch groups when nostrPublicKey changes
-  useEffect(() => {
-    const fetchNostrGroups = async () => {
-      if (!nostrPublicKey || !nostrInitialized) {
+    const fetchNdkGroups = async () => {
+      // Only fetch if NostrContext is initialized and we have a pubkey
+      if (!nostrInitialized || !nostrPublicKey) {
+        console.log('TeamsContext: NDK not ready or no pubkey, clearing groups.');
         setMyNostrGroups([]);
         return;
       }
 
+      console.log('TeamsContext: NDK ready, fetching user groups for pubkey:', nostrPublicKey);
+      setLoadingNostrGroups(true);
+      setError(null);
+      
       try {
-        setLoadingNostrGroups(true);
-        setError(null);
-        
-        // Set Amber public key for nostrClient.js
-        setAmberUserPubkey(nostrPublicKey);
+        // TODO: Replace with NDK-based group list fetching (e.g., Kind 30001)
+        // This likely involves ndk.fetchEvents(...) with appropriate filters
+        // For now, just log and set empty array
+        console.warn('TeamsContext: NDK Group list fetching (Kind 30001) not implemented yet.');
+        // Example placeholder:
+        // const filter = { kinds: [30001], authors: [nostrPublicKey], '#d': ['groups'] };
+        // const listEvent = await ndk.fetchEvent(filter);
+        // if (listEvent) { 
+        //    const groupTags = listEvent.tags.filter(t => t[0] === 'a' && t[1]?.startsWith('39000:')); 
+        //    setMyNostrGroups(groupTags); // Store the raw tags or fetch metadata
+        // } else { setMyNostrGroups([]); }
+        setMyNostrGroups([]); // Placeholder
 
-        console.log('TeamsContext: Fetching user groups for pubkey:', nostrPublicKey);
-        
-        try {
-          // Use WebSocket implementation to avoid SimplePool issues
-          const groups = await fetchUserGroupListWS(nostrPublicKey);
-          console.log('TeamsContext: Fetched groups using WebSocket:', groups);
-          setMyNostrGroups(groups || []);
-        } catch (wsErr) {
-          console.error('WebSocket approach failed, trying fallback:', wsErr);
-          
-          try {
-            // Fallback to original implementation if WebSocket fails
-            const groups = await fetchUserGroupList(nostrPublicKey);
-            console.log('TeamsContext: Fetched groups using fallback:', groups);
-            setMyNostrGroups(groups || []);
-          } catch (fallbackErr) {
-            console.error('Error in fallback approach:', fallbackErr);
-            setError('Failed to fetch Nostr groups');
-            setMyNostrGroups([]);
-          }
-        }
       } catch (err) {
-        console.error('Error in overall fetch process:', err);
-        setError('Failed to fetch Nostr groups');
+        console.error('TeamsContext: Error fetching NDK groups:', err);
+        setError('Failed to fetch Nostr groups using NDK.');
         setMyNostrGroups([]);
       } finally {
         setLoadingNostrGroups(false);
       }
     };
 
-    // Fetch groups whenever nostrPublicKey changes and Nostr is initialized
-    if (nostrInitialized) {
-      console.log('TeamsContext: nostrPublicKey changed, fetching groups...');
-      fetchNostrGroups();
-    }
+    fetchNdkGroups();
+    // Depend on the readiness flags from NostrContext
   }, [nostrPublicKey, nostrInitialized]);
 
   // Clear error
@@ -109,13 +76,13 @@ export const TeamsProvider = ({ children }) => {
     setError(null);
   }, []);
 
-  // Context value
+  // Context value - provide NDK-based state
   const value = {
-    myNostrGroups,
+    myNostrGroups, // Will be populated by NDK fetch
     loadingNostrGroups,
     error,
     clearError,
-    nostrInitialized
+    nostrInitialized // Pass down the flag from NostrContext
   };
 
   return (

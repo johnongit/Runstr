@@ -11,7 +11,10 @@ import '../assets/styles/achievements.css';
  * Shown on the dashboard below the run tracker
  */
 const AchievementCard = ({ currentStreak, runHistory, stats }) => {
-  const { publicKey } = useNostr();
+  // Handle case where NostrContext might not be fully initialized yet
+  const nostrContext = useNostr();
+  const publicKey = nostrContext?.publicKey || null;
+  
   const { nextMilestone } = useStreakRewards(currentStreak, publicKey);
   const { distanceLeaderboard } = useLeaderboard(publicKey, null, runHistory, stats);
   const [modalOpen, setModalOpen] = useState(false);

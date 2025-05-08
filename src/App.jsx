@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState, useContext } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { NostrProvider } from './contexts/NostrProvider';
 import { AuthProvider } from './components/AuthProvider';
@@ -16,6 +16,7 @@ import ErrorFallback from './components/ErrorFallback';
 import { directFetchRunningPosts } from './utils/feedFetcher';
 import { lightweightProcessPosts } from './utils/feedProcessor';
 import { storeFeedCache, isCacheFresh } from './utils/feedCache';
+import { NostrContext } from './contexts/NostrContext.jsx';
 
 console.log("App.jsx is loading");
 
@@ -68,6 +69,12 @@ const AppRoutes = lazy(() =>
 
 const App = () => {
   const [hasError, setHasError] = useState(false);
+  
+  // Add global NDK initialization log
+  const { isInitialized } = useContext(NostrContext);
+  useEffect(() => {
+    console.log('~~ GLOBAL App.jsx: isInitialized changed to:', isInitialized);
+  }, [isInitialized]);
   
   // Initialize app services
   useEffect(() => {

@@ -128,6 +128,81 @@ export const createFitnessLevelEvent = (level) => {
 };
 
 /**
+ * Create a workout intensity event (kind 1356)
+ * @param {string} intensityValue - The intensity value (e.g., "7" or "high")
+ * @param {string} scale - The scale used ("rpe10" or "keyword")
+ * @param {Object} options - Optional parameters 
+ * @param {string} [options.timestamp] - ISO8601 timestamp string
+ * @param {string} [options.activityType] - E.g., "run", "bike"
+ * @param {string} [options.zone] - E.g., "1"-"5"
+ * @param {string} [options.source] - Source application name
+ * @param {string} [options.workoutEventId] - ID of the related workout event for linking
+ * @returns {Object|null} Event template for workout intensity or null if essential data missing
+ */
+export const createWorkoutIntensityEvent = (intensityValue, scale, options = {}) => {
+  if (!intensityValue || !scale || !['rpe10', 'keyword'].includes(scale)) {
+    console.warn('Missing or invalid intensityValue or scale for createWorkoutIntensityEvent');
+    return null;
+  }
+
+  const tags = [
+    ['t', 'health'],
+    ['t', 'intensity'],
+    ['scale', scale]
+  ];
+
+  if (options.timestamp) tags.push(['timestamp', options.timestamp]);
+  if (options.activityType) tags.push(['activity', options.activityType]);
+  if (options.zone) tags.push(['zone', options.zone]);
+  if (options.source) tags.push(['source', options.source]);
+  if (options.workoutEventId) tags.push(['e', options.workoutEventId, '', 'root']); // Assuming 'root' marker, adjust if needed
+
+  return {
+    kind: 1356,
+    content: String(intensityValue),
+    tags
+  };
+};
+
+/**
+ * Create a caloric data event (kind 1357)
+ * @param {number|string} calories - Calories burned (kcal)
+ * @param {Object} options - Optional parameters
+ * @param {string} [options.timestamp] - ISO8601 timestamp string
+ * @param {string} [options.source] - Source application name
+ * @param {string} [options.accuracy] - "estimated" or "measured"
+ * @param {string} [options.workoutEventId] - ID of the related workout event for linking
+ * @returns {Object|null} Event template for caloric data or null if essential data missing
+ */
+export const createCaloricDataEvent = (calories, options = {}) => {
+  if (calories === undefined || calories === null || calories === '') {
+    console.warn('Missing calories for createCaloricDataEvent');
+    return null;
+  }
+
+  const tags = [
+    ['unit', 'kcal'],
+    ['t', 'health'],
+    ['t', 'calories']
+  ];
+
+  if (options.timestamp) tags.push(['timestamp', options.timestamp]);
+  if (options.source) tags.push(['source', options.source]);
+  if (options.accuracy) tags.push(['accuracy', options.accuracy]);
+  if (options.workoutEventId) tags.push(['e', options.workoutEventId, '', 'root']); // Assuming 'root' marker, adjust if needed
+
+  // Optional: Convert kcal to kJ for a converted_value tag if desired in the future
+  // const kjValue = (parseFloat(calories) * 4.184).toFixed(0);
+  // tags.push(['converted_value', kjValue, 'kJ']);
+
+  return {
+    kind: 1357,
+    content: String(calories),
+    tags
+  };
+};
+
+/**
  * Publish all health profile metrics to Nostr
  * @param {Object} profile - User profile data
  * @param {Object} units - Unit preferences

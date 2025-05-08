@@ -31,6 +31,17 @@ export const SettingsProvider = ({ children }) => {
     }
   });
 
+  // Initialize calorieIntensityPref state from localStorage
+  const [calorieIntensityPref, setCalorieIntensityPref] = useState(() => {
+    try {
+      const storedPref = localStorage.getItem('calorieIntensityPref');
+      return storedPref && ['autoAccept', 'autoIgnore', 'manual'].includes(storedPref) ? storedPref : 'manual';
+    } catch (error) {
+      console.error('Error initializing calorie/intensity preference state:', error);
+      return 'manual';
+    }
+  });
+
   // Toggle between km and mi units
   const toggleDistanceUnit = () => {
     const newUnit = distanceUnit === 'km' ? 'mi' : 'km';
@@ -50,11 +61,26 @@ export const SettingsProvider = ({ children }) => {
     }
   }, [distanceUnit]);
 
+  // Save calorieIntensityPref to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('calorieIntensityPref', calorieIntensityPref);
+      
+      // Dispatch an event so other components can listen for changes
+      const event = new CustomEvent('calorieIntensityPrefChanged', { detail: calorieIntensityPref });
+      document.dispatchEvent(event);
+    } catch (error) {
+      console.error('Error saving calorie/intensity preference:', error);
+    }
+  }, [calorieIntensityPref]);
+
   return (
     <SettingsContext.Provider value={{ 
       distanceUnit, 
       setDistanceUnit,
-      toggleDistanceUnit
+      toggleDistanceUnit,
+      calorieIntensityPref,
+      setCalorieIntensityPref
     }}>
       {children}
     </SettingsContext.Provider>

@@ -275,18 +275,29 @@ const GroupDiscoveryScreen = () => {
   // Navigate to group chat
   const handleGroupPress = (group) => {
     try {
-      // Ensure we have a valid naddr
-      if (!group || !group.naddr) {
-        setError("Invalid group data - missing naddr");
+      // Ensure we have a valid naddr and metadata
+      if (!group || !group.naddr || !group.metadata) {
+        setError("Invalid group data - missing naddr or metadata");
         return;
       }
       
-      // Make sure the naddr is properly encoded for URL
-      const encodedNaddr = encodeURIComponent(group.naddr);
-      console.log(`Navigating to group chat with naddr: ${group.naddr}`);
-      console.log(`Encoded naddr for URL: ${encodedNaddr}`);
+      // Extract necessary data to pass in state
+      const groupName = group.metadata?.metadata?.name || group.metadata?.name || 'Unnamed Group';
+      const groupPicture = group.metadata?.metadata?.picture || group.metadata?.picture || '/default-avatar.png';
       
-      navigate(`/teams/${encodedNaddr}`);
+      const encodedNaddr = encodeURIComponent(group.naddr);
+      console.log(`Navigating to group chat for ${groupName} with naddr: ${group.naddr}`);
+      
+      // Pass name and picture via route state
+      navigate(
+          `/teams/${encodedNaddr}`,
+          {
+              state: {
+                  displayName: groupName,
+                  displayPicture: groupPicture
+              }
+          }
+      );
     } catch (error) {
       console.error("Error navigating to team detail:", error);
       setError("Failed to navigate to team detail. Please try again.");

@@ -1,6 +1,8 @@
 import { SimplePool, finalizeEvent, verifyEvent } from 'nostr-tools';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import * as nip19 from 'nostr-tools/nip19';
+import { parseNaddr } from './ndkGroups.js'; // Import parseNaddr
+import { relays } from '../config/relays.js'; // Import relays from config
 
 // Add debugging for nostr-tools version
 console.log('Importing nostr-tools with version:', SimplePool ? 'Available' : 'Unavailable');
@@ -72,16 +74,6 @@ console.log('Pool list method type:', pool && pool.list ? typeof pool.list : 'No
 
 // Export pool for inspection from other modules
 export const debugPool = pool;
-
-// Focus on a smaller set of the most reliable relays
-export const relays = [
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-  'wss://relay.nostr.band',
-  'wss://relay.snort.social',
-  'wss://purplepag.es',
-  'wss://groups.0xchat.com'  // NIP-29 group support
-];
 
 // Storage for keys
 let cachedKeyPair = null;
@@ -172,45 +164,6 @@ export const initializeNostr = async () => {
   } catch (error) {
     console.error('Error initializing Nostr:', error);
     return false;
-  }
-};
-
-/**
- * Parse a NIP19 naddr string to extract group components
- * @param {string} naddrString - The naddr string to parse
- * @returns {Object|null} Parsed group data or null if invalid
- */
-export const parseNaddr = (naddrString) => {
-  try {
-    if (!naddrString) {
-      console.error('No naddr string provided to parseNaddr');
-      return null;
-    }
-    
-    console.log(`Attempting to parse naddr string: ${naddrString.substring(0, 30)}...`);
-    
-    // Decode the naddr string using nostr-tools NIP19 decoder
-    const { type, data } = nip19.decode(naddrString);
-    console.log('Decoded naddr data:', { type, data });
-    
-    if (type !== 'naddr' || !data) {
-      console.error('Invalid naddr format - expected type "naddr"');
-      return null;
-    }
-    
-    const result = {
-      kind: data.kind,
-      pubkey: data.pubkey,
-      identifier: data.identifier,
-      relays: data.relays || []
-    };
-    
-    console.log('Successfully parsed naddr to:', result);
-    return result;
-  } catch (error) {
-    console.error('Error parsing naddr:', error);
-    console.error('Problematic naddr string:', naddrString);
-    return null;
   }
 };
 

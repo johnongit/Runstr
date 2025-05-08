@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { useStreakRewards } from '../hooks/useStreakRewards';
 import { useNostr } from '../hooks/useNostr';
+import PropTypes from 'prop-types';
 
 /**
  * Component for displaying streak rewards and claiming Bitcoin rewards
  */
 const StreakRewardsCard = ({ currentStreak, showTitle = true }) => {
-  const { publicKey } = useNostr();
+  // Handle case where NostrContext might not be fully initialized yet
+  const nostrContext = useNostr();
+  const publicKey = nostrContext?.publicKey || null;
+  
   const { 
     rewards, 
     eligibleRewards, 
@@ -137,6 +141,11 @@ const StreakRewardsCard = ({ currentStreak, showTitle = true }) => {
       )}
     </div>
   );
+};
+
+StreakRewardsCard.propTypes = {
+  currentStreak: PropTypes.number.isRequired,
+  showTitle: PropTypes.bool,
 };
 
 export default StreakRewardsCard; 

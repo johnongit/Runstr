@@ -1,0 +1,75 @@
+---
+description: NIP29 Implementation 
+globs: 
+alwaysApply: false
+---
+# NIP-29 Teams/Group Chat Implementation
+
+- **Always Read Implementation Journal First**
+  - Review `nip29-memory.md` in the project root before making any changes
+  - Understand current state, outstanding issues, and past approaches
+  - Pay attention to console logs and documented errors from previous attempts
+
+- **Core Implementation Requirements**
+  - Use correct tags per NIP-29 specification:
+    - **Group metadata** (kind 39000): Use `#d` tag with value `["d", "<rawGroupId>"]`
+    - **Group messages** (kind 9): Use `#h` tag with value `["h", "<rawGroupId>"]`
+    - **Never** use the legacy `#g` tag which is now obsolete
+  - All group-related components require NDK to be initialized before querying
+  - Implementation must handle relay connection state properly
+  - Ensure proper sequencing when waiting for `ndkReady` before message load
+
+- **Common Pitfalls to Avoid**
+  - React state update timing issues (wait for `ndkReady` before state updates)
+  - Function declaration ordering (ensure functions are declared before use)
+  - Missing proper relay connection validation before queries
+  - Trying to load data without confirming relay connectivity
+  - Not allowing enough time for relay connection before timeout
+  - Incorrect tag usage in filters/subscriptions
+
+- **Testing Implementation Changes**
+  - Verify message fetch returns events with console logging
+  - Check connection status of relays before attempting data fetch
+  - Test with known group ID that has messages
+  - Use browser console to manually validate event retrieval:
+    ```js
+    window.ndk.fetchEvents([{ kinds:[9], '#h':['<rawGroupId>'], limit:5 }])
+      .then(evts => console.log('Found', evts.length, 'events'))
+    ```
+
+- **Documenting Implementation Progress**
+  - **After each implementation attempt**:
+    - Document in `nip29-memory.md` using consistent formatting
+    - Include timestamp/date heading for each new entry
+    - Describe what changes were made and their results
+    - Include relevant console output, errors, and code snippets
+    - List any new findings or insights discovered
+
+- **Implementation Entry Template**
+  ```markdown
+  ### Date: YYYY-MM-DD - Implementation Attempt [#]
+  
+  **Changes Made:**
+  - Specific change 1
+  - Specific change 2
+  
+  **Results:**
+  - Worked: [list what worked]
+  - Failed: [list what failed]
+  - Console output:
+  ```console
+  // Include relevant console logs here
+  ```
+  
+  **Next Steps:**
+  - Proposed fixes/improvements
+  ```
+
+- **Current Implementation Status**
+  - Refer to outstanding issues in `nip29-memory.md`
+  - React component ordering issue in TeamDetail.jsx
+  - NDK readiness race condition issue
+  - Group messages not displaying even after fetch attempts
+
+
+Remember: When reporting a new failure, always update the nip29-memory.md file with details, following the template format above. This creates a continuous implementation journal that helps trace progress and avoid repeating mistakes.

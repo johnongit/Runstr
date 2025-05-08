@@ -58,8 +58,8 @@
   flex-shrink: 0; /* Prevent tab shrinking */
 }
 
-.tab-button.active {
-  color: #ffffff; /* Ensure text is white, not blue */
+.team-tabs .tab-button.active { /* Increased specificity */
+  color: #ffffff !important; /* Ensure text is white, overriding other rules */
   background-color: rgba(58, 134, 255, 0.8); /* Semi-transparent blue background */
   border-radius: 6px 6px 0 0; /* Rounded top corners */
   font-weight: 600; /* Make text slightly bolder when active */
@@ -988,4 +988,33 @@
 .posts-loading-more .progressive-loading {
   margin-top: 20px;
   background-color: transparent;
+}
+
+/* ChatRoom.jsx specific message item styling */
+.message-item {
+  display: flex;
+  justify-content: space-between; /* Pushes content and button to opposite ends */
+  align-items: center; /* Vertically aligns items in the center */
+  padding: 8px 0; /* Add some padding for spacing */
+  border-bottom: 1px solid #333; /* Optional: separator between messages */
+}
+
+.message-main-area {
+  flex-grow: 1; /* Allows this area to take up available space */
+  margin-right: 8px; /* Adds some space between content and button */
+}
+
+.message-item .pin-button {
+  flex-shrink: 0; /* Prevents the button from shrinking */
+  /* Add other styling as needed, e.g., padding, min-width */
+  padding: 6px 10px;
+  border: 1px solid #555;
+  background-color: #444;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.message-item .pin-button:hover {
+  background-color: #555;
 } 

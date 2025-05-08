@@ -10,7 +10,12 @@ import PropTypes from 'prop-types';
  * Leaderboard component with tabs for different leaderboard types
  */
 const LeaderboardTabs = ({ runHistory, stats, showSettings = true }) => {
-  const { publicKey, profiles = new Map() } = useNostr();
+  // Handle case where NostrContext might not be fully initialized yet
+  const nostrContext = useNostr();
+  const publicKey = nostrContext?.publicKey || null;
+  // Default to empty Map if profiles isn't available
+  const profiles = nostrContext?.profiles || new Map();
+  
   const { distanceUnit } = useSettings();
   const [activeTab, setActiveTab] = useState('distance');
   

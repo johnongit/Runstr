@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { saveLeaderboardParticipation, getLeaderboardParticipation } from '../utils/leaderboardUtils';
 import { getRewardsSettings, saveRewardsSettings } from '../utils/streakRewards';
@@ -7,8 +7,9 @@ const Settings = () => {
   const { 
     distanceUnit, 
     setDistanceUnit,
-    isMetric,
-    setIsMetric
+    setIsMetric,
+    calorieIntensityPref,
+    setCalorieIntensityPref
   } = useSettings();
   
   const [showPaceInMinutes, setShowPaceInMinutes] = useState(true);
@@ -125,6 +126,10 @@ const Settings = () => {
       showNotifications
     });
   };
+
+  const handleCalorieIntensityChange = (preference) => {
+    setCalorieIntensityPref(preference);
+  };
   
   return (
     <div className="settings-page">
@@ -205,6 +210,33 @@ const Settings = () => {
             />
             <span className="toggle-slider"></span>
           </div>
+        </div>
+
+        <div className="setting-item">
+          <label>Workout Extras Publishing (Calories/Intensity)</label>
+          <div className="unit-toggle">
+            <button 
+              className={calorieIntensityPref === 'autoAccept' ? 'active' : ''}
+              onClick={() => handleCalorieIntensityChange('autoAccept')}
+            >
+              Auto-Accept
+            </button>
+            <button 
+              className={calorieIntensityPref === 'manual' ? 'active' : ''}
+              onClick={() => handleCalorieIntensityChange('manual')}
+            >
+              Manual
+            </button>
+            <button 
+              className={calorieIntensityPref === 'autoIgnore' ? 'active' : ''}
+              onClick={() => handleCalorieIntensityChange('autoIgnore')}
+            >
+              Auto-Ignore
+            </button>
+          </div>
+          <p className="setting-description">
+            Choose how to handle publishing workout intensity and caloric data to Nostr.
+          </p>
         </div>
       </div>
       

@@ -1,0 +1,152 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content.save-run-extras-modal {
+  background: #fff; /* Adjust for dark mode if needed */
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 450px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.save-run-extras-modal h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333; /* Adjust for dark mode */
+}
+
+.save-run-extras-modal p {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 0.95em;
+  color: #555; /* Adjust for dark mode */
+}
+
+.save-run-extras-modal .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.save-run-extras-modal .form-group label {
+  font-weight: bold;
+  font-size: 0.9em;
+  color: #444; /* Adjust for dark mode */
+}
+
+.save-run-extras-modal input[type="number"],
+.save-run-extras-modal select {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+}
+
+.save-run-extras-modal .intensity-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.save-run-extras-modal .intensity-controls select,
+.save-run-extras-modal .intensity-controls input {
+  flex-grow: 1;
+}
+
+.save-run-extras-modal .toggle-switch-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Basic toggle switch styling (can be replaced with existing app style) */
+.save-run-extras-modal input[type="checkbox"] {
+  /* Hide default checkbox */
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 40px;
+  height: 20px;
+  background-color: #ccc;
+  border-radius: 10px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.3s;
+}
+
+.save-run-extras-modal input[type="checkbox"]::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: white;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s;
+}
+
+.save-run-extras-modal input[type="checkbox"]:checked {
+  background-color: #4CAF50; /* Active color */
+}
+
+.save-run-extras-modal input[type="checkbox"]:checked::before {
+  transform: translateX(20px);
+}
+
+.save-run-extras-modal .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.save-run-extras-modal .button-primary,
+.save-run-extras-modal .button-secondary {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.save-run-extras-modal .button-primary {
+  background-color: #007bff; /* Primary action color */
+  color: white;
+}
+
+.save-run-extras-modal .button-primary:hover {
+  background-color: #0056b3;
+}
+
+.save-run-extras-modal .button-secondary {
+  background-color: #6c757d; /* Secondary action color */
+  color: white;
+}
+
+.save-run-extras-modal .button-secondary:hover {
+  background-color: #545b62;
+}
+
+.save-run-extras-modal input:disabled,
+.save-run-extras-modal select:disabled,
+.save-run-extras-modal button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+} 

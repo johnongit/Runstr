@@ -4,7 +4,9 @@ import {
   createHeightEvent, 
   createAgeEvent, 
   createGenderEvent, 
-  createFitnessLevelEvent 
+  createFitnessLevelEvent,
+  createWorkoutIntensityEvent,
+  createCaloricDataEvent
 } from '../utils/nostrHealth';
 
 // Mock createAndPublishEvent
@@ -101,5 +103,91 @@ describe('Nostr Health Events', () => {
   test('returns null for fitness level event with missing level', () => {
     const event = createFitnessLevelEvent(null);
     expect(event).toBeNull();
+  });
+
+  // Tests for createWorkoutIntensityEvent (kind 1356)
+  describe('createWorkoutIntensityEvent', () => {
+    test('creates intensity event with rpe10 scale', () => {
+      const event = createWorkoutIntensityEvent('7', 'rpe10');
+      expect(event.kind).toBe(1356);
+      expect(event.content).toBe('7');
+      expect(event.tags).toContainEqual(['t', 'health']);
+      expect(event.tags).toContainEqual(['t', 'intensity']);
+      expect(event.tags).toContainEqual(['scale', 'rpe10']);
+    });
+
+    test('creates intensity event with keyword scale', () => {
+      const event = createWorkoutIntensityEvent('high', 'keyword');
+      expect(event.kind).toBe(1356);
+      expect(event.content).toBe('high');
+      expect(event.tags).toContainEqual(['scale', 'keyword']);
+    });
+
+    test('creates intensity event with all optional tags', () => {
+      const options = {
+        timestamp: '2023-01-01T12:00:00Z',
+        activityType: 'run',
+        zone: '3',
+        source: 'RunstrApp',
+        workoutEventId: 'test-workout-event'
+      };
+      const event = createWorkoutIntensityEvent('5', 'rpe10', options);
+      expect(event.tags).toContainEqual(['timestamp', '2023-01-01T12:00:00Z']);
+      expect(event.tags).toContainEqual(['activity', 'run']);
+      expect(event.tags).toContainEqual(['zone', '3']);
+      expect(event.tags).toContainEqual(['source', 'RunstrApp']);
+      expect(event.tags).toContainEqual(['e', 'test-workout-event', '', 'root']);
+    });
+
+    test('returns null for intensity event with missing intensityValue', () => {
+      const event = createWorkoutIntensityEvent(null, 'rpe10');
+      expect(event).toBeNull();
+    });
+
+    test('returns null for intensity event with missing scale', () => {
+      const event = createWorkoutIntensityEvent('7', null);
+      expect(event).toBeNull();
+    });
+
+    test('returns null for intensity event with invalid scale', () => {
+      const event = createWorkoutIntensityEvent('7', 'invalidScale');
+      expect(event).toBeNull();
+    });
+  });
+
+  // Tests for createCaloricDataEvent (kind 1357)
+  describe('createCaloricDataEvent', () => {
+    test('creates caloric data event with basic info', () => {
+      const event = createCaloricDataEvent(500);
+      expect(event.kind).toBe(1357);
+      expect(event.content).toBe('500');
+      expect(event.tags).toContainEqual(['unit', 'kcal']);
+      expect(event.tags).toContainEqual(['t', 'health']);
+      expect(event.tags).toContainEqual(['t', 'calories']);
+    });
+
+    test('creates caloric data event with all optional tags', () => {
+      const options = {
+        timestamp: '2023-01-01T13:00:00Z',
+        source: 'MyFitnessPal',
+        accuracy: 'estimated',
+        workoutEventId: 'another-workout-id'
+      };
+      const event = createCaloricDataEvent('650', options);
+      expect(event.tags).toContainEqual(['timestamp', '2023-01-01T13:00:00Z']);
+      expect(event.tags).toContainEqual(['source', 'MyFitnessPal']);
+      expect(event.tags).toContainEqual(['accuracy', 'estimated']);
+      expect(event.tags).toContainEqual(['e', 'another-workout-id', '', 'root']);
+    });
+
+    test('returns null for caloric data event with missing calories', () => {
+      const event = createCaloricDataEvent(null);
+      expect(event).toBeNull();
+    });
+
+    test('returns null for caloric data event with empty string calories', () => {
+      const event = createCaloricDataEvent('');
+      expect(event).toBeNull();
+    });
   });
 }); 
