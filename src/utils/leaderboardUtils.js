@@ -218,4 +218,37 @@ export const createImprovementLeaderboard = (users) => {
       ...entry,
       rank: index + 1
     }));
+};
+
+/**
+ * Compute daily winners based on total distance for the day (used by scheduler).
+ * @param {Array} runs - Array of run objects that occurred on the same day.
+ *   Each run should have at minimum `{ pubkey, distance }`.
+ * @param {Set<string>} optInPubkeys - Set of pubkeys who have opted in. If empty, everyone is considered opted-out.
+ * @param {number} maxWinners - Number of winners to return (default 3).
+ * @returns {Array<{ pubkey: string, distance: number, rank: number }>} Sorted list of winners.
+ */
+export const computeDailyWinners = (runs = [], optInPubkeys = new Set(), maxWinners = 3) => {
+  if (!runs.length) return [];
+
+  // Aggregate distance per pubkey
+  const distanceByUser = new Map();
+
+  runs.forEach((run) => {
+    const userPubkey = run.pubkey || run.publicKey || 'unknown';
+    if (optInPubkeys.size > 0 && !optInPubkeys.has(userPubkey)) return; // Skip non-opt-ins
+
+    const prev = distanceByUser.get(userPubkey) || 0;
+    const dist = Number(run.distance) || 0;
+    distanceByUser.set(userPubkey, prev + dist);
+  });
+
+  // Convert to array and sort descending distance
+  const sorted = Array.from(distanceByUser.entries())
+    .map(([pubkey, distance]) => ({ pubkey, distance }))
+    .sort((a, b) => b.distance - a.distance)
+    .slice(0, maxWinners)
+    .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
+
+  return sorted;
 }; 

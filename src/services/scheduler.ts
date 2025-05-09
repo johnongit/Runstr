@@ -30,13 +30,52 @@ const getYesterdayLocalISO = () => {
   return yesterday.toLocaleDateString('sv');
 };
 
-/** Fetches runs for a specific date range (e.g., yesterday). Needs RunDataService method. */
+/**
+ * Fetch runs for a specific calendar day (local time).
+ * Falls back to timestamp comparison when the stored `date` field format
+ * is inconsistent across locales. A run is considered within the day if its
+ * `timestamp` occurs between 00:00:00.000 and 23:59:59.999 *local time* of
+ * the provided `isoDate` (formatted YYYY-MM-DD).
+ *
+ * NOTE: We keep this logic here instead of adding a new public method to
+ * `RunDataService` to minimise surface-area changes. When we introduce a
+ * backend or indexed DB later, we can move this helper next to the data layer.
+ */
 const getRunsForDate = (isoDate: string) => {
-  // Placeholder: Requires RunDataService to implement filtering by date
-  console.warn('[Scheduler] getRunsForDate needs implementation in RunDataService');
-  const allRuns = runDataService.getAllRuns(); // Inefficient, needs date filter
-  return allRuns.filter(run => run.date === isoDate);
-}
+  const startOfDay = new Date(`${isoDate}T00:00:00`).getTime();
+  const endOfDay = new Date(`${isoDate}T23:59:59.999`).getTime();
+
+  const allRuns = runDataService.getAllRuns();
+
+  return allRuns.filter((run: any) => {
+    // Prefer explicit timestamp if present
+    if (typeof run.timestamp === 'number') {
+      return run.timestamp >= startOfDay && run.timestamp <= endOfDay;
+    }
+
+    // Fallback to parsing the stored date string, attempting common formats
+    if (run.date) {
+      // Try ISO first (sv locale)
+      let runDate = new Date(run.date);
+      if (isNaN(runDate.getTime())) {
+        // Attempt locale-dependent parse (e.g., MM/DD/YYYY)
+        const parts = run.date.split(/[\/-]/);
+        if (parts.length === 3) {
+          // Assume order: month, day, year (US) → convert to ISO
+          const [p1, p2, p3] = parts.map(Number);
+          const yyyy = p3 < 100 ? 2000 + p3 : p3; // naive 2-digit year fix
+          // Months are 0-based in Date
+          runDate = new Date(yyyy, p1 - 1, p2);
+        }
+      }
+
+      const ts = runDate.getTime();
+      return ts >= startOfDay && ts <= endOfDay;
+    }
+
+    return false;
+  });
+};
 
 /** Reads leaderboardOptIn directly from localStorage. */
 const getLeaderboardOptInStatusFromStorage = (): boolean => {
