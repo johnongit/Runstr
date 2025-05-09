@@ -1,4 +1,4 @@
-import { ndk } from '../contexts/NostrContext.jsx';
+import { ndk, ndkReadyPromise } from '../lib/ndkSingleton';
 // Import NDKRelayStatus normally - will rely on runtime check or ignore if it fails
 // import { NDKRelayStatus } from '@nostr-dev-kit/ndk'; // Removed unused import
 

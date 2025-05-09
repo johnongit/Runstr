@@ -9,7 +9,6 @@ import { ActivityModeProvider } from './contexts/ActivityModeContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { WalletProvider } from './contexts/WalletContext';
 import { MenuBar } from './components/MenuBar';
-import { initializeNostr } from './utils/nostr';
 import { initializeEvents } from './services/EventService';
 import './App.css';
 import ErrorFallback from './components/ErrorFallback';
@@ -88,8 +87,10 @@ const App = () => {
         initializeEvents();
         console.log('Events initialized');
         
-        // Initialize Nostr connection
-        await initializeNostr();
+        // REMOVE: await initializeNostr();
+        // NDK initialization is now handled by the NDKSingleton and NostrProvider
+        // The NostrProvider will await the ndkReadyPromise from the singleton.
+        console.log('NDK initialization is managed by NDKSingleton and NostrProvider.');
         
         // First check if we have a fresh cache that can be used immediately
         // Note: We check for cache freshness but don't need to assign the variable if not using it

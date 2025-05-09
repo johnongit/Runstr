@@ -1,11 +1,10 @@
-import { ndk } from '../contexts/NostrContext.jsx';
+import { ndk, ndkReadyPromise } from '../lib/ndkSingleton';
 import { nip19 } from 'nostr-tools';
 import { NDKEvent, NDKRelaySet } from '@nostr-dev-kit/ndk';
 import { ensureRelays } from './relays.js';
 
 // Added for Hybrid Approach (Phase 3)
 import { fetchEventsViaWebSocket } from './wsFetch.js';
-import { ndkReadyPromise } from '../contexts/NostrContext.jsx';
 
 // PHASE 7: In-memory cache for group metadata
 const metadataCache = new Map();
@@ -403,7 +402,7 @@ export const subscribeToGroupMessages = async (rawGroupId, onEventCallback, opti
  * @returns {Promise<object|null>} The raw published event object or null on failure
  */
 export const sendGroupMessage = async (groupId, content, options = {}) => {
-  const { relays: relayHints = [], tags = [] } = options;
+  const { relays: relayHints /*, tags = []*/ } = options; // Comment out or remove unused 'tags' destructuring
   // console.log(`[ndkGroups] sendGroupMessage: Sending to rawGroupId: ${rawGroupId}, Relays: ${JSON.stringify(relayHints)}`);
 
   if (!ndk) {

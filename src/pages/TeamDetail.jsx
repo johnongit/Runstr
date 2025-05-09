@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
-import { NostrContext, ndkReadyPromise } from '../contexts/NostrContext.jsx';
+import { NostrContext } from '../contexts/NostrContext.jsx';
+import { ndkReadyPromise } from '../lib/ndkSingleton';
 import { 
   parseNaddr, 
   isMember, 
@@ -8,7 +9,7 @@ import {
   removeMember,
 } from '../utils/ndkGroups.js';
 import { ensureRelays } from '../utils/relays.js';
-import { useRunProfile as useProfiles } from '../hooks/useRunProfile';
+import { useProfileCache } from '../hooks/useProfileCache.js';
 import '../components/RunClub.css';
 import { ChatRoom } from '../components/ChatRoom.jsx';
 
@@ -38,7 +39,8 @@ export const TeamDetail = () => {
   const [isProcessingMembership, setIsProcessingMembership] = useState(false);
   const [members, setMembers] = useState([]);
   const [admins, setAdmins] = useState([]);
-  const { profiles, fetchProfiles } = useProfiles(); 
+  const { fetchProfiles } = useProfileCache();
+  const [profiles, setProfiles] = useState(new Map());
 
   // Define loadGroupMembers *before* the useEffect that uses it as a dependency
   const loadGroupMembers = useCallback(async (currentGroupId, ndkInstance, currentRelayHints) => {
@@ -91,9 +93,18 @@ export const TeamDetail = () => {
 
     // console.log(`TeamDetail: Found ${currentMembersArray.length} members (including admins) for group ${currentGroupId}`);
     setMembers([...new Set(currentMembersArray)]);
-    if (currentMembersArray.length > 0) await fetchProfiles([...new Set(currentMembersArray)]);
+    if (currentMembersArray.length > 0) {
+        const fetchedMap = await fetchProfiles([...new Set(currentMembersArray)]);
+        if (fetchedMap instanceof Map) {
+            setProfiles(prev => {
+               const newMap = new Map(prev);
+               fetchedMap.forEach((val, key) => newMap.set(key, val));
+               return newMap;
+            });
+        }
+    }
 
-  }, [ndk, fetchProfiles, setAdmins, setMembers, setError]); 
+  }, [fetchProfiles, setAdmins, setMembers, setError]); 
 
   // Effect to parse naddr and set groupId/relayHints/load pinned messages
   useEffect(() => {

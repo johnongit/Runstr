@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { ndk } from '../contexts/NostrContext.jsx';
+import { ndk, ndkReadyPromise } from '../lib/ndkSingleton';
 
 // Module-level cache and status tracking
 const profileCache = new Map();
@@ -40,9 +40,22 @@ const parseProfileContent = (contentString) => {
 
 export const useProfileCache = () => {
   const fetchProfiles = useCallback(async (pubkeys = []) => {
-    if (!ndk) {
-      console.error('[useProfileCache] NDK instance not available.');
-      return new Map(); // Return empty map if NDK is not ready
+    // Ensure NDK is ready before proceeding
+    try {
+      const isNdkReady = await ndkReadyPromise;
+      if (!isNdkReady) {
+        console.error('[useProfileCache] NDK is not ready. Aborting profile fetch.');
+        return new Map();
+      }
+    } catch (error) {
+      console.error('[useProfileCache] Error awaiting NDK readiness:', error);
+      return new Map();
+    }
+    
+    // NDK instance is imported and should be available if ndkReadyPromise resolved true
+    if (!ndk) { 
+      console.error('[useProfileCache] NDK instance unexpectedly not available after readiness check.');
+      return new Map(); 
     }
 
     const uniquePubkeys = [...new Set(pubkeys.filter(pk => typeof pk === 'string' && pk.trim() !== ''))];

@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { NostrContext, initNdk } from '../contexts/NostrContext';
-import { ndk } from '../contexts/NostrContext';
+import { NostrContext } from '../contexts/NostrContext';
+import { ndk, awaitNDKReady } from '../lib/ndkSingleton';
 import { nip19, generateSecretKey } from 'nostr-tools';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 
@@ -31,8 +31,8 @@ export const Team = () => {
       
       console.log('Team.jsx: Loading profiles for pubkeys:', uniquePubkeys);
       if (!isNdkInitialized) {
-          console.log("Waiting for NDK to initialize before fetching profiles...");
-          await initNdk();
+          console.log("Waiting for NDK to become ready before fetching profiles...");
+          await awaitNDKReady().catch(() => console.warn('NDK not ready within timeout during profile load'));
       }
 
       const profileEvents = await ndk.fetchEvents({
@@ -198,10 +198,9 @@ export const Team = () => {
     const setup = async () => {
       try {
         if (!isNdkInitialized) {
-            console.log("Team.jsx: Waiting for NDK initialization...");
-            await initNdk();
-            const { connected } = await initNdk();
-             if (!connected) {
+            console.log("Team.jsx: Waiting for NDK readiness...");
+            const ready = await awaitNDKReady();
+            if (!ready && !(ndk.pool?.stats()?.connected > 0)) {
                 throw new Error(ndkInitError || 'NDK failed to initialize.');
             }
         }
@@ -280,7 +279,10 @@ export const Team = () => {
       }
       console.log(`searchTeams: Searching for groups with query: ${searchQuery}`);
 
-      if (!isNdkInitialized) await initNdk();
+      if (!isNdkInitialized) {
+          console.log("Waiting for NDK to become ready before fetching profiles...");
+          await awaitNDKReady().catch(() => console.warn('NDK not ready within timeout during profile load'));
+      }
 
       const teamEvents = await ndk.fetchEvents({
         kinds: [39000],

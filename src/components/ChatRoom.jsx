@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import PropTypes from 'prop-types';
-import { NostrContext, ndkReadyPromise } from '../contexts/NostrContext.jsx';
+import { ndk, ndkReadyPromise } from '../lib/ndkSingleton';
 import {
   fetchGroupMessages,
   subscribeToGroupMessages,
@@ -8,8 +8,8 @@ import {
 } from '../utils/ndkGroups.js';
 import { ensureRelays } from '../utils/relays.js';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
-import { ndk } from '../contexts/NostrContext.jsx'; // Import ndk for NDKEvent instantiation
-import { useProfileCache } from '../hooks/useProfileCache.js'; // Import the new hook
+import { useProfileCache } from '../hooks/useProfileCache.js';
+import { NostrContext } from '../contexts/NostrContext.jsx';
 
 /**
  * ChatRoom – standalone component responsible for displaying and sending
@@ -21,25 +21,22 @@ import { useProfileCache } from '../hooks/useProfileCache.js'; // Import the new
  */
 export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRelayHints }) => {
   console.log(`ChatRoom: Render (Phase 4). GroupId: ${groupId}, Naddr: ${naddrString ? naddrString.substring(0,15) : 'none'}, PassedRelayHints:`, passedRelayHints);
-  // Use new context values. 'ndk' instance is not directly used here anymore.
   const { ndkReady, relayCount, ndkError: ndkInitError } = useContext(NostrContext);
-  const { fetchProfiles } = useProfileCache(); // Use the new hook
+  const { fetchProfiles } = useProfileCache();
 
   const [messages, setMessages] = useState([]);
   const [messageAuthorProfiles, setMessageAuthorProfiles] = useState(new Map());
   const [pinnedMessages, setPinnedMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [isLoadingChat, setIsLoadingChat] = useState(true); // Renamed from isLoadingInitialMessages
+  const [isLoadingChat, setIsLoadingChat] = useState(true);
   const [error, setError] = useState(null);
 
   const chatEndRef = useRef(null);
   const subscriptionRef = useRef(null);
 
-  // PHASE 7: Load messages from localStorage on initial mount or when groupId changes
   useEffect(() => {
     if (groupId) {
-      // console.log(`[ChatRoom] Attempting to load messages from localStorage for groupId: ${groupId}`);
       const cacheKey = `chatMessages_${groupId}`;
       const storedMessagesJson = localStorage.getItem(cacheKey);
       if (storedMessagesJson) {
@@ -47,29 +44,24 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
           const rawEvents = JSON.parse(storedMessagesJson);
           if (Array.isArray(rawEvents) && rawEvents.length > 0) {
             const ndkMessages = rawEvents.map(rawEv => {
-              // Ensure we have NDKEvent instances as the component expects
               if (rawEv instanceof NDKEvent) return rawEv;
-              const ndkEventInstance = new NDKEvent(ndk); // Use imported ndk
-              Object.assign(ndkEventInstance, rawEv); // Copy properties
-              // Ensure essential properties like id, sig are there if NDKEvent constructor doesn't auto-map them from rawEv
+              const ndkEventInstance = new NDKEvent(ndk);
+              Object.assign(ndkEventInstance, rawEv);
               ndkEventInstance.id = rawEv.id;
               ndkEventInstance.sig = rawEv.sig; 
-              // Other NDKEvent specific initializations if needed based on rawEv structure
               return ndkEventInstance;
             });
-            // console.log(`[ChatRoom] Loaded ${ndkMessages.length} messages from localStorage.`);
-            setMessages(ndkMessages.sort((a, b) => a.created_at - b.created_at)); // Sort oldest first
-            setIsLoadingChat(false); // Show cached messages immediately
+            setMessages(ndkMessages.sort((a, b) => a.created_at - b.created_at));
+            setIsLoadingChat(false);
           }
         } catch (e) {
           console.warn(`[ChatRoom] Failed to parse stored messages for groupId ${groupId}:`, e);
-          localStorage.removeItem(cacheKey); // Clear corrupted cache
+          localStorage.removeItem(cacheKey);
         }
       }
     }
-  }, [groupId]); // Only re-run if groupId changes
+  }, [groupId]);
 
-  // Load initial messages and subscribe - REFACTORED FOR PHASE 5
   useEffect(() => {
     if (!groupId) {
       console.log("ChatRoom: useEffect - no groupId, cannot load/subscribe.");
@@ -92,36 +84,30 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
         console.log(`[ChatRoom] Phase 1 (useEffect): Ensuring relays for group ${groupId}:`, passedRelayHints);
         await ensureRelays(passedRelayHints || []); 
         
-        // Optional brief pause might still be useful after adding relays
         await new Promise(resolve => setTimeout(resolve, 100)); 
         if (!isActive) return;
 
-        // console.log(`[ChatRoom] Phase 2 (useEffect): Fetching initial messages for group ${groupId}`);
         console.log(`ChatRoom: Fetching initial messages for group ${groupId}`);
         const initialMessages = await fetchGroupMessages(groupId, { relays: passedRelayHints || [], limit: 50 });
         if (!isActive) return;
 
         console.log(`ChatRoom: Fetched ${initialMessages.length} initial messages.`);
-        // Merge with existing (possibly from cache) and sort, ensuring NDKEvent instances
         setMessages(prevMessages => {
           const messageMap = new Map();
-          // Add existing messages (ensuring they are NDKEvent instances or converted)
           prevMessages.forEach(msg => {
-            const key = msg.id || msg.tempId; // Ensure key exists
+            const key = msg.id || msg.tempId;
             if (key) messageMap.set(key, msg instanceof NDKEvent ? msg : new NDKEvent(ndk, msg));
           });
-          // Add new/fetched messages (fetchGroupMessages returns NDKEvent instances)
           initialMessages.forEach(msg => {
             const key = msg.id || msg.tempId;
             if (key) messageMap.set(key, msg);
           });
-          return Array.from(messageMap.values()).sort((a, b) => a.created_at - b.created_at); // Sort oldest first
+          return Array.from(messageMap.values()).sort((a, b) => a.created_at - b.created_at);
         });
         setIsLoadingChat(false);
 
-        let subSinceTimestamp = Math.floor(Date.now() / 1000) - 3600; // Default: last hour
-        if (messages.length > 0 && messages[messages.length - 1]?.created_at) { // Check last message for oldest first
-             // messages[messages.length - 1] is the newest due to sorting
+        let subSinceTimestamp = Math.floor(Date.now() / 1000) - 3600;
+        if (messages.length > 0 && messages[messages.length - 1]?.created_at) {
             subSinceTimestamp = messages[messages.length - 1].created_at; 
         }
         
@@ -131,8 +117,7 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
             if (!isActive) return;
             setMessages(prevMessages => {
               if (prevMessages.some((m) => m.id === newEvent.id)) return prevMessages;
-              // Add new event and re-sort
-              return [...prevMessages, newEvent].sort((a, b) => a.created_at - b.created_at); // Sort oldest first
+              return [...prevMessages, newEvent].sort((a, b) => a.created_at - b.created_at);
             });
           },
           { relays: passedRelayHints || [], since: subSinceTimestamp }
@@ -162,50 +147,39 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
     };
   }, [groupId, JSON.stringify(passedRelayHints)]); 
 
-  // PHASE 7: Save messages to localStorage when they change
   useEffect(() => {
     if (groupId && messages.length > 0) {
-      // console.log(`[ChatRoom] Saving ${messages.length} messages to localStorage for groupId: ${groupId}`);
       const cacheKey = `chatMessages_${groupId}`;
       try {
-        // Store only raw event data to keep localStorage clean and avoid circular refs
         const rawEventsToStore = messages.slice(0, 50).map(msg => {
-            return msg instanceof NDKEvent ? msg.rawEvent() : msg; // Assumes msg might already be raw if from a failed NDKEvent creation
+            return msg instanceof NDKEvent ? msg.rawEvent() : msg;
         });
         localStorage.setItem(cacheKey, JSON.stringify(rawEventsToStore));
       } catch (e) {
         console.error(`[ChatRoom] Failed to save messages to localStorage for groupId ${groupId}:`, e);
       }
     }
-  }, [messages, groupId]); // Re-run if messages or groupId change
+  }, [messages, groupId]);
 
-  // Effect to fetch author profiles for messages
   useEffect(() => {
-    // Define an async function inside the effect to use await
     const fetchAndSetProfiles = async () => {
         console.log('[ChatRoom] Profile fetch effect triggered. Checking NDK readiness via promise...');
         
-        // Wait for NDK initialization (including signer) to complete
         const isNdkActuallyReady = await ndkReadyPromise;
         console.log(`[ChatRoom] ndkReadyPromise resolved with: ${isNdkActuallyReady}`);
 
-        // === GUARD CLAUSE ===
-        // Only proceed if NDK is ready AND there are messages
         if (!isNdkActuallyReady || messages.length === 0) {
           console.log(`[ChatRoom] Skipping profile fetch. NDK Ready (from promise): ${isNdkActuallyReady}, Messages Count: ${messages.length}`);
           return;
         }
-        // ====================
 
         const pubkeysToProcess = Array.from(
           new Set(messages.map(msg => {
-            // Handle both NDKEvent and raw event structures for pubkey
             return msg instanceof NDKEvent ? msg.pubkey : msg.pubkey;
           }))
-        ).filter(pubkey => pubkey && !messageAuthorProfiles.has(pubkey)); // Only fetch if not already in local state
+        ).filter(pubkey => pubkey && !messageAuthorProfiles.has(pubkey));
 
         if (pubkeysToProcess.length === 0) {
-          // console.log('[ChatRoom] No new profiles to fetch based on local state.');
           return;
         }
 
@@ -220,7 +194,6 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
               const newProfiles = new Map(prevProfiles);
               let profilesActuallyAddedOrUpdated = false;
               fetchedProfileData.forEach((profile, pubkey) => {
-                // Update if new or if content differs (though useProfileCache aims to return consistent objects)
                 if (!newProfiles.has(pubkey) || JSON.stringify(newProfiles.get(pubkey)) !== JSON.stringify(profile)) {
                   newProfiles.set(pubkey, profile);
                   profilesActuallyAddedOrUpdated = true;
@@ -237,22 +210,17 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
         } catch (err) {
           console.error("[ChatRoom] Error calling fetchProfiles from useProfileCache:", err);
         }
-    }; // End of updateAuthorProfiles
+    };
 
-    // Call the inner async function
     fetchAndSetProfiles();
-
-    // Dependencies: messages (to get new pubkeys), fetchProfiles (stable from hook)
-    // ndkReady removed because we now await the promise inside.
   }, [messages, fetchProfiles]); 
 
   useEffect(() => {
     if (naddrString) loadPinnedMessages();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [naddrString]); // Reload pinned if naddr changes
+  }, [naddrString]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); // Enabled for oldest-first display
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const storageKey = naddrString ? `pinnedMessages_${naddrString}` : null;
@@ -287,12 +255,10 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
     if (!messageText.trim()) return;
     setIsSending(true); setError(null);
     try {
-      // Pass relayHints to sendGroupMessage if it supports it, or ensure relays are active via ensureRelays
-      await ensureRelays(passedRelayHints); // Ensure relays are active before sending
+      await ensureRelays(passedRelayHints);
       const sentEvent = await sendGroupMessage(groupId, messageText.trim());
       if (sentEvent) {
         setMessageText('');
-        // Optionally, add the sent message to state optimistically if not handled by subscription quickly enough
       } else {
         throw new Error('Failed to send message event.');
       }
@@ -316,9 +282,9 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: 'calc(100% - 40px)', // Example: Adjust as needed, assuming some padding/margin from parent
-        maxHeight: '70vh', // Example: Or a max height
-        border: '1px solid #444', // Added for visibility during debug
+        height: 'calc(100% - 40px)',
+        maxHeight: '70vh',
+        border: '1px solid #444',
         padding: '10px',
         boxSizing: 'border-box'
       }}
@@ -343,14 +309,12 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
           flexGrow: 1, 
           overflowY: 'auto', 
           marginBottom: '10px',
-          paddingRight: '5px' // For scrollbar visibility
+          paddingRight: '5px'
         }}
       >
         {messages.map((evt) => {
-          // Ensure evt is an NDKEvent instance or has a rawEvent method
           const raw = evt instanceof NDKEvent ? evt.rawEvent() : (evt.rawEvent ? evt.rawEvent() : evt);
           
-          // Fallback if raw or raw.pubkey is somehow undefined
           if (!raw || !raw.pubkey) {
             console.warn("Message object or pubkey is undefined, skipping rendering:", evt);
             return null; 
@@ -361,13 +325,13 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
           const avatarUrl = authorProfile?.picture;
           
           return (
-            <div key={raw.id || JSON.stringify(raw)} className="message-item"> {/* Added fallback key for safety */}
+            <div key={raw.id || JSON.stringify(raw)} className="message-item">
               {avatarUrl && (
                 <img
                   src={avatarUrl}
                   alt={`${displayName}'s avatar`}
                   className="message-avatar"
-                  onError={(e) => { e.target.style.display = 'none'; }} // Hide if error, or use default: e.target.src = '/default-avatar.svg';
+                  onError={(e) => { e.target.style.display = 'none'; }}
                   loading="lazy"
                   width="40"
                   height="40"
@@ -391,7 +355,7 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
         <form 
           onSubmit={handleSend} 
           className="message-input-form"
-          style={{ display: 'flex', marginTop: 'auto' }} // Ensure it's at the bottom
+          style={{ display: 'flex', marginTop: 'auto' }}
         >
           <input 
             type="text" 
@@ -414,9 +378,9 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
 
 ChatRoom.propTypes = {
   groupId: PropTypes.string.isRequired,
-  naddrString: PropTypes.string, // naddr for pinning context
-  publicKey: PropTypes.string,   // Logged-in user's public key
-  passedRelayHints: PropTypes.arrayOf(PropTypes.string) // Relay hints passed from parent
+  naddrString: PropTypes.string,
+  publicKey: PropTypes.string,
+  relayHints: PropTypes.arrayOf(PropTypes.string)
 };
 
 export default ChatRoom; 

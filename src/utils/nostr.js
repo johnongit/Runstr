@@ -1,116 +1,35 @@
-import NDK, { NDKEvent } from '@nostr-dev-kit/ndk';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { Platform } from '../utils/react-native-shim';
 import AmberAuth from '../services/AmberAuth';
 // Import nostr-tools implementation for fallback
 import { createAndPublishEvent as publishWithNostrTools } from './nostrClient';
 
-// Optimized relay list based on testing results
-export const RELAYS = [
-  'wss://relay.damus.io',    // Most reliable for running content
-  'wss://nos.lol',           // Good secondary option  // Has unique running content
-  'wss://nostr.wine',        // Additional reliable relay
-  'wss://eden.nostr.land',   // Additional reliable relay
-  'wss://e.nos.lol',         // Additional reliable relay
-  'wss://relay.snort.social', // Backup relay
-  'wss://relay.0xchat.com',  // NIP-29 group support for running clubs
-];
-
-// Create a new NDK instance with optimized relay configuration
-const ndk = new NDK({
-  explicitRelayUrls: RELAYS
-});
+// Import the NDK singleton
+import { ndk, ndkReadyPromise } from '../lib/ndkSingleton'; // Adjusted path
 
 // Storage for subscriptions
 const activeSubscriptions = new Set();
 
-// Track connection status
-let isConnected = false;
-let lastConnectionCheck = 0;
-const CONNECTION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Initialize the Nostr client - connect to relays
- * @returns {Promise<boolean>} Success status
- */
-export const initializeNostr = async () => {
-  try {
-    // Connect to relays
-    await ndk.connect();
-    console.log('Connected to NDK relays');
-    isConnected = true;
-    lastConnectionCheck = Date.now();
-    return true;
-  } catch (error) {
-    console.error('Error initializing Nostr:', error);
-    isConnected = false;
-    return false;
-  }
-};
-
-/**
- * Ensure connection to relays is active
- * @returns {Promise<boolean>} Connection status
- */
-export const ensureConnection = async () => {
-  // Check if we're due for a connection check
-  const now = Date.now();
-  const timeSinceLastCheck = now - lastConnectionCheck;
-  
-  if (!isConnected || timeSinceLastCheck > CONNECTION_CHECK_INTERVAL) {
-    console.log('Verifying relay connections...');
-    
-    try {
-      // Check existing connections
-      const connectionStatus = await diagnoseConnection();
-      
-      // If we have no connected relays, reconnect
-      if (!connectionStatus.connectedRelays || connectionStatus.connectedRelays.length === 0) {
-        console.log('No active relay connections, reconnecting...');
-        await ndk.connect();
-        isConnected = true;
-      } else {
-        console.log(`Connected to ${connectionStatus.connectedRelays.length} relays`);
-        isConnected = true;
-      }
-    } catch (error) {
-      console.error('Error checking connection:', error);
-      // Attempt to reconnect
-      try {
-        await ndk.connect();
-        isConnected = true;
-      } catch (reconnectError) {
-        console.error('Failed to reconnect:', reconnectError);
-        isConnected = false;
-      }
-    }
-    
-    lastConnectionCheck = now;
-  }
-  
-  return isConnected;
-};
-
 /**
  * Fetch events from Nostr
  * @param {Object} filter - Nostr filter
- * @returns {Promise<Set>} Set of events
+ * @returns {Promise<Set<NDKEvent>>} Set of events
  */
 export const fetchEvents = async (filter) => {
+  // It's good practice to ensure NDK is ready before fetching
+  // Add: await ndkReadyPromise; (or handle cases where it might not be ready)
+  // For now, just using the singleton ndk directly as per the current pattern in the file.
   try {
-    // Log what we're fetching - helpful for debugging
-    console.log('Fetching events with filter:', filter);
-    
-    // Set safe defaults
+    console.log('[nostr.js] Fetching events with filter:', filter, 'using singleton NDK');
     if (!filter.limit) {
       filter.limit = 30;
     }
-    
-    // Fetch events using NDK
+    // All functions will now use the imported singleton `ndk`
     const events = await ndk.fetchEvents(filter);
-    console.log(`Fetched ${events.size} events for filter:`, filter);
+    console.log(`[nostr.js] Fetched ${events.size} events for filter:`, filter);
     return events;
   } catch (error) {
-    console.error('Error fetching events:', error);
+    console.error('[nostr.js] Error fetching events:', error);
     return new Set();
   }
 };
@@ -119,120 +38,91 @@ export const fetchEvents = async (filter) => {
  * Fetch running posts from Nostr relays
  * @param {number} limit - Maximum number of posts to fetch
  * @param {number} since - Timestamp to fetch posts since
- * @returns {Promise<Array>} Array of running posts
+ * @returns {Promise<Array<NDKEvent>>} Array of running posts
  */
 export const fetchRunningPosts = async (limit = 7, since = undefined) => {
+  // Add: await ndkReadyPromise; // This should be awaited before this function or at the start if non-blocking behavior is not desired.
   try {
-    // If no custom "since" provided, use 14 days (reduced from 30 for faster loading)
     const defaultSince = Math.floor(Date.now() / 1000) - 14 * 24 * 60 * 60;
     const sinceTimestamp = since ? Math.floor(since / 1000) : defaultSince;
+    console.log(`[nostr.js] Fetching posts with #runstr hashtag from ${new Date(sinceTimestamp * 1000).toLocaleString()}`);
     
-    console.log(`Fetching posts with #runstr hashtag from ${new Date(sinceTimestamp * 1000).toLocaleString()}`);
-    
-    // Track unique events to avoid duplicates
     const uniqueEvents = new Map();
     let receivedEvents = false;
     
-    // Create a promise that will resolve once we have enough events or timeout
-    return new Promise((resolve) => {
-      // Set a maximum timeout - don't wait forever for all relays
+    return new Promise((resolve) => { // Executor function should not be async
+      // Example: If ndkReadyPromise needs to be awaited here, it has to be done carefully, 
+      // often by chaining or by an outer async IIFE that then calls resolve/reject.
+      // For now, assuming NDK calls will queue or handle internally if not fully ready, 
+      // or that `ndkReadyPromise` is awaited by the calling code.
+
       const maxTimeout = setTimeout(() => {
-        console.log(`Timeout reached with ${uniqueEvents.size} posts collected`);
-        
-        // Convert to array, sort by created_at (newest first), and limit results
+        console.log(`[nostr.js] Timeout reached with ${uniqueEvents.size} posts collected`);
         const eventArray = Array.from(uniqueEvents.values())
           .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
           .slice(0, limit);
-        
         resolve(eventArray);
-      }, 12000); // 12 second max timeout
+      }, 12000);
       
-      // Create a subscription to receive events as they arrive
+      // Ensure ndk is ready before subscribing
+      // await ndkReadyPromise; // Commenting out await here too for consistency
       const sub = ndk.subscribe({
-        kinds: [1], // Regular posts
-        limit: limit * 2, // Get more than needed to allow for better sorting
-        "#t": ["runstr"],  // Only the runstr hashtag
+        kinds: [1],
+        limit: limit * 2,
+        "#t": ["runstr"],
         since: sinceTimestamp
       });
       
-      // Track relay performance
       const relayPerformance = {};
-      
-      // Process events as they arrive
       sub.on('event', (event) => {
-        // Track which relay sent this event
         const relay = event.relay?.url || 'unknown';
         if (!relayPerformance[relay]) {
           relayPerformance[relay] = { count: 0, startTime: Date.now() };
         }
         relayPerformance[relay].count++;
         receivedEvents = true;
-        
-        // Store unique events by id
         uniqueEvents.set(event.id, event);
         
-        // If we have enough events, we can resolve early
         if (uniqueEvents.size >= limit) {
           setTimeout(() => {
             clearTimeout(maxTimeout);
-            
-            // Save relay performance metrics to localStorage for future prioritization
             try {
               const storedMetrics = JSON.parse(localStorage.getItem('relayPerformance') || '{}');
-              
-              // Update metrics with new data
-              Object.entries(relayPerformance).forEach(([relay, metrics]) => {
-                const responseTime = metrics.count > 0 ? 
-                  (Date.now() - metrics.startTime) : 0;
-                
-                storedMetrics[relay] = storedMetrics[relay] || { 
-                  count: 0, 
-                  totalTime: 0,
-                  lastUpdated: Date.now()
-                };
-                storedMetrics[relay].count += metrics.count;
-                storedMetrics[relay].totalTime += responseTime;
-                storedMetrics[relay].lastUpdated = Date.now();
+              Object.entries(relayPerformance).forEach(([relayUrl, metrics]) => {
+                const responseTime = metrics.count > 0 ? (Date.now() - metrics.startTime) : 0;
+                storedMetrics[relayUrl] = storedMetrics[relayUrl] || { count: 0, totalTime: 0, lastUpdated: Date.now() };
+                storedMetrics[relayUrl].count += metrics.count;
+                storedMetrics[relayUrl].totalTime += responseTime;
+                storedMetrics[relayUrl].lastUpdated = Date.now();
               });
-              
               localStorage.setItem('relayPerformance', JSON.stringify(storedMetrics));
             } catch (err) {
-              console.warn('Could not save relay performance data', err);
+              console.warn('[nostr.js] Could not save relay performance data', err);
             }
-            
-            // Convert to array, sort by created_at (newest first), and limit results
             const eventArray = Array.from(uniqueEvents.values())
               .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
               .slice(0, limit);
-            
-            console.log(`Resolved early with ${eventArray.length} posts with #runstr hashtag`);
+            console.log(`[nostr.js] Resolved early with ${eventArray.length} posts with #runstr hashtag`);
             sub.stop();
             resolve(eventArray);
-          }, 1000); // Wait a short time for potentially more relevant events
+          }, 1000);
         }
       });
       
-      // Handle when the subscription is complete from a relay
       sub.on('eose', () => {
-        // If we've already received some events and it's been more than 3 seconds,
-        // resolve to show content quickly without waiting for all relays
-        if (receivedEvents && uniqueEvents.size > 0 && Date.now() - sub.started > 3000) {
+        if (receivedEvents && uniqueEvents.size > 0 && sub.started && (Date.now() - sub.started > 3000)) {
           clearTimeout(maxTimeout);
-          
-          console.log(`EOSE received with ${uniqueEvents.size} posts collected`);
-          
-          // Convert to array, sort by created_at (newest first), and limit results
+          console.log(`[nostr.js] EOSE received with ${uniqueEvents.size} posts collected`);
           const eventArray = Array.from(uniqueEvents.values())
             .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
             .slice(0, limit);
-          
           sub.stop();
           resolve(eventArray);
         }
       });
     });
   } catch (error) {
-    console.error('Error fetching hashtag posts:', error);
+    console.error('[nostr.js] Error fetching hashtag posts:', error);
     return [];
   }
 };
@@ -547,7 +437,7 @@ const publishWithRetry = async (ndkEvent, maxRetries = 3, delay = 2000) => {
       console.log(`Publishing to NDK relays - attempt ${attempt}/${maxRetries}...`);
       
       // Ensure we're connected before publishing
-      await ensureConnection();
+      await ndkReadyPromise;
       
       // Publish the event
       await ndkEvent.publish();
@@ -647,7 +537,7 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
     // APPROACH 1: Try NDK first
     try {
       // Make sure we're connected before attempting to publish
-      await ensureConnection();
+      await ndkReadyPromise;
       
       // Create NDK Event and publish with retry
       const ndkEvent = new NDKEvent(ndk, signedEvent);
@@ -732,7 +622,7 @@ export const diagnoseConnection = async () => {
     // Check if NDK is initialized
     if (!ndk || !ndk.pool || !ndk.pool.relays) {
       console.log('NDK not initialized, initializing...');
-      await initializeNostr();
+      await ndkReadyPromise;
     }
     
     // Check connected relays
@@ -787,21 +677,6 @@ export const diagnoseConnection = async () => {
     };
   }
 };
-
-// Set up periodic connection check
-setInterval(async () => {
-  try {
-    await ensureConnection();
-  } catch (error) {
-    console.error('Error in periodic connection check:', error);
-  }
-}, CONNECTION_CHECK_INTERVAL);
-
-// Initialize connection on module load
-if (typeof window !== 'undefined') {
-  // Only run in browser environment
-  initializeNostr().catch(err => console.error('Initial connection failed:', err));
-}
 
 /**
  * Create a NIP-101e kind 1301 workout event from run data

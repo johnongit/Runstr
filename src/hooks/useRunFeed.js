@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  initializeNostr, 
   fetchRunningPosts, 
   loadSupplementaryData, 
   processPostsWithData
 } from '../utils/nostr';
+import { awaitNDKReady } from '../lib/ndkSingleton';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -29,12 +29,12 @@ export const useRunFeed = () => {
   const initialLoadRef = useRef(globalState.isInitialized);
   const subscriptionRef = useRef(null);
 
-  // Initialize Nostr as soon as the hook is used, even if component isn't visible
+  // Ensure NDK as soon as the hook is used
   useEffect(() => {
     const initNostr = async () => {
       // Only initialize once
       if (!globalState.isInitialized) {
-        await initializeNostr();
+        await awaitNDKReady();
         globalState.isInitialized = true;
       }
     };
@@ -117,7 +117,7 @@ export const useRunFeed = () => {
         console.error('Error in background fetch:', error);
         // Don't set error state - this is a background operation
       }
-    }, 60000); // Check every minute
+    }, 60000);
     
     // Store reference to cleanup
     subscriptionRef.current = timeoutRef.current;
@@ -171,8 +171,8 @@ export const useRunFeed = () => {
         timeoutRef.current = null;
       }
 
-      // Initialize Nostr first
-      await initializeNostr();
+      // Ensure NDK ready first
+      await awaitNDKReady();
 
       // Check if we have cached posts that are recent enough (less than 5 minutes old)
       const now = Date.now();
