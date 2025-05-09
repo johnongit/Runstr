@@ -5,6 +5,7 @@ import {
   processPostsWithData
 } from '../utils/nostr';
 import { awaitNDKReady } from '../lib/ndkSingleton';
+import { lightweightProcessPosts, mergeProcessedPosts } from '../utils/feedProcessor';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -199,7 +200,14 @@ export const useRunFeed = () => {
       
       console.log(`Fetched ${runPostsArray.length} running posts`);
       
-      // Remove content fallback - as requested, only use hashtag search
+      // QUICK-DISPLAY PHASE ─────────────────────────────────────────
+      // Show minimally processed posts immediately
+      if (runPostsArray.length > 0 && allPosts.length === 0) {
+        const quickPosts = lightweightProcessPosts(runPostsArray);
+        setAllPosts(quickPosts);
+        setPosts(quickPosts.slice(0, displayLimit));
+        setLoading(false);
+      }
       
       // If we didn't get enough posts, there may not be more to load
       if (runPostsArray.length < limit) {
@@ -223,19 +231,22 @@ export const useRunFeed = () => {
       // Process posts with all the data
       const processedPosts = await processPostsWithData(runPostsArray, supplementaryData);
       
+      // Merge with quick posts (if any) so we keep order
+      const finalPosts = mergeProcessedPosts(allPosts.length ? allPosts : lightweightProcessPosts(runPostsArray), processedPosts);
+      
       // Update global cache
-      globalState.allPosts = processedPosts;
+      globalState.allPosts = finalPosts;
       globalState.lastFetchTime = now;
       
       // Update state with processed posts
       if (page === 1) {
-        setAllPosts(processedPosts);
-        setPosts(processedPosts.slice(0, displayLimit)); // Only display up to the limit
+        setAllPosts(finalPosts);
+        setPosts(finalPosts.slice(0, displayLimit)); // Only display up to the limit
       } else {
         // For pagination, append new posts, removing duplicates
         setAllPosts(prevPosts => {
           const existingIds = new Set(prevPosts.map(p => p.id));
-          const newPosts = processedPosts.filter(p => !existingIds.has(p.id));
+          const newPosts = finalPosts.filter(p => !existingIds.has(p.id));
           const mergedPosts = [...prevPosts, ...newPosts];
           
           // Update global cache
@@ -245,7 +256,7 @@ export const useRunFeed = () => {
         });
         // Update displayed posts
         setPosts(prevPosts => {
-          const allPostsCombined = [...prevPosts, ...processedPosts];
+          const allPostsCombined = [...prevPosts, ...finalPosts];
           const uniquePosts = [];
           const seen = new Set();
           
@@ -432,4 +443,6 @@ export const useRunFeed = () => {
     canLoadMore,
     handleCommentClick
   };
-}; 
+};
+
+export default useRunFeed; 

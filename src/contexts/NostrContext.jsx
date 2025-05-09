@@ -237,6 +237,33 @@ export const NostrProvider = ({ children }) => {
     }
   }, [publicKey, ndkReady]);
 
+  // Periodically re-attempt signer attachment if no pubkey yet
+  useEffect(() => {
+    if (publicKey) return; // already have pubkey
+    let intervalId = setInterval(async () => {
+      if (publicKey) { clearInterval(intervalId); return; }
+      if (ndk.signer) {
+        try {
+          const user = await ndk.signer.user();
+          if (user?.pubkey) {
+            setPublicKey(user.pubkey);
+            clearInterval(intervalId);
+          }
+        } catch(_err) { void _err; }
+      } else if (window?.nostr) {
+        // Try attaching again
+        try {
+          const result = await ensureSignerAttached();
+          if (result?.pubkey) {
+            setPublicKey(result.pubkey);
+            clearInterval(intervalId);
+          }
+        } catch(_err) { void _err; }
+      }
+    }, 3000);
+    return () => clearInterval(intervalId);
+  }, [publicKey]);
+
   const value = useMemo(() => ({
     publicKey,
     setPublicKey, 

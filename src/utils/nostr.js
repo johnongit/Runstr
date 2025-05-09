@@ -1,8 +1,9 @@
-import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { NDKEvent, NDKRelaySet } from '@nostr-dev-kit/ndk';
 import { Platform } from '../utils/react-native-shim';
 import AmberAuth from '../services/AmberAuth';
 // Import nostr-tools implementation for fallback
 import { createAndPublishEvent as publishWithNostrTools } from './nostrClient';
+import { getFastestRelays, directFetchRunningPosts } from './feedFetcher';
 
 // Import the NDK singleton
 import { ndk, ndkReadyPromise } from '../lib/ndkSingleton'; // Adjusted path
@@ -13,19 +14,24 @@ const activeSubscriptions = new Set();
 /**
  * Fetch events from Nostr
  * @param {Object} filter - Nostr filter
+ * @param {Object} fetchOpts - Additional fetch options
  * @returns {Promise<Set<NDKEvent>>} Set of events
  */
-export const fetchEvents = async (filter) => {
-  // It's good practice to ensure NDK is ready before fetching
-  // Add: await ndkReadyPromise; (or handle cases where it might not be ready)
-  // For now, just using the singleton ndk directly as per the current pattern in the file.
+export const fetchEvents = async (filter, fetchOpts = {}) => {
+  // Ensure relay pool is connected before issuing query
   try {
+    const ndkReady = await ndkReadyPromise;
+    if (!ndkReady) {
+      console.warn('[nostr.js] NDK not ready – no relays connected. Aborting fetch.');
+      return new Set();
+    }
+
     console.log('[nostr.js] Fetching events with filter:', filter, 'using singleton NDK');
     if (!filter.limit) {
       filter.limit = 30;
     }
     // All functions will now use the imported singleton `ndk`
-    const events = await ndk.fetchEvents(filter);
+    const events = await ndk.fetchEvents(filter, fetchOpts);
     console.log(`[nostr.js] Fetched ${events.size} events for filter:`, filter);
     return events;
   } catch (error) {
@@ -56,22 +62,34 @@ export const fetchRunningPosts = async (limit = 7, since = undefined) => {
       // For now, assuming NDK calls will queue or handle internally if not fully ready, 
       // or that `ndkReadyPromise` is awaited by the calling code.
 
-      const maxTimeout = setTimeout(() => {
-        console.log(`[nostr.js] Timeout reached with ${uniqueEvents.size} posts collected`);
-        const eventArray = Array.from(uniqueEvents.values())
+      const maxTimeout = setTimeout(async () => {
+        console.log(`[nostr.js] Timeout (6s) reached with ${uniqueEvents.size} posts collected`);
+        let eventArray = Array.from(uniqueEvents.values())
           .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
           .slice(0, limit);
+
+        // Fallback: if nothing collected, run direct fetch on fastest relays
+        if (eventArray.length === 0) {
+          console.log('[nostr.js] Falling back to directFetchRunningPosts due to empty result set.');
+          try {
+            eventArray = await directFetchRunningPosts(limit, 7);
+          } catch (fallbackErr) {
+            console.warn('[nostr.js] directFetchRunningPosts fallback failed:', fallbackErr);
+          }
+        }
         resolve(eventArray);
-      }, 12000);
+      }, 6000);
       
       // Ensure ndk is ready before subscribing
       // await ndkReadyPromise; // Commenting out await here too for consistency
+      const fastRelays = getFastestRelays(3);
+      const relaySet = NDKRelaySet.fromRelayUrls(fastRelays, ndk);
       const sub = ndk.subscribe({
         kinds: [1],
         limit: limit * 2,
         "#t": ["runstr"],
         since: sinceTimestamp
-      });
+      }, { closeOnEose: false, relaySet });
       
       const relayPerformance = {};
       sub.on('event', (event) => {
@@ -158,49 +176,38 @@ export const loadSupplementaryData = async (posts, type) => {
   const postIds = posts.map(post => post.id);
   
   // Extract unique author public keys (if available)
-  const authors = [...new Set(posts.filter(post => post.pubkey).map(post => post.pubkey))];
+  const authors = [...new Set(posts.map(p => (p.pubkey || (p.author && p.author.pubkey))).filter(Boolean))];
   
-  // Run all queries in parallel like in the working implementation
-  const [profileEvents, comments, likes, reposts, zapReceipts] = await Promise.all([
+  // Run all queries in parallel using Promise.allSettled so that one failure
+  // doesn\'t break the entire supplementary data pipeline
+  const [profileRes, commentsRes, likesRes, repostsRes, zapRes] = await Promise.allSettled([
     // Profile information (only if we have author public keys)
-    authors.length > 0 ? fetchEvents({
-      kinds: [0],
-      authors
-    }) : Promise.resolve(new Set()),
-    
+    authors.length > 0 ? (() => {
+      const fastRelays = getFastestRelays(3);
+      const relaySet = NDKRelaySet.fromRelayUrls(fastRelays, ndk);
+      return fetchEvents(
+        { kinds: [0], authors, limit: authors.length },
+        { relaySet, timeout: 6000 }
+      );
+    })() : Promise.resolve(new Set()),
     // Comments
-    fetchEvents({
-      kinds: [1],
-      '#e': postIds
-    }),
-    
+    fetchEvents({ kinds: [1], '#e': postIds }),
     // Likes
-    fetchEvents({
-      kinds: [7],
-      '#e': postIds
-    }),
-    
+    fetchEvents({ kinds: [7], '#e': postIds }),
     // Reposts
-    fetchEvents({
-      kinds: [6],
-      '#e': postIds
-    }),
-    
+    fetchEvents({ kinds: [6], '#e': postIds }),
     // Zap receipts
-    fetchEvents({
-      kinds: [9735],
-      '#e': postIds
-    })
+    fetchEvents({ kinds: [9735], '#e': postIds })
   ]);
   
-  // If called with a single ID, add the ID to the result for easier lookup
-  const result = {
-    profileEvents,
-    comments,
-    likes,
-    reposts,
-    zapReceipts
-  };
+  // Convert settled results into usable Sets (fallback to empty Set on rejection)
+  const profileEvents = profileRes.status === 'fulfilled' ? profileRes.value : new Set();
+  const comments = commentsRes.status === 'fulfilled' ? commentsRes.value : new Set();
+  const likes = likesRes.status === 'fulfilled' ? likesRes.value : new Set();
+  const reposts = repostsRes.status === 'fulfilled' ? repostsRes.value : new Set();
+  const zapReceipts = zapRes.status === 'fulfilled' ? zapRes.value : new Set();
+  
+  const result = { profileEvents, comments, likes, reposts, zapReceipts };
   
   // If called with a single post ID and 'comments' type, structure the result
   // to be compatible with the expected format in handleCommentClick
@@ -376,7 +383,7 @@ export const processPostsWithData = async (posts, supplementaryData) => {
       }
       
       // Get author's profile with robust fallback
-      const authorPubkey = post.pubkey || '';
+      const authorPubkey = post.pubkey || (post.author && post.author.pubkey) || '';
       const profile = profileMap.get(authorPubkey) || {
         name: 'Anonymous Runner',
         picture: undefined,

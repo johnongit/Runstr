@@ -400,6 +400,10 @@ export const subscribeToGroupMessages = async (rawGroupId, onEventCallback, opti
  * @param {string} groupId - The group identifier ('d' tag value)
  * @param {string} content - Message content
  * @returns {Promise<object|null>} The raw published event object or null on failure
+ *
+ * According to NIP-29, a real-time group chat message SHOULD be event kind 9 with
+ * an `h` tag that contains the group identifier. Other kinds (11/12, 10) are
+ * reserved for threaded/grouped use-cases. We therefore set `kind = 9`.
  */
 export const sendGroupMessage = async (groupId, content, options = {}) => {
   const { relays: relayHints /*, tags = []*/ } = options; // Comment out or remove unused 'tags' destructuring
@@ -420,15 +424,15 @@ export const sendGroupMessage = async (groupId, content, options = {}) => {
 
   const event = new NDKEvent(ndk);
   try {
-    console.log(`ndkGroups: Sending message to group ID: ${groupId} (Kind 39001)`);
+    console.log(`ndkGroups: Sending chat message to group ID: ${groupId} (Kind 9)`);
     const user = await ndk.signer.user();
     if (!user || !user.pubkey) {
         throw new Error('Cannot send message: Unable to get user pubkey from signer.');
     }
     const userPubkey = user.pubkey;
     
-    // Create a Kind 39001 event using NDK
-    event.kind = 39001; // NIP-29 specific message kind
+    // Create a Kind 9 "Group Chat Message" event as per NIP-29
+    event.kind = 9; // NIP-29 chat message kind
     event.content = content;
     event.tags = [
         ['h', groupId],

@@ -11,6 +11,11 @@ const STATIC_ASSETS = [
 
 // Install Service Worker
 self.addEventListener('install', (event) => {
+  // In development on localhost, skip caching static assets to avoid cache quota issues
+  if (self.location.hostname === 'localhost') {
+    self.skipWaiting();
+    return;
+  }
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
@@ -65,6 +70,11 @@ self.addEventListener('fetch', (event) => {
   
   // Skip other cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+  
+  // Skip all runtime caching when developing locally to avoid quota issues
+  if (self.location.hostname === 'localhost') {
     return;
   }
   

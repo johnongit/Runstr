@@ -20,6 +20,7 @@ export const lightweightProcessPosts = (posts) => {
     id: post.id || `post-${Date.now()}-${Math.random().toString(36).substring(7)}`,
     content: post.content || '',
     created_at: post.created_at || Math.floor(Date.now() / 1000),
+    pubkey: post.pubkey || '',
     author: {
       pubkey: post.pubkey || '',
       profile: { 

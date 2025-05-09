@@ -250,7 +250,21 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!publicKey) { setError('Connect your Nostr key to send messages'); return; }
+    // Ensure we have a signer attached on-demand if the user hasn't connected yet.
+    if (!publicKey || !ndk.signer) {
+      try {
+        const { ensureSignerAttached } = await import('../contexts/NostrContext.jsx');
+        const { pubkey, error: signerError } = await ensureSignerAttached();
+        if (signerError || !pubkey) {
+          setError(signerError || 'Unable to attach Nostr signer.');
+          return;
+        }
+      } catch (attachErr) {
+        console.error('ChatRoom: Failed to dynamically import ensureSignerAttached:', attachErr);
+        setError('Unable to attach Nostr signer.');
+        return;
+      }
+    }
     if (!groupId) { setError('Group ID not available to send message.'); return; }
     if (!messageText.trim()) return;
     setIsSending(true); setError(null);
@@ -351,27 +365,26 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
         <div ref={chatEndRef} />
       </div>
 
-      {publicKey ? (
-        <form 
-          onSubmit={handleSend} 
-          className="message-input-form"
-          style={{ display: 'flex', marginTop: 'auto' }}
+      <form 
+        onSubmit={handleSend} 
+        className="message-input-form"
+        style={{ display: 'flex', marginTop: 'auto' }}
+      >
+        <input 
+          type="text" 
+          value={messageText} 
+          onChange={(e) => setMessageText(e.target.value)} 
+          placeholder="Type your message…" 
+          disabled={isSending || !groupId} 
+          style={{ flexGrow: 1, marginRight: '5px' }}
+        />
+        <button 
+          type="submit" 
+          disabled={isSending || !groupId}
         >
-          <input 
-            type="text" 
-            value={messageText} 
-            onChange={(e) => setMessageText(e.target.value)} 
-            placeholder="Type your message…" 
-            disabled={isSending || !groupId} 
-            style={{ flexGrow: 1, marginRight: '5px' }}
-          />
-          <button type="submit" disabled={isSending || !groupId}>
-            {isSending ? 'Sending…' : 'Send'}
-          </button>
-        </form>
-      ) : (
-        <p className="info-message">Connect your Nostr key to send messages.</p>
-      )}
+          {isSending ? 'Sending…' : 'Send'}
+        </button>
+      </form>
     </div>
   );
 };
