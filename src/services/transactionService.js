@@ -402,6 +402,65 @@ const transactionService = {
       success: true,
       results
     };
+  },
+  
+  /**
+   * Generic reward processor (used by TypeScript services)
+   * @param {string} pubkey - User's destination lightning address
+   * @param {number} amount - Amount in sats
+   * @param {string} type - One of TRANSACTION_TYPES values
+   * @param {string} reason - Human-readable reason (e.g. "2-day streak reward")
+   * @param {Object} metadata - Extra fields recorded with the tx
+   */
+  processReward: async (pubkey, amount, type, reason, metadata = {}) => {
+    // Fallback routing so TS code works without duplicating logic
+    if (type === TRANSACTION_TYPES.STREAK_REWARD) {
+      return transactionService.processStreakReward(pubkey, amount, reason, metadata);
+    }
+    if (type === TRANSACTION_TYPES.LEADERBOARD_REWARD) {
+      return transactionService.processLeaderboardReward(pubkey, amount, reason, metadata);
+    }
+
+    // Generic implementation for any other reward types
+    try {
+      const tx = transactionService.recordTransaction({
+        type,
+        amount,
+        recipient: pubkey,
+        reason,
+        pubkey,
+        metadata
+      });
+
+      const result = await bitvoraService.sendBitcoin(pubkey, amount, reason, {
+        txid: tx.id,
+        type,
+        ...metadata
+      });
+
+      if (result.success) {
+        transactionService.updateTransaction(tx.id, {
+          status: TRANSACTION_STATUS.COMPLETED,
+          bitvora_txid: result.txid,
+          bitvora_status: result.status,
+          fee: result.fee
+        });
+        return {
+          success: true,
+          transaction: { ...tx, bitvora_txid: result.txid, status: TRANSACTION_STATUS.COMPLETED }
+        };
+      }
+
+      // Failed
+      transactionService.updateTransaction(tx.id, {
+        status: TRANSACTION_STATUS.FAILED,
+        error: result.error
+      });
+      return { success: false, error: result.error, transaction: tx };
+    } catch (err) {
+      console.error('processReward error:', err);
+      return { success: false, error: err.message || 'unknown error', transaction: null };
+    }
   }
 };
 

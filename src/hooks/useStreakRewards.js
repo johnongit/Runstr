@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   getStreakRewards, 
   getEligibleRewards, 
@@ -25,6 +25,7 @@ export const useStreakRewards = (currentStreak, pubkey) => {
     error: null
   });
   const [settings, setSettings] = useState(getRewardsSettings());
+  const prevEligibleRewardsRef = useRef([]);
   
   // Load rewards data on mount
   useEffect(() => {
@@ -65,6 +66,24 @@ export const useStreakRewards = (currentStreak, pubkey) => {
     const next = getNextMilestone(streak);
     setNextMilestone(next);
   }, [currentStreak, rewards]);
+  
+  // Auto-claim newly eligible rewards
+  useEffect(() => {
+    // Auto-claim for every newly eligible reward
+    const newlyEligible = eligibleRewards.filter(
+      reward => !prevEligibleRewardsRef.current.some(prev => prev.days === reward.days)
+    );
+
+    if (newlyEligible.length > 0 && pubkey) {
+      newlyEligible.forEach(async reward => {
+        try {
+          await handleClaimReward(reward.days);
+        } catch (e) {
+          console.error('Auto-claim failed:', e);
+        }
+      });
+    }
+  }, [eligibleRewards, handleClaimReward, pubkey]);
   
   /**
    * Claim a streak reward

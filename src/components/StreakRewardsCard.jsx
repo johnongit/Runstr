@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStreakRewards } from '../hooks/useStreakRewards';
 import { useNostr } from '../hooks/useNostr';
 import PropTypes from 'prop-types';
@@ -20,6 +20,24 @@ const StreakRewardsCard = ({ currentStreak, showTitle = true }) => {
   } = useStreakRewards(currentStreak, publicKey);
   
   const [showSuccess, setShowSuccess] = useState(false);
+  const prevEligibleRewardsRef = useRef([]);
+
+  useEffect(() => {
+    // Check for newly eligible rewards
+    if (eligibleRewards.length > prevEligibleRewardsRef.current.length) {
+      const newlyEligible = eligibleRewards.filter(
+        currentReward => !prevEligibleRewardsRef.current.some(prevReward => prevReward.days === currentReward.days)
+      );
+
+      if (newlyEligible.length > 0) {
+        newlyEligible.forEach(reward => {
+          // You can replace this with a more sophisticated toast notification
+          alert(`🎉 You've unlocked a new reward: ${reward.days}-Day Streak for ${reward.sats} sats! Claim it now!`);
+        });
+      }
+    }
+    prevEligibleRewardsRef.current = eligibleRewards;
+  }, [eligibleRewards]);
   
   // Handle claim button click
   const handleClaim = async (days) => {

@@ -7,17 +7,18 @@ import axios from 'axios';
 
 // API configuration
 const BITVORA_API_URL = 'https://api.bitvora.com/v1';
-const BITVORA_API_KEY = '48|31651aad-632f-4162-8eb9-d6146587d497';
+// Use environment variable for the Access Token
+const BITVORA_ACCESS_TOKEN = import.meta.env.VITE_BITVORA_ACCESS_TOKEN;
 const NETWORK_TYPE = 'mainnet'; // or 'testnet', 'signet'
 
-// DEMO_MODE: Set to false to use the real API with the correct key format
+// DEMO_MODE: Set to false to use the real API
 const DEMO_MODE = false; // API connection confirmed working with full key format
 
 // Create axios instance with auth headers
 const bitvoraApi = axios.create({
   baseURL: BITVORA_API_URL,
   headers: {
-    'Authorization': `Bearer ${BITVORA_API_KEY}`,
+    'Authorization': `Bearer ${BITVORA_ACCESS_TOKEN}`,
     'Content-Type': 'application/json'
   }
 });
