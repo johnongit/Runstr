@@ -5,6 +5,24 @@ import { registerPlugin } from '@capacitor/core';
 
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
+// Optional battery-optimisation plugin is loaded at runtime so tests / web build won't fail if it's absent
+const ensureBatteryWhitelist = async () => {
+  try {
+    const platform = navigator.userAgent.toLowerCase().includes('android') ? 'android' : 'other';
+    if (platform !== 'android') return;
+    const { BatteryOptimization } = await import('@capawesome-team/capacitor-android-battery-optimization');
+    if (!BatteryOptimization?.isIgnoringBatteryOptimizations) return;
+
+    const status = await BatteryOptimization.isIgnoringBatteryOptimizations();
+    if (!status?.value) {
+      await BatteryOptimization.requestIgnoreBatteryOptimizations();
+    }
+  } catch (err) {
+    // Gracefully ignore if plugin not available (e.g. web / test env)
+    console.warn('Battery optimisation plugin not available or failed', err?.message || err);
+  }
+};
+
 export const PermissionDialog = ({ onContinue, onCancel }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -49,6 +67,9 @@ export const PermissionDialog = ({ onContinue, onCancel }) => {
       } catch (locationError) {
         console.warn('Error requesting location permissions:', locationError);
       }
+      
+      // Ask user to whitelist the app from battery optimisations (GrapheneOS & Android)
+      await ensureBatteryWhitelist();
       
       // Mark dialog as completed regardless of results
       localStorage.setItem('permissionsGranted', 'true');

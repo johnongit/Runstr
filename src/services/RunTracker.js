@@ -220,13 +220,12 @@ class RunTracker extends EventEmitter {
         {
           backgroundMessage: 'Tracking your run...',
           backgroundTitle: 'Runstr',
-          // Never request permissions here - we've already done it in the permission dialog
+          foregroundService: true,
+          foregroundServiceType: 'location',
           requestPermissions: false, 
           distanceFilter: 10,
-          // Add high accuracy mode for better GPS precision
           highAccuracy: true,
-          // Increase stale location threshold to get fresher GPS data
-          staleLocationThreshold: 30000 // 30 seconds
+          staleLocationThreshold: 30000
         },
         (location, error) => {
           if (error) {
@@ -285,6 +284,14 @@ class RunTracker extends EventEmitter {
       loss: 0,
       lastAltitude: null
     };
+
+    // Hold a partial CPU wake-lock so the OS doesn't suspend GPS callbacks (released in stop())
+    try {
+      const { KeepAwake } = await import('@capacitor-community/keep-awake');
+      await KeepAwake.keepAwake();
+    } catch (err) {
+      console.warn('KeepAwake plugin not available', err?.message || err);
+    }
 
     this.startTracking();
     this.startTimer(); // Start the timer
@@ -368,6 +375,14 @@ class RunTracker extends EventEmitter {
     this.stopTracking();
     this.stopTimer();
     this.stopPaceCalculator();
+    
+    // Release CPU wake-lock
+    try {
+      const { KeepAwake } = await import('@capacitor-community/keep-awake');
+      await KeepAwake.allowSleep();
+    } catch (err) {
+      console.warn('KeepAwake allowSleep failed / plugin missing', err?.message || err);
+    }
     
     // Emit status change and completed event
     this.emit('statusChange', { isTracking: false, isPaused: false });

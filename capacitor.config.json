@@ -10,7 +10,8 @@
       "distanceFilter": 30,
       "debug": true,
       "stopOnTerminate": false,
-      "startForeground": true
+      "startForeground": true,
+      "foregroundServiceType": "location"
     }
   },
   "android": {
