@@ -41,6 +41,10 @@ export const TeamDetail = () => {
   const [admins, setAdmins] = useState([]);
   const { fetchProfiles } = useProfileCache();
   const [profiles, setProfiles] = useState(new Map());
+  // Silence unused variable warnings while Members feature is disabled
+  // eslint-disable-next-line no-unused-vars
+  const _unusedStateDeps = [members, admins, profiles];
+  void _unusedStateDeps;
 
   // Define loadGroupMembers *before* the useEffect that uses it as a dependency
   const loadGroupMembers = useCallback(async (currentGroupId, ndkInstance, currentRelayHints) => {
@@ -238,7 +242,7 @@ export const TeamDetail = () => {
 
       <div className="team-tabs">
         <button className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>Chat</button>
-        <button className={`tab-button ${activeTab === 'members' ? 'active' : ''}`} onClick={() => setActiveTab('members')}>Members</button>
+        {/* Members tab hidden until feature is ready */}
         <button className={`tab-button ${activeTab === 'pinned' ? 'active' : ''}`} onClick={() => setActiveTab('pinned')}>Pinned</button>
       </div>
 
@@ -248,26 +252,7 @@ export const TeamDetail = () => {
             <ChatRoom groupId={groupId} naddrString={naddrStringFromUrl} publicKey={publicKey} relayHints={relayHintsRef.current} /> :
             <p className="info-message">Group identifier not available for chat.</p>
         )}
-        {activeTab === 'members' && (
-          <div className="members-list space-y-3">
-             <h3 className="text-lg font-semibold text-white mb-3">Members ({members.length})</h3>
-             {isLoadingData && members.length === 0 && <p className="text-gray-500">Loading members...</p>}
-             {!isLoadingData && members.length === 0 && <p className="text-gray-500">No members found.</p>}
-             {members.map(mPubkey => {
-                 const profile = profiles.get(mPubkey);
-                 const isAdmin = admins.includes(mPubkey);
-                 return (
-                    <div key={mPubkey} className="member-item flex items-center space-x-3 p-2 bg-gray-800 rounded">
-                        <img src={profile?.picture || '/default-avatar.png'} alt={profile?.name || 'Member'} className="w-10 h-10 rounded-full object-cover bg-gray-600" />
-                        <div className="flex-1">
-                            <p className="text-white font-medium">{profile?.name || mPubkey.substring(0, 12) + '...'}</p>
-                            {isAdmin && <span className="text-xs text-yellow-400 bg-yellow-900/50 px-1.5 py-0.5 rounded">Admin</span>}
-                        </div>
-                    </div>
-                 );
-             })}
-          </div>
-        )}
+        {/* Members content hidden until feature is ready */}
         {activeTab === 'pinned' && (
           <div className="pinned-messages-list">
              <h3>Pinned Messages</h3>

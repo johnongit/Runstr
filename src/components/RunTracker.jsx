@@ -9,7 +9,6 @@ import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
 import SplitsTable from './SplitsTable';
 import DashboardRunCard from './DashboardRunCard';
 import AchievementCard from './AchievementCard';
-import EventBanner from './EventBanner';
 import { validateEventRun, initializeEvents } from '../services/EventService';
 
 export const RunTracker = () => {
@@ -361,11 +360,6 @@ ${additionalContent ? `\n${additionalContent}` : ''}
 
   return (
     <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">
-      {/* Event Banner - No longer sticky */}
-      <div>
-        <EventBanner />
-      </div>
-      
       {/* Title Banner */}
       <div className="bg-gradient-to-r from-indigo-800 to-purple-800 p-4 mb-6 text-center">
         <h2 className="text-2xl font-bold text-white">{getActivityText('header')}</h2>
