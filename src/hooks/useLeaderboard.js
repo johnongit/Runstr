@@ -17,6 +17,9 @@ import bitcoinRewardsService from '../services/bitcoinRewardsService';
  * @returns {Object} Leaderboard state and functions
  */
 export const useLeaderboard = (publicKey, profiles, runHistory, stats) => {
+  // Ensure profiles is a Map to avoid null errors in WebView
+  const profileMap = profiles instanceof Map ? profiles : new Map();
+
   const [participating, setParticipating] = useState(getLeaderboardParticipation());
   const [distanceLeaderboard, setDistanceLeaderboard] = useState([]);
   const [streakLeaderboard, setStreakLeaderboard] = useState([]);
@@ -51,7 +54,7 @@ export const useLeaderboard = (publicKey, profiles, runHistory, stats) => {
   const generateUserData = useCallback(() => {
     if (!publicKey || !participating) return null;
     
-    const userProfile = profiles.get(publicKey) || {};
+    const userProfile = profileMap.get(publicKey) || {};
     const userName = userProfile.name || userProfile.display_name || 'You';
     const userPicture = userProfile.picture || '';
     
@@ -64,7 +67,7 @@ export const useLeaderboard = (publicKey, profiles, runHistory, stats) => {
       stats: stats,
       streak: stats?.currentStreak || 0
     };
-  }, [publicKey, profiles, runHistory, stats, participating]);
+  }, [publicKey, profileMap, runHistory, stats, participating]);
   
   // Update leaderboards
   useEffect(() => {
