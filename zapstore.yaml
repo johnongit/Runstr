@@ -17,5 +17,5 @@ runstr:
       - wavlake
       - bitcoin
     icons:
-      - url: https://github.com/HealthNoteLabs/Runstr/blob/updates1-release-prep/runstr-logo.png
+      - file: runstr_logo.png
         type: image/png 

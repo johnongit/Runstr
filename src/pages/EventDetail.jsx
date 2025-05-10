@@ -6,9 +6,8 @@ import {
   isUserRegisteredForEvent, 
   registerForEvent
 } from '../services/EventService';
-import EventLeaderboard from '../components/EventLeaderboard';
 
-const EventDetail = ({ profiles = new Map(), userPublicKey = null }) => {
+const EventDetail = ({ userPublicKey = null }) => {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const [event, setEvent] = useState(null);
@@ -124,16 +123,6 @@ const EventDetail = ({ profiles = new Map(), userPublicKey = null }) => {
           </button>
           <button
             className={`py-2 px-4 font-medium text-sm ${
-              activeTab === 'leaderboard'
-                ? 'border-b-2 border-indigo-500 text-indigo-300'
-                : 'text-gray-400 hover:text-gray-300'
-            }`}
-            onClick={() => setActiveTab('leaderboard')}
-          >
-            Leaderboard
-          </button>
-          <button
-            className={`py-2 px-4 font-medium text-sm ${
               activeTab === 'rules'
                 ? 'border-b-2 border-indigo-500 text-indigo-300'
                 : 'text-gray-400 hover:text-gray-300'
@@ -201,18 +190,6 @@ const EventDetail = ({ profiles = new Map(), userPublicKey = null }) => {
                   <p>Complete a 5K run (3.1 miles) during the event period to compete for prizes. Your time will be automatically recorded and displayed on the leaderboard.</p>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-        
-        {activeTab === 'leaderboard' && (
-          <div className="event-leaderboard mb-6">
-            <h2 className="text-lg font-semibold mb-2 text-indigo-300">Event Leaderboard</h2>
-            <p className="text-sm text-gray-400 mb-4">
-              The fastest runners will be displayed here. Complete a 5K run during the event to appear on the leaderboard.
-            </p>
-            <div className="bg-gray-800 border border-gray-700 rounded-md overflow-hidden">
-              <EventLeaderboard eventId={eventId} userProfiles={profiles} />
             </div>
           </div>
         )}
@@ -315,12 +292,10 @@ const EventDetail = ({ profiles = new Map(), userPublicKey = null }) => {
 };
 
 EventDetail.propTypes = {
-  profiles: PropTypes.instanceOf(Map),
   userPublicKey: PropTypes.string
 };
 
 EventDetail.defaultProps = {
-  profiles: new Map(),
   userPublicKey: null
 };
 

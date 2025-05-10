@@ -493,21 +493,6 @@ ${additionalContent ? `\n${additionalContent}` : ''}
               recentRun?.streak || localStorage.getItem('currentStreak') ? 
                 parseInt(localStorage.getItem('currentStreak')) : 0
             } 
-            runHistory={
-              // Pass run history for leaderboard calculation
-              (() => {
-                try {
-                  return JSON.parse(localStorage.getItem('runHistory') || '[]');
-                } catch (error) {
-                  console.error('Error parsing run history:', error);
-                  return [];
-                }
-              })()
-            }
-            stats={
-              // Get stats from the most recent run or empty object
-              recentRun?.stats || {}
-            }
           />
         </div>
       )}

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { useStreakRewards } from '../hooks/useStreakRewards';
-import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useNostr } from '../hooks/useNostr';
 import AchievementModal from './AchievementModal';
 import '../assets/styles/achievements.css';
@@ -10,17 +9,14 @@ import '../assets/styles/achievements.css';
  * Card displaying user achievements and rewards
  * Shown on the dashboard below the run tracker
  */
-const AchievementCard = ({ currentStreak, runHistory, stats }) => {
+const AchievementCard = ({ currentStreak }) => {
   // Handle case where NostrContext might not be fully initialized yet
   const nostrContext = useNostr();
   const publicKey = nostrContext?.publicKey || null;
   
   const { nextMilestone } = useStreakRewards(currentStreak, publicKey);
-  const { distanceLeaderboard } = useLeaderboard(publicKey, null, runHistory, stats);
   const [modalOpen, setModalOpen] = useState(false);
   
-  // Find user position in leaderboard
-  const userPosition = distanceLeaderboard.findIndex(entry => entry.isCurrentUser) + 1;
   const progressPercentage = nextMilestone ? Math.min(100, (currentStreak / nextMilestone.days) * 100) : 0;
   
   return (
@@ -46,19 +42,6 @@ const AchievementCard = ({ currentStreak, runHistory, stats }) => {
             <div className="item-details">
               <span className="item-label">Current Streak</span>
               <span className="item-value">{currentStreak} {currentStreak === 1 ? 'day' : 'days'}</span>
-            </div>
-          </div>
-          
-          {/* Leaderboard Position */}
-          <div className="achievement-item">
-            <div className="icon-container">
-              <span className="icon">⭐</span>
-            </div>
-            <div className="item-details">
-              <span className="item-label">Leaderboard</span>
-              <span className="item-value">
-                #{userPosition > 0 ? userPosition : '--'}
-              </span>
             </div>
           </div>
           
@@ -89,8 +72,6 @@ const AchievementCard = ({ currentStreak, runHistory, stats }) => {
         <AchievementModal 
           onClose={() => setModalOpen(false)}
           currentStreak={currentStreak}
-          runHistory={runHistory}
-          stats={stats}
         />
       )}
     </div>
@@ -98,9 +79,7 @@ const AchievementCard = ({ currentStreak, runHistory, stats }) => {
 };
 
 AchievementCard.propTypes = {
-  currentStreak: PropTypes.number.isRequired,
-  runHistory: PropTypes.array.isRequired,
-  stats: PropTypes.object.isRequired
+  currentStreak: PropTypes.number.isRequired
 };
 
 export default AchievementCard; 

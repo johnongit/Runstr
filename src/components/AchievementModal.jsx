@@ -1,21 +1,19 @@
 import { useState } from 'react';
+import PropTypes from 'prop-types';
 import StreakRewardsCard from './StreakRewardsCard';
-import LeaderboardTabs from './LeaderboardTabs';
 import BitcoinTransactionHistory from './BitcoinTransactionHistory';
 
 /**
  * Modal displaying detailed achievements, rewards, and transactions
  * Opens when the AchievementCard is clicked
  */
-const AchievementModal = ({ onClose, currentStreak, runHistory, stats }) => {
+const AchievementModal = ({ onClose, currentStreak }) => {
   const [activeTab, setActiveTab] = useState('streaks');
   
   const renderTabContent = () => {
     switch (activeTab) {
       case 'streaks':
         return <StreakRewardsCard currentStreak={currentStreak} showTitle={false} />;
-      case 'leaderboards':
-        return <LeaderboardTabs runHistory={runHistory} stats={stats} />;
       case 'transactions':
         return <BitcoinTransactionHistory />;
       default:
@@ -39,12 +37,6 @@ const AchievementModal = ({ onClose, currentStreak, runHistory, stats }) => {
             STREAKS
           </button>
           <button 
-            className={`tab-button ${activeTab === 'leaderboards' ? 'active' : ''}`}
-            onClick={() => setActiveTab('leaderboards')}
-          >
-            LEADERBOARDS
-          </button>
-          <button 
             className={`tab-button ${activeTab === 'transactions' ? 'active' : ''}`}
             onClick={() => setActiveTab('transactions')}
           >
@@ -60,4 +52,9 @@ const AchievementModal = ({ onClose, currentStreak, runHistory, stats }) => {
   );
 };
 
-export default AchievementModal; 
+export default AchievementModal;
+
+AchievementModal.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  currentStreak: PropTypes.number.isRequired
+}; 
