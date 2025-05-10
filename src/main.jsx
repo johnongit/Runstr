@@ -4,6 +4,32 @@ import './index.css';
 import './utils/nostrPolyfills.js'; // Shim SimplePool.list for nostr-tools v2
 import App from './App.jsx';
 
+/* -----------------------------------------------------------
+  Temporary debug overlay to surface runtime errors on device
+  Remove this block once blank-screen issue is fixed
+------------------------------------------------------------*/
+if (typeof window !== 'undefined') {
+  const showError = (msg) => {
+    const el = document.createElement('pre');
+    el.style.cssText =
+      'position:fixed;top:0;left:0;right:0;max-height:45%;overflow:auto;' +
+      'background:#300;color:#f88;padding:8px 12px;z-index:99999;' +
+      'font-size:12px;font-family:monospace;white-space:pre-wrap;';
+    el.textContent = msg;
+    document.body.appendChild(el);
+  };
+
+  window.addEventListener('error', (e) => {
+    showError('[error] ' + e.message + '\n' + (e.error?.stack || ''));
+  });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    const reason = e.reason;
+    showError('[promise] ' + (reason?.message || reason) + '\n' + (reason?.stack || ''));
+  });
+}
+/* ---------------------------------------------------------*/
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
