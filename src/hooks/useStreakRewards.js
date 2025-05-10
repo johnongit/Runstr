@@ -27,64 +27,6 @@ export const useStreakRewards = (currentStreak, pubkey) => {
   const [settings, setSettings] = useState(getRewardsSettings());
   const prevEligibleRewardsRef = useRef([]);
   
-  // Load rewards data on mount
-  useEffect(() => {
-    const rewardsData = getStreakRewards();
-    setRewards(rewardsData);
-  }, []);
-  
-  // Update eligible rewards and next milestone when streak changes
-  useEffect(() => {
-    // Load current streak from stats if not provided
-    let streak = currentStreak;
-    
-    if (streak === undefined) {
-      try {
-        const storedStats = localStorage.getItem('runStats');
-        if (storedStats) {
-          const stats = JSON.parse(storedStats);
-          streak = stats.currentStreak || 0;
-        }
-      } catch (err) {
-        console.error('Error loading streak from stats:', err);
-        streak = 0;
-      }
-    }
-    
-    // Check if we need to reset rewards (if streak was broken)
-    const storedStreak = Number(localStorage.getItem('lastStreakCheck') || '0');
-    if (storedStreak !== streak) {
-      checkAndResetRewards(storedStreak, streak);
-      localStorage.setItem('lastStreakCheck', streak.toString());
-    }
-    
-    // Get eligible unclaimed rewards
-    const eligible = getEligibleRewards(streak);
-    setEligibleRewards(eligible);
-    
-    // Get next milestone
-    const next = getNextMilestone(streak);
-    setNextMilestone(next);
-  }, [currentStreak, rewards]);
-  
-  // Auto-claim newly eligible rewards
-  useEffect(() => {
-    // Auto-claim for every newly eligible reward
-    const newlyEligible = eligibleRewards.filter(
-      reward => !prevEligibleRewardsRef.current.some(prev => prev.days === reward.days)
-    );
-
-    if (newlyEligible.length > 0 && pubkey) {
-      newlyEligible.forEach(async reward => {
-        try {
-          await handleClaimReward(reward.days);
-        } catch (e) {
-          console.error('Auto-claim failed:', e);
-        }
-      });
-    }
-  }, [eligibleRewards, handleClaimReward, pubkey]);
-  
   /**
    * Claim a streak reward
    * @param {number} days - The streak milestone (days)
@@ -163,6 +105,64 @@ export const useStreakRewards = (currentStreak, pubkey) => {
       return { success: false, error: error.message };
     }
   }, [pubkey, rewards, currentStreak]);
+  
+  // Load rewards data on mount
+  useEffect(() => {
+    const rewardsData = getStreakRewards();
+    setRewards(rewardsData);
+  }, []);
+  
+  // Update eligible rewards and next milestone when streak changes
+  useEffect(() => {
+    // Load current streak from stats if not provided
+    let streak = currentStreak;
+    
+    if (streak === undefined) {
+      try {
+        const storedStats = localStorage.getItem('runStats');
+        if (storedStats) {
+          const stats = JSON.parse(storedStats);
+          streak = stats.currentStreak || 0;
+        }
+      } catch (err) {
+        console.error('Error loading streak from stats:', err);
+        streak = 0;
+      }
+    }
+    
+    // Check if we need to reset rewards (if streak was broken)
+    const storedStreak = Number(localStorage.getItem('lastStreakCheck') || '0');
+    if (storedStreak !== streak) {
+      checkAndResetRewards(storedStreak, streak);
+      localStorage.setItem('lastStreakCheck', streak.toString());
+    }
+    
+    // Get eligible unclaimed rewards
+    const eligible = getEligibleRewards(streak);
+    setEligibleRewards(eligible);
+    
+    // Get next milestone
+    const next = getNextMilestone(streak);
+    setNextMilestone(next);
+  }, [currentStreak, rewards]);
+  
+  // Auto-claim newly eligible rewards
+  useEffect(() => {
+    // Auto-claim for every newly eligible reward
+    const newlyEligible = eligibleRewards.filter(
+      reward => !prevEligibleRewardsRef.current.some(prev => prev.days === reward.days)
+    );
+
+    if (newlyEligible.length > 0 && pubkey) {
+      newlyEligible.forEach(async reward => {
+        try {
+          await handleClaimReward(reward.days);
+        } catch (e) {
+          console.error('Auto-claim failed:', e);
+        }
+      });
+    }
+  }, [eligibleRewards, handleClaimReward, pubkey]);
   
   /**
    * Update reward settings
