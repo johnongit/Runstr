@@ -1,6 +1,7 @@
 import { SimplePool } from 'nostr-tools';
 import { Buffer as BufferPolyfill } from 'buffer';
 import 'fast-text-encoding';
+import { Crypto as WebCrypto } from '@peculiar/webcrypto';
 
 // ----- Additional polyfills for Android WebView -----
 // Some libraries expect globals that WebView may not have (Buffer, TextEncoder/Decoder)
@@ -14,6 +15,14 @@ if (typeof window !== 'undefined') {
     // text-encoding-polyfill adds these globally
     // eslint-disable-next-line no-console
     console.info('[nostr-polyfill] TextEncoder/TextDecoder shim applied');
+  }
+  if (!window.crypto) {
+    window.crypto = {};
+  }
+  if (!window.crypto.subtle) {
+    window.crypto.subtle = new WebCrypto().subtle;
+    // eslint-disable-next-line no-console
+    console.info('[nostr-polyfill] WebCrypto.subtle shim applied');
   }
 }
 
