@@ -507,23 +507,7 @@ const GroupDiscoveryScreen = () => {
             {renderTags(tags)}
             
             <div className="border-t border-gray-700 pt-3 mt-1">
-              <button 
-                onClick={(e) => handleJoinGroup(group.naddr, e)}
-                className={`px-4 py-2 rounded-md float-right 
-                  ${hasJoined 
-                    ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50' 
-                    : 'bg-gray-700 text-blue-400 hover:bg-gray-600'}`}
-                disabled={isJoining}
-              >
-                {isJoining ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-                    <span>{currentAction}</span>
-                  </div>
-                ) : (
-                  hasJoined ? 'Joined ✓' : 'Join Group'
-                )}
-              </button>
+              {/* Join Group button removed */}
             </div>
           </div>
         );

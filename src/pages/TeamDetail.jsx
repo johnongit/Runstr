@@ -7,6 +7,8 @@ import {
   isMember, 
   joinGroup, 
   removeMember,
+  fetchGroupMetadataByNaddr,
+  isGroupAdmin,
 } from '../utils/ndkGroups.js';
 import { ensureRelays } from '../utils/relays.js';
 import { useProfileCache } from '../hooks/useProfileCache.js';
@@ -31,7 +33,6 @@ export const TeamDetail = () => {
   // Keep state needed for groupId, relayHints, tabs, members, etc.
   const [groupId, setGroupId] = useState(null);
   const relayHintsRef = useRef([]);
-  const [pinnedMessages, setPinnedMessages] = useState([]);
   const [isLoadingData, setIsLoadingData] = useState(true); 
   const [isMemberState, setIsMemberState] = useState(false);
   const [error, setError] = useState(null);
@@ -40,16 +41,15 @@ export const TeamDetail = () => {
   const [members, setMembers] = useState([]);
   const [admins, setAdmins] = useState([]);
   const { fetchProfiles } = useProfileCache();
-  const [profiles, setProfiles] = useState(new Map());
   // Silence unused variable warnings while Members feature is disabled
   // eslint-disable-next-line no-unused-vars
-  const _unusedStateDeps = [members, admins, profiles];
+  const _unusedStateDeps = [members, admins];
   void _unusedStateDeps;
 
   // Define loadGroupMembers *before* the useEffect that uses it as a dependency
   const loadGroupMembers = useCallback(async (currentGroupId, ndkInstance, currentRelayHints) => {
     if (!currentGroupId) return;
-    if (!ndkInstance) { setError("Failed to load members: NDK unavailable."); return; }
+    if (!ndkInstance) return; // Simply return if NDK is unavailable, don't set error
     // console.log(`Fetching members for group ${currentGroupId} with hints ${JSON.stringify(currentRelayHints)}`);
     
     ensureRelays(currentRelayHints);
@@ -100,11 +100,11 @@ export const TeamDetail = () => {
     if (currentMembersArray.length > 0) {
         const fetchedMap = await fetchProfiles([...new Set(currentMembersArray)]);
         if (fetchedMap instanceof Map) {
-            setProfiles(prev => {
-               const newMap = new Map(prev);
-               fetchedMap.forEach((val, key) => newMap.set(key, val));
-               return newMap;
-            });
+            // setProfiles(prev => {
+               // const newMap = new Map(prev);
+               // fetchedMap.forEach((val, key) => newMap.set(key, val));
+               // return newMap;
+            // });
         }
     }
 
@@ -124,8 +124,7 @@ export const TeamDetail = () => {
       // console.log("TeamDetail EarlyParse: Successfully parsed. rawGroupId:", parsedInfo.rawGroupId, "RelayHints:", parsedInfo.relays);
       setGroupId(parsedInfo.rawGroupId);
       relayHintsRef.current = parsedInfo.relays || [];
-      setError(null); 
-      loadPinnedMessages(decodedNaddr); 
+      setError(null);
     } else {
       console.error("TeamDetail EarlyParse: Failed to parse naddr or get rawGroupId", parsedInfo);
       setError("Failed to understand group address.");
@@ -176,33 +175,6 @@ export const TeamDetail = () => {
     executeLoad();
   }, [groupId, naddrStringFromUrl, publicKey, ndkInitError, ndkReady, relayCount, loadGroupMembers, ndk]); // Added ndk back as loadGroupMembers depends on it
   
-  const loadPinnedMessages = (naddrToPinBy) => {
-    const key = `pinnedMessages_${naddrToPinBy}`;
-    const pinnedJson = localStorage.getItem(key);
-    const pinned = pinnedJson ? JSON.parse(pinnedJson) : [];
-    setPinnedMessages(pinned);
-  };
-
-  const handleJoinGroup = async () => {
-    if (!publicKey || !groupId) { setError(publicKey ? "Group ID not loaded." : "Login required to join."); return; }
-    setIsProcessingMembership(true); setError(null);
-    try {
-      const event = await joinGroup(groupId);
-      if (event) { setIsMemberState(true); } else { throw new Error("Failed to publish joinGroup event."); }
-    } catch(err) { console.error("Error joining group:", err); setError(`Failed to join: ${err.message}`); }
-    finally { setIsProcessingMembership(false); }
-  };
-
-  const handleLeaveGroup = async () => {
-    if (!publicKey || !groupId) { setError(publicKey ? "Group ID not loaded." : "Login required to leave."); return; }
-    setIsProcessingMembership(true); setError(null);
-    try {
-      const event = await removeMember(groupId, publicKey);
-      if (event) { setIsMemberState(false); } else { throw new Error("Failed to publish removeMember event."); }
-    } catch(err) { console.error("Error leaving group:", err); setError(`Failed to leave: ${err.message}`); }
-    finally { setIsProcessingMembership(false); }
-  };
-
   if (ndkInitError) {
     return <div className="container error-message">Error initializing Nostr: {ndkInitError}</div>;
   }
@@ -233,17 +205,12 @@ export const TeamDetail = () => {
         {/* <p>{groupAbout}</p> */} 
         {/* Keep loading indicator if member loading takes time? */}
         {/* {isLoadingData && <div className="info-message">Loading group members...</div>} */}
-        {publicKey && (
-             <button onClick={isMemberState ? handleLeaveGroup : handleJoinGroup} disabled={isProcessingMembership} className={`membership-button ${isMemberState ? 'leave' : 'join'}`}>
-                {isProcessingMembership ? 'Processing...' : (isMemberState ? 'Leave Group' : 'Join Group')}
-            </button>
-        )}
+        {/* Loading message removed as per requirement */}
       </div>
 
       <div className="team-tabs">
-        <button className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>Chat</button>
-        {/* Members tab hidden until feature is ready */}
-        <button className={`tab-button ${activeTab === 'pinned' ? 'active' : ''}`} onClick={() => setActiveTab('pinned')}>Pinned</button>
+        <button className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>Group Chat</button>
+        {/* Pinned tab removed */}
       </div>
 
       <div className="tab-content">
@@ -252,19 +219,7 @@ export const TeamDetail = () => {
             <ChatRoom groupId={groupId} naddrString={naddrStringFromUrl} publicKey={publicKey} relayHints={relayHintsRef.current} /> :
             <p className="info-message">Group identifier not available for chat.</p>
         )}
-        {/* Members content hidden until feature is ready */}
-        {activeTab === 'pinned' && (
-          <div className="pinned-messages-list">
-             <h3>Pinned Messages</h3>
-             {pinnedMessages.length === 0 && <p>No messages pinned yet.</p>}
-             {pinnedMessages.map(msg => (
-                <div key={msg.id} className="message-item pinned">
-                  <p><strong>{msg.pubkey.substring(0, 8)}...:</strong> {msg.content}</p>
-                  <span className="timestamp">{new Date(msg.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-              ))}
-          </div>
-        )}
+        {/* Pinned tab content removed */}
       </div>
     </div>
   );

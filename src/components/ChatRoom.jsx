@@ -26,7 +26,6 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
 
   const [messages, setMessages] = useState([]);
   const [messageAuthorProfiles, setMessageAuthorProfiles] = useState(new Map());
-  const [pinnedMessages, setPinnedMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isLoadingChat, setIsLoadingChat] = useState(true);
@@ -216,37 +215,8 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
   }, [messages, fetchProfiles]); 
 
   useEffect(() => {
-    if (naddrString) loadPinnedMessages();
-  }, [naddrString]);
-
-  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const storageKey = naddrString ? `pinnedMessages_${naddrString}` : null;
-  const loadPinnedMessages = () => {
-    if (!storageKey) return;
-    const json = localStorage.getItem(storageKey);
-    setPinnedMessages(json ? JSON.parse(json) : []);
-  };
-  const pinMessage = (evt) => {
-    if (!storageKey) return;
-    const raw = evt instanceof NDKEvent ? evt.rawEvent() : evt;
-    if (pinnedMessages.some((p) => p.id === raw.id)) return;
-    const updated = [...pinnedMessages, raw];
-    setPinnedMessages(updated);
-    localStorage.setItem(storageKey, JSON.stringify(updated));
-  };
-  const unpinMessage = (id) => {
-    if (!storageKey) return;
-    const updated = pinnedMessages.filter((p) => p.id !== id);
-    setPinnedMessages(updated);
-    localStorage.setItem(storageKey, JSON.stringify(updated));
-  };
-  const togglePinMessage = (raw) => {
-    if (pinnedMessages.some((p) => p.id === raw.id)) unpinMessage(raw.id);
-    else pinMessage(raw);
-  };
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -353,12 +323,20 @@ export const ChatRoom = ({ groupId, naddrString, publicKey, relayHints: passedRe
                 />
               )}
               <div className="message-main-area">
-                <p><strong>{displayName}:</strong> {raw.content}</p>
+                <p style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                  <strong>{displayName}:</strong>{' '}
+                  {raw.content.split(/(\s+)/).map((part, index) => {
+                    if (part.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
+                      return <img key={index} src={part} alt="Chat image" style={{ maxWidth: '100%', maxHeight: '200px', display: 'block', marginTop: '5px' }} loading="lazy" />;
+                    }
+                    if (part.match(/^https?:\/\/[^\s]+/)) {
+                      return <a key={index} href={part} target="_blank" rel="noopener noreferrer">{part}</a>;
+                    }
+                    return part; 
+                  })}
+                </p>
                 <span className="timestamp">{formatTs(raw.created_at)}</span>
               </div>
-              <button className="pin-button" onClick={() => togglePinMessage(raw)}>
-                {pinnedMessages.some((p) => p.id === raw.id) ? 'Unpin' : 'Pin'}
-              </button>
             </div>
           );
         })}
