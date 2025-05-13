@@ -2,6 +2,7 @@ import { formatPostContent } from '../utils/postFormatters';
 import PropTypes from 'prop-types';
 import { useState, useCallback, memo } from 'react';
 import { Heart, MessageSquare, Repeat, Zap } from "lucide-react";
+import { getAvatarUrl } from '../utils/imageHelpers';
 
 /**
  * Comment component - memoized to prevent unnecessary re-renders
@@ -10,11 +11,11 @@ const Comment = memo(({ comment, handleAvatarError }) => {
   return (
     <div className="comment-item">
       <img
-        src={comment.author.profile.picture || '/default-avatar.svg'}
+        src={getAvatarUrl(comment.author.profile.picture, 32) || '/default-avatar.svg'}
         alt={comment.author.profile.name}
         className="comment-avatar"
+        onLoad={(e) => e.target.classList.add('avatar-loaded')}
         onError={handleAvatarError}
-        loading="lazy"
         width="32"
         height="32"
       />
@@ -66,9 +67,16 @@ export const Post = ({
   // Track if comments are loading
   const [commentsLoading, setCommentsLoading] = useState(false);
 
+  // Handle avatar load to fade in
+  const handleAvatarLoad = (event) => {
+    event.target.classList.add('avatar-loaded');
+  };
+
   // Android optimization: handle avatar error
   const handleAvatarError = (event) => {
-    event.target.src = '/default-avatar.svg';
+    // Hide broken avatars by keeping them transparent
+    event.target.classList.remove('avatar-loaded');
+    event.target.style.opacity = 0;
   };
 
   // Handle image load to ensure smooth transitions
@@ -154,11 +162,11 @@ export const Post = ({
     <div className="post-card" data-post-id={post.id}>
       <div className="post-header">
         <img
-          src={post.author.profile.picture || '/default-avatar.svg'}
+          src={getAvatarUrl(post.author.profile.picture, 48) || '/default-avatar.svg'}
           alt={post.author.profile.name || 'Anonymous'}
           className="author-avatar"
+          onLoad={handleAvatarLoad}
           onError={handleAvatarError}
-          loading="lazy"
           width="48"
           height="48"
         />
@@ -231,7 +239,7 @@ export const Post = ({
           onClick={() => handleZap(post, wallet)}
         >
           <Zap className="h-5 w-5 mr-1" />
-          <span className="action-text">Kudos</span>
+          <span className="action-text">Zap</span>
           {post.zaps > 0 && <span className="action-count">{post.zaps}</span>}
         </button>
         <button

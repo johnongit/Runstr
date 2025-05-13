@@ -6060,3 +6060,17 @@ input:checked + .toggle-slider:before {
   color: #60a5fa;
   text-decoration: underline;
 }
+
+/* Avatar placeholder & fade-in */
+.author-avatar,
+.comment-avatar {
+  background-color: #000;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.2s ease-in;
+}
+
+.author-avatar.avatar-loaded,
+.comment-avatar.avatar-loaded {
+  opacity: 1;
+}
