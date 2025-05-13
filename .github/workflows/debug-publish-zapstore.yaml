@@ -121,7 +121,7 @@ jobs:
           VERSION=${{ github.event.inputs.version_to_publish }} # Use input version
           # Define filenames and paths (rest is same as main workflow)
           ROOT_ZAPSTORE_YAML="$GITHUB_WORKSPACE/zapstore.yaml"
-          ROOT_LOGO_PNG="$GITHUB_WORKSPACE/runstr-logo.png"
+          ROOT_LOGO_PNG="$GITHUB_WORKSPACE/runstr_logo.png"
           RELEASE_DIR="./release" # Use variable for clarity
           ICON_FILENAME="runstr_logo.png" # Consistent icon filename in release dir
           NOTES_FILENAME="release_notes.md"

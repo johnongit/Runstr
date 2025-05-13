@@ -520,7 +520,7 @@ jobs:
           VERSION=${{ needs.release_and_build.outputs.build_version }}
           # Define filenames and paths
           ROOT_ZAPSTORE_YAML="$GITHUB_WORKSPACE/zapstore.yaml"
-          ROOT_LOGO_PNG="$GITHUB_WORKSPACE/runstr-logo.png"
+          ROOT_LOGO_PNG="$GITHUB_WORKSPACE/runstr_logo.png"
           RELEASE_DIR="./release" # Use variable for clarity
           ICON_FILENAME="runstr_logo.png" # Consistent icon filename in release dir
           NOTES_FILENAME="release_notes.md"
@@ -596,16 +596,28 @@ jobs:
 
 
           # --- Create Release Notes ---
-          echo "--- Creating Release Notes ($NOTES_FILENAME) ---"
-          echo "# Release v$VERSION" > "$NOTES_FILENAME"
-          echo "" >> "$NOTES_FILENAME"
-          echo "See repository CHANGELOG.md for full details." >> "$NOTES_FILENAME"
-          # Check if notes file was created
+          echo "--- Creating Release Notes ($NOTES_FILENAME) from MANUAL_RELEASE_NOTES.md ---"
+          # Check if the manual notes file exists at the root
+          MANUAL_NOTES_FILE_ROOT="$GITHUB_WORKSPACE/MANUAL_RELEASE_NOTES.md"
+          if [ ! -f "$MANUAL_NOTES_FILE_ROOT" ]; then
+            echo "❌ Error: MANUAL_RELEASE_NOTES.md not found at $MANUAL_NOTES_FILE_ROOT!"
+            echo "Please create this file in the repository root with your release notes."
+            # Create a fallback notes file to prevent publish failure, but with a clear warning
+            echo "# Release v$VERSION" > "$NOTES_FILENAME"
+            echo "" >> "$NOTES_FILENAME"
+            echo "⚠️ WARNING: MANUAL_RELEASE_NOTES.md was not found. Using fallback notes." >> "$NOTES_FILENAME"
+            echo "Please create MANUAL_RELEASE_NOTES.md in the repository root." >> "$NOTES_FILENAME"
+          else
+            echo "Copying content from $MANUAL_NOTES_FILE_ROOT to $NOTES_FILENAME"
+            cp "$MANUAL_NOTES_FILE_ROOT" "./$NOTES_FILENAME"
+          fi
+          
+          # Check if notes file was created or copied
           if [ ! -f "./$NOTES_FILENAME" ]; then
-             echo "❌ Error: Failed to create $NOTES_FILENAME in $(pwd)"
+             echo "❌ Error: Failed to create/copy $NOTES_FILENAME in $(pwd)"
              exit 1
           fi
-          echo "✅ Created $NOTES_FILENAME:"
+          echo "✅ Created/Copied $NOTES_FILENAME:"
           cat "$NOTES_FILENAME"
 
           # --- Set Environment Variables ---
