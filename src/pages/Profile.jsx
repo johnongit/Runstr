@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRunProfile } from '../hooks/useRunProfile';
 import { publishHealthProfile } from '../utils/nostrHealth';
+import { useSettings } from '../contexts/SettingsContext';
 import '../assets/styles/profile.css';
-import BitcoinTransactionHistory from '../components/BitcoinTransactionHistory';
 
 export const Profile = () => {
   const navigate = useNavigate();
@@ -20,6 +20,8 @@ export const Profile = () => {
     unitPreferences,
     handleUnitChange
   } = useRunProfile();
+
+  const { isHealthEncryptionEnabled } = useSettings();
 
   // Custom submit handler that navigates back after saving
   const handleProfileSubmit = () => {
@@ -44,7 +46,7 @@ export const Profile = () => {
     
     try {
       // Publish health profile to Nostr
-      const result = await publishHealthProfile(profile, unitPreferences);
+      const result = await publishHealthProfile(profile, unitPreferences, { encrypt: isHealthEncryptionEnabled() });
       
       // Show success message
       if (window.Android && window.Android.showToast) {
@@ -276,8 +278,12 @@ export const Profile = () => {
         </div>
       )}
 
-      {/* Add Bitcoin transaction history */}
-      <BitcoinTransactionHistory />
+      {/*
+      <div className="profile-section bitcoin-history-section">
+        <BitcoinTransactionHistory />
+      </div>
+      */
+      }
     </div>
   );
 }; 

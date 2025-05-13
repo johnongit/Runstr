@@ -7,9 +7,8 @@ import PropTypes from 'prop-types';
  * Component for displaying streak rewards and claiming Bitcoin rewards
  */
 const StreakRewardsCard = ({ currentStreak, showTitle = true }) => {
-  // Handle case where NostrContext might not be fully initialized yet
   const nostrContext = useNostr();
-  const publicKey = nostrContext?.publicKey || null;
+  const lightningAddress = nostrContext?.lightningAddress || null;
   
   const { 
     rewards, 
@@ -17,7 +16,7 @@ const StreakRewardsCard = ({ currentStreak, showTitle = true }) => {
     nextMilestone, 
     claimStatus,
     claimReward 
-  } = useStreakRewards(currentStreak, publicKey);
+  } = useStreakRewards(currentStreak, lightningAddress);
   
   const [showSuccess, setShowSuccess] = useState(false);
   const prevEligibleRewardsRef = useRef([]);
@@ -39,14 +38,8 @@ const StreakRewardsCard = ({ currentStreak, showTitle = true }) => {
     prevEligibleRewardsRef.current = eligibleRewards;
   }, [eligibleRewards]);
   
-  // Handle claim button click
-  const handleClaim = async (days) => {
-    const result = await claimReward(days);
-    if (result.success) {
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
-    }
-  };
+  // No manual claim; handleClaim retained only for legacy but not used
+  const handleClaim = () => {};
   
   // Generate streak flame icons based on current streak length
   const renderStreakFlames = () => {
@@ -83,18 +76,12 @@ const StreakRewardsCard = ({ currentStreak, showTitle = true }) => {
         <div className="eligible-rewards">
           <h4>Eligible Rewards</h4>
           {eligibleRewards.map(reward => (
-            <div key={reward.days} className="reward-item">
+            <div key={reward.days} className="reward-item auto">
               <div className="reward-info">
                 <span className="days-milestone">{reward.days} Day Streak</span>
                 <span className="sats-amount">{reward.sats} sats</span>
+                <span className="auto-sent-label">💸 Auto-sent</span>
               </div>
-              <button 
-                className="claim-button"
-                onClick={() => handleClaim(reward.days)}
-                disabled={claimStatus.claiming}
-              >
-                {claimStatus.claiming ? 'Claiming...' : 'Claim Reward'}
-              </button>
             </div>
           ))}
         </div>

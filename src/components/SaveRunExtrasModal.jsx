@@ -7,7 +7,7 @@ import { createAndPublishEvent } from '../utils/nostr'; // Assuming createAndPub
 import './SaveRunExtrasModal.css'; // We'll create this CSS file next
 
 export const SaveRunExtrasModal = ({ run, workoutEventId, onClose, onPublishSuccess }) => {
-  const { calorieIntensityPref } = useSettings();
+  const { calorieIntensityPref, isHealthEncryptionEnabled } = useSettings();
 
   // State for inputs
   const [intensityValue, setIntensityValue] = useState('5'); // Default RPE
@@ -61,7 +61,7 @@ export const SaveRunExtrasModal = ({ run, workoutEventId, onClose, onPublishSucc
         });
         if (intensityEvent) {
           try {
-            const publishedIntensity = await createAndPublishEvent(intensityEvent);
+            const publishedIntensity = await createAndPublishEvent(intensityEvent, null, { encrypt: isHealthEncryptionEnabled() });
             intensityEventId = publishedIntensity?.id;
             console.log('Published intensity event:', publishedIntensity);
           } catch (e) {
@@ -81,7 +81,7 @@ export const SaveRunExtrasModal = ({ run, workoutEventId, onClose, onPublishSucc
         });
         if (caloricEvent) {
           try {
-            const publishedCalories = await createAndPublishEvent(caloricEvent);
+            const publishedCalories = await createAndPublishEvent(caloricEvent, null, { encrypt: isHealthEncryptionEnabled() });
             caloricEventId = publishedCalories?.id;
             console.log('Published caloric event:', publishedCalories);
           } catch (e) {

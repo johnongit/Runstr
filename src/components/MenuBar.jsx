@@ -8,7 +8,10 @@ export const MenuBar = () => {
   const location = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { mode, setMode, getActivityText } = useActivityMode();
-  const { distanceUnit, toggleDistanceUnit } = useSettings();
+  const { 
+    distanceUnit, toggleDistanceUnit,
+    healthEncryptionPref, setHealthEncryptionPref
+  } = useSettings();
 
   const menuItems = [
     { 
@@ -64,6 +67,20 @@ export const MenuBar = () => {
 
   const handleActivityModeChange = (newMode) => {
     setMode(newMode);
+  };
+
+  const handleHealthEncryptionToggle = async (e) => {
+    const enable = e.target.checked;
+    if (!enable) {
+      const confirmDisable = window.confirm(
+        'Publishing health data unencrypted will make the values publicly visible on relays. Are you sure you want to disable encryption?'
+      );
+      if (!confirmDisable) {
+        e.preventDefault();
+        return;
+      }
+    }
+    setHealthEncryptionPref(enable ? 'encrypted' : 'plaintext');
   };
 
   return (
@@ -145,6 +162,23 @@ export const MenuBar = () => {
               <p className="text-sm text-gray-400 mt-2">
                 All distances will be shown in {distanceUnit === 'km' ? 'kilometers' : 'miles'} throughout the app
               </p>
+            </div>
+            
+            {/* Health Encryption Section */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold mb-3">Health-Data Encryption</h4>
+              <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg">
+                <span className="text-sm text-gray-400 mr-3">Encrypt Health Data (NIP-44)</span>
+                <div className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    id="encryptionToggleModal"
+                    checked={healthEncryptionPref === 'encrypted'}
+                    onChange={handleHealthEncryptionToggle}
+                  />
+                  <span className="toggle-slider"></span>
+                </div>
+              </div>
             </div>
             
             <div className="flex flex-col space-y-4">

@@ -4,6 +4,7 @@ import AmberAuth from '../services/AmberAuth';
 // Import nostr-tools implementation for fallback
 import { createAndPublishEvent as publishWithNostrTools } from './nostrClient';
 import { getFastestRelays, directFetchRunningPosts } from './feedFetcher';
+import { encryptContentNip44 } from './nip44';
 
 // Import the NDK singleton
 import { ndk, ndkReadyPromise } from '../lib/ndkSingleton'; // Adjusted path
@@ -466,9 +467,10 @@ const publishWithRetry = async (ndkEvent, maxRetries = 3, delay = 2000) => {
  * Uses NDK with fallback to nostr-tools for reliable posting
  * @param {Object} eventTemplate - Event template 
  * @param {string|null} pubkeyOverride - Override for pubkey (optional)
+ * @param {Object} opts - Additional options for the event
  * @returns {Promise<Object>} Published event
  */
-export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null) => {
+export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null, opts = {}) => {
   try {
     // Get publishing strategy metadata to return to caller
     const publishResult = {
@@ -480,6 +482,10 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
 
     let pubkey = pubkeyOverride;
     let signedEvent;
+    
+    // Determine encryption preference (default false to avoid breaking existing flows)
+    const shouldEncrypt = !!opts.encrypt;
+    let recipientPubkey = opts.recipientPubkey || null; // if null we will fill with user's pubkey once known
     
     // Use platform-specific signing
     if (Platform.OS === 'android') {
@@ -497,9 +503,24 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
           }
         }
         
+        // Encrypt content if requested (encrypt-to-self by default)
+        let processedTemplate = { ...eventTemplate };
+        if (shouldEncrypt) {
+          if (!recipientPubkey) recipientPubkey = pubkey;
+          const { cipherText, nip44Tags } = await encryptContentNip44(
+            String(processedTemplate.content),
+            recipientPubkey
+          );
+          processedTemplate = {
+            ...processedTemplate,
+            content: cipherText,
+            tags: [...(processedTemplate.tags || []), ...nip44Tags]
+          };
+        }
+        
         // Create the event with user's pubkey
         const event = {
-          ...eventTemplate,
+          ...processedTemplate,
           pubkey,
           created_at: Math.floor(Date.now() / 1000)
         };
@@ -529,9 +550,24 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
         pubkey = await window.nostr.getPublicKey();
       }
       
+      // Encrypt content if requested (encrypt-to-self by default)
+      let processedTemplate = { ...eventTemplate };
+      if (shouldEncrypt) {
+        if (!recipientPubkey) recipientPubkey = pubkey;
+        const { cipherText, nip44Tags } = await encryptContentNip44(
+          String(processedTemplate.content),
+          recipientPubkey
+        );
+        processedTemplate = {
+          ...processedTemplate,
+          content: cipherText,
+          tags: [...(processedTemplate.tags || []), ...nip44Tags]
+        };
+      }
+      
       // Create the event with user's pubkey
       const event = {
-        ...eventTemplate,
+        ...processedTemplate,
         pubkey,
         created_at: Math.floor(Date.now() / 1000)
       };

@@ -13,7 +13,12 @@ export const useSettings = () => {
     return {
       distanceUnit: 'km',
       toggleDistanceUnit: () => console.warn('Settings not initialized'),
-      setDistanceUnit: () => console.warn('Settings not initialized')
+      setDistanceUnit: () => console.warn('Settings not initialized'),
+      calorieIntensityPref: 'manual',
+      setCalorieIntensityPref: () => console.warn('Settings not initialized'),
+      healthEncryptionPref: 'encrypted',
+      setHealthEncryptionPref: () => console.warn('Settings not initialized'),
+      isHealthEncryptionEnabled: () => true
     };
   }
   return context;
@@ -39,6 +44,17 @@ export const SettingsProvider = ({ children }) => {
     } catch (error) {
       console.error('Error initializing calorie/intensity preference state:', error);
       return 'manual';
+    }
+  });
+
+  // Initialize healthEncryptionPref state from localStorage ("encrypted" | "plaintext")
+  const [healthEncryptionPref, setHealthEncryptionPref] = useState(() => {
+    try {
+      const stored = localStorage.getItem('healthEncryptionPref');
+      return stored === 'plaintext' ? 'plaintext' : 'encrypted';
+    } catch (e) {
+      console.error('Error initializing health encryption pref:', e);
+      return 'encrypted';
     }
   });
 
@@ -74,13 +90,29 @@ export const SettingsProvider = ({ children }) => {
     }
   }, [calorieIntensityPref]);
 
+  // Save healthEncryptionPref to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('healthEncryptionPref', healthEncryptionPref);
+      
+      // Dispatch an event so other components can listen for changes
+      const event = new CustomEvent('healthEncryptionPrefChanged', { detail: healthEncryptionPref });
+      document.dispatchEvent(event);
+    } catch (error) {
+      console.error('Error saving health encryption preference:', error);
+    }
+  }, [healthEncryptionPref]);
+
   return (
     <SettingsContext.Provider value={{ 
       distanceUnit, 
       setDistanceUnit,
       toggleDistanceUnit,
       calorieIntensityPref,
-      setCalorieIntensityPref
+      setCalorieIntensityPref,
+      healthEncryptionPref,
+      setHealthEncryptionPref,
+      isHealthEncryptionEnabled: () => healthEncryptionPref === 'encrypted'
     }}>
       {children}
     </SettingsContext.Provider>

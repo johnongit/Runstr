@@ -1,203 +1,153 @@
-import { useState, useEffect } from 'react';
-import { useNostr } from '../hooks/useNostr';
-import transactionService, { TRANSACTION_TYPES, TRANSACTION_STATUS } from '../services/transactionService';
-import bitvoraRewardsService from '../services/bitvoraRewardsService';
+import React from 'react';
 
-/**
- * Component for displaying Bitcoin transaction history
- */
 const BitcoinTransactionHistory = () => {
-  // Handle case where NostrContext might not be fully initialized yet
-  const nostrContext = useNostr();
-  const publicKey = nostrContext?.publicKey || null;
-  
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [syncStatus, setSyncStatus] = useState({ inProgress: false, message: '' });
-  
-  useEffect(() => {
-    if (!publicKey) return;
-    
-    const loadTransactions = async () => {
-      setLoading(true);
+  // All original content is commented out to hide this feature for now.
+  /*
+  import { useState, useEffect } from 'react';
+  import { useNostr } from '../hooks/useNostr';
+  import transactionService from '../services/transactionService';
+  import '../assets/styles/bitcoinTransactionHistory.css';
+
+  const BitcoinTransactionHistory = () => { 
+    const nostrContext = useNostr();
+    const publicKey = nostrContext?.publicKey || null;
+    const [transactions, setTransactions] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [syncStatus, setSyncStatus] = useState('idle');
+
+    const fetchTransactions = async () => {
+      if (!publicKey) return;
+      setIsLoading(true);
+      setError(null);
       try {
-        const result = await bitvoraRewardsService.getUserTransactions(publicKey);
+        const userTransactions = transactionService.getTransactions({ pubkey: publicKey });
+        setTransactions(userTransactions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
+      } catch (err) {
+        setError('Failed to load transactions.');
+        console.error('Error fetching transactions:', err);
+      }
+      setIsLoading(false);
+    };
+
+    const handleSyncTransactions = async () => {
+      if (!publicKey) {
+        setError('Nostr public key not available for sync.');
+        return;
+      }
+      setSyncStatus('syncing');
+      setError(null);
+      try {
+        const result = await transactionService.syncAllUserTransactions(publicKey);
         if (result.success) {
-          setTransactions(result.transactions || []);
-          setError(null);
+          setSyncStatus('success');
+          // Refetch transactions after sync
+          await fetchTransactions();
         } else {
-          setError(result.error || 'Failed to load transactions');
+          setSyncStatus('failed');
+          setError(result.error || 'Sync failed. Check console for details.');
         }
       } catch (err) {
-        console.error('Error loading Bitcoin transactions:', err);
-        setError('Error loading transactions');
-      } finally {
-        setLoading(false);
+        setSyncStatus('failed');
+        setError('An error occurred during sync.');
+        console.error('Error syncing transactions:', err);
+      }
+    };
+
+    useEffect(() => {
+      fetchTransactions();
+    }, [publicKey]);
+
+    // Helper to format date
+    const formatDate = (isoString) => {
+      if (!isoString) return 'N/A';
+      try {
+        return new Date(isoString).toLocaleString();
+      } catch (e) {
+        return 'Invalid Date';
+      }
+    };
+
+    // Helper to get transaction type label
+    const getTransactionTypeLabel = (type) => {
+      switch (type) {
+        case 'streak_reward':
+          return 'Streak Reward';
+        case 'leaderboard_reward':
+          return 'Leaderboard Reward';
+        case 'zap_sent':
+          return 'Zap Sent';
+        case 'zap_received':
+          return 'Zap Received';
+        case 'manual_payout':
+          return 'Manual Payout';
+        default:
+          return 'Unknown';
       }
     };
     
-    loadTransactions();
-    
-    // Add event listener for transaction updates
-    const handleTransactionAdded = (event) => {
-      setTransactions(prevTx => [event.detail.transaction, ...prevTx]);
-    };
-    
-    const handleTransactionUpdated = (event) => {
-      setTransactions(prevTx => 
-        prevTx.map(tx => 
-          tx.id === event.detail.transaction.id ? event.detail.transaction : tx
-        )
-      );
-    };
-    
-    document.addEventListener('bitcoinTransactionAdded', handleTransactionAdded);
-    document.addEventListener('bitcoinTransactionUpdated', handleTransactionUpdated);
-    
-    return () => {
-      document.removeEventListener('bitcoinTransactionAdded', handleTransactionAdded);
-      document.removeEventListener('bitcoinTransactionUpdated', handleTransactionUpdated);
-    };
-  }, [publicKey]);
-  
-  const handleSyncTransactions = async () => {
-    if (syncStatus.inProgress) return;
-    
-    setSyncStatus({ inProgress: true, message: 'Syncing transactions...' });
-    try {
-      const result = await bitvoraRewardsService.syncTransactions();
-      if (result.success) {
-        // Refresh transaction list
-        const txResult = await bitvoraRewardsService.getUserTransactions(publicKey);
-        if (txResult.success) {
-          setTransactions(txResult.transactions || []);
-        }
-        
-        setSyncStatus({ 
-          inProgress: false,
-          message: `Sync complete. Updated: ${result.results?.updated || 0}, Completed: ${result.results?.completed || 0}`
-        });
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => {
-          setSyncStatus({ inProgress: false, message: '' });
-        }, 3000);
-      } else {
-        setSyncStatus({ inProgress: false, message: `Sync failed: ${result.error}` });
+    const getStatusIndicator = (status) => {
+      switch(status) {
+        case 'completed': return <span className="status-indicator completed">✓</span>;
+        case 'pending': return <span className="status-indicator pending">⏳</span>;
+        case 'failed': return <span className="status-indicator failed">✗</span>;
+        default: return <span className="status-indicator unknown">?</span>;
       }
-    } catch (err) {
-      console.error('Error syncing transactions:', err);
-      setSyncStatus({ inProgress: false, message: `Error: ${err.message}` });
-    }
-  };
-  
-  // Helper function to format date
-  const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString();
-    } catch (e) {
-      return dateString;
-    }
-  };
-  
-  // Helper to get status badge class
-  const getStatusClass = (status) => {
-    switch (status) {
-      case TRANSACTION_STATUS.COMPLETED:
-        return 'status-completed';
-      case TRANSACTION_STATUS.FAILED:
-        return 'status-failed';
-      case TRANSACTION_STATUS.PENDING:
-        return 'status-pending';
-      default:
-        return '';
-    }
-  };
-  
-  // Helper to get transaction type label
-  const getTypeLabel = (type) => {
-    switch (type) {
-      case TRANSACTION_TYPES.STREAK_REWARD:
-        return 'Streak Reward';
-      case TRANSACTION_TYPES.LEADERBOARD_REWARD:
-        return 'Leaderboard Reward';
-      case TRANSACTION_TYPES.MANUAL_WITHDRAWAL:
-        return 'Withdrawal';
-      case TRANSACTION_TYPES.DEPOSIT:
-        return 'Deposit';
-      default:
-        return type;
-    }
-  };
-  
-  return (
-    <div className="bitcoin-transaction-history">
-      <div className="transaction-header">
-        <h3>Bitcoin Transaction History</h3>
-        <button 
-          onClick={handleSyncTransactions}
-          disabled={syncStatus.inProgress}
-          className="sync-button"
-        >
-          {syncStatus.inProgress ? 'Syncing...' : 'Sync Status'}
-        </button>
+    };
+
+    return (
+      <div className="bitcoin-transaction-history">
+        <div className="history-header">
+          <h3>Bitcoin Transaction History</h3>
+          <button onClick={handleSyncTransactions} disabled={syncStatus === 'syncing'}>
+            {syncStatus === 'syncing' ? 'Syncing...' : 'Sync Status'}
+          </button>
+        </div>
+
+        {isLoading && <p>Loading transaction history...</p>}
+        {error && <p className="error-message">{error}</p>}
+        {!isLoading && !error && transactions.length === 0 && (
+          <p>No transactions found.</p>
+        )}
+
+        {!isLoading && !error && transactions.length > 0 && (
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Amount (sats)</th>
+                <th>Reason/Recipient</th>
+                <th>Status</th>
+                <th>Bitvora TXID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx) => (
+                <tr key={tx.id}>
+                  <td>{formatDate(tx.timestamp)}</td>
+                  <td>{getTransactionTypeLabel(tx.type)}</td>
+                  <td className={`amount ${tx.amount > 0 ? 'positive' : 'negative'}`}>
+                    {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}
+                  </td>
+                  <td>{tx.reason || tx.recipient || 'N/A'}</td>
+                  <td>
+                    {getStatusIndicator(tx.status)} {tx.status}
+                  </td>
+                  <td title={tx.bitvora_txid}>{tx.bitvora_txid ? `${tx.bitvora_txid.substring(0, 8)}...` : 'N/A'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {syncStatus === 'success' && <p className="sync-message success">Transactions synced successfully!</p>}
+        {syncStatus === 'failed' && <p className="sync-message error">Transaction sync failed. Please try again.</p>}
       </div>
-      
-      {syncStatus.message && (
-        <div className={`sync-message ${syncStatus.inProgress ? 'syncing' : ''}`}>
-          {syncStatus.message}
-        </div>
-      )}
-      
-      {loading ? (
-        <div className="loading-transactions">Loading transaction history...</div>
-      ) : error ? (
-        <div className="error-message">{error}</div>
-      ) : transactions.length === 0 ? (
-        <div className="no-transactions">
-          <p>No Bitcoin transactions yet</p>
-        </div>
-      ) : (
-        <div className="transactions-list">
-          {transactions.map(tx => (
-            <div key={tx.id} className="transaction-item">
-              <div className="transaction-info">
-                <div className="transaction-type">
-                  {getTypeLabel(tx.type)}
-                </div>
-                <div className="transaction-amount">
-                  {tx.amount} sats
-                </div>
-                <div className={`transaction-status ${getStatusClass(tx.status)}`}>
-                  {tx.status}
-                </div>
-                <div className="transaction-date">
-                  {formatDate(tx.timestamp)}
-                </div>
-              </div>
-              <div className="transaction-details">
-                <div className="transaction-reason">
-                  {tx.reason || 'No description'}
-                </div>
-                {tx.bitvora_txid && (
-                  <div className="transaction-id">
-                    TX: {tx.bitvora_txid.slice(0, 8)}...
-                  </div>
-                )}
-                {tx.error && (
-                  <div className="transaction-error">
-                    Error: {tx.error}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+    );
+  }; 
+  */
+  return null; // Return null to render nothing
 };
 
 export default BitcoinTransactionHistory; 

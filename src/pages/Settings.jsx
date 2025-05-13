@@ -9,7 +9,9 @@ const Settings = () => {
     setDistanceUnit,
     setIsMetric,
     calorieIntensityPref,
-    setCalorieIntensityPref
+    setCalorieIntensityPref,
+    healthEncryptionPref,
+    setHealthEncryptionPref
   } = useSettings();
   
   const [showPaceInMinutes, setShowPaceInMinutes] = useState(true);
@@ -131,6 +133,21 @@ const Settings = () => {
     setCalorieIntensityPref(preference);
   };
   
+  const handleHealthEncryptionToggle = async (e) => {
+    const enable = e.target.checked;
+    if (!enable) {
+      const confirmDisable = window.confirm(
+        'Publishing health data unencrypted will make the values publicly visible on relays. Are you sure you want to disable encryption?'
+      );
+      if (!confirmDisable) {
+        // Revert toggle
+        e.preventDefault();
+        return;
+      }
+    }
+    setHealthEncryptionPref(enable ? 'encrypted' : 'plaintext');
+  };
+
   return (
     <div className="settings-page">
       <h2>Settings</h2>
@@ -177,6 +194,19 @@ const Settings = () => {
               id="darkModeToggle"
               checked={darkMode}
               onChange={handleDarkModeToggle}
+            />
+            <span className="toggle-slider"></span>
+          </div>
+        </div>
+        
+        <div className="setting-item">
+          <label htmlFor="encryptionToggle">Encrypt Health Data (NIP-44)</label>
+          <div className="toggle-switch">
+            <input
+              type="checkbox"
+              id="encryptionToggle"
+              checked={healthEncryptionPref === 'encrypted'}
+              onChange={handleHealthEncryptionToggle}
             />
             <span className="toggle-slider"></span>
           </div>

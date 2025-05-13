@@ -12,10 +12,10 @@ import bitvoraRewardsService from '../services/bitvoraRewardsService';
 /**
  * Custom hook to manage streak rewards
  * @param {number} currentStreak - User's current streak
- * @param {string} pubkey - User's public key for Bitcoin rewards
+ * @param {string} lightningAddress - User's lightning address for Bitcoin rewards
  * @returns {Object} Streak rewards state and functions
  */
-export const useStreakRewards = (currentStreak, pubkey) => {
+export const useStreakRewards = (currentStreak, lightningAddress) => {
   const [rewards, setRewards] = useState([]);
   const [eligibleRewards, setEligibleRewards] = useState([]);
   const [nextMilestone, setNextMilestone] = useState(null);
@@ -27,19 +27,21 @@ export const useStreakRewards = (currentStreak, pubkey) => {
   const [settings, setSettings] = useState(getRewardsSettings());
   const prevEligibleRewardsRef = useRef([]);
   
+  const isValidLightningAddress = (addr) => /.+@.+\..+/.test(addr);
+  
   /**
    * Claim a streak reward
    * @param {number} days - The streak milestone (days)
    * @returns {Promise<Object>} Claim result
    */
   const handleClaimReward = useCallback(async (days) => {
-    if (!pubkey) {
+    if (!lightningAddress || !isValidLightningAddress(lightningAddress)) {
       setClaimStatus({
         claiming: false,
         success: false,
-        error: 'Public key required for claiming rewards'
+        error: 'Valid lightning address required for reward payout'
       });
-      return { success: false, error: 'Public key required' };
+      return { success: false, error: 'Lightning address required' };
     }
     
     setClaimStatus({
@@ -56,14 +58,14 @@ export const useStreakRewards = (currentStreak, pubkey) => {
       }
       
       // Mark as claimed in local storage
-      const claimed = claimReward(days, pubkey);
+      const claimed = claimReward(days, lightningAddress);
       if (!claimed) {
         throw new Error('Failed to record claim');
       }
       
       // Request the Bitcoin reward
       const result = await bitvoraRewardsService.claimReward(
-        pubkey,
+        lightningAddress,
         reward.sats,
         `${days}-day streak reward`
       );
@@ -77,7 +79,7 @@ export const useStreakRewards = (currentStreak, pubkey) => {
         type: 'streak',
         days,
         sats: reward.sats,
-        pubkey,
+        pubkey: lightningAddress,
         txid: result.txid,
         reason: `${days}-day streak reward`
       });
@@ -104,7 +106,7 @@ export const useStreakRewards = (currentStreak, pubkey) => {
       });
       return { success: false, error: error.message };
     }
-  }, [pubkey, rewards, currentStreak]);
+  }, [lightningAddress, rewards, currentStreak]);
   
   // Load rewards data on mount
   useEffect(() => {
@@ -153,7 +155,7 @@ export const useStreakRewards = (currentStreak, pubkey) => {
       reward => !prevEligibleRewardsRef.current.some(prev => prev.days === reward.days)
     );
 
-    if (newlyEligible.length > 0 && pubkey) {
+    if (newlyEligible.length > 0 && lightningAddress && isValidLightningAddress(lightningAddress)) {
       newlyEligible.forEach(async reward => {
         try {
           await handleClaimReward(reward.days);
@@ -162,7 +164,7 @@ export const useStreakRewards = (currentStreak, pubkey) => {
         }
       });
     }
-  }, [eligibleRewards, handleClaimReward, pubkey]);
+  }, [eligibleRewards, handleClaimReward, lightningAddress]);
   
   /**
    * Update reward settings

@@ -99,6 +99,7 @@ export const ensureSignerAttached = async () => {
 // Create context with a default value structure
 export const NostrContext = createContext({
   publicKey: null,
+  lightningAddress: null,
   setPublicKey: () => console.warn('NostrContext not yet initialized'),
   ndkReady: false,
   isInitialized: false,
@@ -112,6 +113,13 @@ export const NostrProvider = ({ children }) => {
   const [ndkReady, setNdkReady] = useState(false);
   const [currentRelayCount, setCurrentRelayCount] = useState(0);
   const [ndkError, setNdkError] = useState(null);
+  // Lightning address cached from Nostr metadata (lud16/lud06)
+  const [lightningAddress, setLightningAddress] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('runstr_lightning_addr') || null;
+    }
+    return null;
+  });
 
   useEffect(() => {
     console.log('>>> NostrProvider useEffect START (using NDK Singleton) <<<');
@@ -165,6 +173,21 @@ export const NostrProvider = ({ children }) => {
             if (isMounted) {
                 setPublicKey(finalPubkey);
                 setNdkError(null); // Clear previous NDK errors if signer is ok
+                // Fetch lightning address from kind 0 metadata
+                try {
+                  const user = ndk.getUser({ pubkey: finalPubkey });
+                  await user.fetchProfile();
+                  const profile = user.profile || {};
+                  const laddr = profile.lud16 || profile.lud06 || null;
+                  if (laddr && isMounted) {
+                    setLightningAddress(laddr);
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('runstr_lightning_addr', laddr);
+                    }
+                  }
+                } catch (laErr) {
+                  console.warn('NostrProvider: Unable to load lightning address from profile:', laErr);
+                }
             }
           } else {
             console.error(`NostrProvider: Failed to attach signer or no signer available. Error: ${signerError}. Relay count: ${currentConnectedCount}`);
@@ -266,6 +289,7 @@ export const NostrProvider = ({ children }) => {
 
   const value = useMemo(() => ({
     publicKey,
+    lightningAddress,
     setPublicKey, 
     ndkReady,
     isInitialized: ndkReady,

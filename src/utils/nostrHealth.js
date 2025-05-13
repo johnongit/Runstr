@@ -206,9 +206,10 @@ export const createCaloricDataEvent = (calories, options = {}) => {
  * Publish all health profile metrics to Nostr
  * @param {Object} profile - User profile data
  * @param {Object} units - Unit preferences
+ * @param {Object} opts - Additional options
  * @returns {Promise<Object>} Publishing results
  */
-export const publishHealthProfile = async (profile, units = { weight: 'kg', height: 'metric' }) => {
+export const publishHealthProfile = async (profile, units = { weight: 'kg', height: 'metric' }, opts = {}) => {
   if (!profile) {
     throw new Error('No profile data provided');
   }
@@ -240,7 +241,7 @@ export const publishHealthProfile = async (profile, units = { weight: 'kg', heig
   const results = [];
   for (const event of events) {
     try {
-      const result = await createAndPublishEvent(event);
+      const result = await createAndPublishEvent(event, null, opts);
       results.push({
         kind: event.kind,
         success: true,
