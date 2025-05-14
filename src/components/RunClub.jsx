@@ -138,14 +138,9 @@ const RunClub = () => {
   
   return (
     <div className="run-club-container">
-      <button 
-        className={`feed-header-button ${isRefreshing ? 'refreshing' : ''}`}
-        onClick={refreshFeed}
-        disabled={loading || isRefreshing}
-      >
+      <div className="feed-header-static">
         <h2>RUNSTR FEED</h2>
-        {isRefreshing && <span className="refresh-icon">↻</span>}
-      </button>
+      </div>
 
       {loading ? (
         <div className="loading-indicator">
