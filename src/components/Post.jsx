@@ -74,7 +74,15 @@ export const Post = ({
 
   // Android optimization: handle avatar error
   const handleAvatarError = (event) => {
-    // Hide broken avatars by keeping them transparent
+    // First retry with original URL if we've been using the proxy thumbnail
+    const originalUrl = post.author?.profile?.picture;
+    if (originalUrl && !event.target.dataset.fallbackTried) {
+      event.target.dataset.fallbackTried = '1';
+      event.target.src = originalUrl;
+      return;
+    }
+
+    // Final fallback – keep black circle (opacity 0) so layout is stable
     event.target.classList.remove('avatar-loaded');
     event.target.style.opacity = 0;
   };

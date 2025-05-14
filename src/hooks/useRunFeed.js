@@ -4,8 +4,10 @@ import {
   loadSupplementaryData, 
   processPostsWithData
 } from '../utils/nostr';
-import { awaitNDKReady } from '../lib/ndkSingleton';
+import { awaitNDKReady, ndk } from '../lib/ndkSingleton';
 import { lightweightProcessPosts, mergeProcessedPosts } from '../utils/feedProcessor';
+import { NDKRelaySet } from '@nostr-dev-kit/ndk';
+import { getFastestRelays } from '../utils/feedFetcher';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -479,6 +481,85 @@ export const useRunFeed = () => {
     };
 
     fetchMissing();
+  }, [posts]);
+
+  /**
+   * Real-time profile subscription – fallback for avatars/usernames that didn't arrive
+   * This keeps scope local to RunFeed and DOES NOT touch shared NDK flows used by
+   * Teams / Chat, so risk of collateral impact is minimal.
+   */
+  useEffect(() => {
+    // Collect pubkeys whose profile is still the placeholder
+    const missingPubkeys = posts
+      .filter(p => p && p.author && p.author.pubkey && (
+        !p.author.profile || p.author.profile.name === 'Loading...'
+      ))
+      .map(p => p.author.pubkey);
+
+    // Bail if nothing to fetch or if we've already fetched them
+    const uniqueMissing = missingPubkeys.filter(pk => !fetchedProfilesRef.current.has(pk));
+    if (uniqueMissing.length === 0) return;
+
+    // Mark as requested so we don't set up duplicate subs
+    uniqueMissing.forEach(pk => fetchedProfilesRef.current.add(pk));
+
+    if (!ndk || uniqueMissing.length === 0) return;
+
+    let sub;
+    try {
+      const relays = getFastestRelays(3);
+      const relaySet = NDKRelaySet.fromRelayUrls(relays, ndk);
+      sub = ndk.subscribe({ kinds: [0], authors: uniqueMissing, limit: uniqueMissing.length }, { closeOnEose: true, relaySet });
+
+      sub.on('event', (profileEvt) => {
+        try {
+          const pubkey = profileEvt.pubkey;
+          if (!pubkey) return;
+
+          let profileData = {};
+          try {
+            profileData = JSON.parse(profileEvt.content);
+          } catch (_) {
+            profileData = {};
+          }
+
+          const normalized = {
+            name: profileData.name || profileData.display_name || 'Anonymous Runner',
+            picture: typeof profileData.picture === 'string' ? profileData.picture : undefined,
+            lud16: profileData.lud16,
+            lud06: profileData.lud06,
+          };
+
+          setPosts(prev => prev.map(p =>
+            p.author && p.author.pubkey === pubkey
+              ? {
+                  ...p,
+                  author: { ...p.author, profile: { ...p.author.profile, ...normalized } }
+                }
+              : p
+          ));
+
+          // Update global cache too
+          globalState.allPosts = globalState.allPosts.map(p =>
+            p.author && p.author.pubkey === pubkey
+              ? {
+                  ...p,
+                  author: { ...p.author, profile: { ...p.author.profile, ...normalized } }
+                }
+              : p
+          );
+        } catch (err) {
+          console.warn('Profile subscription processing failed', err);
+        }
+      });
+    } catch (err) {
+      console.warn('Could not start profile subscription', err);
+    }
+
+    // Cleanup when posts array changes or component unmounts
+    return () => {
+      if (sub) sub.stop();
+    };
   }, [posts]);
 
   return {

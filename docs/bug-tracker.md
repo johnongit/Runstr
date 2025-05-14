@@ -1,6 +1,6 @@
 # RUNSTR – Active Bug List & Fix-it Plan
 
-_Last updated: 2025-05-14_
+_Last updated: 2025-05-14 (metadata fix attempt – profile subscription)_
 
 ---
 
@@ -65,7 +65,7 @@ _Last updated: 2025-05-14_
 - [ ] FEED-03 – Refresh button removed
 - [x] ICON-01 – Adaptive icon fixed
 - [x] FEED-02 – Feed re-subscribes on remount
-- [x] FEED-01 – User metadata loads consistently
+- [ ] FEED-01 – User metadata loads consistently
 - [ ] CACHE-01 – Local cache for Feed posts
 - [ ] MUSIC-01 – Liked Songs playlist plays
 - [ ] MUSIC-02 – Music player stabilised
