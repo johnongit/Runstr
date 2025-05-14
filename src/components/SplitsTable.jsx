@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { formatTime, formatPace } from '../utils/formatters';
+import { formatDuration, formatPace } from '../utils/formatters';
 import { useEffect, useState } from 'react';
 
 const SplitsTable = ({ splits, distanceUnit = 'km' }) => {
@@ -99,7 +99,7 @@ const SplitsTable = ({ splits, distanceUnit = 'km' }) => {
                   )}
                   {visibleColumns.time && (
                     <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-200">
-                      {formatTime(splitTime)}
+                      {formatDuration(splitTime)}
                     </td>
                   )}
                   {visibleColumns.pace && (

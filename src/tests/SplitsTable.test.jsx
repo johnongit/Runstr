@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import SplitsTable from '../components/SplitsTable';
-import { formatTime, formatPace } from '../utils/formatters';
+import { formatDuration, formatPace } from '../utils/formatters';
 
 describe('SplitsTable', () => {
   it('renders nothing when no splits are provided', () => {
@@ -29,12 +29,12 @@ describe('SplitsTable', () => {
     expect(rows).toHaveLength(4);
     
     // Extract the displayed times from the table cells
-    const timeCells = screen.getAllByRole('cell', { name: /\d+:\d+:\d+/ });
+    const timeCells = screen.getAllByRole('cell', { name: /\d+:\d+/ });
     
     // Check individual split times (8:00, 8:00, 7:00) converted to seconds
-    expect(timeCells[0].textContent).toBe(formatTime(480)); // 8:00 for first km
-    expect(timeCells[1].textContent).toBe(formatTime(480)); // 8:00 for second km (960-480)
-    expect(timeCells[2].textContent).toBe(formatTime(420)); // 7:00 for third km (1380-960)
+    expect(timeCells[0].textContent).toBe(formatDuration(480)); // 8:00 for first km
+    expect(timeCells[1].textContent).toBe(formatDuration(480)); // 8:00 for second km (960-480)
+    expect(timeCells[2].textContent).toBe(formatDuration(420)); // 7:00 for third km (1380-960)
   });
 
   it('displays correct pace for each split', () => {
@@ -80,8 +80,8 @@ describe('SplitsTable', () => {
 
     render(<SplitsTable splits={splits} />);
     
-    const timeCell = screen.getByRole('cell', { name: /\d+:\d+:\d+/ });
-    expect(timeCell.textContent).toBe(formatTime(360)); // 6:00
+    const timeCell = screen.getByRole('cell', { name: /\d+:\d+/ });
+    expect(timeCell.textContent).toBe(formatDuration(360)); // 6:00
     
     const paceCell = screen.getByRole('cell', { name: /\d+:\d+ min\/km/ });
     expect(paceCell.textContent).toBe(formatPace(6, 'km')); // 6:00 min/km

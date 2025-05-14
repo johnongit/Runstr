@@ -141,7 +141,7 @@ export const useRunStats = (runHistory, userProfile) => {
           
           // 5K
           if (distanceInKm >= 5) {
-            const timeFor5K = (5 * paceInMinutes * 60); // seconds
+            const timeFor5K = (5 * paceInMinutes); // minutes
             if (timeFor5K < newStats.personalBests['5k'] || newStats.personalBests['5k'] === 99999) {
               newStats.personalBests['5k'] = timeFor5K;
             }
@@ -149,7 +149,7 @@ export const useRunStats = (runHistory, userProfile) => {
           
           // 10K
           if (distanceInKm >= 10) {
-            const timeFor10K = (10 * paceInMinutes * 60); // seconds
+            const timeFor10K = (10 * paceInMinutes); // minutes
             if (timeFor10K < newStats.personalBests['10k'] || newStats.personalBests['10k'] === 99999) {
               newStats.personalBests['10k'] = timeFor10K;
             }
@@ -157,7 +157,7 @@ export const useRunStats = (runHistory, userProfile) => {
           
           // Half Marathon (21.1km)
           if (distanceInKm >= 21.1) {
-            const timeForHalfMarathon = (21.1 * paceInMinutes * 60); // seconds
+            const timeForHalfMarathon = (21.1 * paceInMinutes); // minutes
             if (timeForHalfMarathon < newStats.personalBests['halfMarathon'] || newStats.personalBests['halfMarathon'] === 99999) {
               newStats.personalBests['halfMarathon'] = timeForHalfMarathon;
             }
@@ -165,7 +165,7 @@ export const useRunStats = (runHistory, userProfile) => {
           
           // Marathon (42.2km)
           if (distanceInKm >= 42.2) {
-            const timeForMarathon = (42.2 * paceInMinutes * 60); // seconds
+            const timeForMarathon = (42.2 * paceInMinutes); // minutes
             if (timeForMarathon < newStats.personalBests['marathon'] || newStats.personalBests['marathon'] === 99999) {
               newStats.personalBests['marathon'] = timeForMarathon;
             }
@@ -239,50 +239,46 @@ export const useRunStats = (runHistory, userProfile) => {
     
     // Calculate streaks
     if (dates.length > 0) {
-      // Convert date strings to timestamps for easier comparison
-      const timestamps = dates.map(d => new Date(d).getTime());
-      
-      // Current streak
+      // Use Set for O(1) look-ups.
+      const dateSet = new Set(dates);
+
+      // Helper to get YYYY-MM-DD string for a JS Date (local time).
+      const toYMD = (d) => {
+        const yyyy = d.getFullYear();
+        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+        const dd = d.getDate().toString().padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      // Current streak — walk backwards from today.
       let currentStreak = 0;
-      const yesterday = today - 86400000; // 24 hours in milliseconds
-      
-      // Check if there's a run today or yesterday to start the streak
-      if (timestamps.includes(today) || timestamps.includes(yesterday)) {
-        currentStreak = 1;
-        
-        // Go back in time day by day
-        let checkDate = yesterday;
-        while (true) {
-          checkDate -= 86400000; // Go back one day
-          
-          // If we find a run on this day, increment streak
-          if (timestamps.includes(checkDate)) {
-            currentStreak++;
-          } else {
-            // Streak is broken
-            break;
-          }
-        }
+      let cursor = new Date(); // today (now)
+      let cursorStr = toYMD(cursor);
+
+      // While we have a run on the cursor date, keep decrementing.
+      while (dateSet.has(cursorStr)) {
+        currentStreak += 1;
+        cursor.setDate(cursor.getDate() - 1);
+        cursorStr = toYMD(cursor);
       }
-      
-      // Best streak
+
+      // Best streak — sort the date strings and scan.
+      const sorted = Array.from(dateSet).sort(); // lex sort works for YYYY-MM-DD
       let bestStreak = 0;
-      let currentBestStreak = 1;
-      
-      for (let i = 1; i < timestamps.length; i++) {
-        // Check if dates are consecutive
-        if (timestamps[i] - timestamps[i-1] <= 86400000) {
-          currentBestStreak++;
+      let tempStreak = 1;
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = new Date(sorted[i - 1]);
+        const curr = new Date(sorted[i]);
+        const diffDays = Math.round((curr - prev) / 86400000);
+        if (diffDays === 1) {
+          tempStreak += 1;
         } else {
-          // Update best streak and reset current
-          bestStreak = Math.max(bestStreak, currentBestStreak);
-          currentBestStreak = 1;
+          bestStreak = Math.max(bestStreak, tempStreak);
+          tempStreak = 1;
         }
       }
-      
-      // Update best streak one more time after the loop
-      bestStreak = Math.max(bestStreak, currentBestStreak);
-      
+      bestStreak = Math.max(bestStreak, tempStreak);
+
       newStats.currentStreak = currentStreak;
       newStats.bestStreak = bestStreak;
     }

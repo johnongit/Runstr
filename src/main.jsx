@@ -25,7 +25,15 @@ if (typeof window !== 'undefined') {
 
   window.addEventListener('unhandledrejection', (e) => {
     const reason = e.reason;
-    showError('[promise] ' + (reason?.message || reason) + '\n' + (reason?.stack || ''));
+    const msg = reason?.message || reason;
+    // Ignore benign Purple Pages relay rejection noise
+    if (typeof msg === 'string' && msg.includes('Purple Pages only accepts')) {
+      // Prevent the default overlay
+      e.preventDefault();
+      console.info('Ignored relay rejection from Purple Pages');
+      return;
+    }
+    showError('[promise] ' + msg + '\n' + (reason?.stack || ''));
   });
 }
 /* ---------------------------------------------------------*/

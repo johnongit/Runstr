@@ -435,11 +435,12 @@ export const processPostsWithData = async (posts, supplementaryData) => {
 /**
  * Helper function to publish an NDK event with retries
  * @param {NDKEvent} ndkEvent - The NDK event to publish
+ * @param {Object} relaySet - Optional relay set for publishing
  * @param {number} maxRetries - Maximum number of retry attempts
  * @param {number} delay - Delay between retries in ms
  * @returns {Promise<{success: boolean, error: string|null}>} Result of publish attempt
  */
-const publishWithRetry = async (ndkEvent, maxRetries = 3, delay = 2000) => {
+const publishWithRetry = async (ndkEvent, relaySet = null, maxRetries = 3, delay = 2000) => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`Publishing to NDK relays - attempt ${attempt}/${maxRetries}...`);
@@ -448,7 +449,11 @@ const publishWithRetry = async (ndkEvent, maxRetries = 3, delay = 2000) => {
       await ndkReadyPromise;
       
       // Publish the event
-      await ndkEvent.publish();
+      if (relaySet) {
+        await ndkEvent.publish({ relaySet });
+      } else {
+        await ndkEvent.publish();
+      }
       console.log('Successfully published with NDK');
       return { success: true, error: null };
     } catch (error) {
@@ -582,9 +587,27 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
       // Make sure we're connected before attempting to publish
       await ndkReadyPromise;
       
+      // Create relay set that excludes relays which block this kind
+      let relaySet = null;
+      try {
+        const allRelays = Array.from(ndk.pool.relays.values()).map(r => r.url);
+        const filtered = allRelays.filter(url => {
+          if (url.includes('purplepag.es')) {
+            // Purple Pages only allows kinds 0,3,10002
+            return [0, 3, 10002].includes(signedEvent.kind);
+          }
+          return true;
+        });
+        if (filtered.length > 0 && filtered.length < allRelays.length) {
+          relaySet = NDKRelaySet.fromRelayUrls(filtered, ndk);
+        }
+      } catch (filterErr) {
+        console.warn('Relay filtering failed:', filterErr);
+      }
+      
       // Create NDK Event and publish with retry
       const ndkEvent = new NDKEvent(ndk, signedEvent);
-      const ndkResult = await publishWithRetry(ndkEvent);
+      const ndkResult = await publishWithRetry(ndkEvent, relaySet);
       
       if (ndkResult.success) {
         publishResult.success = true;

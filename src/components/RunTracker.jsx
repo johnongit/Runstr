@@ -10,6 +10,7 @@ import SplitsTable from './SplitsTable';
 import DashboardRunCard from './DashboardRunCard';
 import AchievementCard from './AchievementCard';
 import { validateEventRun, initializeEvents } from '../services/EventService';
+import { SaveRunExtrasModal } from './SaveRunExtrasModal';
 
 export const RunTracker = () => {
   const { 
@@ -40,6 +41,8 @@ export const RunTracker = () => {
   const [workoutSaved, setWorkoutSaved] = useState(false);
   const [isSavingWorkout, setIsSavingWorkout] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showSaveExtrasModal, setShowSaveExtrasModal] = useState(false);
+  const [currentWorkoutEventId, setCurrentWorkoutEventId] = useState(null);
 
   // Initialize events when the component mounts
   useEffect(() => {
@@ -287,16 +290,19 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       const workoutEvent = createWorkoutEvent(recentRun, distanceUnit);
       
       // Use the existing createAndPublishEvent function
-      await createAndPublishEvent(workoutEvent);
+      const publishedEvent = await createAndPublishEvent(workoutEvent);
       
-      // Update UI to show success
-      setWorkoutSaved(true);
-      
-      // Show success message
-      if (window.Android && window.Android.showToast) {
-        window.Android.showToast('Workout record saved to Nostr!');
+      const publishedEventId = publishedEvent?.id;
+      if (publishedEventId) {
+        setWorkoutSaved(true);
+        setCurrentWorkoutEventId(publishedEventId);
+        setShowSaveExtrasModal(true);
+        // Optionally inform the user that extra options are available
+        if (window.Android && window.Android.showToast) {
+          window.Android.showToast('Workout saved! Add intensity & calories?');
+        }
       } else {
-        alert('Workout record saved to Nostr!');
+        throw new Error('Failed to get ID from published workout event.');
       }
     } catch (error) {
       console.error('Error saving workout record:', error);
@@ -356,6 +362,34 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleCloseSaveExtrasModal = () => {
+    setShowSaveExtrasModal(false);
+    setCurrentWorkoutEventId(null);
+    setIsSavingWorkout(false);
+  };
+
+  const handlePublishExtrasSuccess = ({ intensityEventId, caloricEventId, errors }) => {
+    if (errors && errors.length > 0) {
+      const msg = 'Extras publishing failed: ' + errors.join(', ');
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast(msg);
+      } else {
+        alert(msg);
+      }
+    } else {
+      let successMsg = 'Workout extras published!';
+      if (intensityEventId && caloricEventId) successMsg = 'Intensity & Calories published!';
+      else if (intensityEventId) successMsg = 'Intensity published!';
+      else if (caloricEventId) successMsg = 'Calories published!';
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast(successMsg);
+      } else {
+        alert(successMsg);
+      }
+    }
+    handleCloseSaveExtrasModal();
   };
 
   return (
@@ -575,6 +609,15 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             </div>
           </div>
         </div>
+      )}
+      
+      {showSaveExtrasModal && recentRun && currentWorkoutEventId && (
+        <SaveRunExtrasModal
+          run={recentRun}
+          workoutEventId={currentWorkoutEventId}
+          onClose={handleCloseSaveExtrasModal}
+          onPublishSuccess={handlePublishExtrasSuccess}
+        />
       )}
     </div>
   );

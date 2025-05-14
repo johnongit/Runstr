@@ -29,6 +29,7 @@ export const useRunFeed = () => {
   const timeoutRef = useRef(null);
   const initialLoadRef = useRef(globalState.isInitialized);
   const subscriptionRef = useRef(null);
+  const fetchedProfilesRef = useRef(new Set());
 
   // Ensure NDK as soon as the hook is used
   useEffect(() => {
@@ -304,20 +305,35 @@ export const useRunFeed = () => {
     }
   }, [loading, hasMore]);
 
-  // Initial load
+  // Initial load / remount logic
   useEffect(() => {
-    if (!initialLoadRef.current) {
-      fetchRunPostsViaSubscription();
-    }
-    
-    // Cleanup function when component unmounts
+    const runFirstLoad = async () => {
+      // If we already have posts cached globally, hydrate state immediately
+      if (globalState.allPosts && globalState.allPosts.length > 0) {
+        setAllPosts(globalState.allPosts);
+        setPosts(globalState.allPosts.slice(0, displayLimit));
+        setLoading(false);
+
+        // Kick off a silent background refresh so content stays fresh
+        setupBackgroundFetch();
+      }
+
+      // Only re-fetch from the network if we haven't fetched yet this session
+      if (!initialLoadRef.current) {
+        await fetchRunPostsViaSubscription();
+      }
+    };
+
+    runFirstLoad();
+
+    // Cleanup when component unmounts
     return () => {
       if (timeoutRef.current) {
         clearInterval(timeoutRef.current);
         timeoutRef.current = null;
       }
     };
-  }, [fetchRunPostsViaSubscription]);
+  }, [fetchRunPostsViaSubscription, displayLimit, setupBackgroundFetch]);
 
   // Update displayed posts when displayLimit changes
   useEffect(() => {
@@ -426,6 +442,44 @@ export const useRunFeed = () => {
       setTimeout(resolve, 1500);
     });
   };
+
+  // Auto-fetch author metadata for posts still showing placeholder names
+  useEffect(() => {
+    const missingPosts = posts.filter(p =>
+      p && p.author && p.author.pubkey &&
+      (!p.author.profile || !p.author.profile.name || p.author.profile.name === 'Loading...') &&
+      !fetchedProfilesRef.current.has(p.author.pubkey)
+    );
+
+    if (missingPosts.length === 0) return;
+
+    const fetchMissing = async () => {
+      try {
+        // Mark as fetched to avoid duplicate requests
+        missingPosts.forEach(mp => fetchedProfilesRef.current.add(mp.author.pubkey));
+
+        const supplementaryData = await loadSupplementaryData(missingPosts);
+        const enrichedPosts = await processPostsWithData(missingPosts, supplementaryData);
+
+        if (enrichedPosts && enrichedPosts.length > 0) {
+          setPosts(prev => prev.map(p => {
+            const enriched = enrichedPosts.find(e => e.id === p.id);
+            return enriched ? { ...p, author: enriched.author } : p;
+          }));
+
+          // Also update global cache so other components profit
+          globalState.allPosts = globalState.allPosts.map(p => {
+            const enriched = enrichedPosts.find(e => e.id === p.id);
+            return enriched ? { ...p, author: enriched.author } : p;
+          });
+        }
+      } catch (err) {
+        console.warn('Metadata enrichment failed', err);
+      }
+    };
+
+    fetchMissing();
+  }, [posts]);
 
   return {
     posts,

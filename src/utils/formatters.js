@@ -130,3 +130,26 @@ export function convertDistance(meters, unit) {
 export function formatPaceWithUnit(pace, unit = 'km') {
   return `${formatPace(pace, unit)} min/${unit}`;
 }
+
+/**
+ * Format duration in seconds to MM:SS format
+ * @param {number} seconds - Duration in seconds
+ * @param {boolean} alwaysShowHours - Whether to always show hours
+ * @returns {string} Formatted duration string
+ */
+export const formatDuration = (seconds, alwaysShowHours = false) => {
+  // Guard against invalid input
+  if (seconds == null || isNaN(seconds)) return '--:--';
+
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  // If we don't need to always show hours and the value is < 1h, omit hours
+  if (!alwaysShowHours && hrs === 0) {
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  // Fallback to HH:MM:SS with zero-padded hours
+  return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};

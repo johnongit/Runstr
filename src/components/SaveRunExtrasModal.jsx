@@ -128,16 +128,19 @@ export const SaveRunExtrasModal = ({ run, workoutEventId, onClose, onPublishSucc
               <option value="keyword">Keyword</option>
             </select>
             {intensityScale === 'rpe10' ? (
-              <input
-                type="number"
-                id="intensityValueRPE"
-                min="1"
-                max="10"
-                value={intensityValue}
-                onChange={(e) => setIntensityValue(e.target.value)}
-                disabled={!isManualMode && !postIntensity}
-                placeholder="e.g., 7"
-              />
+              <div className="flex flex-col w-full">
+                <input
+                  type="range"
+                  id="intensityValueRPE"
+                  min="1"
+                  max="10"
+                  step="1"
+                  value={intensityValue}
+                  onChange={(e) => setIntensityValue(e.target.value)}
+                  disabled={!isManualMode && !postIntensity}
+                />
+                <div className="text-center text-sm mt-1">{intensityValue}</div>
+              </div>
             ) : (
               <select 
                 id="intensityValueKeyword"
