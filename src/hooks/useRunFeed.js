@@ -8,6 +8,7 @@ import { awaitNDKReady, ndk } from '../lib/ndkSingleton';
 import { lightweightProcessPosts, mergeProcessedPosts } from '../utils/feedProcessor';
 import { NDKRelaySet } from '@nostr-dev-kit/ndk';
 import { getFastestRelays } from '../utils/feedFetcher';
+import { startFeed, subscribeFeed, getFeed } from '../lib/feedManager';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -18,8 +19,9 @@ const globalState = {
 };
 
 export const useRunFeed = () => {
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Prefer central manager; hydrate immediately
+  const [posts, setPosts] = useState(() => getFeed());
+  const [loading, setLoading] = useState(getFeed().length === 0);
   const [error, setError] = useState(null);
   const [userLikes, setUserLikes] = useState(new Set());
   const [userReposts, setUserReposts] = useState(new Set());
@@ -561,6 +563,18 @@ export const useRunFeed = () => {
       if (sub) sub.stop();
     };
   }, [posts]);
+
+  // --- Central Feed Manager integration ----
+  useEffect(() => {
+    // Ensure the manager is running (no-op if already started)
+    startFeed();
+    // Subscribe for updates
+    const unsub = subscribeFeed((newPosts) => {
+      setPosts(newPosts);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
 
   return {
     posts,
