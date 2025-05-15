@@ -47,103 +47,114 @@ export const fetchEvents = async (filter, fetchOpts = {}) => {
  * @param {number} since - Timestamp to fetch posts since
  * @returns {Promise<Array<NDKEvent>>} Array of running posts
  */
-export const fetchRunningPosts = async (limit = 7, since = undefined) => {
-  // Add: await ndkReadyPromise; // This should be awaited before this function or at the start if non-blocking behavior is not desired.
-  try {
-    const defaultSince = Math.floor(Date.now() / 1000) - 14 * 24 * 60 * 60;
-    const sinceTimestamp = since ? Math.floor(since / 1000) : defaultSince;
-    console.log(`[nostr.js] Fetching posts with #runstr hashtag from ${new Date(sinceTimestamp * 1000).toLocaleString()}`);
-    
-    const uniqueEvents = new Map();
-    let receivedEvents = false;
-    
-    return new Promise((resolve) => { // Executor function should not be async
-      // Example: If ndkReadyPromise needs to be awaited here, it has to be done carefully, 
-      // often by chaining or by an outer async IIFE that then calls resolve/reject.
-      // For now, assuming NDK calls will queue or handle internally if not fully ready, 
-      // or that `ndkReadyPromise` is awaited by the calling code.
-
-      const maxTimeout = setTimeout(async () => {
-        console.log(`[nostr.js] Timeout (6s) reached with ${uniqueEvents.size} posts collected`);
-        let eventArray = Array.from(uniqueEvents.values())
-          .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
-          .slice(0, limit);
-
-        // Fallback: if nothing collected, run direct fetch on fastest relays
-        if (eventArray.length === 0) {
-          console.log('[nostr.js] Falling back to directFetchRunningPosts due to empty result set.');
-          try {
-            eventArray = await directFetchRunningPosts(limit, 7);
-          } catch (fallbackErr) {
-            console.warn('[nostr.js] directFetchRunningPosts fallback failed:', fallbackErr);
-          }
-        }
-        resolve(eventArray);
-      }, 6000);
+export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWindows = [2 * 3600, 24 * 3600, 14 * 24 * 3600]) => {
+  // If caller provided an explicit since timestamp we just run single window with old logic
+  const runSingleWindow = async (sinceArg) => {
+    try {
+      const defaultSince = Math.floor(Date.now() / 1000) - 14 * 24 * 60 * 60;
+      const sinceTimestamp = sinceArg ? Math.floor(sinceArg / 1000) : defaultSince;
+      console.log(`[nostr.js] Fetching posts with #runstr hashtag from ${new Date(sinceTimestamp * 1000).toLocaleString()}`);
       
-      // Ensure ndk is ready before subscribing
-      // await ndkReadyPromise; // Commenting out await here too for consistency
-      const fastRelays = getFastestRelays(3);
-      const relaySet = NDKRelaySet.fromRelayUrls(fastRelays, ndk);
-      const sub = ndk.subscribe({
-        kinds: [1],
-        limit: limit * 2,
-        "#t": ["runstr"],
-        since: sinceTimestamp
-      }, { closeOnEose: false, relaySet });
+      const uniqueEvents = new Map();
+      let receivedEvents = false;
       
-      const relayPerformance = {};
-      sub.on('event', (event) => {
-        const relay = event.relay?.url || 'unknown';
-        if (!relayPerformance[relay]) {
-          relayPerformance[relay] = { count: 0, startTime: Date.now() };
-        }
-        relayPerformance[relay].count++;
-        receivedEvents = true;
-        uniqueEvents.set(event.id, event);
-        
-        if (uniqueEvents.size >= limit) {
-          setTimeout(() => {
-            clearTimeout(maxTimeout);
+      return await new Promise((resolve) => {
+        const maxTimeout = setTimeout(async () => {
+          console.log(`[nostr.js] Timeout (6s) reached with ${uniqueEvents.size} posts collected`);
+          let eventArray = Array.from(uniqueEvents.values())
+            .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+            .slice(0, limit);
+
+          // Fallback: if nothing collected, run direct fetch on fastest relays
+          if (eventArray.length === 0) {
+            console.log('[nostr.js] Falling back to directFetchRunningPosts due to empty result set.');
             try {
-              const storedMetrics = JSON.parse(localStorage.getItem('relayPerformance') || '{}');
-              Object.entries(relayPerformance).forEach(([relayUrl, metrics]) => {
-                const responseTime = metrics.count > 0 ? (Date.now() - metrics.startTime) : 0;
-                storedMetrics[relayUrl] = storedMetrics[relayUrl] || { count: 0, totalTime: 0, lastUpdated: Date.now() };
-                storedMetrics[relayUrl].count += metrics.count;
-                storedMetrics[relayUrl].totalTime += responseTime;
-                storedMetrics[relayUrl].lastUpdated = Date.now();
-              });
-              localStorage.setItem('relayPerformance', JSON.stringify(storedMetrics));
-            } catch (err) {
-              console.warn('[nostr.js] Could not save relay performance data', err);
+              eventArray = await directFetchRunningPosts(limit, 7);
+            } catch (fallbackErr) {
+              console.warn('[nostr.js] directFetchRunningPosts fallback failed:', fallbackErr);
             }
+          }
+          resolve(eventArray);
+        }, 6000);
+        
+        const fastRelays = getFastestRelays(3);
+        const relaySet = NDKRelaySet.fromRelayUrls(fastRelays, ndk);
+        const sub = ndk.subscribe({
+          kinds: [1],
+          limit: limit * 2,
+          "#t": ["runstr"],
+          since: sinceTimestamp
+        }, { closeOnEose: false, relaySet });
+        
+        const relayPerformance = {};
+        sub.on('event', (event) => {
+          const relay = event.relay?.url || 'unknown';
+          if (!relayPerformance[relay]) {
+            relayPerformance[relay] = { count: 0, startTime: Date.now() };
+          }
+          relayPerformance[relay].count++;
+          receivedEvents = true;
+          uniqueEvents.set(event.id, event);
+          
+          if (uniqueEvents.size >= limit) {
+            setTimeout(() => {
+              clearTimeout(maxTimeout);
+              try {
+                const storedMetrics = JSON.parse(localStorage.getItem('relayPerformance') || '{}');
+                Object.entries(relayPerformance).forEach(([relayUrl, metrics]) => {
+                  const responseTime = metrics.count > 0 ? (Date.now() - metrics.startTime) : 0;
+                  storedMetrics[relayUrl] = storedMetrics[relayUrl] || { count: 0, totalTime: 0, lastUpdated: Date.now() };
+                  storedMetrics[relayUrl].count += metrics.count;
+                  storedMetrics[relayUrl].totalTime += responseTime;
+                  storedMetrics[relayUrl].lastUpdated = Date.now();
+                });
+                localStorage.setItem('relayPerformance', JSON.stringify(storedMetrics));
+              } catch (err) {
+                console.warn('[nostr.js] Could not save relay performance data', err);
+              }
+              const eventArray = Array.from(uniqueEvents.values())
+                .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+                .slice(0, limit);
+              console.log(`[nostr.js] Resolved early with ${eventArray.length} posts with #runstr hashtag`);
+              sub.stop();
+              resolve(eventArray);
+            }, 1000);
+          }
+        });
+        
+        sub.on('eose', () => {
+          if (receivedEvents && uniqueEvents.size > 0 && sub.started && (Date.now() - sub.started > 3000)) {
+            clearTimeout(maxTimeout);
+            console.log(`[nostr.js] EOSE received with ${uniqueEvents.size} posts collected`);
             const eventArray = Array.from(uniqueEvents.values())
               .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
               .slice(0, limit);
-            console.log(`[nostr.js] Resolved early with ${eventArray.length} posts with #runstr hashtag`);
             sub.stop();
             resolve(eventArray);
-          }, 1000);
-        }
+          }
+        });
       });
-      
-      sub.on('eose', () => {
-        if (receivedEvents && uniqueEvents.size > 0 && sub.started && (Date.now() - sub.started > 3000)) {
-          clearTimeout(maxTimeout);
-          console.log(`[nostr.js] EOSE received with ${uniqueEvents.size} posts collected`);
-          const eventArray = Array.from(uniqueEvents.values())
-            .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
-            .slice(0, limit);
-          sub.stop();
-          resolve(eventArray);
-        }
-      });
-    });
-  } catch (error) {
-    console.error('[nostr.js] Error fetching hashtag posts:', error);
-    return [];
+    } catch (error) {
+      console.error('[nostr.js] Error fetching hashtag posts:', error);
+      return [];
+    }
+  };
+
+  if (since !== undefined) {
+    // Legacy single-window behaviour remains
+    return await runSingleWindow(since);
   }
+
+  // Cascading windows logic
+  const collected = new Map();
+  for (const secondsAgo of fallbackWindows) {
+    const sinceTimestampMs = Date.now() - secondsAgo * 1000;
+    const batch = await runSingleWindow(sinceTimestampMs);
+    batch.forEach(ev => collected.set(ev.id, ev));
+    if (collected.size >= limit) break;
+  }
+
+  return Array.from(collected.values()).sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, limit);
 };
 
 /**
