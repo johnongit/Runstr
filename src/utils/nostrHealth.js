@@ -262,4 +262,34 @@ export const publishHealthProfile = async (profile, units = { weight: 'kg', heig
     failed: results.filter(r => !r.success).length,
     results
   };
+};
+
+/**
+ * Helper: build workout intensity event from a saved run record.
+ * Returns null if run.intensity is missing.
+ * @param {Object} run
+ */
+export const buildIntensityEvent = (run) => {
+  if (!run || !run.intensity) return null;
+  return createWorkoutIntensityEvent(run.intensity, 'keyword', {
+    timestamp: new Date(run.timestamp || Date.now()).toISOString(),
+    activityType: 'run',
+    workoutEventId: run.nostrWorkoutEventId || undefined,
+    source: 'RunstrApp'
+  });
+};
+
+/**
+ * Helper: build caloric data event from a saved run record.
+ * Returns null if run.calories is missing.
+ * @param {Object} run
+ */
+export const buildCalorieEvent = (run) => {
+  if (!run || run.calories === undefined || run.calories === null) return null;
+  return createCaloricDataEvent(run.calories, {
+    timestamp: new Date(run.timestamp || Date.now()).toISOString(),
+    workoutEventId: run.nostrWorkoutEventId || undefined,
+    accuracy: 'estimated',
+    source: 'RunstrApp'
+  });
 }; 

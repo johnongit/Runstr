@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { saveLeaderboardParticipation, getLeaderboardParticipation } from '../utils/leaderboardUtils';
-import { getRewardsSettings, saveRewardsSettings } from '../utils/streakRewards';
+import { getRewardsSettings, saveRewardsSettings } from '../utils/rewardsSettings';
 
 const Settings = () => {
   const { 

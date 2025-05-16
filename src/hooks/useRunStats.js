@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import runDataService from '../services/RunDataService';
 import { useSettings } from '../contexts/SettingsContext';
+import { MIN_STREAK_DISTANCE } from '../config/rewardsConfig';
 
 /**
  * Custom hook for calculating and managing run statistics
@@ -173,37 +174,43 @@ export const useRunStats = (runHistory, userProfile) => {
         }
       }
       
-      // Process date information for streak calculation
-      let runDate = new Date(run.date);
-      
-      // For older runs that stored date as milliseconds
-      if (isNaN(runDate.getTime()) && !isNaN(parseInt(run.date))) {
-        runDate = new Date(parseInt(run.date));
-      }
+      // Process date information for streak calculation – only if run meets minimum distance for streak
+      const qualifiesForStreak = run.distance >= (distanceUnit === 'km' ? MIN_STREAK_DISTANCE.km : MIN_STREAK_DISTANCE.mi);
 
-      if (!isNaN(runDate.getTime())) {
-        // Format the date as YYYY-MM-DD for consistent grouping
-        const dateKey = runDate.toISOString().split('T')[0];
-        runsByDate[dateKey] = true;
+      // Only runs meeting the distance gate are considered for streak calculations
+      if (qualifiesForStreak) {
+        // Process date information for streak calculation
+        let runDate = new Date(run.date);
         
-        // Add to dates array for streak calculation
-        if (!dates.includes(dateKey)) {
-          dates.push(dateKey);
+        // For older runs that stored date as milliseconds
+        if (isNaN(runDate.getTime()) && !isNaN(parseInt(run.date))) {
+          runDate = new Date(parseInt(run.date));
         }
-        
-        // Check if run is from this week
-        if (runDate >= startOfWeek) {
-          newStats.thisWeekDistance += run.distance;
-        }
-        
-        // Check if run is from last week
-        if (runDate >= startOfLastWeek && runDate < startOfWeek) {
-          newStats.previousWeekDistance += run.distance;
-        }
-        
-        // Check if run is from this month
-        if (runDate >= startOfMonth) {
-          newStats.thisMonthDistance += run.distance;
+
+        if (!isNaN(runDate.getTime())) {
+          // Format the date as YYYY-MM-DD for consistent grouping
+          const dateKey = runDate.toISOString().split('T')[0];
+          runsByDate[dateKey] = true;
+          
+          // Add to dates array for streak calculation
+          if (!dates.includes(dateKey)) {
+            dates.push(dateKey);
+          }
+          
+          // Check if run is from this week
+          if (runDate >= startOfWeek) {
+            newStats.thisWeekDistance += run.distance;
+          }
+          
+          // Check if run is from last week
+          if (runDate >= startOfLastWeek && runDate < startOfWeek) {
+            newStats.previousWeekDistance += run.distance;
+          }
+          
+          // Check if run is from this month
+          if (runDate >= startOfMonth) {
+            newStats.thisMonthDistance += run.distance;
+          }
         }
       }
 

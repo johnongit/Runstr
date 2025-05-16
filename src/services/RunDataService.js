@@ -65,6 +65,11 @@ class RunDataService {
         timestamp: runData.timestamp || Date.now(),
         // Default activity type to 'run' if not provided (for backward compatibility)
         activityType: runData.activityType || ACTIVITY_TYPES.RUN,
+        // New optional health metrics – default to null to keep schema explicit
+        intensity: runData.intensity ?? null, // 'easy' | 'moderate' | 'hard'
+        calories:
+          runData.calories ??
+          (runData.distance ? Math.round(runData.distance * 0.06) : null), // rough estimate if not provided
         ...runData
       };
       
@@ -183,12 +188,12 @@ class RunDataService {
    * @returns {string} Formatted distance string (e.g., "5.00 km")
    */
   formatDistance(distance, unit = 'km') {
-    if (distance === 0) return `0.00 ${unit}`;
-    
-    const valueInUnit = unit === 'km' 
-      ? distance / 1000 
+    if (distance === 0) return `0.00 ${unit}`
+     
+    const valueInUnit = unit === 'km'
+      ? distance / 1000
       : distance / 1609.344;
-    
+     
     return `${valueInUnit.toFixed(2)} ${unit}`;
   }
 
@@ -196,83 +201,59 @@ class RunDataService {
    * Format elevation consistently across the app
    * @param {number} elevation - Elevation in meters
    * @param {string} unit - Distance unit (km or mi)
-   * @returns {string} Formatted elevation string (e.g., "120 m" or "394 ft")
+   * @returns {string} Formatted elevation string
    */
   formatElevation(elevation, unit = 'km') {
     if (elevation === undefined || elevation === null) return '--';
-    
     if (unit === 'km') {
       return `${Math.round(elevation)} m`;
     } else {
-      // Convert to feet for imperial units
       const elevationInFeet = elevation * 3.28084;
       return `${Math.round(elevationInFeet)} ft`;
     }
   }
 
   /**
-   * Format time consistently across the app
-   * @param {number} seconds - Time in seconds
-   * @returns {string} Formatted time string (e.g., "01:30:45")
+   * Format time hh:mm:ss
    */
   formatTime(seconds) {
-    if (!seconds && seconds !== 0) return '--:--';
-    
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    
-    if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    } else {
-      return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    }
+    if (seconds === undefined || seconds === null) return '--:--';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    return hrs > 0
+      ? `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+      : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
   /**
-   * Calculate workout statistics from position data
-   * @param {Array} positions - Array of GPS positions
-   * @param {number} elapsedTime - Optional total elapsed time in seconds
-   * @returns {Object} Calculated statistics including distance, pace, and splits
+   * Calculate stats via helper
    */
   calculateStats(positions, elapsedTime = null) {
     return calculateRunStats(positions, elapsedTime);
   }
 
-  /**
-   * Add a listener for run data changes
-   * @param {Function} listener - Callback function
-   */
   addListener(listener) {
     if (typeof listener === 'function' && !this.listeners.includes(listener)) {
       this.listeners.push(listener);
     }
   }
 
-  /**
-   * Remove a listener
-   * @param {Function} listener - Callback function to remove
-   */
   removeListener(listener) {
     this.listeners = this.listeners.filter(l => l !== listener);
   }
 
-  /**
-   * Notify all listeners of changes
-   * @param {Array} runs - Updated runs array
-   */
   notifyListeners(runs) {
-    this.listeners.forEach(listener => {
+    this.listeners.forEach((fn) => {
       try {
-        listener(runs);
-      } catch (error) {
-        console.error('Error in run data listener:', error);
+        fn(runs);
+      } catch (err) {
+        console.error('Error in run data listener:', err);
       }
     });
   }
 }
 
-// Create singleton instance
+// Export singleton
 const runDataService = new RunDataService();
-
-export default runDataService; 
+export default runDataService;

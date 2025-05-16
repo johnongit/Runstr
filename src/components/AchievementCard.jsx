@@ -1,6 +1,7 @@
-import { useStreakRewards } from '../hooks/useStreakRewards';
+import { useStreakRewards as useLinearStreakRewards } from '../hooks/useStreakRewards';
 import PropTypes from 'prop-types';
 import { useNostr } from '../hooks/useNostr';
+import { REWARDS } from '../config/rewardsConfig';
 // import AchievementModal from './AchievementModal';
 import '../assets/styles/achievements.css';
 
@@ -8,15 +9,25 @@ import '../assets/styles/achievements.css';
  * Card displaying user achievements and rewards
  * Shown on the dashboard below the run tracker
  */
-const AchievementCard = ({ currentStreak }) => {
+const AchievementCard = () => {
   // Handle case where NostrContext might not be fully initialized yet
   const nostrContext = useNostr();
-  const lightningAddress = nostrContext?.lightningAddress || null;
+  const pubkey = nostrContext?.publicKey || null;
   
-  const { nextMilestone } = useStreakRewards(currentStreak, lightningAddress);
-  // const [modalOpen, setModalOpen] = useState(false);
+  const { streakData, rewardState } = useLinearStreakRewards(pubkey);
   
-  const progressPercentage = nextMilestone ? Math.min(100, (currentStreak / nextMilestone.days) * 100) : 0;
+  // Compute next milestone details from reward config
+  const { satsPerDay, capDays } = REWARDS.STREAK;
+  const currentDays = streakData.currentStreakDays;
+  // Next milestone is simply next day until cap reached
+  const nextMilestoneDays = Math.min(capDays, currentDays + 1);
+  const daysRemaining = Math.max(0, nextMilestoneDays - currentDays);
+  const nextMilestone = {
+    days: nextMilestoneDays,
+    sats: satsPerDay * (nextMilestoneDays - streakData.lastRewardedDay)
+  };
+  
+  const progressPercentage = nextMilestone ? Math.min(100, (currentDays / nextMilestone.days) * 100) : 0;
   
   return (
     <div className="achievement-card modern">
@@ -42,18 +53,18 @@ const AchievementCard = ({ currentStreak }) => {
             </div>
             <div className="item-details">
               <span className="item-label">Current Streak</span>
-              <span className="item-value">{currentStreak} {currentStreak === 1 ? 'day' : 'days'}</span>
+              <span className="item-value">{currentDays} {currentDays === 1 ? 'day' : 'days'}</span>
             </div>
           </div>
           
           {/* Next Reward */}
-          {nextMilestone && (
+          {nextMilestone && daysRemaining > 0 && (
             <div className="achievement-item full-width">
               <div className="reward-header">
                 <span className="item-label">Next Reward</span>
                 {' '}
                 <span className="reward-progress">
-                  {currentStreak}/{nextMilestone.days} days
+                  {currentDays}/{nextMilestone.days} days
                 </span>
               </div>
               <div className="reward-progress-bar">
@@ -63,7 +74,7 @@ const AchievementCard = ({ currentStreak }) => {
                 ></div>
               </div>
               <span className="reward-text">
-                {nextMilestone.sats} SATS in {nextMilestone.days - currentStreak} days
+                {nextMilestone.sats} SATS in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
               </span>
             </div>
           )}
@@ -82,8 +93,6 @@ const AchievementCard = ({ currentStreak }) => {
   );
 };
 
-AchievementCard.propTypes = {
-  currentStreak: PropTypes.number.isRequired
-};
+AchievementCard.propTypes = {};
 
 export default AchievementCard; 

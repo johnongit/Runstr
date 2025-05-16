@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import StreakRewardsCard from './StreakRewardsCard';
 import BitcoinTransactionHistory from './BitcoinTransactionHistory';
 
 /**
@@ -13,11 +12,11 @@ const AchievementModal = ({ onClose, currentStreak }) => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'streaks':
-        return <StreakRewardsCard currentStreak={currentStreak} showTitle={false} />;
+        return null; // Placeholder – streak detail UI moved to dashboard
       case 'transactions':
         return <BitcoinTransactionHistory />;
       default:
-        return <StreakRewardsCard currentStreak={currentStreak} showTitle={false} />;
+        return null;
     }
   };
   

@@ -42,4 +42,9 @@ type ValueOf<T> = T[keyof T];
 export type RewardKey = keyof typeof REWARDS;
 // export type StreakConfig = typeof REWARDS["STREAK"]; // Now an interface
 export type DailyLeaderboardConfig = typeof REWARDS["DAILY_LEADERBOARD"]; // Now an interface
-export type Event100kConfig = typeof REWARDS["EVENT_100K"]; // Now an interface 
+export type Event100kConfig = typeof REWARDS["EVENT_100K"]; // Now an interface
+
+export const MIN_STREAK_DISTANCE = {
+  km: 500, // 0.5 km in meters
+  mi: 804, // 0.5 mile in meters
+} as const; 

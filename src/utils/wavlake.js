@@ -4,7 +4,7 @@ import { getLnurlFromCache, storeLnurlInCache } from '../services/lnurlCacheServ
 
 // todo: move this to env variables
 const WAVLAKE_CATALOG_API_BASE_URL = 'https://catalog.wavlake.com/v1';
-const WAVLAKE_API_BASE_URL = 'https://wavlake.com/api/v1';
+export const WAVLAKE_API_BASE_URL = 'https://wavlake.com/api/v1';
 
 // Constants for playlist types
 export const PLAYLIST = 'playlist';

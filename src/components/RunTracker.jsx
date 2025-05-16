@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRunTracker } from '../contexts/RunTrackerContext';
 import { useActivityMode } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -10,7 +10,9 @@ import SplitsTable from './SplitsTable';
 import DashboardRunCard from './DashboardRunCard';
 import AchievementCard from './AchievementCard';
 import { validateEventRun, initializeEvents } from '../services/EventService';
-import { SaveRunExtrasModal } from './SaveRunExtrasModal';
+import { PostRunWizardModal } from './PostRunWizardModal';
+import { updateUserStreak } from '../utils/streakUtils';
+import { MIN_STREAK_DISTANCE } from '../config/rewardsConfig';
 
 export const RunTracker = () => {
   const { 
@@ -41,8 +43,7 @@ export const RunTracker = () => {
   const [workoutSaved, setWorkoutSaved] = useState(false);
   const [isSavingWorkout, setIsSavingWorkout] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showSaveExtrasModal, setShowSaveExtrasModal] = useState(false);
-  const [currentWorkoutEventId, setCurrentWorkoutEventId] = useState(null);
+  const [showPostRunWizard, setShowPostRunWizard] = useState(false);
 
   // Initialize events when the component mounts
   useEffect(() => {
@@ -295,11 +296,22 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       const publishedEventId = publishedEvent?.id;
       if (publishedEventId) {
         setWorkoutSaved(true);
-        setCurrentWorkoutEventId(publishedEventId);
-        setShowSaveExtrasModal(true);
-        // Optionally inform the user that extra options are available
-        if (window.Android && window.Android.showToast) {
-          window.Android.showToast('Workout saved! Add intensity & calories?');
+        recentRun.nostrWorkoutEventId = publishedEventId;
+        runDataService.updateRun(recentRun.id, { nostrWorkoutEventId: publishedEventId });
+        setShowPostRunWizard(true);
+        // Update streak data if run distance meets threshold
+        const minDistance = distanceUnit === 'km' ? MIN_STREAK_DISTANCE.km : MIN_STREAK_DISTANCE.mi;
+        if (recentRun.distance >= minDistance) {
+          try {
+            updateUserStreak(new Date(recentRun.date));
+            // Cache currentStreak for quick dashboard display
+            const streakData = JSON.parse(localStorage.getItem('runstrStreakData')) || {};
+            if (typeof streakData.currentStreakDays === 'number') {
+              localStorage.setItem('currentStreak', streakData.currentStreakDays.toString());
+            }
+          } catch (err) {
+            console.error('Failed to update streak after workout save:', err);
+          }
         }
       } else {
         throw new Error('Failed to get ID from published workout event.');
@@ -362,34 +374,6 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     } finally {
       setIsDeleting(false);
     }
-  };
-
-  const handleCloseSaveExtrasModal = () => {
-    setShowSaveExtrasModal(false);
-    setCurrentWorkoutEventId(null);
-    setIsSavingWorkout(false);
-  };
-
-  const handlePublishExtrasSuccess = ({ intensityEventId, caloricEventId, errors }) => {
-    if (errors && errors.length > 0) {
-      const msg = 'Extras publishing failed: ' + errors.join(', ');
-      if (window.Android && window.Android.showToast) {
-        window.Android.showToast(msg);
-      } else {
-        alert(msg);
-      }
-    } else {
-      let successMsg = 'Workout extras published!';
-      if (intensityEventId && caloricEventId) successMsg = 'Intensity & Calories published!';
-      else if (intensityEventId) successMsg = 'Intensity published!';
-      else if (caloricEventId) successMsg = 'Calories published!';
-      if (window.Android && window.Android.showToast) {
-        window.Android.showToast(successMsg);
-      } else {
-        alert(successMsg);
-      }
-    }
-    handleCloseSaveExtrasModal();
   };
 
   return (
@@ -611,13 +595,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         </div>
       )}
       
-      {showSaveExtrasModal && recentRun && currentWorkoutEventId && (
-        <SaveRunExtrasModal
-          run={recentRun}
-          workoutEventId={currentWorkoutEventId}
-          onClose={handleCloseSaveExtrasModal}
-          onPublishSuccess={handlePublishExtrasSuccess}
-        />
+      {showPostRunWizard && recentRun && (
+        <PostRunWizardModal run={recentRun} onClose={() => setShowPostRunWizard(false)} />
       )}
     </div>
   );
