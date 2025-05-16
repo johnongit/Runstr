@@ -72,8 +72,29 @@ export const usePostInteractions = ({
 
       console.log('Post liked successfully');
     } catch (error) {
+      // Many relays respond slowly; NDK throws "publish timed out" after waiting
+      // This isn't critical for a like, so we treat it as success and avoid the red-box.
+      if (error?.message?.toLowerCase().includes('timed out')) {
+        console.warn('Like publish timed out – treating as success (slow relays)');
+
+        // Optimistically update UI the same way we would on success
+        setUserLikes(prev => {
+          const newLikes = new Set(prev);
+          newLikes.add(post.id);
+          return newLikes;
+        });
+
+        setPosts(currentPosts =>
+          currentPosts.map(p =>
+            p.id === post.id ? { ...p, likes: p.likes + 1 } : p
+          )
+        );
+
+        return; // prevent console.error below
+      }
+
       console.error('Error liking post:', error);
-      alert('Failed to like post: ' + error.message);
+      alert('Failed to like post: ' + (error.message || 'Unknown error'));
     }
   }, [setUserLikes, setPosts]);
 

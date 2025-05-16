@@ -73,9 +73,9 @@ export const PostRunWizardModal = ({ run, onClose }) => {
         <h3 className="text-lg font-semibold mb-4">Share to Nostr</h3>
         <p className="mb-3">The following data will be published:</p>
         <ul className="list-disc pl-6 mb-6">
-          <li>Workout summary (distance, duration, elevation, calories) – NIP-101e</li>
-          <li>Workout intensity – NIP-101h</li>
-          <li>Calories burned – NIP-101h</li>
+          <li>Workout Record</li>
+          <li>Workout Intensity</li>
+          <li>Calories</li>
         </ul>
         {publishResults && (
           <div className="mb-4 text-sm">
