@@ -181,15 +181,13 @@ export const RunClub = () => {
           return null;
         })()
       ) : posts.length === 0 ? (
-        <div className="no-posts-message">
-          <p>No running posts found</p>
-          <button 
-            className="retry-button" 
-            onClick={refreshFeed}
-          >
-            Refresh
-          </button>
-        </div>
+        (() => {
+          // silently trigger refresh and show simple loading text
+          refreshFeed();
+          return (
+            <div className="loading-indicator"><p>Loading posts...</p></div>
+          );
+        })()
       ) : (
         <PostList
           posts={posts}

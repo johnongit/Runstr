@@ -34,6 +34,7 @@ export const useRunFeed = () => {
   const initialLoadRef = useRef(globalState.isInitialized);
   const subscriptionRef = useRef(null);
   const fetchedProfilesRef = useRef(new Set());
+  const pollingRef = useRef(null);
 
   // Ensure NDK as soon as the hook is used
   useEffect(() => {
@@ -617,6 +618,35 @@ export const useRunFeed = () => {
     });
     return unsub;
   }, []);
+
+  // 10-second polling for engagement data of currently displayed posts
+  const startEngagementPolling = useCallback(() => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const visible = posts.slice(0, displayLimit);
+        if (visible.length === 0) return;
+
+        const supp = await loadSupplementaryData(visible);
+        const enriched = await processPostsWithData(visible, supp);
+
+        setPosts(prev => prev.map(p => {
+          const upd = enriched.find(e => e.id === p.id);
+          return upd ? { ...p, likes: upd.likes, reposts: upd.reposts, zaps: upd.zaps, zapAmount: upd.zapAmount, comments: upd.comments } : p;
+        }));
+      } catch (err) {
+        console.warn('Engagement polling error', err);
+      }
+    }, 10000); // 10 seconds
+  }, [posts, displayLimit]);
+
+  useEffect(() => {
+    startEngagementPolling();
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [startEngagementPolling]);
 
   return {
     posts,
