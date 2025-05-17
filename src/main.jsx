@@ -35,12 +35,6 @@ if (typeof window !== 'undefined') {
     }
     showError('[promise] ' + msg + '\n' + (reason?.stack || ''));
   });
-
-  // Global suppression of unhandled promise rejections to remove red overlay in dev
-  window.addEventListener('unhandledrejection', (e) => {
-    e.preventDefault();
-    console.warn('Suppressed unhandled rejection:', e.reason);
-  });
 }
 /* ---------------------------------------------------------*/
 

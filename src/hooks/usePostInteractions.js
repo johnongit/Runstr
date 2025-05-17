@@ -115,7 +115,7 @@ export const usePostInteractions = ({
       }
 
       console.error('Error liking post:', error);
-      alert('Failed to like post: ' + (error.message || 'Unknown error'));
+      console.warn('Like failed (silenced):', error.message);
     }
   }, [setUserLikes, setPosts]);
 
@@ -158,7 +158,7 @@ export const usePostInteractions = ({
       console.log('Post reposted successfully');
     } catch (error) {
       console.error('Error reposting:', error);
-      alert('Failed to repost: ' + error.message);
+      console.warn('Repost failed (silenced):', error.message);
     }
   }, [setUserReposts, setPosts]);
 
@@ -407,7 +407,7 @@ export const usePostInteractions = ({
       }
     } catch (error) {
       console.error('Error sending zap:', error);
-      alert('Failed to send zap: ' + (error.message || 'Unknown error'));
+      console.warn('Zap failed (silenced):', error.message);
     }
   }, [defaultZapAmount, setPosts]);
 
@@ -464,7 +464,7 @@ export const usePostInteractions = ({
       setCommentText('');
     } catch (error) {
       console.error('Error posting comment:', error);
-      alert('Failed to post comment: ' + error.message);
+      console.warn('Comment failed (silenced):', error.message);
     }
   }, [commentText, setPosts]);
 

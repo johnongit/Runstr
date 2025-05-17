@@ -254,7 +254,7 @@ export const Post = ({
         >
           <Zap className="h-5 w-5 mr-1" />
           <span className="action-text">Zap</span>
-          {post.zapAmount > 0 && <span className="action-count">{post.zapAmount}</span>}
+          <span className="action-count">{post.zaps ?? 0}</span>
         </button>
         <button
           className={`action-button like-button ${userLikes.has(post.id) ? 'liked' : ''}`}
@@ -262,7 +262,7 @@ export const Post = ({
         >
           <Heart className={`h-5 w-5 mr-1 ${userLikes.has(post.id) ? 'fill-current' : ''}`} />
           <span className="action-text">Like</span>
-          {post.likes > 0 && <span className="action-count">{post.likes}</span>}
+          <span className="action-count">{post.likes ?? 0}</span>
         </button>
         <button
           className={`action-button repost-button ${userReposts.has(post.id) ? 'reposted' : ''}`}
@@ -270,7 +270,7 @@ export const Post = ({
         >
           <Repeat className="h-5 w-5 mr-1" />
           <span className="action-text">Repost</span>
-          {post.reposts > 0 && <span className="action-count">{post.reposts}</span>}
+          <span className="action-count">{post.reposts ?? 0}</span>
         </button>
         <button
           className="action-button comment-button"
@@ -278,7 +278,7 @@ export const Post = ({
         >
           <MessageSquare className="h-5 w-5 mr-1" />
           <span className="action-text">Comment</span>
-          {(post.comments?.length > 0) && <span className="action-count">{post.comments.length}</span>}
+          <span className="action-count">{post.comments?.length ?? 0}</span>
         </button>
       </div>
       

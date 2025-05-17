@@ -9,6 +9,7 @@ import { lightweightProcessPosts, mergeProcessedPosts } from '../utils/feedProce
 import { NDKRelaySet } from '@nostr-dev-kit/ndk';
 import { getFastestRelays } from '../utils/feedFetcher';
 import { startFeed, subscribeFeed, getFeed } from '../lib/feedManager';
+import { getEventTargetId } from '../utils/eventHelpers';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -34,7 +35,8 @@ export const useRunFeed = () => {
   const initialLoadRef = useRef(globalState.isInitialized);
   const subscriptionRef = useRef(null);
   const fetchedProfilesRef = useRef(new Set());
-  const pollingRef = useRef(null);
+  const reactionSubRef = useRef(null);
+  const reactionSetsRef = useRef({ likes: new Map(), reposts: new Map(), zaps: new Map(), comments: new Map() });
 
   // Ensure NDK as soon as the hook is used
   useEffect(() => {
@@ -619,34 +621,64 @@ export const useRunFeed = () => {
     return unsub;
   }, []);
 
-  // 10-second polling for engagement data of currently displayed posts
-  const startEngagementPolling = useCallback(() => {
-    if (pollingRef.current) clearInterval(pollingRef.current);
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        const visible = posts.slice(0, displayLimit);
-        if (visible.length === 0) return;
-
-        const supp = await loadSupplementaryData(visible);
-        const enriched = await processPostsWithData(visible, supp);
-
-        setPosts(prev => prev.map(p => {
-          const upd = enriched.find(e => e.id === p.id);
-          return upd ? { ...p, likes: upd.likes, reposts: upd.reposts, zaps: upd.zaps, zapAmount: upd.zapAmount, comments: upd.comments } : p;
-        }));
-      } catch (err) {
-        console.warn('Engagement polling error', err);
-      }
-    }, 10000); // 10 seconds
-  }, [posts, displayLimit]);
-
+  // Add effect after posts state updates
   useEffect(() => {
-    startEngagementPolling();
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, [startEngagementPolling]);
+    if (posts.length === 0) return;
+    // Start reaction subscription once
+    if (reactionSubRef.current) return;
+    const ids = posts.map(p => p.id);
+    try {
+      const sub = ndk.subscribe({ kinds: [7,6,9735,1], '#e': ids, since: Math.floor(Date.now()/1000) - 14*24*3600 }, { closeOnEose:false });
+      reactionSubRef.current = sub;
+      sub.on('event', (ev) => {
+        const postId = getEventTargetId(ev);
+        if (!postId) return;
+        setPosts(prev => prev.map(p => {
+          if (p.id !== postId) return p;
+          // duplicate check
+          switch(ev.kind){
+            case 7: {
+              let set = reactionSetsRef.current.likes.get(postId);
+              if(!set){ set=new Set(); reactionSetsRef.current.likes.set(postId,set);} 
+              if(set.has(ev.id)) return p;
+              set.add(ev.id);
+              return { ...p, likes: (p.likes||0)+1 };
+            }
+            case 6: {
+              let set = reactionSetsRef.current.reposts.get(postId);
+              if(!set){ set=new Set(); reactionSetsRef.current.reposts.set(postId,set);} 
+              if(set.has(ev.id)) return p;
+              set.add(ev.id);
+              return { ...p, reposts: (p.reposts||0)+1 };
+            }
+            case 9735:{
+              let store = reactionSetsRef.current.zaps.get(postId);
+              if(!store){ store={ids:new Set(), amount:0}; reactionSetsRef.current.zaps.set(postId,store);} 
+              if(store.ids.has(ev.id)) return p;
+              store.ids.add(ev.id);
+              // amount parse
+              let amount=0;
+              const amtTag = ev.tags.find(t=>t[0]==='amount');
+              if(amtTag && amtTag[1]){ const val=parseInt(amtTag[1],10); if(!isNaN(val)) amount = val/1000; }
+              store.amount += amount;
+              return { ...p, zaps: (p.zaps||0)+1, zapAmount: (p.zapAmount||0)+amount };
+            }
+            case 1: {
+              // comment
+              let set = reactionSetsRef.current.comments.get(postId);
+              if(!set){ set=new Set(); reactionSetsRef.current.comments.set(postId,set);} 
+              if(set.has(ev.id)) return p;
+              set.add(ev.id);
+              const newComment = { id: ev.id, content: ev.content, created_at: ev.created_at, author:{pubkey: ev.pubkey, profile:{}} };
+              return { ...p, comments: [...p.comments, newComment] };
+            }
+            default: return p;
+          }
+        }));
+      });
+    }catch(err){ console.warn('Reaction subscription failed', err);} 
+    return () => { if(reactionSubRef.current){reactionSubRef.current.stop(); reactionSubRef.current=null;} };
+  }, [posts]);
 
   return {
     posts,
