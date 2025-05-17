@@ -24,7 +24,7 @@ export const lightweightProcessPosts = (posts) => {
     author: {
       pubkey: post.pubkey || '',
       profile: { 
-        name: 'Loading...', // Placeholder for profile data
+        name: undefined,
         picture: undefined
       }
     },

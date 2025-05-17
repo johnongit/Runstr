@@ -1,4 +1,4 @@
-import { useEffect, useContext, useState } from 'react';
+import { useEffect, useContext, useState, useCallback } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
 import { useAuth } from '../hooks/useAuth';
 import { useRunFeed } from '../hooks/useRunFeed';
@@ -115,7 +115,7 @@ export const RunClub = () => {
   };
 
   // Function to refresh the feed when the header is clicked
-  const refreshFeed = () => {
+  const refreshFeed = useCallback(() => {
     // Don't allow multiple refreshes at once
     if (loading || isRefreshing) return;
     
@@ -127,7 +127,7 @@ export const RunClub = () => {
           setIsRefreshing(false);
         }, 500);
       });
-  };
+  }, [loading, isRefreshing, fetchRunPostsViaSubscription]);
 
   // Simple scroll handler
   useEffect(() => {
@@ -145,6 +145,20 @@ export const RunClub = () => {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loadMorePosts]);
+
+  // Refresh feed automatically when the page/tab regains focus
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshFeed();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshFeed]);
 
   return (
     <div className="run-club-container">

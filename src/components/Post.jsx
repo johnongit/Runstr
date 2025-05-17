@@ -179,7 +179,11 @@ export const Post = ({
           height="48"
         />
         <div className="author-info">
-          <h4>{post.author.profile.name || 'Anonymous Runner'}</h4>
+          <h4>
+            {post.author?.profile?.name && post.author.profile.name !== 'Loading...'
+              ? post.author.profile.name
+              : 'Anonymous Runner'}
+          </h4>
           <span className="post-date">
             {formatDate(post.created_at)}
           </span>
@@ -248,7 +252,7 @@ export const Post = ({
         >
           <Zap className="h-5 w-5 mr-1" />
           <span className="action-text">Zap</span>
-          {post.zaps > 0 && <span className="action-count">{post.zaps}</span>}
+          <span className="action-count">{post.zaps ?? 0}</span>
         </button>
         <button
           className={`action-button like-button ${userLikes.has(post.id) ? 'liked' : ''}`}
@@ -256,7 +260,7 @@ export const Post = ({
         >
           <Heart className={`h-5 w-5 mr-1 ${userLikes.has(post.id) ? 'fill-current' : ''}`} />
           <span className="action-text">Like</span>
-          {post.likes > 0 && <span className="action-count">{post.likes}</span>}
+          <span className="action-count">{post.likes ?? 0}</span>
         </button>
         <button
           className={`action-button repost-button ${userReposts.has(post.id) ? 'reposted' : ''}`}
@@ -264,7 +268,7 @@ export const Post = ({
         >
           <Repeat className="h-5 w-5 mr-1" />
           <span className="action-text">Repost</span>
-          {post.reposts > 0 && <span className="action-count">{post.reposts}</span>}
+          <span className="action-count">{post.reposts ?? 0}</span>
         </button>
         <button
           className="action-button comment-button"
@@ -272,7 +276,7 @@ export const Post = ({
         >
           <MessageSquare className="h-5 w-5 mr-1" />
           <span className="action-text">Comment</span>
-          {(post.comments?.length > 0) && <span className="action-count">{post.comments.length}</span>}
+          <span className="action-count">{post.comments?.length ?? 0}</span>
         </button>
       </div>
       
@@ -304,9 +308,7 @@ export const Post = ({
                       </button>
                     )}
                   </>
-                ) : (
-                  <div className="no-comments">No comments yet. Be the first to comment!</div>
-                )}
+                ) : null }
               </>
             )}
           </div>

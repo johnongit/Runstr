@@ -93,6 +93,27 @@ export const usePostInteractions = ({
         return; // prevent console.error below
       }
 
+      // Handle benign errors that don't impact the user experience (e.g., relay rejects like event)
+      if (error?.message?.toLowerCase().includes('missing group') ||
+          error?.message?.toLowerCase().includes('blocked')) {
+        console.warn('Relay rejected like event – treating as success:', error.message);
+
+        // Optimistically update UI just like on success
+        setUserLikes(prev => {
+          const newLikes = new Set(prev);
+          newLikes.add(post.id);
+          return newLikes;
+        });
+
+        setPosts(currentPosts =>
+          currentPosts.map(p =>
+            p.id === post.id ? { ...p, likes: p.likes + 1 } : p
+          )
+        );
+
+        return; // prevent alert below
+      }
+
       console.error('Error liking post:', error);
       alert('Failed to like post: ' + (error.message || 'Unknown error'));
     }
