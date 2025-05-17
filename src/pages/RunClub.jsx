@@ -171,28 +171,15 @@ export const RunClub = () => {
           <p>Loading posts...</p>
         </div>
       ) : error ? (
-        <div className="error-message">
-          <p>{error}</p>
-          <div className="error-buttons">
-            <button 
-              className="retry-button" 
-              onClick={refreshFeed}
-            >
-              Retry
-            </button>
-            <button 
-              className="diagnose-button" 
-              onClick={diagnoseConnection}
-            >
-              Diagnose Connection
-            </button>
-          </div>
-          {diagnosticInfo && (
-            <div className="diagnostic-info">
-              <p>{diagnosticInfo}</p>
-            </div>
-          )}
-        </div>
+        // Silently attempt a background retry; no UI banner displayed
+        (() => {
+          console.warn('Feed error suppressed:', error);
+          // Attempt auto-retry once after short delay
+          setTimeout(() => {
+            if (!loading) refreshFeed();
+          }, 2000);
+          return null;
+        })()
       ) : posts.length === 0 ? (
         <div className="no-posts-message">
           <p>No running posts found</p>

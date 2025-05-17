@@ -37,7 +37,8 @@ export const lightweightProcessPosts = (posts) => {
     zaps: 0,
     zapAmount: 0,
     images: extractImagesFromContent(post.content || ''),
-    _needsEnrichment: true // Flag for background enhancement
+    _needsEnrichment: true, // Flag for background enhancement
+    needsProfile: true // Explicitly mark that we still need to fetch author profile
   })).sort((a, b) => b.created_at - a.created_at);
 };
 

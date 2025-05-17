@@ -5,6 +5,7 @@ import AmberAuth from '../services/AmberAuth';
 import { createAndPublishEvent as publishWithNostrTools } from './nostrClient';
 import { getFastestRelays, directFetchRunningPosts } from './feedFetcher';
 import { encryptContentNip44 } from './nip44';
+import { getEventTargetId, chunkArray } from './eventHelpers';
 
 // Import the NDK singleton
 import { ndk, ndkReadyPromise } from '../lib/ndkSingleton'; // Adjusted path
@@ -190,8 +191,19 @@ export const loadSupplementaryData = async (posts, type) => {
   // Extract unique author public keys (if available)
   const authors = [...new Set(posts.map(p => (p.pubkey || (p.author && p.author.pubkey))).filter(Boolean))];
   
+  // Helper to run chunked fetch for event kinds referencing many ids
+  const chunkedFetch = async (kind, ids) => {
+    const chunks = chunkArray(ids, 150);
+    const results = await Promise.all(chunks.map(slice => fetchEvents({ kinds: [kind], '#e': slice })));
+    // Merge into single Set
+    return results.reduce((acc, set) => {
+      for (const ev of set) acc.add(ev);
+      return acc;
+    }, new Set());
+  };
+
   // Run all queries in parallel using Promise.allSettled so that one failure
-  // doesn\'t break the entire supplementary data pipeline
+  // doesn't break the entire supplementary data pipeline
   const [profileRes, commentsRes, likesRes, repostsRes, zapRes] = await Promise.allSettled([
     // Profile information (only if we have author public keys)
     authors.length > 0 ? (() => {
@@ -203,13 +215,13 @@ export const loadSupplementaryData = async (posts, type) => {
       );
     })() : Promise.resolve(new Set()),
     // Comments
-    fetchEvents({ kinds: [1], '#e': postIds }),
+    chunkedFetch(1, postIds),
     // Likes
-    fetchEvents({ kinds: [7], '#e': postIds }),
+    chunkedFetch(7, postIds),
     // Reposts
-    fetchEvents({ kinds: [6], '#e': postIds }),
+    chunkedFetch(6, postIds),
     // Zap receipts
-    fetchEvents({ kinds: [9735], '#e': postIds })
+    chunkedFetch(9735, postIds)
   ]);
   
   // Convert settled results into usable Sets (fallback to empty Set on rejection)
@@ -295,30 +307,28 @@ export const processPostsWithData = async (posts, supplementaryData) => {
     
     // Process likes
     Array.from(likes).forEach(like => {
-      const postId = like.tags.find(tag => tag[0] === 'e')?.[1];
-      if (postId) {
-        if (!likesByPost.has(postId)) {
-          likesByPost.set(postId, 0);
-        }
-        likesByPost.set(postId, likesByPost.get(postId) + 1);
+      const postId = getEventTargetId(like);
+      if (!postId) return;
+      if (!likesByPost.has(postId)) {
+        likesByPost.set(postId, new Set());
       }
+      likesByPost.get(postId).add(like.id);
     });
     
     // Process reposts
     Array.from(reposts).forEach(repost => {
-      const postId = repost.tags.find(tag => tag[0] === 'e')?.[1];
-      if (postId) {
-        if (!repostsByPost.has(postId)) {
-          repostsByPost.set(postId, 0);
-        }
-        repostsByPost.set(postId, repostsByPost.get(postId) + 1);
+      const postId = getEventTargetId(repost);
+      if (!postId) return;
+      if (!repostsByPost.has(postId)) {
+        repostsByPost.set(postId, new Set());
       }
+      repostsByPost.get(postId).add(repost.id);
     });
     
     // Process zap receipts
     Array.from(zapReceipts).forEach(zapReceipt => {
       try {
-        const postId = zapReceipt.tags.find(tag => tag[0] === 'e')?.[1];
+        const postId = getEventTargetId(zapReceipt);
         if (postId) {
           // Get the zap amount from the bolt11 or amount tag
           let zapAmount = 0;
@@ -338,12 +348,13 @@ export const processPostsWithData = async (posts, supplementaryData) => {
           
           // Add to post's total zaps
           if (!zapsByPost.has(postId)) {
-            zapsByPost.set(postId, { count: 0, amount: 0 });
+            zapsByPost.set(postId, { ids: new Set(), amount: 0 });
           }
           const postZaps = zapsByPost.get(postId);
-          postZaps.count += 1;
-          postZaps.amount += zapAmount;
-          zapsByPost.set(postId, postZaps);
+          if (!postZaps.ids.has(zapReceipt.id)) {
+            postZaps.ids.add(zapReceipt.id);
+            postZaps.amount += zapAmount;
+          }
         }
       } catch (err) {
         console.error('Error processing zap receipt:', err);
@@ -407,9 +418,9 @@ export const processPostsWithData = async (posts, supplementaryData) => {
       const images = extractImagesFromContent(post.content || '');
       
       // Get post interactions with safe defaults
-      const postZaps = zapsByPost.get(post.id) || { count: 0, amount: 0 };
-      const postLikes = likesByPost.get(post.id) || 0;
-      const postReposts = repostsByPost.get(post.id) || 0;
+      const postZaps = zapsByPost.get(post.id) || { ids: new Set(), amount: 0 };
+      const postLikes = likesByPost.get(post.id) || new Set();
+      const postReposts = repostsByPost.get(post.id) || new Set();
       const postComments = commentsByPost.get(post.id) || [];
       
       return {
@@ -424,11 +435,12 @@ export const processPostsWithData = async (posts, supplementaryData) => {
         },
         comments: postComments,
         showComments: false,
-        likes: postLikes,
-        reposts: postReposts,
-        zaps: postZaps.count,
+        likes: postLikes.size,
+        reposts: postReposts.size,
+        zaps: postZaps.ids.size,
         zapAmount: postZaps.amount,
-        images: images  // Add extracted images to the post object
+        images: images,  // Add extracted images to the post object
+        needsProfile: false
       };
     });
     

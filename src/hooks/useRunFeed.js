@@ -511,7 +511,14 @@ export const useRunFeed = () => {
     try {
       const relays = getFastestRelays(3);
       const relaySet = NDKRelaySet.fromRelayUrls(relays, ndk);
-      sub = ndk.subscribe({ kinds: [0], authors: uniqueMissing, limit: uniqueMissing.length }, { closeOnEose: true, relaySet });
+      const candidateSub = ndk.subscribe({ kinds: [0], authors: uniqueMissing, limit: uniqueMissing.length }, { closeOnEose: true, relaySet });
+
+      if (!candidateSub) {
+        console.warn('Profile subscription could not be started (ndk returned null)');
+        return; // abort effect; will try fallback fetch later
+      }
+
+      sub = candidateSub;
 
       sub.on('event', (profileEvt) => {
         try {
@@ -554,6 +561,41 @@ export const useRunFeed = () => {
           console.warn('Profile subscription processing failed', err);
         }
       });
+
+      // Fallback: direct fetch each missing profile once
+      (async () => {
+        try {
+          const promises = uniqueMissing.map(async (pk) => {
+            try {
+              const res = await ndk.fetchEvents({ kinds: [0], authors: [pk], limit: 1 });
+              if (res && res.size > 0) {
+                const profileEvt = Array.from(res)[0];
+                let parsed = {};
+                try { parsed = JSON.parse(profileEvt.content); } catch {}
+                const normalized = {
+                  name: parsed.name || parsed.display_name,
+                  picture: typeof parsed.picture === 'string' ? parsed.picture : undefined,
+                  lud16: parsed.lud16,
+                  lud06: parsed.lud06,
+                };
+                setPosts(prev => prev.map(p =>
+                  p.author && p.author.pubkey === pk
+                    ? { ...p, author: { ...p.author, profile: { ...p.author.profile, ...normalized } }, needsProfile: false }
+                    : p
+                ));
+                globalState.allPosts = globalState.allPosts.map(p =>
+                  p.author && p.author.pubkey === pk
+                    ? { ...p, author: { ...p.author, profile: { ...p.author.profile, ...normalized } }, needsProfile: false }
+                    : p
+                );
+              }
+            } catch (err) {
+              console.warn('Direct profile fetch failed for', pk, err);
+            }
+          });
+          await Promise.all(promises);
+        } catch (_) {}
+      })();
     } catch (err) {
       console.warn('Could not start profile subscription', err);
     }

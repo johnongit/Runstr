@@ -169,21 +169,23 @@ export const Post = ({
   return (
     <div className="post-card" data-post-id={post.id}>
       <div className="post-header">
-        <img
-          src={getAvatarUrl(post.author.profile.picture, 48) || '/default-avatar.svg'}
-          alt={post.author.profile.name || 'Anonymous'}
-          className="author-avatar"
-          onLoad={handleAvatarLoad}
-          onError={handleAvatarError}
-          width="48"
-          height="48"
-        />
+        {(() => {
+          const avatarSrc = getAvatarUrl(post.author?.profile?.picture, 48);
+          return (
+            <img
+              src={avatarSrc || ''}
+              alt=""
+              className="author-avatar"
+              style={{ opacity: avatarSrc ? 1 : 0 }}
+              onLoad={handleAvatarLoad}
+              onError={handleAvatarError}
+              width="48"
+              height="48"
+            />
+          );
+        })()}
         <div className="author-info">
-          <h4>
-            {post.author?.profile?.name && post.author.profile.name !== 'Loading...'
-              ? post.author.profile.name
-              : 'Anonymous Runner'}
-          </h4>
+          <h4>{post.author?.profile?.name || '\u00A0'}</h4>
           <span className="post-date">
             {formatDate(post.created_at)}
           </span>
