@@ -19,35 +19,30 @@ export const fetchProfilesFromAggregator = async (pubkeys = []) => {
   if (!pubkeys || pubkeys.length === 0) return new Map();
 
   try {
-    // According to nostr.band docs the plural `pubkeys` param is required.
-    // Fall back to old param if the request fails, but prefer the correct one.
-    let url = `https://api.nostr.band/v0/profiles?pubkeys=${pubkeys.join(',')}`;
+    // The r.jyx.ai mirror offers identical payloads to nostr.band but with permissive CORS headers.
+    // We default to the plural `pubkeys` param; if that fails retry once with the singular form.
+    const BASE_URL = 'https://r.jyx.ai/profiles';
+    let url = `${BASE_URL}?pubkeys=${pubkeys.join(',')}`;
+
     let res;
     try {
       res = await fetch(url);
+
       // If the endpoint returns 404/400 it might be because we used the wrong
       // parameter name – retry once with the legacy singular form for safety.
       if (!res.ok) {
         console.warn('[profileAggregator] plural param failed, retrying with singular', res.status);
-        url = `https://api.nostr.band/v0/profiles?pubkey=${pubkeys.join(',')}`;
+        url = `${BASE_URL}?pubkey=${pubkeys.join(',')}`;
         res = await fetch(url);
       }
     } catch (fetchErr) {
-      console.warn('[profileAggregator] initial fetch failed', fetchErr);
-      // Could be CORS/network – attempt via proxy before giving up
-      try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-        console.warn('[profileAggregator] Retrying via CORS proxy after network error', proxyUrl);
-        res = await fetch(proxyUrl);
-      } catch (proxyErr) {
-        console.warn('[profileAggregator] proxy fetch failed after network error', proxyErr);
-        return new Map();
-      }
+      console.warn('[profileAggregator] HTTP fetch failed', fetchErr);
+      return new Map();
+    }
 
-      if (!res.ok) {
-        console.warn('[profileAggregator] proxy response not ok after network error', res.status);
-        return new Map();
-      }
+    if (!res.ok) {
+      console.warn('[profileAggregator] aggregator response not ok', res.status);
+      return new Map();
     }
 
     const data = await res.json();
