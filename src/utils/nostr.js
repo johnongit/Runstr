@@ -342,7 +342,7 @@ export const processPostsWithData = async (posts, supplementaryData) => {
     if (missingAuthors.length > 0) {
       try {
         const { fetchProfilesFromAggregator } = await import('./profileAggregator.js');
-        const aggProfiles = await fetchProfilesFromAggregator(missingAuthors.slice(0, 100));
+        const aggProfiles = await fetchProfilesFromAggregator(missingAuthors);
         aggProfiles.forEach((profile, pk) => profileMap.set(pk, profile));
       } catch (aggErr) {
         console.warn('Aggregator profile fetch failed', aggErr);

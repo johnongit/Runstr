@@ -1,4 +1,21 @@
 export const fetchProfilesFromAggregator = async (pubkeys = []) => {
+  // Chunk to avoid extremely long query strings that break mobile/proxies
+  const MAX_PER_REQUEST = 20;
+  if (pubkeys.length > MAX_PER_REQUEST) {
+    const chunks = [];
+    for (let i = 0; i < pubkeys.length; i += MAX_PER_REQUEST) {
+      chunks.push(pubkeys.slice(i, i + MAX_PER_REQUEST));
+    }
+
+    const results = await Promise.all(chunks.map(chunk => fetchProfilesFromAggregator(chunk)));
+    // Merge maps
+    const merged = new Map();
+    results.forEach(chunkMap => {
+      chunkMap.forEach((val, key) => merged.set(key, val));
+    });
+    return merged;
+  }
+
   if (!pubkeys || pubkeys.length === 0) return new Map();
 
   try {
