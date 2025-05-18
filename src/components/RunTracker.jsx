@@ -11,8 +11,6 @@ import DashboardRunCard from './DashboardRunCard';
 import AchievementCard from './AchievementCard';
 import { validateEventRun, initializeEvents } from '../services/EventService';
 import { PostRunWizardModal } from './PostRunWizardModal';
-import { updateUserStreak } from '../utils/streakUtils';
-import { MIN_STREAK_DISTANCE } from '../config/rewardsConfig';
 
 export const RunTracker = () => {
   const { 
@@ -299,20 +297,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         recentRun.nostrWorkoutEventId = publishedEventId;
         runDataService.updateRun(recentRun.id, { nostrWorkoutEventId: publishedEventId });
         setShowPostRunWizard(true);
-        // Update streak data if run distance meets threshold
-        const minDistance = distanceUnit === 'km' ? MIN_STREAK_DISTANCE.km : MIN_STREAK_DISTANCE.mi;
-        if (recentRun.distance >= minDistance) {
-          try {
-            updateUserStreak(new Date(recentRun.date));
-            // Cache currentStreak for quick dashboard display
-            const streakData = JSON.parse(localStorage.getItem('runstrStreakData')) || {};
-            if (typeof streakData.currentStreakDays === 'number') {
-              localStorage.setItem('currentStreak', streakData.currentStreakDays.toString());
-            }
-          } catch (err) {
-            console.error('Failed to update streak after workout save:', err);
-          }
-        }
+        // Streak & reward are now automatically handled when the run is saved.
       } else {
         throw new Error('Failed to get ID from published workout event.');
       }

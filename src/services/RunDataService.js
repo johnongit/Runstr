@@ -4,6 +4,8 @@
  */
 
 import { calculateStats as calculateRunStats } from '../utils/runCalculations';
+import { MIN_STREAK_DISTANCE } from '../config/rewardsConfig';
+import { updateUserStreak } from '../utils/streakUtils';
 
 // Define activity types as constants for consistency across the app
 export const ACTIVITY_TYPES = {
@@ -80,6 +82,18 @@ class RunDataService {
       // Notify listeners
       this.notifyListeners(updatedRuns);
       
+      // --- STREAK / REWARD UPDATE -------------------------------------------------
+      try {
+        const minDistance = newRun.unit === 'km' ? MIN_STREAK_DISTANCE.km : MIN_STREAK_DISTANCE.mi;
+        if (newRun.distance >= minDistance) {
+          // Fire and forget; we don't await to avoid blocking UI
+          updateUserStreak(new Date(newRun.date));
+        }
+      } catch (err) {
+        console.error('[RunDataService] Failed to update streak after saving run:', err);
+      }
+      // ---------------------------------------------------------------------------
+
       return newRun;
     } catch (error) {
       console.error('Error saving run:', error);

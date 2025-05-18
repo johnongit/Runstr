@@ -3,6 +3,7 @@
  * Manages streak state and calculations based on the new linear model.
  */
 import { REWARDS } from '../config/rewardsConfig';
+import rewardsPayoutService from '../services/rewardsPayoutService';
 
 const STREAK_DATA_KEY = 'runstrStreakData';
 
@@ -99,6 +100,28 @@ export const updateUserStreak = (newRunDateObject: Date): StreakData => {
   };
 
   saveStreakData(newData);
+
+  // Determine if a payout is needed (also enforces capDays)
+  const { amountToReward, effectiveDaysForReward } = calculateStreakReward(newData);
+  if (amountToReward > 0) {
+    const pubkey = localStorage.getItem('userPubkey');
+    if (pubkey) {
+      rewardsPayoutService
+        .sendStreakReward(pubkey, amountToReward, effectiveDaysForReward)
+        .then((result) => {
+          if (result.success) {
+            updateLastRewardedDay(effectiveDaysForReward);
+          } else {
+            console.error('[StreakRewards] Auto-payout failed:', result.error);
+          }
+        })
+        .catch((err) => {
+          console.error('[StreakRewards] Error during auto-payout:', err);
+        });
+    } else {
+      console.warn('[StreakRewards] Cannot auto-pay reward – pubkey not set.');
+    }
+  }
   return newData;
 };
 
@@ -177,4 +200,45 @@ export const resetStreakDataCompletely = (): StreakData => {
 // resetRewardsForNewStreak, checkAndResetRewards, getNextMilestone,
 // getRewardsSettings, saveRewardsSettings ARE NO LONGER VALID with the new linear model.
 // They are effectively replaced by the functions above and the logic in useStreakRewards.ts hook.
-// This file will be renamed to streakUtils.ts or similar to reflect its new purpose. 
+// This file will be renamed to streakUtils.ts or similar to reflect its new purpose.
+
+// ------------- NEW HELPER -----------------
+/**
+ * Sync streak state coming from an external calculation (e.g. Stats page).
+ * If this raises the streak beyond lastRewardedDay, the required sats are
+ * automatically paid out.
+ * @param {number} externalStreakDays - Current streak length calculated elsewhere.
+ */
+export const syncStreakWithStats = async (externalStreakDays: number): Promise<StreakData> => {
+  const data = getStreakData();
+  if (externalStreakDays <= 0) {
+    return data;
+  }
+  const merged: StreakData = {
+    ...data,
+    currentStreakDays: externalStreakDays,
+  };
+  saveStreakData(merged);
+
+  // Determine if a payout is needed (also enforces capDays)
+  const { amountToReward, effectiveDaysForReward } = calculateStreakReward(merged);
+  if (amountToReward > 0) {
+    const pubkey = localStorage.getItem('userPubkey');
+    if (pubkey) {
+      try {
+        const result = await rewardsPayoutService.sendStreakReward(pubkey, amountToReward, effectiveDaysForReward);
+        if (result.success) {
+          updateLastRewardedDay(effectiveDaysForReward);
+        } else {
+          console.error('[StreakRewards] Auto-payout failed:', result.error);
+        }
+      } catch (err) {
+        console.error('[StreakRewards] Error during auto-payout:', err);
+      }
+    } else {
+      console.warn('[StreakRewards] Cannot auto-pay reward – pubkey not set.');
+    }
+  }
+  return getStreakData();
+};
+// ------------- END NEW HELPER ------------- 
