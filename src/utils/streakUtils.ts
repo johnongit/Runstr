@@ -104,13 +104,22 @@ export const updateUserStreak = (newRunDateObject: Date): StreakData => {
   // Determine if a payout is needed (also enforces capDays)
   const { amountToReward, effectiveDaysForReward } = calculateStreakReward(newData);
   if (amountToReward > 0) {
-    const pubkey = localStorage.getItem('userPubkey');
+    const pubkey = getStoredPubkey();
     if (pubkey) {
       rewardsPayoutService
         .sendStreakReward(pubkey, amountToReward, effectiveDaysForReward)
         .then((result) => {
           if (result.success) {
             updateLastRewardedDay(effectiveDaysForReward);
+            // Notify user
+            const successMsg = `🎉 Streak reward sent: ${amountToReward} sats for day ${effectiveDaysForReward}!`;
+            if ((window as any).Android?.showToast) {
+              (window as any).Android.showToast(successMsg);
+            } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              new Notification('Runstr Reward', { body: successMsg });
+            } else {
+              console.log(successMsg);
+            }
           } else {
             console.error('[StreakRewards] Auto-payout failed:', result.error);
           }
@@ -223,12 +232,21 @@ export const syncStreakWithStats = async (externalStreakDays: number): Promise<S
   // Determine if a payout is needed (also enforces capDays)
   const { amountToReward, effectiveDaysForReward } = calculateStreakReward(merged);
   if (amountToReward > 0) {
-    const pubkey = localStorage.getItem('userPubkey');
+    const pubkey = getStoredPubkey();
     if (pubkey) {
       try {
         const result = await rewardsPayoutService.sendStreakReward(pubkey, amountToReward, effectiveDaysForReward);
         if (result.success) {
           updateLastRewardedDay(effectiveDaysForReward);
+          // Notify user
+          const successMsg = `🎉 Streak reward sent: ${amountToReward} sats for day ${effectiveDaysForReward}!`;
+          if ((window as any).Android?.showToast) {
+            (window as any).Android.showToast(successMsg);
+          } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification('Runstr Reward', { body: successMsg });
+          } else {
+            console.log(successMsg);
+          }
         } else {
           console.error('[StreakRewards] Auto-payout failed:', result.error);
         }
@@ -241,4 +259,21 @@ export const syncStreakWithStats = async (externalStreakDays: number): Promise<S
   }
   return getStreakData();
 };
-// ------------- END NEW HELPER ------------- 
+// ------------- END NEW HELPER -------------
+
+/**
+ * Retrieve the user\'s Lightning / Nostr pub-key regardless of which key name
+ * was used elsewhere in the app.  Falls back gracefully and writes the value
+ * back to `userPubkey` for forward compatibility.
+ */
+const getStoredPubkey = (): string | null => {
+  const pk = localStorage.getItem('userPubkey') || localStorage.getItem('nostrPublicKey');
+  if (pk) {
+    try {
+      localStorage.setItem('userPubkey', pk); // normalise key for modules that expect it
+    } catch (_) {
+      /* ignore quota errors */
+    }
+  }
+  return pk;
+}; 
