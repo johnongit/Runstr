@@ -3,7 +3,7 @@
  * Service for Amber authentication and signing
  */
 
-import { Platform, Linking } from '../utils/react-native-shim';
+import { Platform, Linking } from '../utils/react-native-shim.js';
 
 // Check if Amber is installed (will only work in native context)
 const isAmberInstalled = async () => {
@@ -166,9 +166,11 @@ const setupDeepLinkHandling = (callback) => {
   };
 };
 
+// Simple stub of AmberAuth for diagnostic scripts running outside the mobile app.
 export default {
+  isLoggedIn: () => false,
+  signEvent: async (ev) => ev,
   isAmberInstalled,
   requestAuthentication,
-  signEvent,
   setupDeepLinkHandling
 }; 

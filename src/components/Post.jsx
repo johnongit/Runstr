@@ -135,6 +135,14 @@ export const Post = ({
   // Detect mobile
   const isMobile = true;
   
+  // Derive a display name with graceful fallbacks
+  const displayName = (
+    post?.author?.profile?.name ||
+    post?.author?.profile?.display_name ||
+    post?.author?.profile?.nip05 ||
+    (post?.author?.pubkey ? post.author.pubkey.slice(0, 8) + '…' : 'Runner')
+  );
+  
   // Use the pre-extracted images array from the post object
   const images = post.images || [];
 
@@ -170,11 +178,13 @@ export const Post = ({
     <div className="post-card" data-post-id={post.id}>
       <div className="post-header">
         {(() => {
-          const avatarSrc = getAvatarUrl(post.author?.profile?.picture, 48);
+          const avatarSrc =
+            getAvatarUrl(post.author?.profile?.picture, 48) ||
+            (post.author?.pubkey ? `https://robohash.org/${post.author.pubkey}.png?size=48x48` : null);
           return (
             <img
               src={avatarSrc || ''}
-              alt=""
+              alt={displayName}
               className="author-avatar"
               style={{ opacity: avatarSrc ? 1 : 0 }}
               onLoad={handleAvatarLoad}
@@ -185,7 +195,7 @@ export const Post = ({
           );
         })()}
         <div className="author-info">
-          <h4>{post.author?.profile?.name || '\u00A0'}</h4>
+          <h4>{displayName}</h4>
           <span className="post-date">
             {formatDate(post.created_at)}
           </span>

@@ -6,7 +6,8 @@
  * to find where posts might be getting lost.
  */
 
-import { initializeNostr, fetchRunningPosts, loadSupplementaryData, processPostsWithData } from '../src/utils/nostr.js';
+import { fetchRunningPosts, loadSupplementaryData, processPostsWithData } from '../src/utils/nostr.js';
+import { awaitNDKReady } from '../src/lib/ndkSingleton.js';
 
 // ANSI color codes for terminal output
 const colors = {
@@ -27,7 +28,7 @@ async function diagnoseFeed() {
   // Step 1: Test NDK connectivity
   console.log(`${colors.blue}[1/5] Testing Nostr connectivity...${colors.reset}`);
   try {
-    const connected = await initializeNostr();
+    const connected = await awaitNDKReady();
     
     if (connected) {
       console.log(`${colors.green}✓ Successfully connected to Nostr network${colors.reset}`);
@@ -42,26 +43,30 @@ async function diagnoseFeed() {
   
   // Step 2: Test fetching raw posts with running hashtags
   console.log(`\n${colors.blue}[2/5] Testing raw post fetching with running hashtags...${colors.reset}`);
-  let rawPosts = [];
-  try {
-    // Get posts from last 30 days with a limit of 10
-    const posts = await fetchRunningPosts(10);
-    rawPosts = posts || [];
-    
-    console.log(`${colors.green}✓ Found ${rawPosts.length} running posts${colors.reset}`);
-    
-    // Show a sample if we found any posts
-    if (rawPosts.length > 0) {
-      console.log(`${colors.cyan}Sample post:${colors.reset}`);
-      console.log(`  ID: ${rawPosts[0].id?.substring(0, 8)}...`);
-      console.log(`  Author: ${rawPosts[0].pubkey?.substring(0, 8)}...`);
-      console.log(`  Content: "${rawPosts[0].content?.substring(0, 100)}${rawPosts[0].content?.length > 100 ? '...' : ''}"`);
-    } else {
-      console.log(`${colors.yellow}⚠ No running posts found with hashtags${colors.reset}`);
+  
+  // Forcing a known post for metadata diagnosis, as app is fetching posts but metadata is missing.
+  const rawPosts = [
+    {
+      id: 'known_post_id_1',
+      pubkey: 'fa984bd7dbb282f07e16e7ae87b26a2a7b9b90b7246a44771f0cf5ae58018f52', // daplums (known active user)
+      created_at: Math.floor(Date.now() / 1000) - 3600,
+      kind: 1,
+      tags: [['t', 'runstr']],
+      content: 'Test post from a known user for metadata diagnosis. #runstr',
+    },
+    {
+      id: 'known_post_id_2',
+      pubkey: '3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d', // jb55 (known active user)
+      created_at: Math.floor(Date.now() / 1000) - 7200,
+      kind: 1,
+      tags: [['t', 'runstr']],
+      content: 'Another test post for metadata. #runstr',
     }
-  } catch (error) {
-    console.log(`${colors.red}✗ Failed to fetch running posts: ${error.message}${colors.reset}`);
-  }
+  ];
+  console.log(`${colors.green}✓ Using ${rawPosts.length} hardcoded sample posts for metadata diagnosis.${colors.reset}`);
+  rawPosts.forEach(post => {
+    console.log(`${colors.cyan}  Sample Post ID: ${post.id}, Author Pubkey: ${post.pubkey.substring(0,10)}...${colors.reset}`);
+  });
   
   // Step 3: Test loading supplementary data (profiles, reactions)
   console.log(`\n${colors.blue}[3/5] Testing supplementary data loading...${colors.reset}`);
@@ -73,9 +78,9 @@ async function diagnoseFeed() {
       supplementaryData = await loadSupplementaryData(rawPosts);
       
       // Log what we found
-      const profilesCount = supplementaryData.profiles?.length || 0;
-      const likesCount = supplementaryData.likes?.length || 0;
-      const repostsCount = supplementaryData.reposts?.length || 0;
+      const profilesCount = supplementaryData.profileEvents ? supplementaryData.profileEvents.size : 0;
+      const likesCount = supplementaryData.likes ? supplementaryData.likes.size : 0;
+      const repostsCount = supplementaryData.reposts ? supplementaryData.reposts.size : 0;
       
       console.log(`${colors.green}✓ Loaded supplementary data:${colors.reset}`);
       console.log(`  - ${profilesCount} profiles`);
@@ -173,7 +178,7 @@ async function diagnoseFeed() {
   // Summary
   console.log(`\n${colors.magenta}${colors.bold}===== DIAGNOSTIC SUMMARY =====${colors.reset}`);
   console.log(`${colors.cyan}Raw posts found: ${rawPosts.length}${colors.reset}`);
-  console.log(`${colors.cyan}Profiles loaded: ${supplementaryData.profiles?.length || 0}${colors.reset}`);
+  console.log(`${colors.cyan}Profiles loaded: ${supplementaryData.profileEvents ? supplementaryData.profileEvents.size : 0}${colors.reset}`);
   console.log(`${colors.cyan}Processed posts: ${processedPosts.length}${colors.reset}`);
   
   // Diagnosis

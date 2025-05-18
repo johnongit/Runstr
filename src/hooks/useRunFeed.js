@@ -512,9 +512,8 @@ export const useRunFeed = () => {
 
     let sub;
     try {
-      const relays = getFastestRelays(3);
-      const relaySet = NDKRelaySet.fromRelayUrls(relays, ndk);
-      const candidateSub = ndk.subscribe({ kinds: [0], authors: uniqueMissing, limit: uniqueMissing.length }, { closeOnEose: true, relaySet });
+      // Subscribe across all connected relays so slower relays with unique profiles are included
+      const candidateSub = ndk.subscribe({ kinds: [0], authors: uniqueMissing, limit: uniqueMissing.length }, { closeOnEose: true });
 
       if (!candidateSub) {
         console.warn('Profile subscription could not be started (ndk returned null)');

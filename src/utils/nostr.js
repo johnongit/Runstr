@@ -1,14 +1,14 @@
 import { NDKEvent, NDKRelaySet } from '@nostr-dev-kit/ndk';
-import { Platform } from '../utils/react-native-shim';
-import AmberAuth from '../services/AmberAuth';
+import { Platform } from '../utils/react-native-shim.js';
+import AmberAuth from '../services/AmberAuth.js';
 // Import nostr-tools implementation for fallback
-import { createAndPublishEvent as publishWithNostrTools } from './nostrClient';
-import { getFastestRelays, directFetchRunningPosts } from './feedFetcher';
-import { encryptContentNip44 } from './nip44';
-import { getEventTargetId, chunkArray } from './eventHelpers';
+import { createAndPublishEvent as publishWithNostrTools } from './nostrClient.js';
+import { getFastestRelays, directFetchRunningPosts } from './feedFetcher.js';
+import { encryptContentNip44 } from './nip44.js';
+import { getEventTargetId, chunkArray } from './eventHelpers.js';
 
 // Import the NDK singleton
-import { ndk, ndkReadyPromise } from '../lib/ndkSingleton'; // Adjusted path
+import { ndk, ndkReadyPromise } from '../lib/ndkSingleton.js'; // Adjusted path
 
 // Storage for subscriptions
 const activeSubscriptions = new Set();
@@ -70,7 +70,7 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
           if (eventArray.length === 0) {
             console.log('[nostr.js] Falling back to directFetchRunningPosts due to empty result set.');
             try {
-              eventArray = await directFetchRunningPosts(limit, 7);
+              eventArray = await directFetchRunningPosts(limit, 7, 5000);
             } catch (fallbackErr) {
               console.warn('[nostr.js] directFetchRunningPosts fallback failed:', fallbackErr);
             }
@@ -193,13 +193,28 @@ export const loadSupplementaryData = async (posts, type) => {
   
   // Helper to run chunked fetch for event kinds referencing many ids
   const chunkedFetch = async (kind, ids) => {
+    console.log(`[nostr.js chunkedFetch kind ${kind}] Starting for ${ids.length} IDs...`);
     const chunks = chunkArray(ids, 150);
-    const results = await Promise.all(chunks.map(slice => fetchEvents({ kinds: [kind], '#e': slice })));
+    // Use Promise.allSettled to ensure all chunks attempt to fetch even if one fails/times out.
+    // Add a timeout to individual chunk fetches as a safeguard.
+    const CHUNK_FETCH_TIMEOUT = 7000; // 7 seconds for each chunk
+    const settledResults = await Promise.allSettled(
+      chunks.map(slice => 
+        fetchEvents({ kinds: [kind], '#e': slice }, { timeout: CHUNK_FETCH_TIMEOUT })
+      )
+    );
+
+    const successfulResults = settledResults
+      .filter(result => result.status === 'fulfilled')
+      .map(result => result.value);
+
     // Merge into single Set
-    return results.reduce((acc, set) => {
+    const mergedSet = successfulResults.reduce((acc, set) => {
       for (const ev of set) acc.add(ev);
       return acc;
     }, new Set());
+    console.log(`[nostr.js chunkedFetch kind ${kind}] Completed. Fetched ${mergedSet.size} total events.`);
+    return mergedSet;
   };
 
   // Run all queries in parallel using Promise.allSettled so that one failure
@@ -207,25 +222,39 @@ export const loadSupplementaryData = async (posts, type) => {
   const [profileRes, commentsRes, likesRes, repostsRes, zapRes] = await Promise.allSettled([
     // Profile information (only if we have author public keys)
     authors.length > 0 ? (() => {
-      const fastRelays = getFastestRelays(3);
-      const relaySet = NDKRelaySet.fromRelayUrls(fastRelays, ndk);
+      console.log('[nostr.js loadSupplementaryData] Fetching profiles...');
+      // Query all connected relays so we don't miss profiles that live only on slower relays
       return fetchEvents(
         { kinds: [0], authors, limit: authors.length },
-        { relaySet, timeout: 6000 }
-      );
+        { timeout: 15000 }
+      ).then(res => { console.log('[nostr.js loadSupplementaryData] Profiles fetched (all relays).'); return res; });
     })() : Promise.resolve(new Set()),
     // Comments
-    chunkedFetch(1, postIds),
+    (() => { console.log('[nostr.js loadSupplementaryData] Fetching comments...'); return chunkedFetch(1, postIds).then(res => { console.log('[nostr.js loadSupplementaryData] Comments fetched.'); return res; }); })(),
     // Likes
-    chunkedFetch(7, postIds),
+    (() => { console.log('[nostr.js loadSupplementaryData] Fetching likes...'); return chunkedFetch(7, postIds).then(res => { console.log('[nostr.js loadSupplementaryData] Likes fetched.'); return res; }); })(),
     // Reposts
-    chunkedFetch(6, postIds),
+    (() => { console.log('[nostr.js loadSupplementaryData] Fetching reposts...'); return chunkedFetch(6, postIds).then(res => { console.log('[nostr.js loadSupplementaryData] Reposts fetched.'); return res; }); })(),
     // Zap receipts
-    chunkedFetch(9735, postIds)
+    (() => { console.log('[nostr.js loadSupplementaryData] Fetching zaps...'); return chunkedFetch(9735, postIds).then(res => { console.log('[nostr.js loadSupplementaryData] Zaps fetched.'); return res; }); })()
   ]);
   
-  // Convert settled results into usable Sets (fallback to empty Set on rejection)
-  const profileEvents = profileRes.status === 'fulfilled' ? profileRes.value : new Set();
+  // Prefer fast-relay profile query, but if it comes back empty try again against _all_ connected relays.
+  let profileEvents = profileRes.status === 'fulfilled' ? profileRes.value : new Set();
+
+  if (profileEvents.size === 0 && authors.length > 0) {
+    try {
+      const fallbackProfiles = await fetchEvents(
+        { kinds: [0], authors, limit: authors.length },
+        { timeout: 15000 }
+      );
+      if (fallbackProfiles && fallbackProfiles.size > 0) {
+        profileEvents = fallbackProfiles;
+      }
+    } catch (err) {
+      console.warn('[nostr.js] profile fallback fetch failed', err);
+    }
+  }
   const comments = commentsRes.status === 'fulfilled' ? commentsRes.value : new Set();
   const likes = likesRes.status === 'fulfilled' ? likesRes.value : new Set();
   const reposts = repostsRes.status === 'fulfilled' ? repostsRes.value : new Set();
@@ -265,21 +294,28 @@ export const processPostsWithData = async (posts, supplementaryData) => {
         if (!profile || !profile.pubkey) return;
         
         let parsedProfile = {};
-        
-        // Safely parse profile content
-        try {
-          // Make sure content is a string before parsing
-          if (typeof profile.content === 'string') {
+        // First try strict JSON parse (spec-compliant)
+        if (typeof profile.content === 'string' && profile.content.trim().startsWith('{')) {
+          try {
             parsedProfile = JSON.parse(profile.content);
-            
-            // Validate and ensure all required fields exist
-            if (typeof parsedProfile !== 'object') {
-              parsedProfile = {};
-            }
+          } catch (err) {
+            console.warn(`Profile JSON parse failed for ${profile.pubkey}`, err);
           }
-        } catch (err) {
-          console.error(`Error parsing profile for ${profile.pubkey}:`, err);
-          // Continue with empty profile object if parsing fails
+        }
+
+        // If JSON parse failed or produced no useful fields, fall back to tag lookup
+        if (!parsedProfile || Object.keys(parsedProfile).length === 0) {
+          const tagValue = (key) => profile.tags?.find(t => t[0] === key)?.[1];
+          parsedProfile = {
+            name: tagValue('name'),
+            display_name: tagValue('display_name'),
+            picture: tagValue('picture'),
+            nip05: tagValue('nip05'),
+            lud16: tagValue('lud16'),
+            lud06: tagValue('lud06'),
+            website: tagValue('website'),
+            banner: tagValue('banner')
+          };
         }
         
         // Ensure profile has all expected fields with proper fallbacks
@@ -298,6 +334,19 @@ export const processPostsWithData = async (posts, supplementaryData) => {
         // Add to profile map
         profileMap.set(profile.pubkey, normalizedProfile);
       });
+    }
+    
+    // Fallback: fetch any still-missing profiles from public aggregator API
+    const allAuthors = [...new Set(posts.map(p => p.pubkey || (p.author && p.author.pubkey)).filter(Boolean))];
+    const missingAuthors = allAuthors.filter(pk => !profileMap.has(pk));
+    if (missingAuthors.length > 0) {
+      try {
+        const { fetchProfilesFromAggregator } = await import('./profileAggregator.js');
+        const aggProfiles = await fetchProfilesFromAggregator(missingAuthors.slice(0, 100));
+        aggProfiles.forEach((profile, pk) => profileMap.set(pk, profile));
+      } catch (aggErr) {
+        console.warn('Aggregator profile fetch failed', aggErr);
+      }
     }
     
     // Count likes and reposts per post
@@ -374,9 +423,12 @@ export const processPostsWithData = async (posts, supplementaryData) => {
         
         // Get profile with fallback
         const authorPubkey = comment.pubkey || '';
-        const profile = profileMap.get(authorPubkey) || {
-          name: 'Anonymous',
-          picture: undefined
+        const hasProfile = profileMap.has(authorPubkey);
+        const profile = hasProfile ? profileMap.get(authorPubkey) : {
+          name: 'Loading...',
+          picture: undefined,
+          lud16: undefined,
+          lud06: undefined
         };
         
         commentsByPost.get(parentId).push({
@@ -407,8 +459,9 @@ export const processPostsWithData = async (posts, supplementaryData) => {
       
       // Get author's profile with robust fallback
       const authorPubkey = post.pubkey || (post.author && post.author.pubkey) || '';
-      const profile = profileMap.get(authorPubkey) || {
-        name: 'Anonymous Runner',
+      const hasProfile = profileMap.has(authorPubkey);
+      const profile = hasProfile ? profileMap.get(authorPubkey) : {
+        name: 'Loading...',
         picture: undefined,
         lud16: undefined,
         lud06: undefined
@@ -440,7 +493,7 @@ export const processPostsWithData = async (posts, supplementaryData) => {
         zaps: postZaps.ids.size,
         zapAmount: postZaps.amount,
         images: images,  // Add extracted images to the post object
-        needsProfile: false
+        needsProfile: !hasProfile
       };
     });
     
