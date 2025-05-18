@@ -1,6 +1,7 @@
 import { registerPlugin } from '@capacitor/core';
 import { EventEmitter } from 'tseep';
 import runDataService, { ACTIVITY_TYPES } from './RunDataService';
+import { filterLocation } from '../utils/runCalculations';
 
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
@@ -103,24 +104,46 @@ class RunTracker extends EventEmitter {
       // Don't process position updates when not actively tracking
       return;
     }
-    
+
+    // Normalise the incoming position so it always has a `coords` object – this is
+    // the shape expected by the shared helper utilities (runCalculations etc.)
+    const standardise = (pos) => ({
+      ...pos,
+      timestamp: pos.timestamp || Date.now(),
+      coords: {
+        latitude: pos.latitude ?? pos.coords?.latitude ?? 0,
+        longitude: pos.longitude ?? pos.coords?.longitude ?? 0,
+        accuracy: pos.accuracy ?? pos.coords?.accuracy ?? 0,
+        altitude: pos.altitude ?? pos.coords?.altitude ?? null,
+      },
+    });
+
+    const currentPositionStd = standardise(newPosition);
+
     if (this.positions.length > 0) {
-      const lastPosition = this.positions[this.positions.length - 1];
+      const lastRawPosition = this.positions[this.positions.length - 1];
+      const lastPositionStd = standardise(lastRawPosition);
+
+      // Use the shared filtering logic to decide whether to accept the point.
+      // If the point fails the quality checks, we ignore it entirely.
+      if (!filterLocation(currentPositionStd, lastPositionStd)) {
+        console.log('[RunTracker] Position rejected by quality filter');
+        return;
+      }
+
       const distanceIncrement = this.calculateDistance(
-        lastPosition.latitude,
-        lastPosition.longitude,
+        lastRawPosition.latitude,
+        lastRawPosition.longitude,
         newPosition.latitude,
         newPosition.longitude
       );
-      
-      // Add a minimum threshold to filter out GPS noise (e.g., 3 meters)
-      // Only count movement if it's above the threshold
-      const MOVEMENT_THRESHOLD = 1.5; // 1.5 meters (reduced from 3m)
+
+      // Minimum threshold to additionally smooth out micro-jitter.
+      const MOVEMENT_THRESHOLD = 1.5; // metres
       if (distanceIncrement >= MOVEMENT_THRESHOLD) {
         this.distance += distanceIncrement;
         this.emit('distanceChange', this.distance); // Emit distance change
       } else {
-        // GPS noise detected, not adding to distance
         console.log(`Filtered out small movement: ${distanceIncrement.toFixed(2)}m`);
       }
 
@@ -181,7 +204,7 @@ class RunTracker extends EventEmitter {
       }
     }
 
-    this.positions.push(newPosition);
+    this.positions.push(currentPositionStd);
   }
 
   startTimer() {

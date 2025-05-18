@@ -44,7 +44,8 @@ export default defineConfig({
   server: {
     // Enable faster Hot Module Replacement
     hmr: {
-      overlay: true,
+      // Disable Vite's default error overlay so runtime errors do not display a red box
+      overlay: false,
     },
     proxy: {
       '/api/v1': {
