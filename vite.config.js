@@ -3,7 +3,14 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      // Disable React Fast Refresh overlay as another layer of error-overlay protection
+      fastRefresh: {
+        overlay: false,
+      },
+    }),
+  ],
   build: {
     rollupOptions: {
       output: {
