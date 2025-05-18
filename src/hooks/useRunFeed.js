@@ -10,6 +10,8 @@ import { NDKRelaySet } from '@nostr-dev-kit/ndk';
 import { getFastestRelays } from '../utils/feedFetcher';
 import { startFeed, subscribeFeed, getFeed } from '../lib/feedManager';
 import { getEventTargetId } from '../utils/eventHelpers';
+import { useProfileCache } from '../hooks/useProfileCache.js';
+import { ensureRelays } from '../utils/relays.js';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -37,6 +39,9 @@ export const useRunFeed = () => {
   const fetchedProfilesRef = useRef(new Set());
   const reactionSubRef = useRef(null);
   const reactionSetsRef = useRef({ likes: new Map(), reposts: new Map(), zaps: new Map(), comments: new Map() });
+
+  // Re-use the shared profile cache that already works in ChatRoom
+  const { fetchProfiles } = useProfileCache();
 
   // Ensure NDK as soon as the hook is used
   useEffect(() => {
@@ -450,163 +455,47 @@ export const useRunFeed = () => {
     });
   };
 
-  // Auto-fetch author metadata for posts still showing placeholder names
-  useEffect(() => {
-    const missingPosts = posts.filter(p =>
-      p && p.author && p.author.pubkey &&
-      (!p.author.profile || !p.author.profile.name || p.author.profile.name === 'Loading...') &&
-      !fetchedProfilesRef.current.has(p.author.pubkey)
-    );
-
-    if (missingPosts.length === 0) return;
-
-    const fetchMissing = async () => {
-      try {
-        // Mark as fetched to avoid duplicate requests
-        missingPosts.forEach(mp => fetchedProfilesRef.current.add(mp.author.pubkey));
-
-        const supplementaryData = await loadSupplementaryData(missingPosts);
-        const enrichedPosts = await processPostsWithData(missingPosts, supplementaryData);
-
-        if (enrichedPosts && enrichedPosts.length > 0) {
-          setPosts(prev => prev.map(p => {
-            const enriched = enrichedPosts.find(e => e.id === p.id);
-            return enriched ? { ...p, author: enriched.author } : p;
-          }));
-
-          // Also update global cache so other components profit
-          globalState.allPosts = globalState.allPosts.map(p => {
-            const enriched = enrichedPosts.find(e => e.id === p.id);
-            return enriched ? { ...p, author: enriched.author } : p;
-          });
-        }
-      } catch (err) {
-        console.warn('Metadata enrichment failed', err);
-      }
-    };
-
-    fetchMissing();
-  }, [posts]);
-
   /**
-   * Real-time profile subscription – fallback for avatars/usernames that didn't arrive
-   * This keeps scope local to RunFeed and DOES NOT touch shared NDK flows used by
-   * Teams / Chat, so risk of collateral impact is minimal.
+   * Auto-enrich feed posts with author profiles using the same
+   * useProfileCache mechanism that already works in ChatRoom.
+   * Falls back to the previous HTTP aggregator later in the pipeline,
+   * so this change only adds a faster, relay-based path.
    */
   useEffect(() => {
-    // Collect pubkeys whose profile is still the placeholder
-    const missingPubkeys = posts
-      .filter(p => p && p.author && p.author.pubkey && (
-        !p.author.profile || p.author.profile.name === 'Loading...'
-      ))
-      .map(p => p.author.pubkey);
+    // Collect pubkeys still unresolved
+    const unresolved = posts
+      .filter(p => p?.author?.pubkey && (!p.author.profile?.name || p.author.profile.name === 'Loading…'))
+      .map(p => p.author.pubkey)
+      .filter(pk => !fetchedProfilesRef.current.has(pk));
 
-    // Bail if nothing to fetch or if we've already fetched them
-    const uniqueMissing = missingPubkeys.filter(pk => !fetchedProfilesRef.current.has(pk));
-    if (uniqueMissing.length === 0) return;
+    if (unresolved.length === 0) return;
 
-    // Mark as requested so we don't set up duplicate subs
-    uniqueMissing.forEach(pk => fetchedProfilesRef.current.add(pk));
+    unresolved.forEach(pk => fetchedProfilesRef.current.add(pk));
 
-    if (!ndk || uniqueMissing.length === 0) return;
+    const run = async () => {
+      try {
+        await ensureRelays([]); // Ensure sockets ready
+        const profiles = await fetchProfiles(unresolved);
 
-    let sub;
-    try {
-      // Subscribe across all connected relays so slower relays with unique profiles are included
-      const candidateSub = ndk.subscribe({ kinds: [0], authors: uniqueMissing, limit: uniqueMissing.length }, { closeOnEose: true });
+        if (profiles.size === 0) return;
 
-      if (!candidateSub) {
-        console.warn('Profile subscription could not be started (ndk returned null)');
-        return; // abort effect; will try fallback fetch later
+        setPosts(prev => prev.map(p => {
+          const prof = profiles.get(p.author?.pubkey);
+          return prof ? { ...p, author: { ...p.author, profile: { ...p.author.profile, ...prof }, needsProfile: false } } : p;
+        }));
+
+        // Keep global cache in sync so other feeds/components benefit
+        globalState.allPosts = globalState.allPosts.map(p => {
+          const prof = profiles.get(p.author?.pubkey);
+          return prof ? { ...p, author: { ...p.author, profile: { ...p.author.profile, ...prof }, needsProfile: false } } : p;
+        });
+      } catch (err) {
+        console.warn('Feed profile enrichment (relay path) failed', err);
       }
-
-      sub = candidateSub;
-
-      sub.on('event', (profileEvt) => {
-        try {
-          const pubkey = profileEvt.pubkey;
-          if (!pubkey) return;
-
-          let profileData = {};
-          try {
-            profileData = JSON.parse(profileEvt.content);
-          } catch (_) {
-            profileData = {};
-          }
-
-          const normalized = {
-            name: profileData.name || profileData.display_name || 'Anonymous Runner',
-            picture: typeof profileData.picture === 'string' ? profileData.picture : undefined,
-            lud16: profileData.lud16,
-            lud06: profileData.lud06,
-          };
-
-          setPosts(prev => prev.map(p =>
-            p.author && p.author.pubkey === pubkey
-              ? {
-                  ...p,
-                  author: { ...p.author, profile: { ...p.author.profile, ...normalized } }
-                }
-              : p
-          ));
-
-          // Update global cache too
-          globalState.allPosts = globalState.allPosts.map(p =>
-            p.author && p.author.pubkey === pubkey
-              ? {
-                  ...p,
-                  author: { ...p.author, profile: { ...p.author.profile, ...normalized } }
-                }
-              : p
-          );
-        } catch (err) {
-          console.warn('Profile subscription processing failed', err);
-        }
-      });
-
-      // Fallback: direct fetch each missing profile once
-      (async () => {
-        try {
-          const promises = uniqueMissing.map(async (pk) => {
-            try {
-              const res = await ndk.fetchEvents({ kinds: [0], authors: [pk], limit: 1 });
-              if (res && res.size > 0) {
-                const profileEvt = Array.from(res)[0];
-                let parsed = {};
-                try { parsed = JSON.parse(profileEvt.content); } catch {}
-                const normalized = {
-                  name: parsed.name || parsed.display_name,
-                  picture: typeof parsed.picture === 'string' ? parsed.picture : undefined,
-                  lud16: parsed.lud16,
-                  lud06: parsed.lud06,
-                };
-                setPosts(prev => prev.map(p =>
-                  p.author && p.author.pubkey === pk
-                    ? { ...p, author: { ...p.author, profile: { ...p.author.profile, ...normalized } }, needsProfile: false }
-                    : p
-                ));
-                globalState.allPosts = globalState.allPosts.map(p =>
-                  p.author && p.author.pubkey === pk
-                    ? { ...p, author: { ...p.author, profile: { ...p.author.profile, ...normalized } }, needsProfile: false }
-                    : p
-                );
-              }
-            } catch (err) {
-              console.warn('Direct profile fetch failed for', pk, err);
-            }
-          });
-          await Promise.all(promises);
-        } catch (_) {}
-      })();
-    } catch (err) {
-      console.warn('Could not start profile subscription', err);
-    }
-
-    // Cleanup when posts array changes or component unmounts
-    return () => {
-      if (sub) sub.stop();
     };
-  }, [posts]);
+
+    run();
+  }, [posts, fetchProfiles]);
 
   // --- Central Feed Manager integration ----
   useEffect(() => {
