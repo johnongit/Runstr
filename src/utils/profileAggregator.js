@@ -17,13 +17,20 @@ export const fetchProfilesFromAggregator = async (pubkeys = []) => {
       }
     } catch (fetchErr) {
       console.warn('[profileAggregator] initial fetch failed', fetchErr);
-      // network-level failure, bail out
-      return new Map();
-    }
+      // Could be CORS/network – attempt via proxy before giving up
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        console.warn('[profileAggregator] Retrying via CORS proxy after network error', proxyUrl);
+        res = await fetch(proxyUrl);
+      } catch (proxyErr) {
+        console.warn('[profileAggregator] proxy fetch failed after network error', proxyErr);
+        return new Map();
+      }
 
-    if (!res.ok) {
-      console.warn('[profileAggregator] HTTP request failed after retries', res.status);
-      return new Map();
+      if (!res.ok) {
+        console.warn('[profileAggregator] proxy response not ok after network error', res.status);
+        return new Map();
+      }
     }
 
     const data = await res.json();
