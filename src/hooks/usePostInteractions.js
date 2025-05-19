@@ -38,7 +38,7 @@ export const usePostInteractions = ({
   }, [loadSupplementaryData, loadedSupplementaryData, setPosts]);
 
   const handleLike = useCallback(async (post) => {
-    // Guard: if a like for this post is already in-flight, exit early
+    // Guard: avoid duplicate publishes
     if (inFlightLikes.current.has(post.id)) return;
 
     if (!window.nostr) {
@@ -46,21 +46,9 @@ export const usePostInteractions = ({
       return;
     }
 
-    // Mark as in-flight and optimistically update UI immediately
     inFlightLikes.current.add(post.id);
-    setUserLikes(prev => {
-      const newLikes = new Set(prev);
-      newLikes.add(post.id);
-      return newLikes;
-    });
-    setPosts(currentPosts =>
-      currentPosts.map(p =>
-        p.id === post.id ? { ...p, likes: p.likes + 1 } : p
-      )
-    );
 
     try {
-      // Build like event (kind 7)
       const likeEvent = {
         kind: 7,
         created_at: Math.floor(Date.now() / 1000),
@@ -72,38 +60,19 @@ export const usePostInteractions = ({
         pubkey: await window.nostr.getPublicKey()
       };
 
-      // Sign and publish
       const signedEvent = await window.nostr.signEvent(likeEvent);
       await createAndPublishEvent(signedEvent);
 
-      console.log('Post liked successfully');
-    } catch (error) {
-      const msg = error?.message?.toLowerCase() || '';
-
-      // Benign errors we treat as success
-      const benign = msg.includes('timed out') || msg.includes('duplicate') || msg.includes('missing group') || msg.includes('blocked');
-
-      if (!benign) {
-        // Serious failure: roll back optimistic UI
-        setUserLikes(prev => {
-          const newLikes = new Set(prev);
-          newLikes.delete(post.id);
-          return newLikes;
-        });
-        setPosts(currentPosts =>
-          currentPosts.map(p =>
-            p.id === post.id ? { ...p, likes: Math.max(0, p.likes - 1) } : p
-          )
-        );
-        console.error('Like failed and rolled back:', error);
-      } else {
-        console.warn('Like error treated as success:', error.message);
+      // Fetch fresh like data so UI updates once relays acknowledge
+      if (loadSupplementaryData) {
+        loadSupplementaryData([post.id], 'likes');
       }
+    } catch (error) {
+      console.error('Like failed:', error);
     } finally {
-      // Remove from in-flight set either way
       inFlightLikes.current.delete(post.id);
     }
-  }, [setUserLikes, setPosts]);
+  }, [loadSupplementaryData]);
 
   const handleRepost = useCallback(async (post) => {
     if (!window.nostr) {
@@ -128,25 +97,17 @@ export const usePostInteractions = ({
       const signedEvent = await window.nostr.signEvent(repostEvent);
       await createAndPublishEvent(signedEvent);
 
-      // Update UI optimistically
-      setUserReposts(prev => {
-        const newReposts = new Set(prev);
-        newReposts.add(post.id);
-        return newReposts;
-      });
-
-      setPosts(currentPosts => 
-        currentPosts.map(p => 
-          p.id === post.id ? { ...p, reposts: p.reposts + 1 } : p
-        )
-      );
+      // Refresh repost data so UI reflects confirmed state
+      if (loadSupplementaryData) {
+        loadSupplementaryData([post.id], 'reposts');
+      }
 
       console.log('Post reposted successfully');
     } catch (error) {
       console.error('Error reposting:', error);
       console.warn('Repost failed (silenced):', error.message);
     }
-  }, [setUserReposts, setPosts]);
+  }, [loadSupplementaryData]);
 
   const handleZap = useCallback(async (post, wallet) => {
     if (!window.nostr) {
@@ -198,19 +159,10 @@ export const usePostInteractions = ({
           // Pay the invoice
           await wallet.makePayment(invoice);
           
-          // Update UI optimistically
-          setPosts(currentPosts => 
-            currentPosts.map(p => {
-              if (p.id === post.id) {
-                return {
-                  ...p,
-                  zaps: (p.zaps || 0) + 1,
-                  zapAmount: (p.zapAmount || 0) + defaultZapAmount
-                };
-              }
-              return p;
-            })
-          );
+          // Trigger fresh zap data load so UI updates
+          if (loadSupplementaryData) {
+            loadSupplementaryData([post.id], 'zaps');
+          }
           
           alert('Zap sent successfully! ⚡️');
           return; // Exit early as we've successfully sent the zap
@@ -364,19 +316,10 @@ export const usePostInteractions = ({
           await wallet.makePayment(invoiceData.pr);
           console.log('[ZapFlow] Payment successful!');
           
-          // Update UI optimistically
-          setPosts(currentPosts => 
-            currentPosts.map(p => {
-              if (p.id === post.id) {
-                return {
-                  ...p,
-                  zaps: (p.zaps || 0) + 1,
-                  zapAmount: (p.zapAmount || 0) + defaultZapAmount
-                };
-              }
-              return p;
-            })
-          );
+          // Trigger fresh zap data load so UI updates
+          if (loadSupplementaryData) {
+            loadSupplementaryData([post.id], 'zaps');
+          }
           
           alert('Zap sent successfully! ⚡️');
         } catch (error) {
@@ -395,7 +338,7 @@ export const usePostInteractions = ({
       console.error('Error sending zap:', error);
       console.warn('Zap failed (silenced):', error.message);
     }
-  }, [defaultZapAmount, setPosts]);
+  }, [defaultZapAmount, loadSupplementaryData]);
 
   const handleComment = useCallback(async (postId) => {
     if (!commentText.trim() || !window.nostr) {
@@ -419,32 +362,10 @@ export const usePostInteractions = ({
       const signedEvent = await window.nostr.signEvent(commentEvent);
       await createAndPublishEvent(signedEvent);
 
-      // Create a simple profile for immediate UI update
-      const userProfile = { name: 'You' };
-
-      // Add comment to UI right away
-      setPosts(currentPosts =>
-        currentPosts.map(post => {
-          if (post.id === postId) {
-            return {
-              ...post,
-              comments: [
-                ...post.comments,
-                {
-                  id: signedEvent.id,
-                  content: commentText,
-                  created_at: Math.floor(Date.now() / 1000),
-                  author: {
-                    pubkey: signedEvent.pubkey,
-                    profile: userProfile
-                  }
-                }
-              ]
-            };
-          }
-          return post;
-        })
-      );
+      // Fetch fresh comments so UI syncs with relay truth
+      if (loadSupplementaryData) {
+        loadSupplementaryData([postId], 'comments');
+      }
 
       // Clear comment text
       setCommentText('');
@@ -452,7 +373,7 @@ export const usePostInteractions = ({
       console.error('Error posting comment:', error);
       console.warn('Comment failed (silenced):', error.message);
     }
-  }, [commentText, setPosts]);
+  }, [commentText, loadSupplementaryData]);
 
   return {
     commentText,
