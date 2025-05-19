@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { runTracker } from '../services/RunTracker';
 import { useActivityMode } from './ActivityModeContext';
 import { ACTIVITY_TYPES } from '../services/RunDataService';
+import { NostrContext } from './NostrContext';
 
 // Create the context
 const RunTrackerContext = createContext(null);
@@ -35,6 +36,7 @@ export const useRunTracker = () => {
 // Provider component
 export const RunTrackerProvider = ({ children }) => {
   const { mode: activityType } = useActivityMode();
+  const { publicKey } = useContext(NostrContext);
 
   // Initialize state with try/catch to prevent fatal errors on startup
   const [trackingState, setTrackingState] = useState(() => {
@@ -242,7 +244,7 @@ export const RunTrackerProvider = ({ children }) => {
 
   const stopRun = async () => {
     try {
-      await runTracker.stop();
+      await runTracker.stop(publicKey);
       // State will be updated through the event listeners
     } catch (error) {
       console.error('Error stopping run:', error);

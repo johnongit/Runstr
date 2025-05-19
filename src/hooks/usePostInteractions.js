@@ -12,7 +12,7 @@ export const usePostInteractions = ({
   const [commentText, setCommentText] = useState('');
   const [activeCommentPost, setActiveCommentPost] = useState(null);
 
-  // Track likes that are being published so rapid double-taps don’t send twice
+  // Track likes that are being published so rapid double-taps don't send twice
   const inFlightLikes = useRef(new Set());
 
   const handleCommentClick = useCallback((postId) => {
@@ -103,7 +103,7 @@ export const usePostInteractions = ({
       // Remove from in-flight set either way
       inFlightLikes.current.delete(post.id);
     }
-  }, [setUserLikes, setPosts, userLikes]);
+  }, [setUserLikes, setPosts]);
 
   const handleRepost = useCallback(async (post) => {
     if (!window.nostr) {

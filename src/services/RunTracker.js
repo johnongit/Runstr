@@ -353,7 +353,7 @@ class RunTracker extends EventEmitter {
     this.emit('statusChange', { isTracking: this.isTracking, isPaused: this.isPaused });
   }
 
-  async stop() {
+  async stop(publicKey) {
     if (!this.isTracking) return;
 
     this.isTracking = false;
@@ -392,7 +392,7 @@ class RunTracker extends EventEmitter {
     };
     
     // Save to run history using RunDataService instead of directly to localStorage
-    runDataService.saveRun(finalResults);
+    runDataService.saveRun(finalResults, publicKey);
     
     // Clean up resources
     this.stopTracking();

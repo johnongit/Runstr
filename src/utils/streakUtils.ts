@@ -52,7 +52,7 @@ export const saveStreakData = (data: StreakData): boolean => {
  * @param {Date} newRunDateObject - The Date object of the new run (in user's local time).
  * @returns {StreakData} The updated streak data.
  */
-export const updateUserStreak = (newRunDateObject: Date): StreakData => {
+export const updateUserStreak = (newRunDateObject: Date, publicKey: string | null): StreakData => {
   const data = getStreakData();
   const { capDays } = REWARDS.STREAK;
 
@@ -104,7 +104,7 @@ export const updateUserStreak = (newRunDateObject: Date): StreakData => {
   // Determine if a payout is needed (also enforces capDays)
   const { amountToReward, effectiveDaysForReward } = calculateStreakReward(newData);
   if (amountToReward > 0) {
-    const pubkey = getStoredPubkey();
+    const pubkey = publicKey;
     if (pubkey) {
       rewardsPayoutService
         .sendStreakReward(pubkey, amountToReward, effectiveDaysForReward)
@@ -218,7 +218,7 @@ export const resetStreakDataCompletely = (): StreakData => {
  * automatically paid out.
  * @param {number} externalStreakDays - Current streak length calculated elsewhere.
  */
-export const syncStreakWithStats = async (externalStreakDays: number): Promise<StreakData> => {
+export const syncStreakWithStats = async (externalStreakDays: number, publicKey: string | null): Promise<StreakData> => {
   const data = getStreakData();
   if (externalStreakDays <= 0) {
     return data;
@@ -232,7 +232,7 @@ export const syncStreakWithStats = async (externalStreakDays: number): Promise<S
   // Determine if a payout is needed (also enforces capDays)
   const { amountToReward, effectiveDaysForReward } = calculateStreakReward(merged);
   if (amountToReward > 0) {
-    const pubkey = getStoredPubkey();
+    const pubkey = publicKey;
     if (pubkey) {
       try {
         const result = await rewardsPayoutService.sendStreakReward(pubkey, amountToReward, effectiveDaysForReward);
@@ -261,19 +261,20 @@ export const syncStreakWithStats = async (externalStreakDays: number): Promise<S
 };
 // ------------- END NEW HELPER -------------
 
-/**
- * Retrieve the user\'s Lightning / Nostr pub-key regardless of which key name
- * was used elsewhere in the app.  Falls back gracefully and writes the value
- * back to `userPubkey` for forward compatibility.
- */
-const getStoredPubkey = (): string | null => {
-  const pk = localStorage.getItem('userPubkey') || localStorage.getItem('nostrPublicKey');
-  if (pk) {
-    try {
-      localStorage.setItem('userPubkey', pk); // normalise key for modules that expect it
-    } catch (_) {
-      /* ignore quota errors */
+/* 
+  The getStoredPubkey function was previously defined here.
+  It is no longer used by updateUserStreak or syncStreakWithStats directly through this path.
+  It is commented out for now and can be removed if confirmed unused elsewhere.
+
+  const getStoredPubkey = (): string | null => {
+    const pk = localStorage.getItem('userPubkey') || localStorage.getItem('nostrPublicKey');
+    if (pk) {
+      try {
+        localStorage.setItem('userPubkey', pk); // normalise key for modules that expect it
+      } catch (_) {
+        // ignore quota errors 
+      }
     }
-  }
-  return pk;
-}; 
+    return pk;
+  };
+*/ 

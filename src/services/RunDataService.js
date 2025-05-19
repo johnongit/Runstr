@@ -54,9 +54,10 @@ class RunDataService {
   /**
    * Save a new run to storage
    * @param {Object} runData - Run data to save
+   * @param {string} publicKey - Public key for updating streak
    * @returns {Object} The saved run with generated ID
    */
-  saveRun(runData) {
+  saveRun(runData, publicKey) {
     try {
       const runs = this.getAllRuns();
       
@@ -87,7 +88,7 @@ class RunDataService {
         const minDistance = newRun.unit === 'km' ? MIN_STREAK_DISTANCE.km : MIN_STREAK_DISTANCE.mi;
         if (newRun.distance >= minDistance) {
           // Fire and forget; we don't await to avoid blocking UI
-          updateUserStreak(new Date(newRun.date));
+          updateUserStreak(new Date(newRun.date), publicKey);
         }
       } catch (err) {
         console.error('[RunDataService] Failed to update streak after saving run:', err);
