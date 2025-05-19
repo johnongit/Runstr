@@ -8,7 +8,7 @@ import axios from 'axios';
 // API configuration
 const BITVORA_API_URL = 'https://api.bitvora.com/v1';
 // Use environment variable for the Access Token
-const BITVORA_ACCESS_TOKEN = import.meta.env.VITE_BITVORA_ACCESS_TOKEN;
+const BITVORA_ACCESS_TOKEN = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BITVORA_ACCESS_TOKEN) || process.env.VITE_BITVORA_ACCESS_TOKEN || undefined;
 const NETWORK_TYPE = 'mainnet'; // or 'testnet', 'signet'
 
 // DEMO_MODE: Set to false to use the real API

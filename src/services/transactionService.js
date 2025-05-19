@@ -3,7 +3,7 @@
  * Manages Bitcoin transaction history and persistence
  */
 
-import bitvoraService from './bitvoraService';
+import bitvoraService from './bitvoraService.js';
 
 // Transaction types
 export const TRANSACTION_TYPES = {
