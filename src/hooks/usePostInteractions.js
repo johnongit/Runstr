@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { createAndPublishEvent } from '../utils/nostr';
 
 export const usePostInteractions = ({
@@ -11,6 +11,9 @@ export const usePostInteractions = ({
 }) => {
   const [commentText, setCommentText] = useState('');
   const [activeCommentPost, setActiveCommentPost] = useState(null);
+
+  // Track likes that are being published so rapid double-taps don’t send twice
+  const inFlightLikes = useRef(new Set());
 
   const handleCommentClick = useCallback((postId) => {
     // Make sure we have post's comments loaded
@@ -35,13 +38,29 @@ export const usePostInteractions = ({
   }, [loadSupplementaryData, loadedSupplementaryData, setPosts]);
 
   const handleLike = useCallback(async (post) => {
+    // Guard: if already liked (in state or pending), exit early
+    if (inFlightLikes.current.has(post.id) || userLikes.has(post.id)) return;
+
     if (!window.nostr) {
       alert('Please login to like posts');
       return;
     }
 
+    // Mark as in-flight and optimistically update UI immediately
+    inFlightLikes.current.add(post.id);
+    setUserLikes(prev => {
+      const newLikes = new Set(prev);
+      newLikes.add(post.id);
+      return newLikes;
+    });
+    setPosts(currentPosts =>
+      currentPosts.map(p =>
+        p.id === post.id ? { ...p, likes: p.likes + 1 } : p
+      )
+    );
+
     try {
-      // Create like event (kind 7)
+      // Build like event (kind 7)
       const likeEvent = {
         kind: 7,
         created_at: Math.floor(Date.now() / 1000),
@@ -57,67 +76,34 @@ export const usePostInteractions = ({
       const signedEvent = await window.nostr.signEvent(likeEvent);
       await createAndPublishEvent(signedEvent);
 
-      // Update UI optimistically
-      setUserLikes(prev => {
-        const newLikes = new Set(prev);
-        newLikes.add(post.id);
-        return newLikes;
-      });
-
-      setPosts(currentPosts => 
-        currentPosts.map(p => 
-          p.id === post.id ? { ...p, likes: p.likes + 1 } : p
-        )
-      );
-
       console.log('Post liked successfully');
     } catch (error) {
-      // Many relays respond slowly; NDK throws "publish timed out" after waiting
-      // This isn't critical for a like, so we treat it as success and avoid the red-box.
-      if (error?.message?.toLowerCase().includes('timed out')) {
-        console.warn('Like publish timed out – treating as success (slow relays)');
+      const msg = error?.message?.toLowerCase() || '';
 
-        // Optimistically update UI the same way we would on success
+      // Benign errors we treat as success
+      const benign = msg.includes('timed out') || msg.includes('duplicate') || msg.includes('missing group') || msg.includes('blocked');
+
+      if (!benign) {
+        // Serious failure: roll back optimistic UI
         setUserLikes(prev => {
           const newLikes = new Set(prev);
-          newLikes.add(post.id);
+          newLikes.delete(post.id);
           return newLikes;
         });
-
         setPosts(currentPosts =>
           currentPosts.map(p =>
-            p.id === post.id ? { ...p, likes: p.likes + 1 } : p
+            p.id === post.id ? { ...p, likes: Math.max(0, p.likes - 1) } : p
           )
         );
-
-        return; // prevent console.error below
+        console.error('Like failed and rolled back:', error);
+      } else {
+        console.warn('Like error treated as success:', error.message);
       }
-
-      // Handle benign errors that don't impact the user experience (e.g., relay rejects like event)
-      if (error?.message?.toLowerCase().includes('missing group') ||
-          error?.message?.toLowerCase().includes('blocked')) {
-        console.warn('Relay rejected like event – treating as success:', error.message);
-
-        // Optimistically update UI just like on success
-        setUserLikes(prev => {
-          const newLikes = new Set(prev);
-          newLikes.add(post.id);
-          return newLikes;
-        });
-
-        setPosts(currentPosts =>
-          currentPosts.map(p =>
-            p.id === post.id ? { ...p, likes: p.likes + 1 } : p
-          )
-        );
-
-        return; // prevent alert below
-      }
-
-      console.error('Error liking post:', error);
-      console.warn('Like failed (silenced):', error.message);
+    } finally {
+      // Remove from in-flight set either way
+      inFlightLikes.current.delete(post.id);
     }
-  }, [setUserLikes, setPosts]);
+  }, [setUserLikes, setPosts, userLikes]);
 
   const handleRepost = useCallback(async (post) => {
     if (!window.nostr) {
