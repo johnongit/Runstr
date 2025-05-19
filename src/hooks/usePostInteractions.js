@@ -38,8 +38,8 @@ export const usePostInteractions = ({
   }, [loadSupplementaryData, loadedSupplementaryData, setPosts]);
 
   const handleLike = useCallback(async (post) => {
-    // Guard: if already liked (in state or pending), exit early
-    if (inFlightLikes.current.has(post.id) || userLikes.has(post.id)) return;
+    // Guard: if a like for this post is already in-flight, exit early
+    if (inFlightLikes.current.has(post.id)) return;
 
     if (!window.nostr) {
       alert('Please login to like posts');
