@@ -159,20 +159,33 @@ const transactionService = {
    * @returns {Promise<Object>} Transaction result
    */
   processStreakReward: async (pubkey, amount, reason, metadata = {}) => {
+    // Ensure we are sending sats to a Lightning address / LNURL rather than a raw hex pubkey
+    const resolveDestination = (key) => {
+      if (!key) return key;
+      if (key.includes('@') || key.startsWith('lnurl') || key.startsWith('lightning:') || key.startsWith('lnbc')) {
+        return key.replace(/^lightning:/, '');
+      }
+      try {
+        const cached = localStorage.getItem('runstr_lightning_addr');
+        if (cached) return cached;
+      } catch (_) {}
+      return key;
+    };
+    const destination = resolveDestination(pubkey);
     try {
       // Record transaction in our system first
       const transaction = transactionService.recordTransaction({
         type: TRANSACTION_TYPES.STREAK_REWARD,
         amount,
-        recipient: pubkey,
+        recipient: destination,
         reason,
-        pubkey,
+        pubkey: destination,
         metadata
       });
       
       // Send Bitcoin using Bitvora
       const result = await bitvoraService.sendBitcoin(
-        pubkey, // Assuming pubkey is a lightning address
+        destination,
         amount,
         reason,
         {
@@ -230,20 +243,32 @@ const transactionService = {
    * @returns {Promise<Object>} Transaction result
    */
   processLeaderboardReward: async (pubkey, amount, reason, metadata = {}) => {
+    const resolveDestination = (key) => {
+      if (!key) return key;
+      if (key.includes('@') || key.startsWith('lnurl') || key.startsWith('lightning:') || key.startsWith('lnbc')) {
+        return key.replace(/^lightning:/, '');
+      }
+      try {
+        const cached = localStorage.getItem('runstr_lightning_addr');
+        if (cached) return cached;
+      } catch (_) {}
+      return key;
+    };
+    const destination = resolveDestination(pubkey);
     try {
       // Record transaction in our system first
       const transaction = transactionService.recordTransaction({
         type: TRANSACTION_TYPES.LEADERBOARD_REWARD,
         amount,
-        recipient: pubkey,
+        recipient: destination,
         reason,
-        pubkey,
+        pubkey: destination,
         metadata
       });
       
       // Send Bitcoin using Bitvora
       const result = await bitvoraService.sendBitcoin(
-        pubkey, // Assuming pubkey is a lightning address
+        destination,
         amount,
         reason,
         {
@@ -413,12 +438,24 @@ const transactionService = {
    * @param {Object} metadata - Extra fields recorded with the tx
    */
   processReward: async (pubkey, amount, type, reason, metadata = {}) => {
+    const resolveDestination = (key) => {
+      if (!key) return key;
+      if (key.includes('@') || key.startsWith('lnurl') || key.startsWith('lightning:') || key.startsWith('lnbc')) {
+        return key.replace(/^lightning:/, '');
+      }
+      try {
+        const cached = localStorage.getItem('runstr_lightning_addr');
+        if (cached) return cached;
+      } catch (_) {}
+      return key;
+    };
+    const destination = resolveDestination(pubkey);
     // Fallback routing so TS code works without duplicating logic
     if (type === TRANSACTION_TYPES.STREAK_REWARD) {
-      return transactionService.processStreakReward(pubkey, amount, reason, metadata);
+      return transactionService.processStreakReward(destination, amount, reason, metadata);
     }
     if (type === TRANSACTION_TYPES.LEADERBOARD_REWARD) {
-      return transactionService.processLeaderboardReward(pubkey, amount, reason, metadata);
+      return transactionService.processLeaderboardReward(destination, amount, reason, metadata);
     }
 
     // Generic implementation for any other reward types
@@ -426,13 +463,13 @@ const transactionService = {
       const tx = transactionService.recordTransaction({
         type,
         amount,
-        recipient: pubkey,
+        recipient: destination,
         reason,
-        pubkey,
+        pubkey: destination,
         metadata
       });
 
-      const result = await bitvoraService.sendBitcoin(pubkey, amount, reason, {
+      const result = await bitvoraService.sendBitcoin(destination, amount, reason, {
         txid: tx.id,
         type,
         ...metadata

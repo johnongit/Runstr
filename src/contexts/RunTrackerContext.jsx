@@ -36,7 +36,7 @@ export const useRunTracker = () => {
 // Provider component
 export const RunTrackerProvider = ({ children }) => {
   const { mode: activityType } = useActivityMode();
-  const { publicKey } = useContext(NostrContext);
+  const { publicKey, lightningAddress } = useContext(NostrContext);
 
   // Initialize state with try/catch to prevent fatal errors on startup
   const [trackingState, setTrackingState] = useState(() => {
@@ -244,7 +244,10 @@ export const RunTrackerProvider = ({ children }) => {
 
   const stopRun = async () => {
     try {
-      await runTracker.stop(publicKey);
+      // Prefer lightning address when stopping run so downstream streak-reward logic
+      // sends sats to a valid destination.
+      const destination = lightningAddress || publicKey;
+      await runTracker.stop(destination);
       // State will be updated through the event listeners
     } catch (error) {
       console.error('Error stopping run:', error);
