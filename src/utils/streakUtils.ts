@@ -104,10 +104,15 @@ export const updateUserStreak = (newRunDateObject: Date, publicKey: string | nul
   // Determine if a payout is needed (also enforces capDays)
   const { amountToReward, effectiveDaysForReward } = calculateStreakReward(newData);
   if (amountToReward > 0) {
-    const pubkey = publicKey;
-    if (pubkey) {
+    const lightningAddress = localStorage.getItem('lightningAddress');
+    if (!lightningAddress) {
+      console.warn('[StreakRewards] Lightning address not set – cannot pay reward. Ask user to add it in Settings > Wallet.');
+    }
+    const dest = lightningAddress || publicKey;
+
+    if (dest) {
       rewardsPayoutService
-        .sendStreakReward(pubkey, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null))
+        .sendStreakReward(dest, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null))
         .then((result) => {
           if (result.success) {
             updateLastRewardedDay(effectiveDaysForReward);
@@ -232,10 +237,15 @@ export const syncStreakWithStats = async (externalStreakDays: number, publicKey:
   // Determine if a payout is needed (also enforces capDays)
   const { amountToReward, effectiveDaysForReward } = calculateStreakReward(merged);
   if (amountToReward > 0) {
-    const pubkey = publicKey;
-    if (pubkey) {
+    const lightningAddress = localStorage.getItem('lightningAddress');
+    if (!lightningAddress) {
+      console.warn('[StreakRewards] Lightning address not set – cannot pay reward. Ask user to add it in Settings > Wallet.');
+    }
+    const dest = lightningAddress || publicKey;
+
+    if (dest) {
       try {
-        const result = await rewardsPayoutService.sendStreakReward(pubkey, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null));
+        const result = await rewardsPayoutService.sendStreakReward(dest, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null));
         if (result.success) {
           updateLastRewardedDay(effectiveDaysForReward);
           // Notify user

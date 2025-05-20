@@ -18,9 +18,23 @@ if (!NWC_URI) {
 /** Parse nostr+walletconnect:// URI → { relayURL, servicePubkey, secretPrivKey } */
 function parseNwcUri(uri = NWC_URI) {
   try {
-    const parsed = new URL(uri);
-    const servicePubkey = parsed.pathname.replace(/\/*/g, ''); // strip leading slashes
-    const relayURL = parsed.searchParams.get('relay');
+    // Handle non-standard scheme (nostr+walletconnect://)
+    let workUri = uri;
+    if (uri.startsWith('nostr+walletconnect://')) {
+      workUri = uri.replace('nostr+walletconnect://', 'http://'); // temporary scheme so URL() accepts
+    }
+    const parsed = new URL(workUri);
+    let servicePubkey = parsed.pathname.replace(/\/*/g, '');
+    if (!servicePubkey) {
+      // Most NWC URIs put the pubkey in the host section (after //)
+      servicePubkey = parsed.hostname;
+    }
+    let relayURL = parsed.searchParams.get('relay');
+    if (!relayURL) {
+      // Some wallets omit the relay query param and rely on a default.
+      // Fall back to a well-known public relay so payments still work.
+      relayURL = 'wss://relay.damus.io';
+    }
     const secret = parsed.searchParams.get('secret');
     if (!relayURL || !servicePubkey || !secret) throw new Error('Invalid NWC URI');
     return { relayURL, servicePubkey, secretPrivKey: secret };

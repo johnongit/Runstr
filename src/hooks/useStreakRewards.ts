@@ -57,7 +57,10 @@ export const useStreakRewards = (pubkey: string | null) => {
    * Triggers the payout service if eligibleSats > 0.
    */
   const triggerStreakRewardPayout = useCallback(async () => {
-    if (!pubkey) {
+    const lightningAddress = localStorage.getItem('lightningAddress');
+    const dest = lightningAddress || pubkey;
+
+    if (!dest) {
       setClaimStatus({ claiming: false, success: false, error: 'Public key required.' });
       return { success: false, error: 'Public key required.' };
     }
@@ -73,7 +76,7 @@ export const useStreakRewards = (pubkey: string | null) => {
 
     try {
       const result = await rewardsPayoutService.sendStreakReward(
-        pubkey,
+        dest,
         amountToReward,
         effectiveDaysForReward,
         (localStorage.getItem('nwcConnectionString') || null)

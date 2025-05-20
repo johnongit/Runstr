@@ -181,6 +181,37 @@ export const MenuBar = () => {
               </div>
             </div>
             
+            {/* Lightning Address for Rewards */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold mb-3">Bitcoin Rewards</h4>
+              <div className="space-y-2">
+                <label htmlFor="lnAddressInput" className="text-sm text-gray-400">Lightning Address (to receive streak rewards)</label>
+                <div className="flex">
+                  <input
+                    id="lnAddressInput"
+                    type="text"
+                    defaultValue={localStorage.getItem('lightningAddress') || ''}
+                    placeholder="you@getalby.com"
+                    className="flex-1 bg-[#111827] p-2 rounded-l-lg text-white text-sm"
+                  />
+                  <button
+                    className="bg-indigo-600 px-4 rounded-r-lg text-white text-sm"
+                    onClick={() => {
+                      const val = document.getElementById('lnAddressInput').value.trim();
+                      if (val && val.includes('@')) {
+                        localStorage.setItem('lightningAddress', val);
+                        localStorage.setItem('runstr_lightning_addr', val);
+                        alert('Lightning address saved!');
+                      } else {
+                        alert('Enter a valid Lightning address e.g. name@domain.com');
+                      }
+                    }}
+                  >Save</button>
+                </div>
+                <p className="text-xs text-gray-500">If you also connect an NWC wallet, the app will pay that first and fall back to this address if needed.</p>
+              </div>
+            </div>
+            
             <div className="flex flex-col space-y-4">
               <Link 
                 to="/nwc" 

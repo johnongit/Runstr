@@ -4,8 +4,8 @@ We're excited to announce the latest update to RUNSTR, packed with new features 
 
 ## 🏆 Streak Rewards
 Keep your momentum going and get rewarded for your consistency:
-- **Base Reward**: Earn 50 sats for every completed run
-- **Streak Bonus**: Unlock an additional 50 sat boost for each day in your streak
+- **Base Reward**: Earn 50 sats for every completed run over .5 miles
+- **Streak Bonus**: Unlock an additional 50 sat boost for each day your streak continues
 
 ## 👥 Teams Enhancement
 Connect and motivate each other like never before:

@@ -127,10 +127,11 @@ const checkStreakRewards = async () => {
   const { amountToReward, effectiveDaysForReward } = calculateStreakReward(streakData);
 
   if (amountToReward > 0) {
-    const pubkey = localStorage.getItem('userPubkey'); // Get current user's pubkey
-    if (pubkey) {
+    const lightningAddress = localStorage.getItem('lightningAddress');
+    const dest = lightningAddress || localStorage.getItem('userPubkey');
+    if (dest) {
       console.log(`[Scheduler] Attempting to pay ${amountToReward} sats for ${effectiveDaysForReward}-day streak.`);
-      const result = await rewardsPayoutService.sendStreakReward(pubkey, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null));
+      const result = await rewardsPayoutService.sendStreakReward(dest, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null));
       if (result.success) {
         console.log(`[Scheduler] Streak reward payout successful (TxID: ${result.txid}). Updating lastRewardedDay.`);
         updateLastRewardedDay(effectiveDaysForReward);
