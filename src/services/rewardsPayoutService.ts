@@ -58,39 +58,6 @@ const rewardsPayoutService = {
   },
 
   /**
-   * Send a leaderboard reward.
-   * @param pubkey User's public key.
-   * @param amount Amount in satoshis.
-   * @param rank User's rank on the leaderboard.
-   * @param leaderboardDate Date of the leaderboard.
-   * @returns Transaction result.
-   */
-  sendLeaderboardReward: async (
-    pubkey: string,
-    amount: number,
-    rank: number,
-    leaderboardDate: string // Consider using Date object
-  ): Promise<PayoutResult> => {
-    if (DEMO_MODE) {
-      return simulateApiCall({
-        success: true,
-        txid: `sim_lb_${Date.now().toString(16)}`,
-        amount,
-        pubkey,
-        timestamp: new Date().toISOString(),
-      });
-    }
-    const reason = `Leaderboard rank ${rank} for ${leaderboardDate}`;
-    return transactionService.processReward(
-      pubkey,
-      amount,
-      TRANSACTION_TYPES.LEADERBOARD_REWARD as TransactionType,
-      reason,
-      { source: 'leaderboard_rewards', rank, leaderboardDate }
-    );
-  },
-
-  /**
    * Process an event-related transaction (registration fee or payout).
    * @param pubkey User's public key.
    * @param amount Amount in satoshis (positive for payout, could be negative for fee if handled by caller that way).
@@ -134,6 +101,27 @@ const rewardsPayoutService = {
       reason,
       { source: 'event_rewards', eventId, type: transactionType } // Added type for clarity
     );
+  },
+
+  /**
+   * Send a leaderboard reward.
+   * @param pubkey User's public key.
+   * @param amount Amount in satoshis.
+   * @param rank The rank of the user.
+   * @param payoutDateISO The ISO date of the payout.
+   * @returns Transaction result.
+   */
+  sendLeaderboardReward: async (
+    pubkey: string,
+    amount: number,
+    rank: number,
+    payoutDateISO: string
+  ): Promise<PayoutResult> => {
+    console.warn('[rewardsPayoutService] Leaderboard rewards feature is disabled – ignoring call.');
+    return {
+      success: false,
+      error: 'Leaderboard rewards not implemented',
+    };
   },
 
   // TODO: The methods below like recordClaim, getClaims, createLightningAddress, 

@@ -300,6 +300,19 @@ export const useRunStats = (runHistory, userProfile) => {
       console.error('Error loading leaderboard participation setting:', err);
     }
     
+    // --- NWC streak reward integration ---
+    try {
+      const pubkeyStored = localStorage.getItem('userPubkey') || localStorage.getItem('nostrPublicKey');
+      if (pubkeyStored && newStats.currentStreak > 0) {
+        // Dynamically import to avoid cyclic deps for React Native / Web bundlers
+        const { syncStreakWithStats } = await import('../utils/streakUtils.ts');
+        await syncStreakWithStats(newStats.currentStreak, pubkeyStored);
+      }
+    } catch (err) {
+      console.error('[RunStats] Auto streak reward sync failed:', err);
+    }
+    // --- end integration ---
+    
     setStats(newStats);
     
     // Save current stats to localStorage for other components to use

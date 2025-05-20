@@ -234,8 +234,9 @@ export const startRewardScheduler = () => {
   const runChecks = () => {
     console.log('[Scheduler] Running scheduled checks...');
     checkStreakRewards().catch(console.error);
-    checkLeaderboardRewards().catch(console.error);
-    checkEventPayouts().catch(console.error);
+    // Leaderboard and event reward processing disabled for now
+    // checkLeaderboardRewards().catch(console.error);
+    // checkEventPayouts().catch(console.error);
   };
 
   // Run immediately on start, then set interval
