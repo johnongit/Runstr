@@ -56,7 +56,7 @@ export const useRunStats = (runHistory, userProfile) => {
   }, [userProfile]);
 
   // Calculate all stats from run history
-  const calculateStats = useCallback((runs) => {
+  const calculateStats = useCallback(async (runs) => {
     if (!runs || !runs.length) return;
 
     // Initialize stats
@@ -305,8 +305,10 @@ export const useRunStats = (runHistory, userProfile) => {
       const pubkeyStored = localStorage.getItem('userPubkey') || localStorage.getItem('nostrPublicKey');
       if (pubkeyStored && newStats.currentStreak > 0) {
         // Dynamically import to avoid cyclic deps for React Native / Web bundlers
-        const { syncStreakWithStats } = await import('../utils/streakUtils.ts');
-        await syncStreakWithStats(newStats.currentStreak, pubkeyStored);
+        const mod = await import('../utils/streakUtils.ts');
+        if (mod?.syncStreakWithStats) {
+          await mod.syncStreakWithStats(newStats.currentStreak, pubkeyStored);
+        }
       }
     } catch (err) {
       console.error('[RunStats] Auto streak reward sync failed:', err);
