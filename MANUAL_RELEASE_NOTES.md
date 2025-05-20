@@ -1,47 +1,32 @@
-## 🚀RUNSTR v0.3.9 Alpha (Rewards)
+# RUNSTR v0.4.0 (Rewards and Encryption)
 
-Hey Runners! Get ready for an exciting update packed with new ways to get rewarded, enhanced health tracking, and a smoother experience all around.
+We're excited to announce the latest update to RUNSTR, packed with new features to enhance your running experience!
 
-### New Features
+## 🏆 Streak Rewards
+Keep your momentum going and get rewarded for your consistency:
+- **Base Reward**: Earn 50 sats for every completed run
+- **Streak Bonus**: Unlock an additional 50 sat boost for each day in your streak
 
-- Streak Rewards: Keep your running streak alive and earn sats for every consecutive day you hit the pavement!
+## 👥 Teams Enhancement
+Connect and motivate each other like never before:
+- **Group Chat**: Communicate with your team members in real-time
+- Share achievements, plan group runs, and stay motivated together
 
-- NIP101h Health Metrics Expanded:
+## 📊 NIP101h Integration
+More comprehensive tracking for your fitness journey:
+- **Caloric Data**: Track calories burned during your activities
+- **Workout Intensity**: Monitor how hard you're pushing yourself
+- **NIP-44 Encryption**: Your fitness data stays private and secure
 
-- Track Workout Intensity to monitor your effort levels.
+## ⚡ Performance Improvements and Small Upgrades
+We've made some over and under-the-hood improvements:
+- **Graphene Optimizations**: Faster loading times and smoother experience
+- **Stricter Distance Filtering**: More accurate run tracking and statistics
+- **Code Refactoring**: Cleaner codebase for better stability
+- **Bug Fixes & UI Improvements**: Various small enhancements throughout the app
+- **Logo**: New RUNSTR logo!
 
-- Log Caloric Data to keep an eye on energy expenditure.
-
-- Plus, continue tracking: Weight (kind 1351), Height (kind 1352), Age (kind 1353), Gender (kind 1354), and Fitness Level (kind 1355).
-
-### Feature Improvements
-
-- Teams Chatroom Functionality:
-
-- Group chats now load real-time metadata directly from Nostr relays (NIP-29).
-
-- Improved loading states, image rendering, and clickable links.
-
-- Smoother navigation and better error handling.
-
-- Chat text now wraps correctly, and distracting UI elements have been streamlined.
-
-- NIP101h Default Encryption Setting: Enhanced privacy controls for your health data.
-
-- Feed Enhancements: Posts now include richer metadata for better discovery and future filtering.
-
-### Other Improvements
-
-- Robust Rewards Backend: A new, consolidated rewardsPayoutService and an automated scheduler ensure timely and reliable reward distribution for streaks, leaderboards, and events.
-
-- Graphene Optimizations: Significant performance boosts and bug fixes specifically for GrapheneOS users, including resolutions for "black screen" issues.
-
-- New Logo: Fresh new look for RUNSTR!
-
-- Code Refactoring: Ongoing efforts to keep the codebase clean, efficient, and maintainable.
-
-- Bug Fixes & UI Updates: Addressed various bugs, including potential crashes and blank screen issues, along with general UI polish for a better user experience.
 
 ---
 
-Lets Go! 
+*Lets Go!*
