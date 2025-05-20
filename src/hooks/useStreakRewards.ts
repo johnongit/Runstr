@@ -75,7 +75,8 @@ export const useStreakRewards = (pubkey: string | null) => {
       const result = await rewardsPayoutService.sendStreakReward(
         pubkey,
         amountToReward,
-        effectiveDaysForReward
+        effectiveDaysForReward,
+        (localStorage.getItem('nwcConnectionString') || null)
       );
 
       if (result.success && result.txid) {

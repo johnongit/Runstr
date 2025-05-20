@@ -4,6 +4,7 @@
  */
 
 import nwcService from './nwcService.js';
+import { fetchLnAddressFromProfile } from '../utils/lnAddressResolver';
 
 // Transaction types
 export const TRANSACTION_TYPES = {
@@ -49,6 +50,53 @@ const saveTransactions = (transactions) => {
   }
 };
 
+// Make resolveDestination an async, module-scoped helper
+const resolveDestination = async (key) => {
+  if (!key) return key;
+
+  // Check if key is already a Lightning Address or LNURL
+  if (key.includes('@') || key.startsWith('lnurl') || key.startsWith('lightning:') || key.startsWith('lnbc')) {
+    return key.replace(/^lightning:/, '');
+  }
+
+  // Check local cache (e.g., for user's own explicitly set or previously resolved LN Address)
+  try {
+    // IMPORTANT: This specific cache key 'runstr_lightning_addr' should ideally be for the *current user's*
+    // explicitly set or resolved payout address. If resolving for *other* pubkeys,
+    // a more generic caching mechanism (e.g., pubkey -> lnAddress map) might be needed.
+    // For now, we'll assume it's okay to check/update this for any key being resolved for payouts.
+    const cached = localStorage.getItem('runstr_lightning_addr');
+    if (cached) {
+      // console.log('[TransactionService] Using cached runstr_lightning_addr:', cached);
+      return cached;
+    }
+  } catch (_) {
+    // Ignore localStorage errors
+  }
+
+  // If it looks like a pubkey (hex or npub) and not an LN address, try to fetch from Nostr profile
+  // (fetchLnAddressFromProfile handles npub decoding and hex validation)
+  // console.log(`[TransactionService] Attempting to fetch LN address for potential pubkey: ${key}`);
+  const lnAddressFromProfile = await fetchLnAddressFromProfile(key);
+
+  if (lnAddressFromProfile) {
+    // console.log(`[TransactionService] Found LN address for ${key} from profile: ${lnAddressFromProfile}.`);
+    // Caching it to 'runstr_lightning_addr' assumes this resolution is primarily for the app user's rewards.
+    // If this service pays out to arbitrary pubkeys, this caching key might need to be more specific
+    // or use a different caching strategy (e.g., a map of pubkey -> resolved LN address).
+    try {
+      localStorage.setItem('runstr_lightning_addr', lnAddressFromProfile);
+      // console.log('[TransactionService] Cached resolved LN address to runstr_lightning_addr.');
+    } catch (cacheErr) {
+      console.error('[TransactionService] Error caching fetched LN address:', cacheErr);
+    }
+    return lnAddressFromProfile;
+  }
+
+  // console.warn(`[TransactionService] Could not resolve LN address for ${key} from profile. Returning original key.`);
+  return key; // Return original key if still not resolved (will likely fail NWC payment)
+};
+
 /**
  * Transaction Service
  */
@@ -78,9 +126,12 @@ const transactionService = {
     saveTransactions(transactions);
     
     // Dispatch event to notify updates
-    document.dispatchEvent(new CustomEvent('bitcoinTransactionAdded', { 
-      detail: { transaction: newTransaction }
-    }));
+    // Ensure this runs only in browser environment
+    if (typeof document !== 'undefined') {
+        document.dispatchEvent(new CustomEvent('bitcoinTransactionAdded', { 
+            detail: { transaction: newTransaction }
+        }));
+    }
     
     return newTransaction;
   },
@@ -106,10 +157,12 @@ const transactionService = {
     
     saveTransactions(transactions);
     
-    // Dispatch event
-    document.dispatchEvent(new CustomEvent('bitcoinTransactionUpdated', { 
-      detail: { transaction: transactions[index] }
-    }));
+    // Dispatch event - Ensure this runs only in browser environment
+    if (typeof document !== 'undefined') {
+        document.dispatchEvent(new CustomEvent('bitcoinTransactionUpdated', { 
+          detail: { transaction: transactions[index] }
+        }));
+    }
     
     return transactions[index];
   },
@@ -159,72 +212,41 @@ const transactionService = {
    * @returns {Promise<Object>} Transaction result
    */
   processStreakReward: async (pubkey, amount, reason, metadata = {}) => {
-    // Ensure we are sending sats to a Lightning address / LNURL rather than a raw hex pubkey
-    const resolveDestination = (key) => {
-      if (!key) return key;
-      if (key.includes('@') || key.startsWith('lnurl') || key.startsWith('lightning:') || key.startsWith('lnbc')) {
-        return key.replace(/^lightning:/, '');
-      }
-      try {
-        const cached = localStorage.getItem('runstr_lightning_addr');
-        if (cached) return cached;
-      } catch (_) {}
-      return key;
-    };
-    const destination = resolveDestination(pubkey);
+    const destination = await resolveDestination(pubkey); // Now async
+
     try {
-      // Record transaction in our system first
       const transaction = transactionService.recordTransaction({
         type: TRANSACTION_TYPES.STREAK_REWARD,
         amount,
         recipient: destination,
         reason,
-        pubkey: destination,
+        pubkey: destination, // Using resolved destination here too
         metadata
       });
       
-      // Send sats using NWC (LNURL → invoice → NWC pay)
       const result = await nwcService.payLightningAddress(
         destination,
         amount,
         reason
       );
       
-      // Update transaction with result
       if (result.success) {
         transactionService.updateTransaction(transaction.id, {
           status: TRANSACTION_STATUS.COMPLETED,
           rail: 'nwc',
           preimage: result.result?.preimage || null
         });
-        
-        return {
-          success: true,
-          transaction: {
-            ...transaction,
-            rail: 'nwc',
-            status: TRANSACTION_STATUS.COMPLETED
-          }
-        };
+        return { success: true, transaction: { ...transaction, rail: 'nwc', status: TRANSACTION_STATUS.COMPLETED } };
       } else {
         transactionService.updateTransaction(transaction.id, {
           status: TRANSACTION_STATUS.FAILED,
           error: result.error
         });
-        
-        return {
-          success: false,
-          error: result.error,
-          transaction
-        };
+        return { success: false, error: result.error, transaction };
       }
     } catch (error) {
       console.error('Error processing streak reward:', error);
-      return {
-        success: false,
-        error: error.message || 'Unknown error',
-        transaction: null
-      };
+      return { success: false, error: error.message || 'Unknown error', transaction: null };
     }
   },
   
@@ -256,26 +278,21 @@ const transactionService = {
    * @param {Object} metadata - Extra fields recorded with the tx
    */
   processReward: async (pubkey, amount, type, reason, metadata = {}) => {
-    const resolveDestination = (key) => {
-      if (!key) return key;
-      if (key.includes('@') || key.startsWith('lnurl') || key.startsWith('lightning:') || key.startsWith('lnbc')) {
-        return key.replace(/^lightning:/, '');
-      }
-      try {
-        const cached = localStorage.getItem('runstr_lightning_addr');
-        if (cached) return cached;
-      } catch (_) {}
-      return key;
-    };
-    const destination = resolveDestination(pubkey);
+    // Resolve destination ONCE here, before specific reward processing
+    const destination = await resolveDestination(pubkey);
+
     if (type === TRANSACTION_TYPES.STREAK_REWARD) {
+      // Pass the already resolved (or attempted to resolve) destination
       return transactionService.processStreakReward(destination, amount, reason, metadata);
     }
+    
+    // Handle other reward types if they become supported
+    // if (type === TRANSACTION_TYPES.LEADERBOARD_REWARD) { ... }
 
-    // Unsupported reward type in current build
+    console.warn(`[TransactionService] Reward type '${type}' not supported for processing.`);
     return {
       success: false,
-      error: 'Reward type not supported in this build'
+      error: `Reward type '${type}' not supported in this build`
     };
   }
 };

@@ -129,9 +129,83 @@ async function payLightningAddress(lnAddress, sats, memo = '') {
   return await payInvoiceWithNwc(invRes.invoice, memo);
 }
 
+/**
+ * Ask a user's NWC wallet to create a bolt11 invoice for a specific amount.
+ * @param {string} userNwcUri - Full nostr+walletconnect URI belonging to the *user*.
+ * @param {number} sats - Amount in satoshis to request.
+ * @param {string} memo - Description / memo to attach.
+ * @returns {Promise<{success:boolean, invoice?:string, error?:string}>}
+ */
+async function makeInvoiceWithNwc(userNwcUri, sats, memo = '') {
+  if (!userNwcUri) return { success: false, error: 'User NWC URI missing' };
+
+  if (DEMO_MODE) {
+    // Simply fabricate a fake invoice.
+    return {
+      success: true,
+      invoice: `lnbc${sats}n1demo${Date.now().toString(36)}`
+    };
+  }
+
+  try {
+    const { relayURL, servicePubkey, secretPrivKey } = parseNwcUri(userNwcUri);
+    if (!relayURL) throw new Error('Invalid user NWC URI');
+
+    const relay = new Relay(relayURL);
+    await relay.connect();
+
+    const reqPayload = {
+      method: 'make_invoice',
+      params: { amount: sats * 1000, memo }
+    };
+
+    const encContent = await nip04.encrypt(secretPrivKey, servicePubkey, JSON.stringify(reqPayload));
+    let ev = {
+      kind: 23194,
+      created_at: Math.floor(Date.now() / 1000),
+      pubkey: getPublicKey(secretPrivKey),
+      tags: [['p', servicePubkey]],
+      content: encContent
+    };
+    ev = finalizeEvent(ev, secretPrivKey);
+
+    await relay.publish(ev);
+
+    return await new Promise((resolve, reject) => {
+      const sub = relay.subscribe([{ kinds: [23195], '#e': [ev.id] }]);
+      const timer = setTimeout(() => {
+        sub.close();
+        relay.close();
+        reject({ success: false, error: 'NWC response timeout' });
+      }, 30000);
+
+      sub.on('event', async (event) => {
+        clearTimeout(timer);
+        sub.close();
+        relay.close();
+        try {
+          const dec = await nip04.decrypt(secretPrivKey, servicePubkey, event.content);
+          const data = JSON.parse(dec);
+          if (data.result && data.result.pr) {
+            resolve({ success: true, invoice: data.result.pr });
+          } else {
+            resolve({ success: false, error: data.error?.message || 'make_invoice failed' });
+          }
+        } catch (err) {
+          reject({ success: false, error: 'Decrypt error: ' + err.message });
+        }
+      });
+    });
+  } catch (err) {
+    console.error('[nwcService] makeInvoiceWithNwc error', err);
+    return { success: false, error: err.message };
+  }
+}
+
 export default {
   payLightningAddress,
   payInvoiceWithNwc,
   lnurlFetchInvoice,
-  parseNwcUri
+  parseNwcUri,
+  makeInvoiceWithNwc
 }; 

@@ -107,7 +107,7 @@ export const updateUserStreak = (newRunDateObject: Date, publicKey: string | nul
     const pubkey = publicKey;
     if (pubkey) {
       rewardsPayoutService
-        .sendStreakReward(pubkey, amountToReward, effectiveDaysForReward)
+        .sendStreakReward(pubkey, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null))
         .then((result) => {
           if (result.success) {
             updateLastRewardedDay(effectiveDaysForReward);
@@ -235,7 +235,7 @@ export const syncStreakWithStats = async (externalStreakDays: number, publicKey:
     const pubkey = publicKey;
     if (pubkey) {
       try {
-        const result = await rewardsPayoutService.sendStreakReward(pubkey, amountToReward, effectiveDaysForReward);
+        const result = await rewardsPayoutService.sendStreakReward(pubkey, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null));
         if (result.success) {
           updateLastRewardedDay(effectiveDaysForReward);
           // Notify user

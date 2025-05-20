@@ -5,6 +5,7 @@
 
 import transactionService, { TRANSACTION_TYPES } from './transactionService';
 import { REWARDS } from '../config/rewardsConfig';
+import nwcService from './nwcService';
 
 // Define TransactionType based on TRANSACTION_TYPES from transactionService.js
 // This assumes TRANSACTION_TYPES is an object like { STREAK_REWARD: 'streak_reward', ... }
@@ -27,7 +28,22 @@ interface PayoutResult {
   pubkey?: string;
   timestamp?: string;
   error?: string;
+  result?: any;
 }
+
+// Add helper to attempt paying via the USER's own NWC connection
+/**
+ * Try paying the runner by requesting an invoice from their own NWC wallet
+ * and then paying it with the app funding wallet (nwcService.payInvoiceWithNwc).
+ */
+const payoutViaUserNwc = async (userNwcUri: string | null, sats: number, memo: string) => {
+  if (!userNwcUri) return { success: false, error: 'User NWC URI missing' } as PayoutResult;
+  const invRes = await nwcService.makeInvoiceWithNwc(userNwcUri, sats, memo);
+  if (!invRes.success || !invRes.invoice) return { success: false, error: invRes.error || 'Failed to get invoice' } as PayoutResult;
+  // Pay the invoice with the funding wallet (configured in nwcService)
+  const payRes = await nwcService.payInvoiceWithNwc(invRes.invoice, memo);
+  return payRes;
+};
 
 const rewardsPayoutService = {
   /**
@@ -35,25 +51,45 @@ const rewardsPayoutService = {
    * @param pubkey User's public key.
    * @param amount Amount in satoshis.
    * @param streakDay The day number of the streak.
+   * @param userNwcUri Optional user's NWC URI.
    * @returns Transaction result.
    */
-  sendStreakReward: async (pubkey: string, amount: number, streakDay: number): Promise<PayoutResult> => {
-    if (DEMO_MODE) {
-      return simulateApiCall({
-        success: true,
-        txid: `sim_streak_${Date.now().toString(16)}`,
-        amount,
-        pubkey,
-        timestamp: new Date().toISOString(),
-      });
+  sendStreakReward: async (
+    pubkey: string,
+    amount: number,
+    streakDay: number,
+    userNwcUri?: string | null
+  ): Promise<PayoutResult> => {
+    const memo = `${streakDay}-day streak reward`;
+
+    // 1. Try paying via user's own NWC wallet first
+    if (userNwcUri) {
+      try {
+        const nwcRes = await payoutViaUserNwc(userNwcUri, amount, memo);
+        if (nwcRes.success) {
+          return {
+            success: true,
+            txid: nwcRes.result?.preimage || nwcRes.txid,
+            amount,
+            pubkey,
+            timestamp: new Date().toISOString(),
+          };
+        } else {
+          console.warn('[rewardsPayoutService] user-NWC payout failed, falling back:', nwcRes.error);
+        }
+      } catch (err: any) {
+        console.error('[rewardsPayoutService] Error in user-NWC payout, falling back:', err.message);
+      }
     }
-    const reason = `${streakDay}-day streak reward`;
-    return transactionService.processReward(
+
+    // 2. Fallback to existing LNURL/Lightning Address payout path (transactionService)
+    const reason = memo;
+    return await transactionService.processReward(
       pubkey,
       amount,
       TRANSACTION_TYPES.STREAK_REWARD as TransactionType,
       reason,
-      { source: 'streak_rewards', streakDay }
+      { source: 'streak_rewards', streakDay, via: 'LNURL' }
     );
   },
 
@@ -94,7 +130,7 @@ const rewardsPayoutService = {
         });
     }
 
-    return transactionService.processReward(
+    return await transactionService.processReward(
       pubkey,
       amount,
       transactionType,
