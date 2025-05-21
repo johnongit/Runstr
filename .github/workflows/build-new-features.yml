@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - update-beta
+      - bug-fixes
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
