@@ -1,6 +1,7 @@
 import { useEffect, useContext, useState, useCallback } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
 import { WalletContext } from '../contexts/WalletContext.jsx';
+import { useRunFeed } from '../hooks/useRunFeed';
 import { usePostInteractions } from '../hooks/usePostInteractions';
 import { PostList } from '../components/PostList';
 import { handleAppBackground } from '../utils/nostr';
