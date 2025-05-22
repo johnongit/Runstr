@@ -13,16 +13,14 @@ I created RUNSTR because I was using Nike Run app and wanted to be more "nostr o
 
 ### Current
 
-- Nostr Login
-- Run Tracker
-- Global Running Feed
-- Wavlake Music 
+- Dashboard
+- Stats
+- Feed
+- Teams
+- Music
 
 ### Coming Soon
-
-- Stats
-- Goals
-- Clubs
+- Extended club functionality
 
 ### Future Roadmap
 
