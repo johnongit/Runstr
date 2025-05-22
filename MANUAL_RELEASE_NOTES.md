@@ -1,5 +1,3 @@
-# RUNSTR v0.4.0 (Rewards and Encryption)
-
 We're excited to announce the latest update to RUNSTR, packed with new features to enhance your running experience!
 
 ## 🏆 Streak Rewards

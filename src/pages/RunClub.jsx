@@ -1,6 +1,6 @@
 import { useEffect, useContext, useState, useCallback } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
-import { useAuth } from '../hooks/useAuth';
+import { WalletContext } from '../contexts/WalletContext.jsx';
 import { useRunFeed } from '../hooks/useRunFeed';
 import { usePostInteractions } from '../hooks/usePostInteractions';
 import { PostList } from '../components/PostList';
@@ -8,7 +8,7 @@ import { handleAppBackground } from '../utils/nostr';
 
 export const RunClub = () => {
   const { defaultZapAmount } = useContext(NostrContext);
-  const { wallet } = useAuth();
+  const { wallet } = useContext(WalletContext);
   const [diagnosticInfo, setDiagnosticInfo] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   

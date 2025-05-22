@@ -138,8 +138,18 @@ export const usePostInteractions = ({
         }
       }
 
-      // Check if author has Lightning address
-      if (!post.author.lud16 && !post.author.lud06) {
+      // Determine recipient LNURL / lightning address from their Nostr profile
+      let lnurl = post.author.lud16 || post.author.lud06 || null;
+
+      // Fallback: derive LNURL-pay endpoint from verified nip05, if present
+      if (!lnurl && post.author?.profile?.nip05 && post.author.profile.nip05.includes('@')) {
+        const [name, domain] = post.author.profile.nip05.split('@');
+        if (name && domain) {
+          lnurl = `${name}@${domain}`; // keep address form; later code converts if needed
+        }
+      }
+
+      if (!lnurl) {
         alert('This user has not set up their Lightning address');
         return;
       }
@@ -174,38 +184,36 @@ export const usePostInteractions = ({
       
       // Fallback to manual LNURL flow
       console.log('[ZapFlow] Using manual LNURL-pay flow');
-      
-      // Create zap request
+
+      // Create zap request event (kind 9734) according to NIP-57
       const zapEvent = {
-        kind: 9734, // Zap request
+        kind: 9734,
         created_at: Math.floor(Date.now() / 1000),
         content: 'Zap for your run! ⚡️',
         tags: [
           ['p', post.author.pubkey],
           ['e', post.id],
           ['amount', (defaultZapAmount * 1000).toString()], // millisats
-          // Add multiple relay hints to increase success rate
+          // relay hints – improves probability relays see the zap receipt
           ['relays', 'wss://relay.damus.io'],
           ['relays', 'wss://nos.lol'],
           ['relays', 'wss://relay.nostr.band']
         ],
         pubkey: await window.nostr.getPublicKey()
       };
-      
-      // Sign the event
+
+      // Sign the zap request with the browser/Amber signer
       const signedEvent = await window.nostr.signEvent(zapEvent);
       console.log('[ZapFlow] Created and signed zap request event');
       
-      // Parse Lightning address
+      // Prepare LNURL endpoint from the lnurl / lightning address we resolved above
       let zapEndpoint;
-      const lnurl = post.author.lud16 || post.author.lud06;
-      
       if (lnurl.includes('@')) {
         // Handle Lightning address (lud16)
         const [username, domain] = lnurl.split('@');
         zapEndpoint = `https://${domain}/.well-known/lnurlp/${username}`;
       } else {
-        // Handle raw LNURL (lud06)
+        // Treat value as raw LNURL (bech32 or full URL)
         zapEndpoint = lnurl;
       }
       
