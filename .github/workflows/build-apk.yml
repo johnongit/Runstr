@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - Simple-updates
-      - updates1 # Added feed branch to automatically trigger the workflow
+      - updates1 
+      - rewards-fix # Added feed branch to automatically trigger the workflow
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
