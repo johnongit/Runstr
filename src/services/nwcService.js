@@ -7,9 +7,9 @@ import { Relay, nip04, finalizeEvent, getPublicKey } from 'nostr-tools';
 
 const DEMO_MODE = false; // set true to bypass real network calls during dev
 
-// Pull NWC URI from env (process.env for Node, import.meta.env for Vite)
-const NWC_URI = (typeof import.meta !== 'undefined' && import.meta?.env?.NWC_URI) ||
-  process.env.NWC_URI || '';
+// Prefer Vite-exposed variable (starts with VITE_) but fall back to legacy names
+const NWC_URI = (typeof import.meta !== 'undefined' && (import.meta?.env?.VITE_NWC_URI || import.meta?.env?.NWC_URI)) ||
+  process.env.VITE_NWC_URI || process.env.NWC_URI || '';
 
 if (!NWC_URI) {
   console.warn('[nwcService] NWC_URI env variable is not set – payments will fail');

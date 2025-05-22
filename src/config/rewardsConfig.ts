@@ -45,6 +45,6 @@ export type DailyLeaderboardConfig = typeof REWARDS["DAILY_LEADERBOARD"]; // Now
 export type Event100kConfig = typeof REWARDS["EVENT_100K"]; // Now an interface
 
 export const MIN_STREAK_DISTANCE = {
-  km: 500, // 0.5 km in meters
-  mi: 804, // 0.5 mile in meters
+  km: 0, // lowered from 500 (0.5 km) to allow any run to qualify during testing
+  mi: 0, // lowered from 804 (0.5 mi) to allow any run to qualify
 } as const; 
