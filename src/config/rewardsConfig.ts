@@ -11,7 +11,7 @@ export interface LeaderboardConfig {
 
 export const REWARDS = {
   STREAK: {
-    satsPerDay: 50,
+    satsPerDay: 100, // 100 sats for day 1; cumulative 200 day 2, etc.
     capDays: 7 // maximum days considered when calculating payout
   },
   DAILY_LEADERBOARD: {

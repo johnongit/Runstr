@@ -111,6 +111,14 @@ export const updateUserStreak = (newRunDateObject: Date, publicKey: string | nul
     const dest = lightningAddress || publicKey;
 
     if (dest) {
+      // Optimistic notice
+      const pendingMsg = `🚀 Sending ${amountToReward} sats reward…`;
+      if ((window as any).Android?.showToast) {
+        (window as any).Android.showToast(pendingMsg);
+      } else if (typeof window !== 'undefined') {
+        console.log(pendingMsg);
+      }
+
       rewardsPayoutService
         .sendStreakReward(dest, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null))
         .then((result) => {
