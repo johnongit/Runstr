@@ -1,9 +1,9 @@
 import { createWorkoutEvent } from './nostr';
 import { createAndPublishEvent } from './nostr';
-import { buildIntensityEvent, buildCalorieEvent } from './nostrHealth';
+import { buildIntensityEvent, buildCalorieEvent, buildDurationEvent } from './nostrHealth';
 
 /**
- * Publish a run's workout summary (kind 1301) plus optional 1356 and 1357 events.
+ * Publish a run's workout summary (kind 1301) plus optional 1356, 1357 and 1358 events.
  * @param {Object} run  Run record saved in local storage.
  * @param {string} distanceUnit 'km' | 'mi'
  * @returns {Promise<Array>} resolved array of publish results
@@ -28,8 +28,12 @@ export const publishRun = async (run, distanceUnit = 'km') => {
     return results;
   }
 
-  // 2️⃣  Publish intensity & calorie events if available
-  const followUps = [buildIntensityEvent(run), buildCalorieEvent(run)].filter(Boolean);
+  // 2️⃣  Publish intensity, calorie, & duration events if available
+  const followUps = [
+    buildIntensityEvent(run),
+    buildCalorieEvent(run),
+    buildDurationEvent(run)
+  ].filter(Boolean);
   for (const tmpl of followUps) {
     try {
       const res = await createAndPublishEvent(tmpl);
