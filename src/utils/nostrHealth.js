@@ -203,6 +203,57 @@ export const createCaloricDataEvent = (calories, options = {}) => {
 };
 
 /**
+ * Create an activity duration event (kind 1358)
+ * Adheres to NIP-101h.8 specification.
+ *
+ * @param {number|string} duration      Numeric duration value
+ * @param {string} [unit='seconds']     Unit of measurement – 'seconds' | 'minutes' | 'hours'
+ * @param {Object} options              Optional parameters
+ * @param {string} [options.timestamp]  ISO8601 timestamp when duration was recorded
+ * @param {string} [options.startTime]  ISO8601 activity start time
+ * @param {string} [options.endTime]    ISO8601 activity end time
+ * @param {string} [options.activityType]  Activity type e.g. 'running'
+ * @param {string} [options.source]     Source application name
+ * @param {string} [options.relatedEventId] Event id to link (workout summary etc.)
+ * @returns {Object|null} Event template or null if essential data missing
+ */
+export const createActivityDurationEvent = (
+  duration,
+  unit = 'seconds',
+  options = {}
+) => {
+  if (duration === undefined || duration === null || duration === '') {
+    console.warn('Missing duration for createActivityDurationEvent');
+    return null;
+  }
+
+  const allowedUnits = ['seconds', 'minutes', 'hours'];
+  if (!allowedUnits.includes(unit)) {
+    console.warn(`Invalid unit '${unit}' for createActivityDurationEvent – defaulting to 'seconds'`);
+    unit = 'seconds';
+  }
+
+  const tags = [
+    ['unit', unit],
+    ['t', 'health'],
+    ['t', 'activity_duration']
+  ];
+
+  if (options.activityType) tags.push(['activity', options.activityType]);
+  if (options.timestamp) tags.push(['timestamp', options.timestamp]);
+  if (options.startTime) tags.push(['start_time', options.startTime]);
+  if (options.endTime) tags.push(['end_time', options.endTime]);
+  if (options.source) tags.push(['source', options.source]);
+  if (options.relatedEventId) tags.push(['related_event', options.relatedEventId]);
+
+  return {
+    kind: 1358,
+    content: String(duration),
+    tags
+  };
+};
+
+/**
  * Publish all health profile metrics to Nostr
  * @param {Object} profile - User profile data
  * @param {Object} units - Unit preferences
@@ -290,6 +341,22 @@ export const buildCalorieEvent = (run) => {
     timestamp: new Date(run.timestamp || Date.now()).toISOString(),
     workoutEventId: run.nostrWorkoutEventId || undefined,
     accuracy: 'estimated',
+    source: 'RunstrApp'
+  });
+};
+
+/**
+ * Helper: build activity duration event from a saved run record.
+ * Returns null if run.duration is missing.
+ * @param {Object} run
+ */
+export const buildDurationEvent = (run) => {
+  if (!run || run.duration === undefined || run.duration === null) return null;
+  // Duration is expected in seconds within run record
+  return createActivityDurationEvent(run.duration, 'seconds', {
+    timestamp: new Date(run.timestamp || Date.now()).toISOString(),
+    activityType: 'running',
+    relatedEventId: run.nostrWorkoutEventId || undefined,
     source: 'RunstrApp'
   });
 }; 
