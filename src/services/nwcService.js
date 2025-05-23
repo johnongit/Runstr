@@ -10,7 +10,7 @@ const DEMO_MODE = false; // set true to bypass real network calls during dev
 // 1) Allow runtime override via localStorage (fundingNwcUri)
 // 2) Use env variables baked by Vite / Node
 // 3) Final hard-coded fallback provided by project owner
-const HARDCODED_NWC_URI = 'nostr+walletconnect://17292be0ffe9b1ab3830f9a26fabb8e91c14bec383be4faf00c5e11042192e51?relay=wss%3A%2F%2Fwallets.bitvora.com&secret=250e610ea41fe21aa4ab42cc5d9b718f989977f742c10f8679bd940cda96f48e';
+const HARDCODED_NWC_URI = 'nostr+walletconnect://17292be0ffe9b1ab3830f9a26fabb8e91c14bec383be4faf00c5e11042192e51?relay=wss://wallets.bitvora.com&secret=250e610ea41fe21aa4ab42cc5d9b718f989977f742c10f8679bd940cda96f48e';
 
 const NWC_URI =
   (typeof localStorage !== 'undefined' && localStorage.getItem('fundingNwcUri')) ||
