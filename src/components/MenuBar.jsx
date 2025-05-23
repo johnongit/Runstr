@@ -211,41 +211,7 @@ export const MenuBar = () => {
                 </div>
                 <p className="text-xs text-gray-500">If you also connect an NWC wallet, the app will pay that first and fall back to this address if needed.</p>
 
-                {/* DEBUG ONLY – TEST PAYOUT BUTTON */}
-                <button
-                  className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg text-sm"
-                  onClick={async () => {
-                    const defaultAddr = localStorage.getItem('lightningAddress') || '';
-                    const dest = prompt('Lightning address to test?', defaultAddr);
-                    if (!dest) return;
-                    const amtInput = prompt('Sats to send?', '50');
-                    const amount = parseInt(amtInput || '0', 10);
-                    if (!amount || amount <= 0) {
-                      alert('Amount must be > 0');
-                      return;
-                    }
-                    const res = await rewardsPayoutService.sendStreakReward(dest, amount, 1, null);
-                    if (res.success) {
-                      const msg = `✅ Sent ${amount} sats to ${dest}`;
-                      console.log(msg);
-                      if (window.Android?.showToast) {
-                        window.Android.showToast(msg);
-                      } else {
-                        alert(msg);
-                      }
-                    } else {
-                      const errMsg = `❌ Reward error: ${res.error}`;
-                      console.error(errMsg);
-                      if (window.Android?.showToast) {
-                        window.Android.showToast(errMsg);
-                      } else {
-                        alert(errMsg);
-                      }
-                    }
-                  }}
-                >
-                  TEST PAYOUT
-                </button>
+                {/* End of debug section – TEST PAYOUT button removed for production */}
               </div>
             </div>
             
