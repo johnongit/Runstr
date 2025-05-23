@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { FloatingMusicPlayer } from './FloatingMusicPlayer';
 import { useActivityMode, ACTIVITY_TYPES } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
+import rewardsPayoutService from '../services/rewardsPayoutService';
 
 export const MenuBar = () => {
   const location = useLocation();
@@ -181,7 +182,7 @@ export const MenuBar = () => {
               </div>
             </div>
             
-            {/* Lightning Address for Rewards */}
+            {/* Bitcoin Rewards Section */}
             <div className="mb-6">
               <h4 className="text-lg font-semibold mb-3">Bitcoin Rewards</h4>
               <div className="space-y-2">
@@ -209,6 +210,42 @@ export const MenuBar = () => {
                   >Save</button>
                 </div>
                 <p className="text-xs text-gray-500">If you also connect an NWC wallet, the app will pay that first and fall back to this address if needed.</p>
+
+                {/* DEBUG ONLY – TEST PAYOUT BUTTON */}
+                <button
+                  className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg text-sm"
+                  onClick={async () => {
+                    const defaultAddr = localStorage.getItem('lightningAddress') || '';
+                    const dest = prompt('Lightning address to test?', defaultAddr);
+                    if (!dest) return;
+                    const amtInput = prompt('Sats to send?', '50');
+                    const amount = parseInt(amtInput || '0', 10);
+                    if (!amount || amount <= 0) {
+                      alert('Amount must be > 0');
+                      return;
+                    }
+                    const res = await rewardsPayoutService.sendStreakReward(dest, amount, 1, null);
+                    if (res.success) {
+                      const msg = `✅ Sent ${amount} sats to ${dest}`;
+                      console.log(msg);
+                      if (window.Android?.showToast) {
+                        window.Android.showToast(msg);
+                      } else {
+                        alert(msg);
+                      }
+                    } else {
+                      const errMsg = `❌ Reward error: ${res.error}`;
+                      console.error(errMsg);
+                      if (window.Android?.showToast) {
+                        window.Android.showToast(errMsg);
+                      } else {
+                        alert(errMsg);
+                      }
+                    }
+                  }}
+                >
+                  TEST PAYOUT
+                </button>
               </div>
             </div>
             

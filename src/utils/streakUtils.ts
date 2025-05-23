@@ -127,10 +127,22 @@ export const updateUserStreak = (newRunDateObject: Date, publicKey: string | nul
             }
           } else {
             console.error('[StreakRewards] Auto-payout failed:', result.error);
+            const errMsg = `Reward error: ${result.error}`;
+            if ((window as any).Android?.showToast) {
+              (window as any).Android.showToast(errMsg);
+            } else if (typeof window !== 'undefined') {
+              alert(errMsg);
+            }
           }
         })
         .catch((err) => {
           console.error('[StreakRewards] Error during auto-payout:', err);
+          const errMsg2 = `Reward error: ${err.message || err}`;
+          if ((window as any).Android?.showToast) {
+            (window as any).Android.showToast(errMsg2);
+          } else if (typeof window !== 'undefined') {
+            alert(errMsg2);
+          }
         });
     } else {
       console.warn('[StreakRewards] Cannot auto-pay reward – pubkey not set.');
@@ -259,9 +271,21 @@ export const syncStreakWithStats = async (externalStreakDays: number, publicKey:
           }
         } else {
           console.error('[StreakRewards] Auto-payout failed:', result.error);
+          const errMsg = `Reward error: ${result.error}`;
+          if ((window as any).Android?.showToast) {
+            (window as any).Android.showToast(errMsg);
+          } else if (typeof window !== 'undefined') {
+            alert(errMsg);
+          }
         }
       } catch (err) {
         console.error('[StreakRewards] Error during auto-payout:', err);
+        const errMsg2 = `Reward error: ${err.message || err}`;
+        if ((window as any).Android?.showToast) {
+          (window as any).Android.showToast(errMsg2);
+        } else if (typeof window !== 'undefined') {
+          alert(errMsg2);
+        }
       }
     } else {
       console.warn('[StreakRewards] Cannot auto-pay reward – pubkey not set.');
