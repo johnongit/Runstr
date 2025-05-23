@@ -1,7 +1,7 @@
 // Constants for accuracy thresholds
-const MINIMUM_ACCURACY = 25; // meters - for good precision
+const MINIMUM_ACCURACY = 10; // meters - require higher precision
 const SPEED_THRESHOLD = 12.5; // meters/second (~45 km/h)
-const MINIMUM_DISTANCE = 0.02; // meters
+const MINIMUM_DISTANCE = 1; // meters
 const MAXIMUM_DISTANCE_PER_POINT = 50; // meters
 const MINIMUM_TIME_DIFF = 0.2; // seconds
 const PACE_WINDOW = 15; // Reduced to 15 seconds for more responsive pace updates

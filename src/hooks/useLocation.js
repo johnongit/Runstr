@@ -124,8 +124,8 @@ export const useLocation = (options = {}) => {
         updateElevation(position.coords.altitude);
       }
 
-      // Less strict filtering criteria - allow any movement >= 0.1m with reasonable accuracy
-      if (distance >= 0.1 && position.coords.accuracy < 30) {
+      // Stricter filtering: ignore jitter below 1m and low-precision points (>15m)
+      if (distance >= 1 && position.coords.accuracy < 15) {
         lastPositionRef.current = filteredPosition;
         setPositions((prev) => [...prev, filteredPosition]);
       }
@@ -203,10 +203,7 @@ export const useLocation = (options = {}) => {
       (position) => {
         if (!isPaused) {
           setLocation(position);
-          addPosition({
-            ...position.toJSON(),
-            timestamp: Date.now() // Use current time instead of GPS time
-          });
+          addPosition(position.toJSON());
         }
       },
       (error) => {
