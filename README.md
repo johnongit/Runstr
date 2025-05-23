@@ -25,10 +25,7 @@ I created RUNSTR because I was using Nike Run app and wanted to be more "nostr o
 ### Future Roadmap
 
 - Events
-- Gear
-- Custom themes
-- Design Overhaul
-- Standardized run data format
+- Bangle.Js App store
 
 ## Development Stages
 
