@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { fetchEvents } from '../utils/nostr'; // Assuming fetchEvents can get kind 1301
+import { NostrContext } from '../contexts/NostrContext'; // Import NostrContext
 
 const NostrStatsPage = () => {
   const { healthEncryptionPref } = useSettings();
+  const { publicKey: userPubkey } = useContext(NostrContext); // Get pubkey from NostrContext
   const [workoutEvents, setWorkoutEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -12,8 +14,7 @@ const NostrStatsPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // TODO: Get current user's pubkey
-      const userPubkey = localStorage.getItem('userPublicKey'); 
+      // userPubkey is now from NostrContext
       if (!userPubkey) {
         setError('User public key not found. Please log in.');
         setIsLoading(false);
@@ -37,20 +38,15 @@ const NostrStatsPage = () => {
   };
 
   useEffect(() => {
-    loadWorkoutEvents();
-  }, []);
+    if (userPubkey) { // Only load if pubkey is available
+      loadWorkoutEvents();
+    }
+  }, [userPubkey]); // Re-run if userPubkey changes (e.g., after login)
 
   return (
     <div className="nostr-stats-page p-4">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Nostr Workout Records (Kind 1301)</h2>
-        <button
-          onClick={loadWorkoutEvents}
-          disabled={isLoading}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50"
-        >
-          {isLoading ? 'Loading...' : 'Refresh'}
-        </button>
+        <h2 className="text-2xl font-bold">Nostr Workout Record</h2>
       </div>
 
       {error && <p className="text-red-500 bg-red-900/20 p-3 rounded">{error}</p>}

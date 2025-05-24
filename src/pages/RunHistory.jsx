@@ -382,7 +382,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             to="/nostr-stats" 
             className="w-full text-center px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-md text-white font-semibold transition-colors duration-150 block md:w-auto md:inline-block"
           >
-            View Raw Nostr Stats (NIP-101e)
+            Nostr Workout Record
           </Link>
         </div>
         <button 
