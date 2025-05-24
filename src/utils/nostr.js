@@ -870,7 +870,8 @@ export const createWorkoutEvent = (run, distanceUnit) => {
       ['exercise', 'running'],
       ['distance', distanceValue, distanceUnit],
       ['duration', durationFormatted],
-      ...elevationTags
+      ...elevationTags,
+      ['source', 'RUNSTR']
     ]
   };
 };
