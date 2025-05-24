@@ -11,7 +11,9 @@ export const MenuBar = () => {
   const { mode, setMode, getActivityText } = useActivityMode();
   const { 
     distanceUnit, toggleDistanceUnit,
-    healthEncryptionPref, setHealthEncryptionPref
+    healthEncryptionPref, setHealthEncryptionPref,
+    publishMode, setPublishMode,
+    privateRelayUrl, setPrivateRelayUrl
   } = useSettings();
 
   const menuItems = [
@@ -167,8 +169,8 @@ export const MenuBar = () => {
             
             {/* Health Encryption Section */}
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Health-Data Encryption</h4>
-              <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg">
+              <h4 className="text-lg font-semibold mb-3">Health Data Privacy</h4>
+              <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg mb-3">
                 <span className="text-sm text-gray-400 mr-3">Encrypt Health Data (NIP-44)</span>
                 <div className="toggle-switch">
                   <input
@@ -179,6 +181,52 @@ export const MenuBar = () => {
                   />
                   <span className="toggle-slider"></span>
                 </div>
+              </div>
+
+              {/* Publish Destination Section - ADDED HERE */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Publish Destination</label>
+                <div className="flex rounded-md bg-[#111827] p-1 space-x-1">
+                  <button
+                    className={`flex-1 px-3 py-2 text-xs rounded-md ${
+                      publishMode === 'public' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'
+                    }`}
+                    onClick={() => setPublishMode('public')}
+                  >
+                    Public Relays
+                  </button>
+                  <button
+                    className={`flex-1 px-3 py-2 text-xs rounded-md ${
+                      publishMode === 'private' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'
+                    }`}
+                    onClick={() => setPublishMode('private')}
+                  >
+                    Private Relay
+                  </button>
+                  <button
+                    className={`flex-1 px-3 py-2 text-xs rounded-md ${
+                      publishMode === 'mixed' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'
+                    }`}
+                    onClick={() => setPublishMode('mixed')}
+                  >
+                    Mixed
+                  </button>
+                </div>
+                {(publishMode === 'private' || publishMode === 'mixed') && (
+                  <div className="mt-2">
+                    <label htmlFor="privateRelayUrlInputModal" className="block text-xs font-medium text-gray-400 mb-1">
+                      Private Relay URL (wss://...)
+                    </label>
+                    <input
+                      id="privateRelayUrlInputModal"
+                      type="text"
+                      value={privateRelayUrl}
+                      onChange={e => setPrivateRelayUrl(e.target.value)}
+                      placeholder="wss://your-private-relay.com"
+                      className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                )}
               </div>
             </div>
             
