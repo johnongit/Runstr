@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRunTracker } from '../contexts/RunTrackerContext';
 import { useActivityMode } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
-import runDataService from '../services/RunDataService';
+import runDataService, { ACTIVITY_TYPES } from '../services/RunDataService';
 import { PermissionDialog } from './PermissionDialog';
 import { formatPaceWithUnit, displayDistance, convertDistance, formatElevation } from '../utils/formatters';
 import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
