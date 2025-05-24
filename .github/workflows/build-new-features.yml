@@ -6,6 +6,7 @@ on:
       - update-beta
       - bug-fixes
       - rewards-fix
+      - nostr-stats
   workflow_dispatch:  # Allows manual triggering
 
 jobs:

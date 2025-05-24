@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { relays as defaultRelays } from '../config/relays.js';
 
 // Create the context
 const SettingsContext = createContext(null);
@@ -18,7 +19,13 @@ export const useSettings = () => {
       setCalorieIntensityPref: () => console.warn('Settings not initialized'),
       healthEncryptionPref: 'encrypted',
       setHealthEncryptionPref: () => console.warn('Settings not initialized'),
-      isHealthEncryptionEnabled: () => true
+      isHealthEncryptionEnabled: () => true,
+      publishMode: 'public',
+      setPublishMode: () => {},
+      privateRelayUrl: '',
+      setPrivateRelayUrl: () => {},
+      blossomEndpoint: '',
+      setBlossomEndpoint: () => {}
     };
   }
   return context;
@@ -57,6 +64,49 @@ export const SettingsProvider = ({ children }) => {
       return 'encrypted';
     }
   });
+
+  // ADD STATE FOR PUBLISH DESTINATION -----------------
+  // Initialize publishMode: 'public' | 'private' | 'blossom' | 'mixed'
+  const [publishMode, setPublishMode] = useState(() => {
+    try {
+      const stored = localStorage.getItem('publishMode');
+      return stored || 'public';
+    } catch (e) {
+      console.warn('init publishMode failed', e);
+      return 'public';
+    }
+  });
+
+  // Private relay URL (if publishMode === 'private' or mixed)
+  const [privateRelayUrl, setPrivateRelayUrl] = useState(() => {
+    try {
+      return localStorage.getItem('privateRelayUrl') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  // Blossom endpoint (for export – kept here so UI can store it)
+  const [blossomEndpoint, setBlossomEndpoint] = useState(() => {
+    try {
+      return localStorage.getItem('blossomEndpoint') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  // Persist the above three values when they change
+  useEffect(() => {
+    localStorage.setItem('publishMode', publishMode);
+  }, [publishMode]);
+
+  useEffect(() => {
+    localStorage.setItem('privateRelayUrl', privateRelayUrl);
+  }, [privateRelayUrl]);
+
+  useEffect(() => {
+    localStorage.setItem('blossomEndpoint', blossomEndpoint);
+  }, [blossomEndpoint]);
 
   // Toggle between km and mi units
   const toggleDistanceUnit = () => {
@@ -112,7 +162,13 @@ export const SettingsProvider = ({ children }) => {
       setCalorieIntensityPref,
       healthEncryptionPref,
       setHealthEncryptionPref,
-      isHealthEncryptionEnabled: () => healthEncryptionPref === 'encrypted'
+      isHealthEncryptionEnabled: () => healthEncryptionPref === 'encrypted',
+      publishMode,
+      setPublishMode,
+      privateRelayUrl,
+      setPrivateRelayUrl,
+      blossomEndpoint,
+      setBlossomEndpoint
     }}>
       {children}
     </SettingsContext.Provider>
@@ -121,4 +177,24 @@ export const SettingsProvider = ({ children }) => {
 
 SettingsProvider.propTypes = {
   children: PropTypes.node.isRequired
+};
+
+// Helper accessible from non-React modules
+export const getActiveRelayList = () => {
+  try {
+    const mode = localStorage.getItem('publishMode') || 'public';
+    const privateRelay = localStorage.getItem('privateRelayUrl') || '';
+    let list = [];
+    if (mode === 'public') {
+      list = [...defaultRelays];
+    } else if (mode === 'private') {
+      if (privateRelay) list = [privateRelay];
+    } else if (mode === 'mixed') {
+      list = [...defaultRelays];
+      if (privateRelay) list.push(privateRelay);
+    }
+    return list;
+  } catch {
+    return [...defaultRelays];
+  }
 }; 

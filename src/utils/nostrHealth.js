@@ -359,4 +359,158 @@ export const buildDurationEvent = (run) => {
     relatedEventId: run.nostrWorkoutEventId || undefined,
     source: 'RunstrApp'
   });
+};
+
+// Helper creators for distance, pace, elevation and split metrics under NIP-101h.
+// NOTE: Kind numbers (1359-1362) follow the draft RUNSTR mapping and can be
+// updated easily in one place when the official spec finalises.
+
+const METRIC_KINDS = {
+  distance: 1359,   // total distance covered during a workout
+  pace: 1360,       // average pace (seconds per km or mile)
+  elevation: 1361,  // elevation gain in metres or feet
+  split: 1362       // individual split (per km/mi) pace/duration
+};
+
+/**
+ * Create a total distance event (kind 1359 draft).
+ * @param {number} distance Numeric distance value (e.g. 5.12)
+ * @param {string} unit 'km' | 'mi'
+ * @param {Object} options Optional fields { timestamp, source, accuracy, validity, workoutEventId }
+ */
+export const createDistanceMetricEvent = (distance, unit = 'km', options = {}) => {
+  if (distance === undefined || distance === null) return null;
+  const tags = [
+    ['unit', unit],
+    ['t', 'health'],
+    ['t', 'distance']
+  ];
+
+  if (options.timestamp) tags.push(['timestamp', options.timestamp]);
+  if (options.source) tags.push(['source', options.source]);
+  if (options.accuracy) tags.push(['accuracy', options.accuracy]);
+  if (options.validity) tags.push(['validity', options.validity]);
+  if (options.workoutEventId) tags.push(['e', options.workoutEventId, '', 'root']);
+
+  return {
+    kind: METRIC_KINDS.distance,
+    content: String(distance),
+    tags
+  };
+};
+
+/**
+ * Create an average pace event (kind 1360 draft).
+ * @param {number} pace Pace value in seconds per unit
+ * @param {string} unit 'sec_per_km' | 'sec_per_mi'
+ */
+export const createPaceMetricEvent = (pace, unit = 'sec_per_km', options = {}) => {
+  if (pace === undefined || pace === null) return null;
+  const tags = [
+    ['unit', unit],
+    ['t', 'health'],
+    ['t', 'pace']
+  ];
+  if (options.timestamp) tags.push(['timestamp', options.timestamp]);
+  if (options.source) tags.push(['source', options.source]);
+  if (options.accuracy) tags.push(['accuracy', options.accuracy]);
+  if (options.validity) tags.push(['validity', options.validity]);
+  if (options.workoutEventId) tags.push(['e', options.workoutEventId, '', 'root']);
+
+  return {
+    kind: METRIC_KINDS.pace,
+    content: String(pace),
+    tags
+  };
+};
+
+/**
+ * Create an elevation gain event (kind 1361 draft).
+ */
+export const createElevationMetricEvent = (gain, unit = 'm', options = {}) => {
+  if (gain === undefined || gain === null) return null;
+  const tags = [
+    ['unit', unit],
+    ['t', 'health'],
+    ['t', 'elevation']
+  ];
+  if (options.timestamp) tags.push(['timestamp', options.timestamp]);
+  if (options.source) tags.push(['source', options.source]);
+  if (options.accuracy) tags.push(['accuracy', options.accuracy]);
+  if (options.validity) tags.push(['validity', options.validity]);
+  if (options.workoutEventId) tags.push(['e', options.workoutEventId, '', 'root']);
+
+  return {
+    kind: METRIC_KINDS.elevation,
+    content: String(gain),
+    tags
+  };
+};
+
+/**
+ * Create a split event (kind 1362 draft).
+ * @param {Object} split { index, distance, duration }
+ * Tags include split_index and optionally distance unit.
+ */
+export const createSplitMetricEvent = (split, unit = 'km', options = {}) => {
+  if (!split || split.index === undefined) return null;
+  const tags = [
+    ['unit', unit],
+    ['t', 'health'],
+    ['t', 'split'],
+    ['split_index', String(split.index)]
+  ];
+  if (options.timestamp) tags.push(['timestamp', options.timestamp]);
+  if (options.source) tags.push(['source', options.source]);
+  if (options.workoutEventId) tags.push(['e', options.workoutEventId, '', 'root']);
+
+  // content encodes pace or duration for that split in seconds
+  return {
+    kind: METRIC_KINDS.split,
+    content: String(split.duration),
+    tags
+  };
+};
+
+// ------- Helper builders used by runPublisher ------------------------------
+export const buildDistanceEvent = (run, distanceUnit = 'km') => {
+  if (!run || run.distance === undefined) return null;
+  return createDistanceMetricEvent(run.distance / (distanceUnit === 'km' ? 1000 : 1609.344), distanceUnit, {
+    timestamp: new Date(run.timestamp || Date.now()).toISOString(),
+    activityType: 'running',
+    accuracy: 'measured',
+    source: 'RunstrApp',
+    workoutEventId: run.nostrWorkoutEventId || undefined
+  });
+};
+
+export const buildPaceEvent = (run, distanceUnit = 'km') => {
+  if (!run || !run.pace) return null; // pace in seconds per unit
+  const unitTag = distanceUnit === 'km' ? 'sec_per_km' : 'sec_per_mi';
+  return createPaceMetricEvent(run.pace, unitTag, {
+    timestamp: new Date(run.timestamp || Date.now()).toISOString(),
+    source: 'RunstrApp',
+    workoutEventId: run.nostrWorkoutEventId || undefined
+  });
+};
+
+export const buildElevationEvent = (run, distanceUnit = 'km') => {
+  if (!run || !run.elevation || run.elevation.gain === undefined) return null;
+  const unit = 'm'; // store metres even if user imperial
+  return createElevationMetricEvent(run.elevation.gain, unit, {
+    timestamp: new Date(run.timestamp || Date.now()).toISOString(),
+    source: 'RunstrApp',
+    workoutEventId: run.nostrWorkoutEventId || undefined
+  });
+};
+
+export const buildSplitEvents = (run, distanceUnit = 'km') => {
+  if (!run || !Array.isArray(run.splits) || run.splits.length === 0) return [];
+  return run.splits.map((s, idx) =>
+    createSplitMetricEvent({ index: idx + 1, distance: s.distance, duration: s.time }, distanceUnit, {
+      timestamp: new Date(run.timestamp || Date.now()).toISOString(),
+      source: 'RunstrApp',
+      workoutEventId: run.nostrWorkoutEventId || undefined
+    })
+  );
 }; 

@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { ACTIVITY_TYPES } from '../services/RunDataService'; // Assuming ACTIVITY_TYPES is exported here
 
 const styles = {
   card: {
@@ -51,6 +52,11 @@ const styles = {
     fontSize: '0.875rem',
     fontWeight: '500',
     color: '#e2e8f0',
+  },
+  metricUnit: {
+    fontSize: '0.75rem',
+    color: '#a5adcf',
+    marginLeft: '4px',
   },
   splitsToggle: {
     background: 'rgba(79, 70, 229, 0.2)',
@@ -110,6 +116,10 @@ export const RunHistoryCard = ({
   formatElevation,
   pace,
   caloriesBurned,
+  activityType,
+  displayMetricValue,
+  displayMetricLabel,
+  displayMetricUnit,
   isWorkoutSaved,
   isSavingWorkout,
   savingWorkoutRunId,
@@ -120,6 +130,26 @@ export const RunHistoryCard = ({
   onToggleSplits,
   SplitsTable
 }) => {
+  let metricLabelToDisplay;
+  let metricValueToDisplay;
+  let metricUnitToDisplay = '';
+
+  const currentActivityType = activityType || run.activityType;
+
+  if (currentActivityType === ACTIVITY_TYPES.WALK && displayMetricValue !== undefined) {
+    metricLabelToDisplay = displayMetricLabel || 'Steps';
+    metricValueToDisplay = Math.round(displayMetricValue);
+    metricUnitToDisplay = displayMetricUnit || '';
+  } else if (currentActivityType === ACTIVITY_TYPES.CYCLE && displayMetricValue !== undefined) {
+    metricLabelToDisplay = displayMetricLabel || 'Speed';
+    metricValueToDisplay = displayMetricValue;
+    metricUnitToDisplay = displayMetricUnit || (distanceUnit === 'km' ? 'km/h' : 'mph');
+  } else {
+    metricLabelToDisplay = "Pace";
+    metricValueToDisplay = pace;
+    metricUnitToDisplay = `min/${distanceUnit}`;
+  }
+  
   return (
     <div style={styles.card}>
       {/* Header with date and delete icon */}
@@ -152,8 +182,14 @@ export const RunHistoryCard = ({
         </div>
         
         <div style={styles.metricItem}>
-          <span style={styles.metricLabel}>Pace</span>
-          <span style={styles.metricValue}>{pace} min/{distanceUnit}</span>
+          <span style={styles.metricLabel}>{metricLabelToDisplay}</span>
+          <span style={styles.metricValue}>
+            {metricValueToDisplay}
+            {metricUnitToDisplay && metricUnitToDisplay !== `min/${distanceUnit}` && (
+              <span style={styles.metricUnit}>{metricUnitToDisplay}</span>
+            )}
+            {metricLabelToDisplay === "Pace" && !metricUnitToDisplay.startsWith('min/') && ` ${metricUnitToDisplay}`}
+          </span>
         </div>
         
         <div style={styles.metricItem}>
@@ -248,6 +284,10 @@ RunHistoryCard.propTypes = {
   formatElevation: PropTypes.func.isRequired,
   pace: PropTypes.string.isRequired,
   caloriesBurned: PropTypes.number.isRequired,
+  activityType: PropTypes.oneOf(Object.values(ACTIVITY_TYPES)),
+  displayMetricValue: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  displayMetricLabel: PropTypes.string,
+  displayMetricUnit: PropTypes.string,
   isWorkoutSaved: PropTypes.bool.isRequired,
   isSavingWorkout: PropTypes.bool.isRequired,
   savingWorkoutRunId: PropTypes.string,

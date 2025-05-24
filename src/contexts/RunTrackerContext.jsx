@@ -20,6 +20,8 @@ export const useRunTracker = () => {
       distance: 0,
       duration: 0,
       pace: 0,
+      estimatedSteps: 0,
+      currentSpeed: { value: 0, unit: 'km/h' },
       splits: [],
       elevation: { current: null, gain: 0, loss: 0 },
       activityType: ACTIVITY_TYPES.RUN,
@@ -47,6 +49,8 @@ export const RunTrackerProvider = ({ children }) => {
         distance: runTracker.distance,
         duration: runTracker.duration,
         pace: runTracker.pace,
+        estimatedSteps: runTracker.estimatedSteps || 0,
+        currentSpeed: runTracker.currentSpeed || { value: 0, unit: 'km/h' },
         splits: runTracker.splits,
         elevation: runTracker.elevation,
         activityType: runTracker.activityType || activityType
@@ -59,6 +63,8 @@ export const RunTrackerProvider = ({ children }) => {
         distance: 0,
         duration: 0,
         pace: 0,
+        estimatedSteps: 0,
+        currentSpeed: { value: 0, unit: activityType === ACTIVITY_TYPES.CYCLE ? (localStorage.getItem('distanceUnit') || 'km') === 'km' ? 'km/h' : 'mph' : 'km/h' },
         splits: [],
         elevation: { current: null, gain: 0, loss: 0, lastAltitude: null },
         activityType: activityType
@@ -89,6 +95,14 @@ export const RunTrackerProvider = ({ children }) => {
         setTrackingState(prev => ({ ...prev, elevation }));
       };
 
+      const handleStepsChange = (steps) => {
+        setTrackingState(prev => ({ ...prev, estimatedSteps: steps }));
+      };
+
+      const handleSpeedChange = (speed) => {
+        setTrackingState(prev => ({ ...prev, currentSpeed: speed }));
+      };
+
       const handleStatusChange = () => {
         setTrackingState(prev => ({
           ...prev,
@@ -111,6 +125,8 @@ export const RunTrackerProvider = ({ children }) => {
       runTracker.on('elevationChange', handleElevationChange);
       runTracker.on('statusChange', handleStatusChange);
       runTracker.on('stopped', handleRunStopped);
+      runTracker.on('stepsChange', handleStepsChange);
+      runTracker.on('speedChange', handleSpeedChange);
 
       // Check for active run state in localStorage on mount
       const savedRunState = localStorage.getItem('activeRunState');
@@ -125,6 +141,8 @@ export const RunTrackerProvider = ({ children }) => {
             distance: runData.distance,
             duration: runData.duration,
             pace: runData.pace,
+            estimatedSteps: runData.estimatedTotalSteps || 0,
+            currentSpeed: runData.averageSpeed || { value: 0, unit: (runData.unit || localStorage.getItem('distanceUnit') || 'km') === 'km' ? 'km/h' : 'mph' },
             splits: runData.splits,
             elevation: runData.elevation,
             activityType: runData.activityType || activityType
@@ -160,6 +178,8 @@ export const RunTrackerProvider = ({ children }) => {
         runTracker.off('elevationChange', handleElevationChange); 
         runTracker.off('statusChange', handleStatusChange);
         runTracker.off('stopped', handleRunStopped);
+        runTracker.off('stepsChange', handleStepsChange);
+        runTracker.off('speedChange', handleSpeedChange);
       };
     } catch (error) {
       console.error('Error setting up run tracker event listeners:', error);
@@ -178,6 +198,8 @@ export const RunTrackerProvider = ({ children }) => {
           distance: trackingState.distance,
           duration: trackingState.duration,
           pace: trackingState.pace,
+          estimatedSteps: trackingState.estimatedSteps,
+          currentSpeed: trackingState.currentSpeed,
           splits: trackingState.splits,
           elevation: trackingState.elevation,
           activityType: trackingState.activityType,
@@ -214,6 +236,8 @@ export const RunTrackerProvider = ({ children }) => {
         distance: 0,
         duration: 0,
         pace: 0,
+        estimatedSteps: 0,
+        currentSpeed: { value: 0, unit: activityType === ACTIVITY_TYPES.CYCLE ? (localStorage.getItem('distanceUnit') || 'km') === 'km' ? 'km/h' : 'mph' : 'km/h' },
         splits: [],
         elevation: { current: null, gain: 0, loss: 0, lastAltitude: null },
         activityType: activityType
@@ -258,6 +282,8 @@ export const RunTrackerProvider = ({ children }) => {
         distance: 0,
         duration: 0,
         pace: 0,
+        estimatedSteps: 0,
+        currentSpeed: { value: 0, unit: activityType === ACTIVITY_TYPES.CYCLE ? (localStorage.getItem('distanceUnit') || 'km') === 'km' ? 'km/h' : 'mph' : 'km/h' },
         splits: [],
         elevation: { current: null, gain: 0, loss: 0, lastAltitude: null },
         activityType: activityType

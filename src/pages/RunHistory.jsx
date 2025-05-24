@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
 import { useRunStats } from '../hooks/useRunStats';
 import { useRunProfile } from '../hooks/useRunProfile';
 import { formatTime, displayDistance, formatElevation, formatDate } from '../utils/formatters';
-import runDataService from '../services/RunDataService';
+import runDataService, { ACTIVITY_TYPES } from '../services/RunDataService';
 import SplitsTable from '../components/SplitsTable';
 import { useActivityMode } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -16,6 +16,9 @@ export const RunHistory = () => {
   const { mode, getActivityText } = useActivityMode();
   const { distanceUnit } = useSettings();
   
+  // Define average stride length for step estimation
+  const AVERAGE_STRIDE_LENGTH_METERS = 0.762; // meters
+
   // State for run history
   const [runHistory, setRunHistory] = useState([]);
   const [filteredHistory, setFilteredHistory] = useState([]);
@@ -374,6 +377,14 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     <div className="run-history">
       <div className="stats-overview">
         <h2>{getActivityText('history')}</h2>
+        <div className="my-4">
+          <Link 
+            to="/nostr-stats" 
+            className="w-full text-center px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-md text-white font-semibold transition-colors duration-150 block md:w-auto md:inline-block"
+          >
+            View Raw Nostr Stats (NIP-101e)
+          </Link>
+        </div>
         <button 
           className="profile-btn" 
           onClick={() => navigate('/profile')}
@@ -522,22 +533,66 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration);
             
             // Calculate pace with the consistent service method
-            const pace = runDataService.calculatePace(run.distance, run.duration, distanceUnit).toFixed(2);
+            const existingPace = runDataService.calculatePace(run.distance, run.duration, distanceUnit).toFixed(2);
             
             // Check if workout has been saved for this run
             const isWorkoutSaved = workoutSavedRuns.has(run.id);
+
+            // Prepare props for RunHistoryCard based on activity type
+            let displayMetricValue;
+            let displayMetricLabel;
+            let displayMetricUnit;
+
+            const currentActivityType = run.activityType || ACTIVITY_TYPES.RUN; // Default to RUN if not present
+
+            if (currentActivityType === ACTIVITY_TYPES.WALK) {
+              // Ensure distance is in meters for step calculation
+              // Assuming run.distance is already in meters as per typical GPS data
+              const distanceInMeters = run.distance; 
+              displayMetricValue = distanceInMeters > 0 ? Math.round(distanceInMeters / AVERAGE_STRIDE_LENGTH_METERS) : 0;
+              displayMetricLabel = 'Steps';
+              displayMetricUnit = ''; // No unit for steps, or could be "steps"
+            } else if (currentActivityType === ACTIVITY_TYPES.CYCLE) {
+              // Ensure distance is in meters and duration in seconds
+              const distanceInMeters = run.distance;
+              const durationInSeconds = run.duration;
+              if (durationInSeconds > 0 && distanceInMeters > 0) {
+                const speedMps = distanceInMeters / durationInSeconds; // m/s
+                if (distanceUnit === 'km') {
+                  displayMetricValue = (speedMps * 3.6).toFixed(1); // km/h
+                  displayMetricUnit = 'km/h';
+                } else {
+                  displayMetricValue = (speedMps * 2.23694).toFixed(1); // mph
+                  displayMetricUnit = 'mph';
+                }
+                displayMetricLabel = 'Speed';
+              } else {
+                displayMetricValue = '0.0';
+                displayMetricLabel = 'Speed';
+                displayMetricUnit = distanceUnit === 'km' ? 'km/h' : 'mph';
+              }
+            } else { // Default to RUN
+              displayMetricValue = existingPace;
+              displayMetricLabel = 'Pace';
+              displayMetricUnit = `min/${distanceUnit}`;
+            }
             
             return (
               <li key={run.id} className="history-item">
                 <RunHistoryCard
                   run={run}
+                  activityType={currentActivityType} // Pass the activityType
                   distanceUnit={distanceUnit}
                   formatDate={formatDate}
                   formatTime={formatTime}
                   displayDistance={displayDistance}
                   formatElevation={formatElevation}
-                  pace={pace}
+                  pace={existingPace} // Keep original pace for fallback in Card if needed
                   caloriesBurned={caloriesBurned}
+                  // Pass the new dynamic metrics
+                  displayMetricValue={displayMetricValue}
+                  displayMetricLabel={displayMetricLabel}
+                  displayMetricUnit={displayMetricUnit}
                   isWorkoutSaved={isWorkoutSaved}
                   isSavingWorkout={isSavingWorkout}
                   savingWorkoutRunId={savingWorkoutRunId}

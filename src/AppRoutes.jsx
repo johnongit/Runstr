@@ -47,6 +47,7 @@ const EventDetail = safeLazy(() => import('./pages/EventDetail'), 'EventDetail')
 const Profile = safeLazy(() => import('./pages/Profile'), 'Profile');
 const About = safeLazy(() => import('./pages/About'), 'About');
 const GroupDiscoveryScreen = safeLazy(() => import('./components/GroupDiscoveryScreen'), 'GroupDiscoveryScreen');
+const NostrStatsPage = safeLazy(() => import('./pages/NostrStatsPage'), 'NostrStatsPage');
 
 // Loading component to show while lazy loading
 const LoadingComponent = () => (
@@ -92,6 +93,7 @@ const AppRoutes = () => {
         <Route path="/teams" element={<GroupDiscoveryScreen />} />
         <Route path="/teams/:teamId" element={<TeamDetail />} />
         
+        <Route path="/nostr-stats" element={<NostrStatsPage />} />
         <Route path="/" element={<RunTracker />} />
       </Routes>
     </Suspense>

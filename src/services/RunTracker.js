@@ -5,6 +5,9 @@ import { filterLocation } from '../utils/runCalculations';
 
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
+// Define average stride length for step estimation
+const AVERAGE_STRIDE_LENGTH_METERS = 0.762; // meters
+
 class RunTracker extends EventEmitter {
   constructor() {
     super();
@@ -12,6 +15,8 @@ class RunTracker extends EventEmitter {
     this.distance = 0; // in meters
     this.duration = 0; // in seconds
     this.pace = 0; // in seconds per meter
+    this.estimatedSteps = 0;
+    this.currentSpeed = { value: 0, unit: 'km/h' }; // Default unit, will update based on preference
     this.splits = []; // Array to store split objects { km, time, pace }
     this.positions = [];
     
@@ -67,6 +72,7 @@ class RunTracker extends EventEmitter {
 
   calculatePace(distance, duration) {
     // Use the centralized pace calculation method
+    // This already considers distanceUnit for its output format (e.g. time for 1km or 1mi)
     return runDataService.calculatePace(distance, duration, this.getDistanceUnit());
   }
 
@@ -143,6 +149,12 @@ class RunTracker extends EventEmitter {
       if (distanceIncrement >= MOVEMENT_THRESHOLD) {
         this.distance += distanceIncrement;
         this.emit('distanceChange', this.distance); // Emit distance change
+
+        // If walking, calculate and emit steps
+        if (this.activityType === ACTIVITY_TYPES.WALK) {
+          this.estimatedSteps = this.distance > 0 ? Math.round(this.distance / AVERAGE_STRIDE_LENGTH_METERS) : 0;
+          this.emit('stepsChange', this.estimatedSteps);
+        }
       } else {
         console.log(`Filtered out small movement: ${distanceIncrement.toFixed(2)}m`);
       }
@@ -220,10 +232,34 @@ class RunTracker extends EventEmitter {
   startPaceCalculator() {
     this.paceInterval = setInterval(() => {
       if (this.isTracking && !this.isPaused) {
-        this.pace = this.calculatePace(this.distance, this.duration);
-        this.emit('paceChange', this.pace); // Emit pace change
+        if (this.activityType === ACTIVITY_TYPES.CYCLE) {
+          if (this.distance > 0 && this.duration > 0) {
+            const speedMps = this.distance / this.duration; // m/s
+            const unit = this.getDistanceUnit();
+            let speedValue;
+            let speedUnitString;
+            if (unit === 'km') {
+              speedValue = (speedMps * 3.6).toFixed(1); // km/h
+              speedUnitString = 'km/h';
+            } else {
+              speedValue = (speedMps * 2.23694).toFixed(1); // mph
+              speedUnitString = 'mph';
+            }
+            this.currentSpeed = { value: speedValue, unit: speedUnitString };
+            this.emit('speedChange', this.currentSpeed);
+          } else {
+            // Reset speed if no distance/duration
+            const unit = this.getDistanceUnit();
+            this.currentSpeed = { value: '0.0', unit: unit === 'km' ? 'km/h' : 'mph' };
+            this.emit('speedChange', this.currentSpeed);
+          }
+        } else {
+          // For non-cycle activities, calculate and emit pace as before
+          this.pace = this.calculatePace(this.distance, this.duration);
+          this.emit('paceChange', this.pace);
+        }
       }
-    }, 5000); // Update pace every 5 seconds
+    }, 5000); // Update pace/speed every 5 seconds
   }
 
   async startTracking() {
@@ -297,6 +333,8 @@ class RunTracker extends EventEmitter {
     this.distance = 0;
     this.duration = 0;
     this.pace = 0;
+    this.estimatedSteps = 0;
+    this.currentSpeed = { value: 0, unit: this.getDistanceUnit() === 'km' ? 'km/h' : 'mph' };
     this.splits = [];
     this.lastSplitDistance = 0;
     
@@ -377,18 +415,34 @@ class RunTracker extends EventEmitter {
       }
     }
     
+    let averageSpeed = null;
+    let finalEstimatedSteps = null;
+
+    if (this.activityType === ACTIVITY_TYPES.CYCLE && this.distance > 0 && this.duration > 0) {
+        const speedMps = this.distance / this.duration;
+        const unit = this.getDistanceUnit();
+        averageSpeed = {
+            value: (unit === 'km' ? (speedMps * 3.6).toFixed(1) : (speedMps * 2.23694).toFixed(1)),
+            unit: unit === 'km' ? 'km/h' : 'mph'
+        };
+    } else if (this.activityType === ACTIVITY_TYPES.WALK) {
+        finalEstimatedSteps = this.distance > 0 ? Math.round(this.distance / AVERAGE_STRIDE_LENGTH_METERS) : 0;
+    }
+
     // Create the final run data object
     const finalResults = {
       distance: this.distance,
       duration: this.duration,
-      pace: this.pace,
+      pace: this.pace, // Existing pace, primarily for runners
       splits: this.splits,
       elevation: { 
         gain: this.elevation.gain,
         loss: this.elevation.loss
       },
       unit: this.getDistanceUnit(),
-      activityType: this.activityType
+      activityType: this.activityType,
+      ...(averageSpeed && { averageSpeed }), // Add if cycling
+      ...(finalEstimatedSteps !== null && { estimatedTotalSteps: finalEstimatedSteps }) // Add if walking
     };
     
     // Save to run history using RunDataService instead of directly to localStorage
@@ -421,6 +475,8 @@ class RunTracker extends EventEmitter {
     this.duration = savedState.duration;
     this.pace = savedState.pace;
     this.splits = [...savedState.splits];
+    this.estimatedSteps = savedState.estimatedTotalSteps || 0;
+    this.currentSpeed = savedState.averageSpeed || { value: 0, unit: this.getDistanceUnit() === 'km' ? 'km/h' : 'mph' };
     this.elevation = {
       ...savedState.elevation,
       lastAltitude: savedState.elevation.current
@@ -453,6 +509,8 @@ class RunTracker extends EventEmitter {
     this.emit('paceChange', this.pace);
     this.emit('splitRecorded', this.splits);
     this.emit('elevationChange', {...this.elevation});
+    this.emit('stepsChange', this.estimatedSteps);
+    this.emit('speedChange', this.currentSpeed);
   }
   
   // Restore an active tracking session that was paused
@@ -462,6 +520,8 @@ class RunTracker extends EventEmitter {
     this.duration = savedState.duration;
     this.pace = savedState.pace;
     this.splits = [...savedState.splits];
+    this.estimatedSteps = savedState.estimatedTotalSteps || 0;
+    this.currentSpeed = savedState.averageSpeed || { value: 0, unit: this.getDistanceUnit() === 'km' ? 'km/h' : 'mph' };
     this.elevation = {
       ...savedState.elevation,
       lastAltitude: savedState.elevation.current
@@ -483,6 +543,8 @@ class RunTracker extends EventEmitter {
     this.emit('paceChange', this.pace);
     this.emit('splitRecorded', this.splits);
     this.emit('elevationChange', {...this.elevation});
+    this.emit('stepsChange', this.estimatedSteps);
+    this.emit('speedChange', this.currentSpeed);
   }
 
   // Make sure the off method is properly documented

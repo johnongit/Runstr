@@ -21,13 +21,16 @@ export const RunTracker = () => {
     pace,
     elevation,
     splits,
+    activityType,
+    estimatedSteps,
+    currentSpeed,
     startRun,
     pauseRun,
     resumeRun,
     stopRun
   } = useRunTracker();
 
-  const { getActivityText } = useActivityMode();
+  const { getActivityText, mode } = useActivityMode();
   const { distanceUnit } = useSettings();
 
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -239,6 +242,25 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     distanceUnit
   );
   
+  // Determine what to display in the 'Pace' card based on activityType from context
+  let primaryMetricLabel = "Pace";
+  let primaryMetricValue = formattedPace.split(' ')[0];
+  let primaryMetricUnit = formattedPace.split(' ')[1] || "";
+
+  // Use activityType from RunTrackerContext, which should be the type of the *active* or *last* run
+  // If no run is active, `mode` from ActivityModeContext can be a fallback for UI hints before start.
+  const currentRunActivityType = isTracking ? activityType : mode;
+
+  if (currentRunActivityType === ACTIVITY_TYPES.WALK) {
+    primaryMetricLabel = "Steps";
+    primaryMetricValue = estimatedSteps !== undefined ? String(Math.round(estimatedSteps)) : "0";
+    primaryMetricUnit = ""; // Or "steps"
+  } else if (currentRunActivityType === ACTIVITY_TYPES.CYCLE) {
+    primaryMetricLabel = "Speed";
+    primaryMetricValue = currentSpeed && currentSpeed.value !== undefined ? String(currentSpeed.value) : "0.0";
+    primaryMetricUnit = currentSpeed && currentSpeed.unit ? currentSpeed.unit : (distanceUnit === 'km' ? 'km/h' : 'mph');
+  }
+
   // Helper function to determine time of day based on timestamp
   const getTimeOfDay = (timestamp) => {
     if (!timestamp) {
@@ -398,18 +420,19 @@ ${additionalContent ? `\n${additionalContent}` : ''}
           <div className="text-3xl font-bold">{runDataService.formatTime(duration)}</div>
         </div>
 
-        {/* Pace Card */}
+        {/* Pace Card / Dynamic Metric Card */}
         <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
           <div className="flex items-center mb-2">
             <div className="w-7 h-7 rounded-full bg-[#F59E0B]/20 flex items-center justify-center mr-2">
+              {/* Icon can also be dynamic based on metric type if desired */}
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#F59E0B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
-            <span className="text-sm text-gray-400">Pace</span>
+            <span className="text-sm text-gray-400">{primaryMetricLabel}</span>
           </div>
-          <div className="text-3xl font-bold">{formattedPace.split(' ')[0]}</div>
-          <div className="text-sm text-gray-400">{formattedPace.split(' ')[1]}</div>
+          <div className="text-3xl font-bold">{primaryMetricValue}</div>
+          {primaryMetricUnit && <div className="text-sm text-gray-400">{primaryMetricUnit}</div>}
         </div>
 
         {/* Elevation Card */}

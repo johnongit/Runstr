@@ -665,20 +665,24 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
       
       // Create relay set that excludes relays which block this kind
       let relaySet = null;
-      try {
-        const allRelays = Array.from(ndk.pool.relays.values()).map(r => r.url);
-        const filtered = allRelays.filter(url => {
-          if (url.includes('purplepag.es')) {
-            // Purple Pages only allows kinds 0,3,10002
-            return [0, 3, 10002].includes(signedEvent.kind);
+      if (opts.relays && Array.isArray(opts.relays)) {
+        relaySet = NDKRelaySet.fromRelayUrls(opts.relays, ndk);
+      } else {
+        try {
+          const allRelays = Array.from(ndk.pool.relays.values()).map(r => r.url);
+          const filtered = allRelays.filter(url => {
+            if (url.includes('purplepag.es')) {
+              // Purple Pages only allows kinds 0,3,10002
+              return [0, 3, 10002].includes(signedEvent.kind);
+            }
+            return true;
+          });
+          if (filtered.length > 0 && filtered.length < allRelays.length) {
+            relaySet = NDKRelaySet.fromRelayUrls(filtered, ndk);
           }
-          return true;
-        });
-        if (filtered.length > 0 && filtered.length < allRelays.length) {
-          relaySet = NDKRelaySet.fromRelayUrls(filtered, ndk);
+        } catch (filterErr) {
+          console.warn('Relay filtering failed:', filterErr);
         }
-      } catch (filterErr) {
-        console.warn('Relay filtering failed:', filterErr);
       }
       
       // Create NDK Event and publish with retry

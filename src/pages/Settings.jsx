@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { saveLeaderboardParticipation, getLeaderboardParticipation } from '../utils/leaderboardUtils';
 import { getRewardsSettings, saveRewardsSettings } from '../utils/rewardsSettings';
+import { Link } from 'react-router-dom';
 
 const Settings = () => {
   const { 
@@ -11,7 +12,13 @@ const Settings = () => {
     calorieIntensityPref,
     setCalorieIntensityPref,
     healthEncryptionPref,
-    setHealthEncryptionPref
+    setHealthEncryptionPref,
+    publishMode,
+    setPublishMode,
+    privateRelayUrl,
+    setPrivateRelayUrl,
+    blossomEndpoint,
+    setBlossomEndpoint
   } = useSettings();
   
   const [showPaceInMinutes, setShowPaceInMinutes] = useState(true);
@@ -210,6 +217,53 @@ const Settings = () => {
             />
             <span className="toggle-slider"></span>
           </div>
+        </div>
+        
+        <div className="setting-item">
+          <label>Publish Destination</label>
+          <div className="unit-toggle">
+            <button
+              className={publishMode === 'public' ? 'active' : ''}
+              onClick={() => setPublishMode('public')}
+            >Public Relays</button>
+            <button
+              className={publishMode === 'private' ? 'active' : ''}
+              onClick={() => setPublishMode('private')}
+            >Private Relay</button>
+            <button
+              className={publishMode === 'mixed' ? 'active' : ''}
+              onClick={() => setPublishMode('mixed')}
+            >Mixed</button>
+          </div>
+          {publishMode !== 'public' && (
+            <div style={{ marginTop: '0.5rem' }}>
+              {publishMode !== 'blossom' && (
+                <>
+                  <label>Private Relay URL</label>
+                  <input
+                    type="text"
+                    value={privateRelayUrl}
+                    onChange={e => setPrivateRelayUrl(e.target.value)}
+                    placeholder="wss://your-relay.example.com"
+                    style={{ width: '100%' }}
+                  />
+                </>
+              )}
+              {/* Blossom endpoint is stored for export feature */}
+              {publishMode === 'blossom' && (
+                <>
+                  <label>Blossom Endpoint</label>
+                  <input
+                    type="text"
+                    value={blossomEndpoint}
+                    onChange={e => setBlossomEndpoint(e.target.value)}
+                    placeholder="https://blossom.example.com/upload"
+                    style={{ width: '100%' }}
+                  />
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
       
