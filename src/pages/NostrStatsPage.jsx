@@ -36,9 +36,35 @@ const NostrStatsPage = () => {
         limit: 50, // Adjust as needed
       };
       const events = await fetchEvents(filter);
-      // NDKEvent objects need to be converted to plain objects for state
-      const plainEvents = Array.from(events).map(event => event.rawEvent()); 
-      setWorkoutEvents(plainEvents.sort((a, b) => b.created_at - a.created_at));
+      const plainEvents = Array.from(events).map(event => event.rawEvent());
+
+      // Deduplication logic
+      const uniqueEvents = [];
+      const seenSignatures = new Set();
+      const TIME_WINDOW_MINUTES = 10; // Deduplication window
+
+      // Sort by created_at descending to process newest first for de-duplication context
+      plainEvents.sort((a, b) => b.created_at - a.created_at);
+
+      for (const event of plainEvents) {
+        const workoutName = getTagValue(event.tags, 'workout') || '';
+        const distanceTag = getTagValues(event.tags, 'distance');
+        const distanceVal = distanceTag[0] && distanceTag[1] ? `${distanceTag[0]} ${distanceTag[1]}` : '';
+        const durationVal = getTagValue(event.tags, 'duration') || '';
+        
+        // Rounded timestamp (e.g., to the nearest 10 minutes)
+        const roundedTimestamp = Math.floor(event.created_at / (TIME_WINDOW_MINUTES * 60));
+        
+        const signature = `${workoutName}_${distanceVal}_${durationVal}_${roundedTimestamp}`;
+        
+        if (!seenSignatures.has(signature)) {
+          seenSignatures.add(signature);
+          uniqueEvents.push(event);
+        }
+      }
+      // Now sort again for display (newest first if not already)
+      setWorkoutEvents(uniqueEvents.sort((a,b) => b.created_at - a.created_at)); 
+
     } catch (err) {
       console.error('Error fetching NIP-101e events:', err);
       setError('Failed to load workout events from Nostr.');
@@ -124,18 +150,26 @@ const NostrStatsPage = () => {
       {workoutEvents.length > 0 && (
         <ul className="space-y-3">
           {workoutEvents.map(event => {
-            const workoutName = getTagValue(event.tags, 'workout') || 'Workout';
-            const workoutDate = new Date(event.created_at * 1000).toLocaleString();
-            const workoutContent = event.content;
-
-            // Extract summary from Kind 1301 tags for direct display
-            const distanceTag = getTagValues(event.tags, 'distance');
+            const workoutNameTag = getTagValue(event.tags, 'workout');
+            const distanceTagValues = getTagValues(event.tags, 'distance'); // Will be [ [<value>, <unit>] ] or []
             const durationTagVal = getTagValue(event.tags, 'duration');
-            const elevationGainTag = getTagValues(event.tags, 'elevation_gain');
+            const elevationGainTagValues = getTagValues(event.tags, 'elevation_gain'); // Similar to distance
             const sourceTag = getTagValue(event.tags, 'source');
 
-            const distVal = distanceTag[0] && distanceTag[1] ? `${distanceTag[0]} ${distanceTag[1]}` : 'N/A';
-            const elevVal = elevationGainTag[0] && elevationGainTag[1] ? `${elevationGainTag[0]} ${elevationGainTag[1]}` : 'N/A';
+            const workoutName = workoutNameTag || 'Workout'; // Fallback if no name
+            
+            let distVal = 'N/A';
+            if (distanceTagValues.length > 0 && distanceTagValues[0].length >= 2) {
+              distVal = `${distanceTagValues[0][0]} ${distanceTagValues[0][1]}`;
+            }
+
+            let elevVal = 'N/A';
+            if (elevationGainTagValues.length > 0 && elevationGainTagValues[0].length >= 2) {
+              elevVal = `${elevationGainTagValues[0][0]} ${elevationGainTagValues[0][1]}`;
+            }
+
+            const workoutDate = new Date(event.created_at * 1000).toLocaleString();
+            const workoutContent = event.content;
 
             const currentDetailedMets = detailedMetrics[event.id];
 
@@ -143,7 +177,7 @@ const NostrStatsPage = () => {
               <li key={event.id} className="bg-gray-800 p-4 rounded-lg shadow">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm text-gray-400">ID: {event.id.substring(0, 10)}... (Kind 1301)</p>
+                    {/* <p className="text-sm text-gray-400">ID: {event.id.substring(0, 10)}... (Kind 1301)</p> */}
                     <p className="text-lg font-semibold">{workoutName}</p>
                     <p className="text-gray-300">Date: {workoutDate}</p>
                   </div>
@@ -152,7 +186,7 @@ const NostrStatsPage = () => {
                 
                 {/* Display summary from Kind 1301 tags */}
                 <div className="mt-2 pt-2 border-t border-gray-700">
-                  <h4 className="font-semibold text-md mb-1">Workout Summary (from Kind 1301):</h4>
+                  <h4 className="font-semibold text-md mb-1">Workout Summary:</h4>
                   {renderMetric('Distance', distVal)}
                   {renderMetric('Duration', durationTagVal)}
                   {renderMetric('Elevation Gain', elevVal)}
@@ -166,7 +200,7 @@ const NostrStatsPage = () => {
                   }
                 }}>
                   <summary className="cursor-pointer text-blue-400 hover:text-blue-300 font-semibold">
-                    {loadingDetailsFor === event.id ? 'Loading Detailed Metrics...' : 'View Detailed Metrics (NIP-101h)'}
+                    {loadingDetailsFor === event.id ? 'Loading Detailed Metrics...' : 'View Detailed Metrics'}
                   </summary>
                   {loadingDetailsFor === event.id && (
                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500 my-2"></div>
@@ -178,7 +212,7 @@ const NostrStatsPage = () => {
                       {currentDetailedMets.elevationMetric && renderMetric('Total Elevation', currentDetailedMets.elevationMetric.content, getTagValue(currentDetailedMets.elevationMetric.tags, 'unit'))}
                       {currentDetailedMets.durationMetric && renderMetric('Total Duration', currentDetailedMets.durationMetric.content, getTagValue(currentDetailedMets.durationMetric.tags, 'unit'))}
                       {currentDetailedMets.calories && renderMetric('Calories Burned', currentDetailedMets.calories.content, getTagValue(currentDetailedMets.calories.tags, 'unit'))}
-                      {currentDetailedMets.intensity && renderMetric('Intensity', `${currentDetailedMets.intensity.content} (${getTagValue(currentDetailedMets.intensity.tags, 'scale')})`)}
+                      {currentDetailedMets.intensity && renderMetric('Intensity', `${currentDetailedMets.intensity.content}`)}
                       {currentDetailedMets.splits && currentDetailedMets.splits.length > 0 && (
                         <div className="mt-1">
                           <p className="font-semibold">Splits:</p>
@@ -191,15 +225,11 @@ const NostrStatsPage = () => {
                           </ul>
                         </div>
                       )}
-                      {!currentDetailedMets.distanceMetric && !currentDetailedMets.paceMetric && /* ... add checks for all metrics ... */ !currentDetailedMets.splits &&
+                      {!(currentDetailedMets.distanceMetric || currentDetailedMets.paceMetric || currentDetailedMets.elevationMetric || currentDetailedMets.durationMetric || currentDetailedMets.calories || currentDetailedMets.intensity || (currentDetailedMets.splits && currentDetailedMets.splits.length > 0)) &&
                         <p className="text-gray-400 italic">No detailed NIP-101h metrics found for this workout.</p>
                       }
                     </div>
                   )}
-                  <pre className="bg-gray-900 p-2 mt-2 rounded overflow-x-auto text-xs">
-                    <span className="font-semibold block mb-1">Raw Kind 1301 Data:</span>
-                    {JSON.stringify(event, null, 2)}
-                  </pre>
                 </details>
               </li>
             );
