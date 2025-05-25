@@ -119,19 +119,48 @@ export const RunTracker = () => {
     
     try {
       const run = recentRun;
-      // Calculate calories (simplified version)
-      const caloriesBurned = Math.round(run.distance * 0.06);
+      const activity = run.activityType || ACTIVITY_TYPES.RUN; // Determine activity type
+
+      // Calculate calories (simplified version, ensure it uses run data if available)
+      const caloriesBurned = run.calories !== null && run.calories !== undefined 
+        ? run.calories 
+        : Math.round(run.distance * 0.06);
+
+      let activitySpecificMetricLine = '';
+      let introMessage = '';
+      let primaryHashtag = '#Running';
+
+      if (activity === ACTIVITY_TYPES.WALK) {
+        const steps = run.estimatedTotalSteps !== undefined ? Math.round(run.estimatedTotalSteps).toLocaleString() : '0';
+        activitySpecificMetricLine = `👟 Steps: ${steps} steps`;
+        introMessage = `Just completed a walk with RUNSTR! 🚶‍♀️💨`;
+        primaryHashtag = '#Walking';
+      } else if (activity === ACTIVITY_TYPES.CYCLE) {
+        const avgSpeed = run.averageSpeed && run.averageSpeed.value !== undefined ? parseFloat(run.averageSpeed.value).toFixed(1) : '0.0';
+        const speedUnit = run.averageSpeed && run.averageSpeed.unit ? run.averageSpeed.unit : (distanceUnit === 'km' ? 'km/h' : 'mph');
+        activitySpecificMetricLine = `🚴 Speed: ${avgSpeed} ${speedUnit}`;
+        introMessage = `Just completed a cycle with RUNSTR! 🚴💨`;
+        primaryHashtag = '#Cycling';
+      } else { // Default to RUN
+        const paceValue = (run.duration / 60 / (distanceUnit === 'km' ? run.distance/1000 : run.distance/1609.344));
+        const paceString = (paceValue && paceValue !== Infinity && paceValue !== 0) 
+                          ? `${Math.floor(paceValue)}:${Math.round((paceValue - Math.floor(paceValue)) * 60).toString().padStart(2, '0')}`
+                          : '-';
+        activitySpecificMetricLine = `⚡ Pace: ${paceString} min/${distanceUnit}`;
+        introMessage = `Just completed a run with RUNSTR! 🏃‍♂️💨`;
+      }
       
       const content = `
-Just completed a run with Runstr! 🏃‍♂️💨
+${introMessage}
 
 ⏱️ Duration: ${runDataService.formatTime(run.duration)}
 📏 Distance: ${displayDistance(run.distance, distanceUnit)}
-⚡ Pace: ${(run.duration / 60 / (distanceUnit === 'km' ? run.distance/1000 : run.distance/1609.344)).toFixed(2)} min/${distanceUnit}
+${activitySpecificMetricLine}
 🔥 Calories: ${caloriesBurned} kcal
-${run.elevation ? `\n🏔️ Elevation Gain: ${formatElevation(run.elevation.gain, distanceUnit)}\n📉 Elevation Loss: ${formatElevation(run.elevation.loss, distanceUnit)}` : ''}
+${run.elevation && run.elevation.gain ? `\n🏔️ Elevation Gain: ${formatElevation(run.elevation.gain, distanceUnit)}` : ''}
+${run.elevation && run.elevation.loss ? `\n📉 Elevation Loss: ${formatElevation(run.elevation.loss, distanceUnit)}` : ''}
 ${additionalContent ? `\n${additionalContent}` : ''}
-#Runstr #Running
+#RUNSTR ${primaryHashtag}
 `.trim();
 
       // Create the event template for nostr-tools
@@ -139,8 +168,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         kind: 1,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
-          ['t', 'Runstr'],
-          ['t', 'Running']
+          ['t', 'RUNSTR'], // Uppercase app name
+          ['t', primaryHashtag.substring(1)] // Remove # for tag value
         ],
         content: content
       };
