@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRunTracker } from '../contexts/RunTrackerContext';
 import { useActivityMode } from '../contexts/ActivityModeContext';
-import { useSettings } from '../contexts/SettingsContext';
 import runDataService, { ACTIVITY_TYPES } from '../services/RunDataService';
 import { PermissionDialog } from './PermissionDialog';
 import { formatPaceWithUnit, displayDistance, convertDistance, formatElevation } from '../utils/formatters';
@@ -12,7 +11,7 @@ import AchievementCard from './AchievementCard';
 import { validateEventRun, initializeEvents } from '../services/EventService';
 import { PostRunWizardModal } from './PostRunWizardModal';
 import { useContext } from 'react';
-import { rewardUserActivity } from '../services/rewardService';
+import { useSettings } from '../contexts/SettingsContext';
 import { NostrContext } from '../contexts/NostrContext';
 
 export const RunTracker = () => {
@@ -34,7 +33,7 @@ export const RunTracker = () => {
   } = useRunTracker();
 
   const { getActivityText, mode } = useActivityMode();
-  const { distanceUnit, publishMode } = useSettings();
+  const { distanceUnit } = useSettings();
   const { publicKey, lightningAddress } = useContext(NostrContext);
 
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -184,13 +183,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       setShowPostModal(false);
       setAdditionalContent('');
       
-      // Reward user (5 or 10 sats) and show success message
-      const rewardSats = publishMode === 'private' ? 10 : 5;
-      if (publicKey) {
-        rewardUserActivity(publicKey, 'workout_record', publishMode === 'private', lightningAddress);
-      }
-
-      const successMsg = `Successfully posted to Nostr! (+${rewardSats} sats reward)`;
+      // Show success message
+      const successMsg = `Successfully posted to Nostr!`;
       if (window.Android && window.Android.showToast) {
         window.Android.showToast(successMsg);
       } else {

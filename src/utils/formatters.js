@@ -76,12 +76,12 @@ export const formatDate = (dateInput) => {
     //   return now.toLocaleDateString(); // Or format 'now' consistently
     // }
 
-    // Format to DD/MM/YYYY using UTC parts to avoid timezone shifts in display
+    // Format to MM/DD/YYYY using UTC parts to avoid timezone shifts in display
     const day = String(date.getUTCDate()).padStart(2, '0');
     const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Months are 0-indexed
     const year = date.getUTCFullYear();
 
-    return `${day}/${month}/${year}`;
+    return `${month}/${day}/${year}`;
   } catch (error) {
     console.error('Error formatting date:', dateInput, error);
     return 'Invalid Date'; // Fallback for any unexpected errors

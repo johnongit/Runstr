@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import runDataService from '../services/RunDataService';
 import { publishRun } from '../utils/runPublisher';
 import { NostrContext } from '../contexts/NostrContext';
+import { useSettings } from '../contexts/SettingsContext';
 
 const intensities = [
   { value: 'easy', label: 'Easy' },
@@ -16,7 +17,8 @@ export const PostRunWizardModal = ({ run, onClose }) => {
   const [publishing, setPublishing] = useState(false);
   const [publishResults, setPublishResults] = useState(null);
 
-  const { lightningAddress } = useContext(NostrContext);
+  const { lightningAddress, publicKey } = useContext(NostrContext);
+  const { publishMode } = useSettings();
 
   // helper save intensity into run record once selected
   const persistIntensity = (value) => {
@@ -41,12 +43,14 @@ export const PostRunWizardModal = ({ run, onClose }) => {
       if (allSuccess) {
         try {
           const { rewardUserActivity } = await import('../services/rewardService');
-          const { default: SettingsCtx } = await import('../contexts/SettingsContext');
-          const { publishMode } = SettingsCtx.useSettings ? SettingsCtx.useSettings() : { publishMode: 'public' };
-          const NostrCtx = (await import('../contexts/NostrContext')).NostrContext;
-          const { publicKey } = NostrCtx._currentValue || {};
           if (publicKey) {
-            rewardUserActivity(publicKey, 'workout_record', publishMode === 'private', lightningAddress);
+            const res = await rewardUserActivity(publicKey, 'workout_record', publishMode === 'private', lightningAddress);
+            const toastMsg = res.success ? `Reward sent: ${res.message}` : `Reward failed: ${res.error || res.message}`;
+            if (window.Android && window.Android.showToast) {
+              window.Android.showToast(toastMsg);
+            } else {
+              alert(toastMsg);
+            }
           }
         } catch (errReward) {
           console.warn('reward zap failed', errReward);
@@ -94,9 +98,12 @@ export const PostRunWizardModal = ({ run, onClose }) => {
         <ul className="list-disc pl-6 mb-6">
           <li>Workout Record</li>
           <li>Workout Intensity</li>
-          <li>Calories Burned</li>
-          <li>Distance / Pace / Steps</li>
-          <li>Elevation & Splits (encrypted)</li>
+          <li>Calories burned</li>
+          <li>Distance</li>
+          <li>Pace</li>
+          <li>Steps</li>
+          <li>Elevation</li>
+          <li>Splits</li>
         </ul>
         {publishResults && (
           <div className="mb-4 text-sm">
