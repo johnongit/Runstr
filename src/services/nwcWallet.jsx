@@ -21,22 +21,28 @@ export class NWCWallet {
     try {
       const url = new URL(connectionString);
 
+      // Expect schemes like nostr+walletconnect://<walletPubKey>?relay=...&secret=...
       if (url.protocol !== 'nostr+walletconnect:') {
-        throw new Error('Invalid NWC URL protocol');
+        throw new Error(`Invalid NWC URL protocol: ${url.protocol}`);
       }
 
+      // Generate a fresh key used only for this NWC session (needed for NIP-47 auth).
       this.secretKey = secp256k1.utils.randomPrivateKey();
       this.pubKey = getPublicKey(this.secretKey);
 
-      const params = new URLSearchParams(url.pathname);
+      // The host portion after the double slashes is the wallet pubkey
+      this.walletPubKey = url.hostname || url.pathname.replace(/^\/+/, '');
+
+      // Query string carries relay + secret
+      const params = url.searchParams ?? new URLSearchParams(url.search);
       this.relayUrl = params.get('relay');
-      this.walletPubKey = params.get('pubkey');
+      this.secret = params.get('secret');
 
       if (!this.relayUrl || !this.walletPubKey) {
-        throw new Error('Missing required NWC parameters');
+        throw new Error('Missing required relay or wallet pubkey in NWC URI');
       }
 
-      // Initialize WebLN provider
+      // Initialise the WebLN provider (Alby SDK) with the raw URI
       this.provider = new webln.NostrWebLNProvider({
         nostrWalletConnectUrl: connectionString
       });

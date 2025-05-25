@@ -93,6 +93,13 @@ export const useStreakRewards = (pubkey: string | null) => {
           error: null,
           txid: result.txid,
         });
+
+        const toastMsg = `Streak reward sent! +${amountToReward} sats`;
+        if ((window as any).Android && (window as any).Android.showToast) {
+          (window as any).Android.showToast(toastMsg);
+        } else {
+          alert(toastMsg);
+        }
         return { success: true, txid: result.txid, amount: amountToReward };
       } else {
         throw new Error(result.error || 'Failed to send streak reward.');
@@ -104,6 +111,13 @@ export const useStreakRewards = (pubkey: string | null) => {
         success: false,
         error: error.message || 'Payout failed.',
       });
+
+      // show failure toast
+      if ((window as any).Android && (window as any).Android.showToast) {
+        (window as any).Android.showToast(`Streak reward failed: ${error.message || 'Unknown error'}`);
+      } else {
+        alert(`Streak reward failed: ${error.message || 'Unknown error'}`);
+      }
       return { success: false, error: error.message };
     }
   }, [pubkey, streakData]);
