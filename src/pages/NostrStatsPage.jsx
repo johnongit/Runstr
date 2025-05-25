@@ -168,7 +168,8 @@ const NostrStatsPage = () => {
               elevVal = `${elevationGainTagValues[0][0]} ${elevationGainTagValues[0][1]}`;
             }
 
-            const workoutDate = new Date(event.created_at * 1000).toLocaleString();
+            const workoutDate = new Date(event.created_at * 1000)
+              .toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
             const workoutContent = event.content;
 
             const currentDetailedMets = detailedMetrics[event.id];
