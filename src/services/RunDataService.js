@@ -61,11 +61,17 @@ class RunDataService {
     try {
       const runs = this.getAllRuns();
       
+      // Ensure timestamp is UTC milliseconds
+      const activityTimestamp = runData.timestamp || Date.now();
+
       // Generate a unique ID if not provided
       const newRun = {
         id: runData.id || Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-        date: runData.date || new Date().toLocaleDateString(),
-        timestamp: runData.timestamp || Date.now(),
+        // Store the definitive UTC timestamp
+        timestamp: activityTimestamp,
+        // Derive a consistent, sortable date string (YYYY-MM-DD in UTC) for convenience if needed,
+        // but the primary source of truth is the timestamp.
+        date: new Date(activityTimestamp).toISOString().split('T')[0],
         // Default activity type to 'run' if not provided (for backward compatibility)
         activityType: runData.activityType || ACTIVITY_TYPES.RUN,
         // New optional health metrics – default to null to keep schema explicit
@@ -88,7 +94,8 @@ class RunDataService {
         const minDistance = newRun.unit === 'km' ? MIN_STREAK_DISTANCE.km : MIN_STREAK_DISTANCE.mi;
         if (newRun.distance >= minDistance) {
           // Fire and forget; we don't await to avoid blocking UI
-          updateUserStreak(new Date(newRun.date), publicKey);
+          // Use the reliable UTC timestamp for streak calculation
+          updateUserStreak(new Date(newRun.timestamp), publicKey);
         }
       } catch (err) {
         console.error('[RunDataService] Failed to update streak after saving run:', err);

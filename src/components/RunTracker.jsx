@@ -11,6 +11,9 @@ import DashboardRunCard from './DashboardRunCard';
 import AchievementCard from './AchievementCard';
 import { validateEventRun, initializeEvents } from '../services/EventService';
 import { PostRunWizardModal } from './PostRunWizardModal';
+import { useContext } from 'react';
+import { rewardUserActivity } from '../services/rewardService';
+import { NostrContext } from '../contexts/NostrContext';
 
 export const RunTracker = () => {
   const { 
@@ -31,7 +34,8 @@ export const RunTracker = () => {
   } = useRunTracker();
 
   const { getActivityText, mode } = useActivityMode();
-  const { distanceUnit } = useSettings();
+  const { distanceUnit, publishMode } = useSettings();
+  const { publicKey } = useContext(NostrContext);
 
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isCountingDown, setIsCountingDown] = useState(false);
@@ -180,11 +184,17 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       setShowPostModal(false);
       setAdditionalContent('');
       
-      // Show success message
+      // Reward user (5 or 10 sats) and show success message
+      const rewardSats = publishMode === 'private' ? 10 : 5;
+      if (publicKey) {
+        rewardUserActivity(publicKey, 'workout_record', publishMode === 'private');
+      }
+
+      const successMsg = `Successfully posted to Nostr! (+${rewardSats} sats reward)`;
       if (window.Android && window.Android.showToast) {
-        window.Android.showToast('Successfully posted to Nostr!');
+        window.Android.showToast(successMsg);
       } else {
-        alert('Successfully posted to Nostr!');
+        alert(successMsg);
       }
     } catch (error) {
       console.error('Error posting to Nostr:', error);

@@ -98,16 +98,25 @@ export const RunHistory = () => {
       // Create a map to store unique runs by their date and metrics
       const uniqueRunsMap = new Map();
       const seenIds = new Set();
-      const now = new Date();
+      const now = Date.now(); // Use UTC timestamp for comparison
       
-      // First pass: identify unique runs and fix missing IDs, future dates, and unrealistic values
+      // First pass: identify unique runs and fix missing IDs, future timestamps, and unrealistic values
       const fixedRuns = parsedRuns.reduce((acc, run) => {
-        // Fix future dates - replace with current date
-        let runDate = new Date(run.date);
-        if (isNaN(runDate.getTime()) || runDate > now) {
-          run.date = now.toLocaleDateString();
-          // Update the run using the service
-          runDataService.updateRun(run.id, { date: run.date });
+        let runTimestamp = run.timestamp;
+
+        // Check if timestamp is valid or in the future
+        if (typeof runTimestamp !== 'number' || isNaN(runTimestamp) || runTimestamp > now) {
+          // If timestamp is invalid or future, attempt to use run.date (YYYY-MM-DD)
+          // If run.date is also problematic, default to current time.
+          const dateFromRunDateString = new Date(run.date).getTime();
+          if (run.date && !isNaN(dateFromRunDateString) && dateFromRunDateString <= now) {
+            run.timestamp = dateFromRunDateString;
+          } else {
+            run.timestamp = now; // Default to current time as a last resort
+          }
+          // Update the run.date field to be consistent with the (potentially new) timestamp
+          run.date = new Date(run.timestamp).toISOString().split('T')[0];
+          runDataService.updateRun(run.id, { timestamp: run.timestamp, date: run.date });
         }
         
         // Fix unrealistic distance values (>100 km is extremely unlikely for normal runs)
@@ -161,12 +170,8 @@ export const RunHistory = () => {
         return acc;
       }, []);
 
-      // Sort runs by date (newest first)
-      fixedRuns.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB - dateA;
-      });
+      // Sort runs by timestamp (newest first)
+      fixedRuns.sort((a, b) => b.timestamp - a.timestamp);
 
       setRunHistory(fixedRuns);
     } catch (error) {
@@ -297,10 +302,18 @@ ${additionalContent ? `\n${additionalContent}` : ''}
 
       if (publishedWorkoutEventId) {
         setWorkoutSavedRuns(prev => new Set([...prev, run.id]));
+        const { publicKey } = require('../contexts/NostrContext').NostrContext._currentValue || {};
+        const { publishMode } = require('../contexts/SettingsContext').useSettings ? require('../contexts/SettingsContext').useSettings() : { publishMode: 'public' };
+        const rewardSats = publishMode === 'private' ? 10 : 5;
+        if (publicKey) {
+          const { rewardUserActivity } = require('../services/rewardService');
+          rewardUserActivity(publicKey, 'workout_record', publishMode === 'private');
+        }
+        const msg = `Main workout record saved! Now choose extras. (+${rewardSats} sats)`;
         if (window.Android && window.Android.showToast) {
-          window.Android.showToast('Main workout record saved! Now choose extras.');
+          window.Android.showToast(msg);
         } else {
-          alert('Main workout record saved! Now choose extras.');
+          alert(msg);
         }
         // Open the extras modal
         setCurrentRunForExtras(run);
@@ -581,15 +594,14 @@ ${additionalContent ? `\n${additionalContent}` : ''}
               <li key={run.id} className="history-item">
                 <RunHistoryCard
                   run={run}
-                  activityType={currentActivityType} // Pass the activityType
+                  activityType={currentActivityType}
                   distanceUnit={distanceUnit}
                   formatDate={formatDate}
                   formatTime={formatTime}
                   displayDistance={displayDistance}
                   formatElevation={formatElevation}
-                  pace={existingPace} // Keep original pace for fallback in Card if needed
+                  pace={existingPace}
                   caloriesBurned={caloriesBurned}
-                  // Pass the new dynamic metrics
                   displayMetricValue={displayMetricValue}
                   displayMetricLabel={displayMetricLabel}
                   displayMetricUnit={displayMetricUnit}
@@ -639,7 +651,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             <p>Are you sure you want to delete this run?</p>
             {runToDelete && (
               <div className="run-summary">
-                <p>Date: {formatDate(runToDelete.date)}</p>
+                <p>Date: {formatDate(runToDelete.timestamp)}</p>
                 <p>Distance: {displayDistance(runToDelete.distance, distanceUnit)}</p>
                 <p>Duration: {formatTime(runToDelete.duration)}</p>
               </div>

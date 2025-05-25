@@ -6,6 +6,7 @@
 import transactionService, { TRANSACTION_TYPES } from './transactionService';
 import { REWARDS } from '../config/rewardsConfig';
 import nwcService from './nwcService';
+import { sendRewardZap } from './rewardService'; // NEW: zap-based payout
 
 // Define TransactionType based on TRANSACTION_TYPES from transactionService.js
 // This assumes TRANSACTION_TYPES is an object like { STREAK_REWARD: 'streak_reward', ... }
@@ -62,7 +63,37 @@ const rewardsPayoutService = {
   ): Promise<PayoutResult> => {
     const memo = `${streakDay}-day streak reward`;
 
-    // 1. Try paying via user's own NWC wallet first
+    /*
+     * --------------------------------------------
+     * 1. Attempt payout via RUNSTR reward wallet zap
+     * --------------------------------------------
+     * If the destination `pubkey` looks like a Nostr hex pubkey (64 hex chars),
+     * we can attempt a direct NIP-57 zap using the Runstr reward wallet
+     * defined in rewardService.js. This aligns with the new lightweight
+     * reward mechanism requested by the user.
+     */
+    const isHexPubkey = /^[0-9a-fA-F]{64}$/.test(pubkey);
+    if (isHexPubkey) {
+      try {
+        const zapRes = await sendRewardZap(pubkey, amount, `RUNSTR: ${memo}`, 'streak_completion');
+        if (zapRes.success) {
+          return {
+            success: true,
+            // paymentResponse structure varies by wallet – fall back to undefined if not present
+            txid: (zapRes.paymentResponse?.payment_hash ?? zapRes.paymentResponse?.preimage) ?? undefined,
+            amount,
+            pubkey,
+            timestamp: new Date().toISOString(),
+          };
+        } else {
+          console.warn('[rewardsPayoutService] Zap payout failed, falling back:', zapRes.error);
+        }
+      } catch (zapErr: any) {
+        console.error('[rewardsPayoutService] Error during zap payout, falling back:', zapErr.message);
+      }
+    }
+
+    // 2. Try paying via user's own NWC wallet first
     if (userNwcUri) {
       try {
         const nwcRes = await payoutViaUserNwc(userNwcUri, amount, memo);

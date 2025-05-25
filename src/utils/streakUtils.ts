@@ -56,32 +56,42 @@ export const updateUserStreak = (newRunDateObject: Date, publicKey: string | nul
   const data = getStreakData();
   const { capDays } = REWARDS.STREAK;
 
-  const newRunLocalISO = newRunDateObject.toLocaleDateString('sv'); // YYYY-MM-DD format
+  // Get YYYY-MM-DD from the Date object, using UTC methods
+  // newRunDateObject is created from a UTC timestamp (Date.now() or runData.timestamp)
+  // so .toISOString().split('T')[0] will give the YYYY-MM-DD in UTC.
+  const newRunUTCDateString = newRunDateObject.toISOString().split('T')[0];
 
-  if (data.lastRunDate === newRunLocalISO) {
-    // Multiple runs on the same day, no change to streak days
+  if (data.lastRunDate === newRunUTCDateString) {
+    // Multiple runs on the same UTC day, no change to streak days
     return data;
   }
 
   let updatedStreakDays = data.currentStreakDays;
-  let updatedLastRunDate = data.lastRunDate;
 
   if (data.lastRunDate) {
-    const lastRunDateObject = new Date(data.lastRunDate);
-    const diffDays = Math.round((newRunDateObject.getTime() - lastRunDateObject.getTime()) / (1000 * 60 * 60 * 24));
+    // data.lastRunDate is, or will become, a UTC YYYY-MM-DD string.
+    // Construct Date objects as UTC midnight for fair day difference calculation.
+    const lastRunEpoch = new Date(data.lastRunDate + 'T00:00:00Z').getTime();
+    const currentRunEpoch = new Date(newRunUTCDateString + 'T00:00:00Z').getTime();
+
+    const diffDays = Math.round((currentRunEpoch - lastRunEpoch) / (1000 * 60 * 60 * 24));
 
     if (diffDays === 1) {
-      // Consecutive day
+      // Consecutive UTC day
       updatedStreakDays++;
     } else if (diffDays > 1) {
-      // Missed day(s), streak resets
+      // Missed UTC day(s), streak resets
       updatedStreakDays = 1;
-    } else if (diffDays <= 0) {
-      // New run is on or before the last run date (e.g. due to time zone changes or manual entry)
-      // If it's a different day and earlier, this implies a reset or complex handling.
-      // For simplicity now, if it's not the *next* day, assume streak resets if it's a new distinct day.
-      // If it's the *same* day, it's handled by the first check.
-      // This part might need more robust logic for out-of-order run entries.
+    } else if (diffDays <= 0) { 
+      // This case means: 
+      // 1. diffDays === 0: Same UTC day, already handled by the initial check.
+      //    (This exact condition should not be met here due to the first check if lastRunDate was already UTC YYYY-MM-DD)
+      //    If lastRunDate was a local date string that parsed to the same UTC day as newRunUTCDateString, 
+      //    it would be caught by the first `if`. 
+      //    If it parsed to an *earlier part of the same UTC day*, diffDays could be < 1 but > 0 (e.g. 0.x for hours within same day)
+      //    Rounding to 0 would mean it's treated as the same day.
+      // 2. diffDays < 0: New run's UTC date is before the last run's UTC date. This implies an out-of-order entry or data issue.
+      //    Streak should reset.
       updatedStreakDays = 1;
     }
   } else {
@@ -96,7 +106,7 @@ export const updateUserStreak = (newRunDateObject: Date, publicKey: string | nul
   const newData: StreakData = {
     ...data, // Preserve lastRewardedDay
     currentStreakDays: updatedStreakDays,
-    lastRunDate: newRunLocalISO,
+    lastRunDate: newRunUTCDateString, // Store the UTC YYYY-MM-DD string
   };
 
   saveStreakData(newData);

@@ -54,29 +54,37 @@ export const formatElevation = (meters, unit = 'km') => {
 };
 
 /**
- * Format date to a consistent readable format
- * @param {string} dateString - Date string to format
- * @returns {string} Formatted date string
+ * Format date to a consistent readable format (DD/MM/YYYY from UTC timestamp)
+ * @param {number | string} dateInput - UTC timestamp (number) or a date string parsable by new Date()
+ * @returns {string} Formatted date string, or 'Invalid Date' if input is unusable
  */
-export const formatDate = (dateString) => {
+export const formatDate = (dateInput) => {
   try {
-    const date = new Date(dateString);
-    
+    const date = new Date(dateInput);
+
     // Check if date is valid
     if (isNaN(date.getTime())) {
-      return new Date().toLocaleDateString();
+      // console.warn('formatDate received an invalid dateInput:', dateInput);
+      return 'Invalid Date'; // Return a clear indicator of an issue
     }
-    
-    // Check if date is in the future (use current date instead)
-    const now = new Date();
-    if (date > now) {
-      return now.toLocaleDateString();
-    }
-    
-    return date.toLocaleDateString();
+
+    // Future date check can remain, but it's less likely if timestamps are correct at source
+    // const now = new Date();
+    // if (date > now) {
+    //   console.warn('formatDate received a future date:', dateInput);
+    //   // Decide if future dates should show current or also 'Invalid Date' or the future date formatted
+    //   return now.toLocaleDateString(); // Or format 'now' consistently
+    // }
+
+    // Format to DD/MM/YYYY using UTC parts to avoid timezone shifts in display
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+    const year = date.getUTCFullYear();
+
+    return `${day}/${month}/${year}`;
   } catch (error) {
-    console.error('Error formatting date:', error);
-    return new Date().toLocaleDateString();
+    console.error('Error formatting date:', dateInput, error);
+    return 'Invalid Date'; // Fallback for any unexpected errors
   }
 };
 
