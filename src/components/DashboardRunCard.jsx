@@ -185,11 +185,9 @@ export function DashboardRunCard({
               </svg>
             </div>
             <div style={styles.metricDetails}>
-              <span style={styles.metricLabel}>Pace</span>
+              <span style={styles.metricLabel}>{run.mainMetricLabel || 'Pace'}</span>
               <span style={styles.metricValue}>
-                {run.distance > 0 
-                  ? (run.duration / 60 / (distanceUnit === 'km' ? run.distance/1000 : run.distance/1609.344)).toFixed(2) 
-                  : '0.00'} min/{distanceUnit}
+                {run.mainMetricValue || '0.00'} {run.mainMetricUnit || (run.activityType === 'run' ? `min/${distanceUnit}` : run.activityType === 'cycle' ? (distanceUnit === 'km' ? 'km/h' : 'mph') : 'steps')}
               </span>
             </div>
           </div>
@@ -246,6 +244,12 @@ DashboardRunCard.propTypes = {
     date: PropTypes.string.isRequired,
     distance: PropTypes.number.isRequired,
     duration: PropTypes.number.isRequired,
+    activityType: PropTypes.string,
+    estimatedTotalSteps: PropTypes.number,
+    averageSpeed: PropTypes.shape({ value: PropTypes.string, unit: PropTypes.string }),
+    mainMetricLabel: PropTypes.string,
+    mainMetricValue: PropTypes.string,
+    mainMetricUnit: PropTypes.string,
   }).isRequired,
   formatTime: PropTypes.func.isRequired,
   displayDistance: PropTypes.func.isRequired,

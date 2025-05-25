@@ -247,19 +247,33 @@ ${additionalContent ? `\n${additionalContent}` : ''}
   let primaryMetricValue = formattedPace.split(' ')[0];
   let primaryMetricUnit = formattedPace.split(' ')[1] || "";
 
-  // Use activityType from RunTrackerContext, which should be the type of the *active* or *last* run
-  // If no run is active, `mode` from ActivityModeContext can be a fallback for UI hints before start.
-  const currentRunActivityType = isTracking ? activityType : mode;
+  // Use activityType from RunTrackerContext for live, or recentRun.activityType for completed run summary
+  const displayActivityType = isTracking ? activityType : (recentRun ? recentRun.activityType : mode);
 
-  if (currentRunActivityType === ACTIVITY_TYPES.WALK) {
+  if (displayActivityType === ACTIVITY_TYPES.WALK) {
     primaryMetricLabel = "Steps";
-    primaryMetricValue = estimatedSteps !== undefined ? String(Math.round(estimatedSteps)) : "0";
-    primaryMetricUnit = ""; // Or "steps"
-  } else if (currentRunActivityType === ACTIVITY_TYPES.CYCLE) {
+    if (!isTracking && recentRun && recentRun.estimatedTotalSteps !== undefined) {
+      primaryMetricValue = String(Math.round(recentRun.estimatedTotalSteps));
+    } else if (isTracking && estimatedSteps !== undefined) {
+      primaryMetricValue = String(Math.round(estimatedSteps));
+    } else {
+      primaryMetricValue = "0";
+    }
+    primaryMetricUnit = "steps"; // Always "steps" for consistency if value is 0
+  } else if (displayActivityType === ACTIVITY_TYPES.CYCLE) {
     primaryMetricLabel = "Speed";
-    primaryMetricValue = currentSpeed && currentSpeed.value !== undefined ? String(currentSpeed.value) : "0.0";
-    primaryMetricUnit = currentSpeed && currentSpeed.unit ? currentSpeed.unit : (distanceUnit === 'km' ? 'km/h' : 'mph');
+    if (!isTracking && recentRun && recentRun.averageSpeed && recentRun.averageSpeed.value !== undefined) {
+      primaryMetricValue = String(parseFloat(recentRun.averageSpeed.value).toFixed(1));
+      primaryMetricUnit = recentRun.averageSpeed.unit;
+    } else if (isTracking && currentSpeed && currentSpeed.value !== undefined && currentSpeed.unit) {
+      primaryMetricValue = String(parseFloat(currentSpeed.value).toFixed(1));
+      primaryMetricUnit = currentSpeed.unit;
+    } else {
+      primaryMetricValue = "0.0";
+      primaryMetricUnit = (distanceUnit === 'km' ? 'km/h' : 'mph');
+    }
   }
+  // For RUN, it defaults to `formattedPace` which is already set
 
   // Helper function to determine time of day based on timestamp
   const getTimeOfDay = (timestamp) => {
@@ -535,7 +549,23 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             run={{
               ...recentRun,
               title: recentRun.title || `${getTimeOfDay(recentRun.timestamp)} ${recentRun.activityType === 'walk' ? 'Walk' : recentRun.activityType === 'cycle' ? 'Cycle' : 'Run'}`,
-              date: formatRunDate(recentRun.date)
+              date: formatRunDate(recentRun.date),
+              // Pass the determined main metric to DashboardRunCard
+              mainMetricLabel: recentRun.activityType === ACTIVITY_TYPES.WALK 
+                ? "Total Steps" 
+                : recentRun.activityType === ACTIVITY_TYPES.CYCLE 
+                  ? "Avg Speed" 
+                  : "Avg Pace",
+              mainMetricValue: recentRun.activityType === ACTIVITY_TYPES.WALK
+                ? (recentRun.estimatedTotalSteps !== undefined ? Math.round(recentRun.estimatedTotalSteps).toLocaleString() : '0')
+                : recentRun.activityType === ACTIVITY_TYPES.CYCLE
+                  ? (recentRun.averageSpeed && recentRun.averageSpeed.value !== undefined ? parseFloat(recentRun.averageSpeed.value).toFixed(1) : '0.0')
+                  : (runDataService.calculatePace(recentRun.distance, recentRun.duration, distanceUnit) ? `${Math.floor(runDataService.calculatePace(recentRun.distance, recentRun.duration, distanceUnit))}:${Math.round((runDataService.calculatePace(recentRun.distance, recentRun.duration, distanceUnit) - Math.floor(runDataService.calculatePace(recentRun.distance, recentRun.duration, distanceUnit))) * 60).toString().padStart(2, '0')}` : '-'),
+              mainMetricUnit: recentRun.activityType === ACTIVITY_TYPES.WALK
+                ? "steps"
+                : recentRun.activityType === ACTIVITY_TYPES.CYCLE
+                  ? (recentRun.averageSpeed && recentRun.averageSpeed.unit ? recentRun.averageSpeed.unit : (distanceUnit === 'km' ? 'km/h' : 'mph'))
+                  : (runDataService.calculatePace(recentRun.distance, recentRun.duration, distanceUnit) ? `min/${distanceUnit}` : '' )
             }}
             formatTime={runDataService.formatTime}
             displayDistance={displayDistance}
