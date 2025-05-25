@@ -15,19 +15,20 @@ export const publishRun = async (run, distanceUnit = 'km') => {
   const results = [];
   const relayList = getActiveRelayList();
 
-  // 1️⃣  Publish workout summary first
-  const summaryTemplate = createWorkoutEvent(run, distanceUnit);
-  try {
-    const summaryResult = await createAndPublishEvent(summaryTemplate, null, { relays: relayList });
-    results.push({ kind: 1301, success: true, result: summaryResult });
-    if (summaryResult?.id) {
-      run.nostrWorkoutEventId = summaryResult.id; // allow linking
+  // 1️⃣ Publish workout summary if not already published earlier
+  if (!run.nostrWorkoutEventId) {
+    const summaryTemplate = createWorkoutEvent(run, distanceUnit);
+    try {
+      const summaryResult = await createAndPublishEvent(summaryTemplate, null, { relays: relayList });
+      results.push({ kind: 1301, success: true, result: summaryResult });
+      if (summaryResult?.id) {
+        run.nostrWorkoutEventId = summaryResult.id;
+      }
+    } catch (err) {
+      console.error('publishRun: failed for kind 1301', err);
+      results.push({ kind: 1301, success: false, error: err.message });
+      return results; // bail if summary fails
     }
-  } catch (err) {
-    console.error('publishRun: failed for kind 1301', err);
-    results.push({ kind: 1301, success: false, error: err.message });
-    // If summary fails, bail early (optional)
-    return results;
   }
 
   // 2️⃣  Publish intensity, calorie, & duration events if available

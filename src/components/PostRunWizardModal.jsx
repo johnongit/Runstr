@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import PropTypes from 'prop-types';
 import runDataService from '../services/RunDataService';
 import { publishRun } from '../utils/runPublisher';
+import { NostrContext } from '../contexts/NostrContext';
 
 const intensities = [
   { value: 'easy', label: 'Easy' },
@@ -14,6 +15,8 @@ export const PostRunWizardModal = ({ run, onClose }) => {
   const [selectedIntensity, setSelectedIntensity] = useState(run.intensity || 'moderate');
   const [publishing, setPublishing] = useState(false);
   const [publishResults, setPublishResults] = useState(null);
+
+  const { lightningAddress } = useContext(NostrContext);
 
   // helper save intensity into run record once selected
   const persistIntensity = (value) => {
@@ -33,6 +36,22 @@ export const PostRunWizardModal = ({ run, onClose }) => {
       const unit = localStorage.getItem('distanceUnit') || 'km';
       const results = await publishRun(run, unit);
       setPublishResults(results);
+
+      const allSuccess = results && results.every(r => r.success);
+      if (allSuccess) {
+        try {
+          const { rewardUserActivity } = await import('../services/rewardService');
+          const { default: SettingsCtx } = await import('../contexts/SettingsContext');
+          const { publishMode } = SettingsCtx.useSettings ? SettingsCtx.useSettings() : { publishMode: 'public' };
+          const NostrCtx = (await import('../contexts/NostrContext')).NostrContext;
+          const { publicKey } = NostrCtx._currentValue || {};
+          if (publicKey) {
+            rewardUserActivity(publicKey, 'workout_record', publishMode === 'private', lightningAddress);
+          }
+        } catch (errReward) {
+          console.warn('reward zap failed', errReward);
+        }
+      }
     } catch (err) {
       console.error('PostRunWizardModal publish error', err);
       setPublishResults([{ success: false, error: err.message }]);
@@ -75,7 +94,9 @@ export const PostRunWizardModal = ({ run, onClose }) => {
         <ul className="list-disc pl-6 mb-6">
           <li>Workout Record</li>
           <li>Workout Intensity</li>
-          <li>Calories</li>
+          <li>Calories Burned</li>
+          <li>Distance / Pace / Steps</li>
+          <li>Elevation & Splits (encrypted)</li>
         </ul>
         {publishResults && (
           <div className="mb-4 text-sm">

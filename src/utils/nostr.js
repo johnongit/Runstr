@@ -866,6 +866,11 @@ export const createWorkoutEvent = (run, distanceUnit) => {
     throw new Error('No run data provided');
   }
 
+  const activity = (run.activityType || 'run').toLowerCase();
+  const activityVerb = activity === 'walk' ? 'walk' : (activity === 'cycle' ? 'cycle' : 'run');
+  const activityEmoji = activity === 'walk' ? '🚶‍♀️' : (activity === 'cycle' ? '🚴' : '🏃‍♂️');
+  const primaryHashtag = activity === 'walk' ? 'Walking' : (activity === 'cycle' ? 'Cycling' : 'Running');
+
   // Format the distance
   const distanceValue = distanceUnit === 'km' 
     ? (run.distance / 1000).toFixed(2) 
@@ -895,14 +900,15 @@ export const createWorkoutEvent = (run, distanceUnit) => {
   // Create event template with kind 1301 for workout record
   return {
     kind: 1301,
-    content: "Completed a run with RUNSTR!",
+    content: `Completed a ${activityVerb} with RUNSTR! ${activityEmoji}`,
     tags: [
       ['workout', runName],
-      ['exercise', 'running'],
+      ['exercise', activityVerb],
       ['distance', distanceValue, distanceUnit],
       ['duration', durationFormatted],
       ...elevationTags,
-      ['source', 'RUNSTR']
+      ['source', 'RUNSTR'],
+      ['t', primaryHashtag]
     ]
   };
 };

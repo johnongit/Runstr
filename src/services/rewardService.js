@@ -1,6 +1,6 @@
 import { NWCWallet } from './nwcWallet'; // Assuming path, adjust if necessary
 import { getProfile } from '../utils/nostr'; // Assuming a utility to fetch profiles
-import {nip57} from 'nostr-tools';
+import { nip57, finalizeEvent, getPublicKey } from 'nostr-tools';
 
 // IMPORTANT: Replace with your actual Runstr Reward NWC URI
 const RUNSTR_REWARD_NWC_URI = "nostr+walletconnect://ba80990666ef0b6f4ba5059347beb13242921e54669e680064ca755256a1e3a6?relay=wss%3A%2F%2Frelay.coinos.io&secret=3eae13051dbc253974c03221699075010de242c76ae2aa7a9672eca0f2cb3114&lud16=TheWildHustle@coinos.io";
@@ -64,9 +64,10 @@ async function getLud16FromProfile(pubkey) {
  * @param {number} amountSats Amount in satoshis.
  * @param {string} message Zap request comment.
  * @param {string} zapType Custom tag for tracking e.g. streak_reward, nip101_reward.
+ * @param {string} fallbackLightningAddress Fallback LN address if zap fails
  * @returns {Promise<PayoutResult>}
  */
-export async function sendRewardZap(recipientPubkey, amountSats, message, zapType = 'general_reward') {
+export async function sendRewardZap(recipientPubkey, amountSats, message, zapType = 'general_reward', fallbackLightningAddress = null) {
   console.log(`[RewardService] Attempting to send ${amountSats} sats reward for ${zapType} to ${recipientPubkey}`);
 
   try {
@@ -93,27 +94,39 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
       return { success: false, message: errorMsg, error: 'LNURL issue' };
     }
     
-    // Construct a simple, unsigned zap request event object
-    // The pubkey of this event is not critical if the LNURL server doesn't strictly validate signatures on 'nostr' param
-    // For simplicity, we'll omit pubkey and id, and not sign it.
-    const unsignedZapRequest = {
+    // --- Build and sign a proper zap-request (NIP-57) ------------------
+    const relaysTag = ['relays', 'wss://relay.damus.io', 'wss://nos.lol'];
+
+    let zapRequestEvent = {
       kind: 9734,
+      pubkey: runstrRewardWallet.pubKey || getPublicKey(runstrRewardWallet.secretKey),
+      created_at: Math.floor(Date.now() / 1000),
       content: message,
       tags: [
         ['p', recipientPubkey],
-        ['amount', (amountSats * 1000).toString()], // NIP-57 specifies amount in millisats in tags
-        // Consider adding ['relays', ...your_app_relays] for better zap receipt discovery
-      ],
-      created_at: Math.floor(Date.now() / 1000),
+        ['amount', (amountSats * 1000).toString()],
+        relaysTag
+      ]
     };
+
+    // Prefer signing via NWC provider (Will pop up for read-only wallets)
+    try {
+      if (runstrRewardWallet.provider && typeof runstrRewardWallet.provider.signEvent === 'function') {
+        zapRequestEvent = await runstrRewardWallet.provider.signEvent(zapRequestEvent);
+      } else if (runstrRewardWallet.secretKey) {
+        zapRequestEvent = finalizeEvent(zapRequestEvent, runstrRewardWallet.secretKey);
+      }
+    } catch (signErr) {
+      console.warn('[RewardService] Could not sign zap request with provider, falling back to unsigned', signErr);
+    }
 
     // Get the invoice from the LNURL provider
     const invoice = await nip57.getInvoice({
         zapProfile: lnurlDetails,
-        amount: amountSats * 1000, // Amount in millisatoshis
+        amount: amountSats * 1000,
         comment: message,
-        zapEvent: unsignedZapRequest, // Pass the unsigned event
-        // relays: [...your_app_relays] // Optional: NIP-57 recommends relays tag in zap request
+        zapEvent: zapRequestEvent,
+        relays: relaysTag.slice(1) // omit the tag key
     });
     
     if (!invoice || !invoice.pr) {
@@ -134,6 +147,20 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
       return { success: true, message: `Successfully sent ${amountSats} sats!`, paymentResponse };
     } else {
       console.error('[RewardService] Payment failed or preimage not found in response.');
+      // At this point zap failed – try plain LN address fallback if provided
+      if (fallbackLightningAddress && fallbackLightningAddress.includes('@')) {
+        try {
+          const { payLightningAddress } = await import('../services/nwcService.js');
+          const payRes = await payLightningAddress(fallbackLightningAddress, amountSats, message);
+          if (payRes.success) {
+            console.log(`[RewardService] Paid ${amountSats} sats via LN address fallback to ${fallbackLightningAddress}`);
+            return { success: true, message: `Paid via LN address fallback`, paymentResponse: payRes.result };
+          }
+          console.warn('[RewardService] LN fallback failed', payRes.error);
+        } catch (lnErr) {
+          console.error('[RewardService] LN fallback threw', lnErr);
+        }
+      }
       return { success: false, message: 'Payment failed.', error: 'No preimage or payment failed', paymentResponse };
     }
 
@@ -142,6 +169,20 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
     let errorMessage = error.message || 'Unknown error during zap.';
     if (error.response && error.response.data && error.response.data.reason) {
       errorMessage = error.response.data.reason;
+    }
+    // At this point zap failed – try plain LN address fallback if provided
+    if (fallbackLightningAddress && fallbackLightningAddress.includes('@')) {
+      try {
+        const { payLightningAddress } = await import('../services/nwcService.js');
+        const payRes = await payLightningAddress(fallbackLightningAddress, amountSats, message);
+        if (payRes.success) {
+          console.log(`[RewardService] Paid ${amountSats} sats via LN address fallback to ${fallbackLightningAddress}`);
+          return { success: true, message: `Paid via LN address fallback`, paymentResponse: payRes.result };
+        }
+        console.warn('[RewardService] LN fallback failed', payRes.error);
+      } catch (lnErr) {
+        console.error('[RewardService] LN fallback threw', lnErr);
+      }
     }
     return { success: false, message: `Failed to send zap: ${errorMessage}`, error: errorMessage };
   }
@@ -171,11 +212,11 @@ export async function rewardNip101Post(recipientPubkey, kind, eventId) {
 
 // Placeholder for Streak completion reward
 // You'll need to call this from where you detect a streak completion.
-export async function rewardStreakCompletion(recipientPubkey, streakDays) {
-  const STREAK_REWARD_AMOUNT_SATS = 500; // As per previous discussion
+export async function rewardStreakCompletion(recipientPubkey, streakDays, lightningAddress = null) {
+  const STREAK_REWARD_AMOUNT_SATS = 100; // linear model (100 per day)
   const message = `Congrats on your ${streakDays}-day streak! +${STREAK_REWARD_AMOUNT_SATS} sats from Runstr! 🔥`;
   const rewardType = 'streak_completion';
-  return sendRewardZap(recipientPubkey, STREAK_REWARD_AMOUNT_SATS, message, rewardType);
+  return sendRewardZap(recipientPubkey, STREAK_REWARD_AMOUNT_SATS, message, rewardType, lightningAddress);
 }
 
 /**
@@ -183,8 +224,9 @@ export async function rewardStreakCompletion(recipientPubkey, streakDays) {
  * @param {string} recipientPubkey - Runner's hex pubkey.
  * @param {('workout_record'|'profile_update')} activityType - What they just did.
  * @param {boolean} usedPrivateRelay - true if the publish destination was set to `private`.
+ * @param {string} lightningAddress - Optional LN address for fallback
  */
-export async function rewardUserActivity(recipientPubkey, activityType, usedPrivateRelay = false) {
+export async function rewardUserActivity(recipientPubkey, activityType, usedPrivateRelay = false, lightningAddress = null) {
   const base = 5;
   const finalAmount = usedPrivateRelay ? base + 5 : base; // 10 sats if private relay, else 5
   const messageAction = activityType === 'profile_update' ? 'updating your profile' : 'posting your workout';
@@ -192,7 +234,7 @@ export async function rewardUserActivity(recipientPubkey, activityType, usedPriv
   const zapType = activityType === 'profile_update' ? 'profile_update_reward' : 'workout_record_reward';
 
   try {
-    const result = await sendRewardZap(recipientPubkey, finalAmount, message, zapType);
+    const result = await sendRewardZap(recipientPubkey, finalAmount, message, zapType, lightningAddress);
     return result;
   } catch (error) {
     console.error(`[RewardService] Error during rewardUserActivity for ${activityType} to ${recipientPubkey}:`, error);

@@ -35,7 +35,7 @@ export const RunTracker = () => {
 
   const { getActivityText, mode } = useActivityMode();
   const { distanceUnit, publishMode } = useSettings();
-  const { publicKey } = useContext(NostrContext);
+  const { publicKey, lightningAddress } = useContext(NostrContext);
 
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isCountingDown, setIsCountingDown] = useState(false);
@@ -187,7 +187,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       // Reward user (5 or 10 sats) and show success message
       const rewardSats = publishMode === 'private' ? 10 : 5;
       if (publicKey) {
-        rewardUserActivity(publicKey, 'workout_record', publishMode === 'private');
+        rewardUserActivity(publicKey, 'workout_record', publishMode === 'private', lightningAddress);
       }
 
       const successMsg = `Successfully posted to Nostr! (+${rewardSats} sats reward)`;
