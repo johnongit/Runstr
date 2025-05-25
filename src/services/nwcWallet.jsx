@@ -1,7 +1,13 @@
 import { getPublicKey } from 'nostr-tools';
 import * as secp256k1 from '@noble/secp256k1';
 import { webln } from '@getalby/sdk';
-import { RELAYS } from '../utils/nostr';
+
+// Fallback relay list for zap requests; adjust as needed or import from config
+const DEFAULT_RELAYS = [
+  'wss://relay.damus.io',
+  'wss://relay.snort.social',
+  'wss://relay.primal.net'
+];
 
 export class NWCWallet {
   constructor() {
@@ -71,37 +77,26 @@ export class NWCWallet {
     }
   }
 
-<<<<<<< HEAD
-  async generateZapInvoice(pubkey, amount, content = '') {
-=======
   async generateZapInvoice(pubkey, amount = null, content = '') {
->>>>>>> Simple-updates
     try {
       if (!this.provider) {
         throw new Error('Wallet not connected');
       }
 
-<<<<<<< HEAD
-=======
-      // Use provided amount or get default from localStorage
+      // Determine zap amount: use provided amount or fallback to stored/default value
       let zapAmount = amount;
       if (!zapAmount) {
         const storedAmount = localStorage.getItem('defaultZapAmount');
-        zapAmount = storedAmount ? parseInt(storedAmount, 10) : 1000;
+        zapAmount = storedAmount ? parseInt(storedAmount, 10) : 1000; // default 1000 sats
       }
 
->>>>>>> Simple-updates
       const zapRequest = {
         kind: 9734,
-        content: content,
+        content,
         tags: [
           ['p', pubkey],
-<<<<<<< HEAD
-          ['amount', amount.toString()],
-=======
           ['amount', zapAmount.toString()],
->>>>>>> Simple-updates
-          ['relays', ...RELAYS]
+          ['relays', ...DEFAULT_RELAYS]
         ],
         created_at: Math.floor(Date.now() / 1000)
       };
@@ -110,11 +105,7 @@ export class NWCWallet {
       const encodedZapRequest = btoa(JSON.stringify(signedZapRequest));
 
       const invoice = await this.provider.makeInvoice({
-<<<<<<< HEAD
-        amount,
-=======
         amount: zapAmount,
->>>>>>> Simple-updates
         defaultMemo: `Zap for ${pubkey}`,
         zapRequest: encodedZapRequest
       });

@@ -43,6 +43,37 @@ export const fetchEvents = async (filter, fetchOpts = {}) => {
 };
 
 /**
+ * Convenience helper to fetch a single kind-0 profile for a pubkey. Returns parsed profile object or null.
+ * Only used by rewardService for quick lud16/lud06 lookup.
+ * @param {string} pubkey Hex pubkey to fetch profile for
+ */
+export const getProfile = async (pubkey) => {
+  if (!pubkey) return null;
+  try {
+    const events = await fetchEvents({ kinds: [0], authors: [pubkey], limit: 1 }, { timeout: 7000 });
+    if (events && events.size > 0) {
+      const ev = Array.from(events)[0];
+      let parsed = {};
+      if (typeof ev.content === 'string' && ev.content.trim().startsWith('{')) {
+        try { parsed = JSON.parse(ev.content); } catch (_) { parsed = {}; }
+      }
+      // fallback to tags
+      const tagLookup = (key) => ev.tags?.find(t => t[0] === key)?.[1];
+      return {
+        name: parsed.name || parsed.display_name,
+        lud16: parsed.lud16 || tagLookup('lud16'),
+        lud06: parsed.lud06 || tagLookup('lud06'),
+        picture: parsed.picture,
+        about: parsed.about
+      };
+    }
+  } catch (err) {
+    console.error('[nostr.js] getProfile error', err);
+  }
+  return null;
+};
+
+/**
  * Fetch running posts from Nostr relays
  * @param {number} limit - Maximum number of posts to fetch
  * @param {number} since - Timestamp to fetch posts since

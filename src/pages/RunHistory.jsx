@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
 import { useRunStats } from '../hooks/useRunStats';
@@ -10,11 +10,14 @@ import { useActivityMode } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { RunHistoryCard } from '../components/RunHistoryCard';
 import { SaveRunExtrasModal } from '../components/SaveRunExtrasModal';
+import { rewardUserActivity } from '../services/rewardService';
+import { NostrContext } from '../contexts/NostrContext';
 
 export const RunHistory = () => {
   const navigate = useNavigate();
   const { mode, getActivityText } = useActivityMode();
-  const { distanceUnit } = useSettings();
+  const { distanceUnit, publishMode } = useSettings();
+  const { publicKey } = useContext(NostrContext);
   
   // Define average stride length for step estimation
   const AVERAGE_STRIDE_LENGTH_METERS = 0.762; // meters
@@ -302,11 +305,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
 
       if (publishedWorkoutEventId) {
         setWorkoutSavedRuns(prev => new Set([...prev, run.id]));
-        const { publicKey } = require('../contexts/NostrContext').NostrContext._currentValue || {};
-        const { publishMode } = require('../contexts/SettingsContext').useSettings ? require('../contexts/SettingsContext').useSettings() : { publishMode: 'public' };
         const rewardSats = publishMode === 'private' ? 10 : 5;
         if (publicKey) {
-          const { rewardUserActivity } = require('../services/rewardService');
           rewardUserActivity(publicKey, 'workout_record', publishMode === 'private');
         }
         const msg = `Main workout record saved! Now choose extras. (+${rewardSats} sats)`;
