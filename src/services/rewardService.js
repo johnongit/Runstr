@@ -1,6 +1,7 @@
 import { NWCWallet } from './nwcWallet'; // Assuming path, adjust if necessary
 import { getProfile } from '../utils/nostr'; // Assuming a utility to fetch profiles
-import { nip57, finalizeEvent, getPublicKey } from 'nostr-tools';
+import { finalizeEvent, getPublicKey } from 'nostr-tools';
+import { bech32 } from 'bech32';
 
 // IMPORTANT: Replace with your actual Runstr Reward NWC URI
 const RUNSTR_REWARD_NWC_URI = "nostr+walletconnect://ba80990666ef0b6f4ba5059347beb13242921e54669e680064ca755256a1e3a6?relay=wss%3A%2F%2Frelay.coinos.io&secret=3eae13051dbc253974c03221699075010de242c76ae2aa7a9672eca0f2cb3114&lud16=TheWildHustle@coinos.io";
@@ -57,6 +58,63 @@ async function getLud16FromProfile(pubkey) {
   }
 }
 
+// --------------------
+// LNURL / NIP-57 Helpers
+// --------------------
+
+/**
+ * Decode a bech32-encoded LNURL string to its raw https URL.
+ * @param {string} lnurlBech32
+ * @returns {string|null}
+ */
+function decodeBech32Url(lnurlBech32) {
+  try {
+    const { words } = bech32.decode(lnurlBech32.toLowerCase(), 1500);
+    const bytes = bech32.fromWords(words);
+    return new TextDecoder().decode(Uint8Array.from(bytes));
+  } catch (err) {
+    console.warn('[RewardService] Failed to decode bech32 LNURL:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch LNURL-Pay endpoint details given a lud16/lud06 value.
+ * Returns the JSON object from the endpoint (contains callback, minSendable, etc.).
+ */
+async function fetchLnurlDetails(lud) {
+  if (!lud) return null;
+
+  let lnurlPayUrl;
+  if (lud.includes('@')) {
+    // lightning address (name@domain)
+    const [name, domain] = lud.split('@');
+    lnurlPayUrl = `https://${domain}/.well-known/lnurlp/${name}`;
+  } else if (lud.toLowerCase().startsWith('lnurl')) {
+    // bech32 encoded lnurl
+    lnurlPayUrl = decodeBech32Url(lud);
+  }
+
+  if (!lnurlPayUrl) return null;
+
+  try {
+    const resp = await fetch(lnurlPayUrl, { headers: { Accept: 'application/json' }, mode: 'cors' });
+    if (!resp.ok) throw new Error(`Status ${resp.status}`);
+    return await resp.json();
+  } catch (err) {
+    console.error('[RewardService] Error fetching LNURL details:', err);
+    return null;
+  }
+}
+
+/**
+ * Helper that base64-encodes a JSON object using browser-safe method.
+ */
+function base64Json(obj) {
+  const json = JSON.stringify(obj);
+  return btoa(unescape(encodeURIComponent(json)));
+}
+
 /**
  * Sends a NIP-57 lightning zap from the configured Runstr reward NWC wallet.
  *
@@ -68,7 +126,14 @@ async function getLud16FromProfile(pubkey) {
  * @returns {Promise<PayoutResult>}
  */
 export async function sendRewardZap(recipientPubkey, amountSats, message, zapType = 'general_reward', fallbackLightningAddress = null) {
-  console.log(`[RewardService] Attempting to send ${amountSats} sats reward for ${zapType} to ${recipientPubkey}`);
+  // Show an optimistic notification immediately so users get feedback.
+  try {
+    if (typeof window !== 'undefined') {
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast(`Sending ${amountSats} sats reward…`);
+      }
+    }
+  } catch (_) {}
 
   try {
     await ensureRewardWalletConnected();
@@ -82,19 +147,22 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
   }
 
   try {
-    const lnurlDetails = await nip57.fetchProfile(lud16);
-    if (!lnurlDetails || !lnurlDetails.callback || !lnurlDetails.allowsNostr || lnurlDetails.minSendable > (amountSats * 1000)) {
-      let errorMsg = 'Failed to fetch LNURL details or zap not possible.';
-      if (lnurlDetails && lnurlDetails.minSendable > (amountSats*1000)) {
-        errorMsg = `Amount too low. Minimum sendable: ${lnurlDetails.minSendable/1000} sats.`;
-      } else if (!lnurlDetails.allowsNostr) {
-        errorMsg = 'Recipient LNURL provider does not support Nostr zaps.';
-      }
-      console.error(`[RewardService] LNURL details error for ${lud16}:`, errorMsg, lnurlDetails);
-      return { success: false, message: errorMsg, error: 'LNURL issue' };
+    const lnurlDetails = await fetchLnurlDetails(lud16);
+    if (!lnurlDetails || !lnurlDetails.callback) {
+      console.error('[RewardService] Invalid LNURL details for', lud16, lnurlDetails);
+      return { success: false, message: 'Invalid LNURL details.', error: 'LNURL invalid' };
     }
-    
-    // --- Build and sign a proper zap-request (NIP-57) ------------------
+
+    if (lnurlDetails.minSendable && lnurlDetails.minSendable > amountSats * 1000) {
+      return { success: false, message: `Amount too low. Minimum is ${lnurlDetails.minSendable / 1000} sats.`, error: 'Amount too low' };
+    }
+
+    if (lnurlDetails.allowsNostr === false) {
+      console.warn('[RewardService] LNURL provider does not allow nostr zaps, will fallback');
+      throw new Error('Provider does not allow nostr');
+    }
+
+    // --- Build and sign zap-request (NIP-57) ---
     const relaysTag = ['relays', 'wss://relay.damus.io', 'wss://nos.lol'];
 
     let zapRequestEvent = {
@@ -109,7 +177,6 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
       ]
     };
 
-    // Prefer signing via NWC provider (Will pop up for read-only wallets)
     try {
       if (runstrRewardWallet.provider && typeof runstrRewardWallet.provider.signEvent === 'function') {
         zapRequestEvent = await runstrRewardWallet.provider.signEvent(zapRequestEvent);
@@ -117,53 +184,35 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
         zapRequestEvent = finalizeEvent(zapRequestEvent, runstrRewardWallet.secretKey);
       }
     } catch (signErr) {
-      console.warn('[RewardService] Could not sign zap request with provider, falling back to unsigned', signErr);
+      console.warn('[RewardService] Could not sign zap request, proceeding unsigned', signErr);
     }
 
-    // Get the invoice from the LNURL provider
-    const invoice = await nip57.getInvoice({
-        zapProfile: lnurlDetails,
-        amount: amountSats * 1000,
-        comment: message,
-        zapEvent: zapRequestEvent,
-        relays: relaysTag.slice(1) // omit the tag key
-    });
-    
-    if (!invoice || !invoice.pr) {
-        console.error('[RewardService] Failed to get invoice from LNURL provider:', invoice);
-        return { success: false, message: 'Failed to get invoice from LNURL provider.', error: 'Invoice generation failed' };
+    const zapRequestB64 = base64Json(zapRequestEvent);
+
+    const callbackUrl = new URL(lnurlDetails.callback);
+    callbackUrl.searchParams.set('amount', (amountSats * 1000).toString());
+    callbackUrl.searchParams.set('nostr', zapRequestB64);
+    if (message) callbackUrl.searchParams.set('comment', message.substring(0, 200));
+
+    const invResp = await fetch(callbackUrl.toString(), { headers: { Accept: 'application/json' } });
+    if (!invResp.ok) throw new Error(`Invoice callback returned ${invResp.status}`);
+    const invJson = await invResp.json();
+
+    if (!invJson.pr) {
+      throw new Error('No invoice in response');
     }
 
-    console.log(`[RewardService] Obtained invoice for ${amountSats} sats to ${lud16}: ${invoice.pr.substring(0, 60)}...`);
+    console.log('[RewardService] Obtained invoice:', invJson.pr.substring(0, 60), '…');
 
-    // Pay the invoice using the Runstr reward wallet
-    const paymentResponse = await runstrRewardWallet.makePayment(invoice.pr);
-    console.log('[RewardService] Payment response:', paymentResponse);
+    // Pay invoice
+    const paymentResponse = await runstrRewardWallet.makePayment(invJson.pr);
 
-    // The structure of paymentResponse can vary.
-    // A common success indicator is the presence of a `preimage`.
     if (paymentResponse && (paymentResponse.preimage || paymentResponse.payment_hash || (paymentResponse.data && paymentResponse.data.preimage))) {
       console.log(`[RewardService] Successfully sent ${amountSats} sats for ${zapType} to ${recipientPubkey}`);
       return { success: true, message: `Successfully sent ${amountSats} sats!`, paymentResponse };
-    } else {
-      console.error('[RewardService] Payment failed or preimage not found in response.');
-      // At this point zap failed – try plain LN address fallback if provided
-      if (fallbackLightningAddress && fallbackLightningAddress.includes('@')) {
-        try {
-          const { payLightningAddress } = await import('../services/nwcService.js');
-          const payRes = await payLightningAddress(fallbackLightningAddress, amountSats, message);
-          if (payRes.success) {
-            console.log(`[RewardService] Paid ${amountSats} sats via LN address fallback to ${fallbackLightningAddress}`);
-            return { success: true, message: `Paid via LN address fallback`, paymentResponse: payRes.result };
-          }
-          console.warn('[RewardService] LN fallback failed', payRes.error);
-        } catch (lnErr) {
-          console.error('[RewardService] LN fallback threw', lnErr);
-        }
-      }
-      return { success: false, message: 'Payment failed.', error: 'No preimage or payment failed', paymentResponse };
     }
 
+    throw new Error('Payment failed or no preimage');
   } catch (error) {
     console.error(`[RewardService] Error during zap process for ${zapType} to ${recipientPubkey}:`, error);
     let errorMessage = error.message || 'Unknown error during zap.';
