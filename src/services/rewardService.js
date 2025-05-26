@@ -245,11 +245,14 @@ export async function rewardNip101Post(recipientPubkey, kind, eventId) {
   // IMPORTANT: Define your KIND numbers and any specific tag checks for NIP101e/h
   const NIP101_REWARD_AMOUNT_SATS = 5;
   let rewardType = '';
+  let message = '';
 
   if (kind === globalThis.NIP101e_KIND_NUMBER) { // Replace with actual kind number
     rewardType = 'nip101e_post';
+    message = `Thanks for your NIP101e post! +${NIP101_REWARD_AMOUNT_SATS} sats from Runstr.`;
   } else if (kind === globalThis.NIP101h_KIND_NUMBER) { // Replace with actual kind number
     rewardType = 'nip101h_post';
+    message = `Thanks for not saving your data with RUNSTR`; // Updated message
   } else {
     console.warn(`[RewardService] Unknown kind for NIP101 reward: ${kind}`);
     return { success: false, message: 'Unknown NIP101 kind.'};
@@ -257,7 +260,6 @@ export async function rewardNip101Post(recipientPubkey, kind, eventId) {
   
   // Potentially add more checks here based on eventId or specific tags if needed
 
-  const message = `Thanks for your ${rewardType.replace('_', ' ')}! +${NIP101_REWARD_AMOUNT_SATS} sats from Runstr.`;
   return sendRewardZap(recipientPubkey, NIP101_REWARD_AMOUNT_SATS, message, rewardType);
 }
 

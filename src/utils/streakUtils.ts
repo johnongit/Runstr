@@ -113,49 +113,104 @@ export const updateUserStreak = (newRunDateObject: Date, publicKey: string | nul
 
   // Determine if a payout is needed (also enforces capDays)
   const { amountToReward, effectiveDaysForReward } = calculateStreakReward(newData);
+  console.log('[StreakUtils] updateUserStreak: Calculated reward. Amount:', amountToReward, 'Effective Days:', effectiveDaysForReward, 'Pubkey:', publicKey);
+
   if (amountToReward > 0) {
     const lightningAddress = localStorage.getItem('lightningAddress');
-    if (!lightningAddress) {
-      console.warn('[StreakRewards] Lightning address not set – cannot pay reward. Ask user to add it in Settings > Wallet.');
-    }
+    // if (!lightningAddress) { // This warning is fine, primary is pubkey
+    //   console.warn('[StreakRewards] Lightning address not set – cannot pay reward. Ask user to add it in Settings > Wallet.');
+    // }
     const dest = lightningAddress || publicKey;
+    console.log('[StreakUtils] updateUserStreak: Destination for reward:', dest);
 
     if (dest) {
-      // Optimistic notice
+      console.log('[StreakUtils] updateUserStreak: `dest` is valid, attempting optimistic notification.');
       const pendingMsg = `🚀 Sending ${amountToReward} sats reward…`;
+      
+      let optimisticToastShown = false;
       if ((window as any).Android?.showToast) {
-        (window as any).Android.showToast(pendingMsg);
-      } else if (typeof window !== 'undefined') {
-        console.log(pendingMsg);
+        try {
+          console.log('[StreakUtils] updateUserStreak: Attempting Android optimistic toast...');
+          (window as any).Android.showToast(pendingMsg);
+          optimisticToastShown = true;
+          console.log('[StreakUtils] updateUserStreak: Android optimistic toast attempted.');
+        } catch (e) {
+          console.error('[StreakUtils] updateUserStreak: Error calling Android optimistic toast:', e);
+        }
+      }
+      
+      if (!optimisticToastShown && typeof window !== 'undefined') { // Fallback for web/dev
+        console.log('[StreakUtils] updateUserStreak: Attempting console.log optimistic notification:', pendingMsg);
+      } else if (!optimisticToastShown) {
+        console.log('[StreakUtils] updateUserStreak: No optimistic notification method available (not Android, not browser window).');
       }
 
       rewardsPayoutService
         .sendStreakReward(dest, amountToReward, effectiveDaysForReward, (localStorage.getItem('nwcConnectionString') || null))
         .then((result) => {
+          console.log('[StreakUtils] updateUserStreak: sendStreakReward promise resolved. Result success:', result.success);
           if (result.success) {
             updateLastRewardedDay(effectiveDaysForReward);
-            // Notify user
             const successMsg = `🎉 Streak reward sent: ${amountToReward} sats for day ${effectiveDaysForReward}!`;
+            console.log('[StreakUtils] updateUserStreak: Attempting success notification.');
+
+            let successToastShown = false;
             if ((window as any).Android?.showToast) {
-              (window as any).Android.showToast(successMsg);
-            } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-              new Notification('Runstr Reward', { body: successMsg });
-            } else {
-              console.log(successMsg);
+              try {
+                console.log('[StreakUtils] updateUserStreak: Attempting Android success toast...');
+                (window as any).Android.showToast(successMsg);
+                successToastShown = true;
+                console.log('[StreakUtils] updateUserStreak: Android success toast attempted.');
+              } catch (e) {
+                console.error('[StreakUtils] updateUserStreak: Error calling Android success toast:', e);
+              }
             }
+            
+            if (!successToastShown && typeof window !== 'undefined' && 'Notification' in window) {
+              console.log('[StreakUtils] updateUserStreak: Attempting Browser Notification. Permission:', Notification.permission);
+              if (Notification.permission === 'granted') {
+                try {
+                  new Notification('Runstr Reward', { body: successMsg });
+                  successToastShown = true;
+                  console.log('[StreakUtils] updateUserStreak: Browser Notification shown.');
+                } catch (e) {
+                   console.error('[StreakUtils] updateUserStreak: Error showing Browser Notification:', e);
+                }
+              } else if (Notification.permission === 'default') {
+                console.log('[StreakUtils] updateUserStreak: Browser Notification permission is default. Requesting...');
+                Notification.requestPermission().then(permission => {
+                  console.log('[StreakUtils] updateUserStreak: Browser Notification permission result:', permission);
+                  if (permission === 'granted') {
+                    try {
+                      new Notification('Runstr Reward', { body: successMsg });
+                      console.log('[StreakUtils] updateUserStreak: Browser Notification shown after request.');
+                    } catch (e) {
+                       console.error('[StreakUtils] updateUserStreak: Error showing Browser Notification after request:', e);
+                    }
+                  }
+                });
+              }
+            }
+            
+            if (!successToastShown) {
+                 console.log('[StreakUtils] updateUserStreak: Fallback console.log success notification:', successMsg);
+            }
+
           } else {
-            // Most NWC wallets return the payment result encrypted; if decryption fails
-            // we may still have paid.  We log the error for developers but avoid alarming
-            // the runner – the optimistic toast was already shown.
-            console.warn('[StreakRewards] Payout may have succeeded but response decode failed:', result.error);
+            console.warn('[StreakUtils] updateUserStreak: Payout service reported failure. Error:', result.error);
+            // Opted to not show an error toast here as the payment might have gone through if NWC response was unparseable
+            // console.warn('[StreakRewards] Payout may have succeeded but response decode failed:', result.error);
           }
         })
         .catch((err) => {
-          console.warn('[StreakRewards] Payout flow threw, but payment likely already sent:', err);
+          console.warn('[StreakUtils] updateUserStreak: sendStreakReward promise was rejected. This is unusual as sendRewardZap should catch errors. Error:', err);
+          // console.warn('[StreakRewards] Payout flow threw, but payment likely already sent:', err);
         });
     } else {
-      console.warn('[StreakRewards] Cannot auto-pay reward – pubkey not set.');
+      console.warn('[StreakUtils] updateUserStreak: Reward payable, but `dest` is null/undefined. Pubkey:', publicKey, 'LN Address in LS:', lightningAddress);
     }
+  } else {
+    console.log('[StreakUtils] updateUserStreak: No reward amount due.');
   }
   return newData;
 };

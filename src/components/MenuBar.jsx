@@ -233,6 +233,7 @@ export const MenuBar = () => {
             {/* Bitcoin Rewards Section */}
             <div className="mb-6">
               <h4 className="text-lg font-semibold mb-3">Bitcoin Rewards</h4>
+              {/*
               <div className="space-y-2">
                 <label htmlFor="lnAddressInput" className="text-sm text-gray-400">Lightning Address (to receive streak rewards)</label>
                 <div className="flex">
@@ -258,9 +259,13 @@ export const MenuBar = () => {
                   >Save</button>
                 </div>
                 <p className="text-xs text-gray-500">If you also connect an NWC wallet, the app will pay that first and fall back to this address if needed.</p>
-
-                {/* End of debug section – TEST PAYOUT button removed for production */}
               </div>
+              */}
+              <p className="text-sm text-gray-400">
+                Runstr now automatically sends Bitcoin rewards directly to your connected Nostr account (via Zaps).
+                You no longer need to configure a separate Lightning Address here. Ensure your Nostr profile has a Lightning Address set up to receive rewards.
+              </p>
+              {/* End of debug section – TEST PAYOUT button removed for production */}
             </div>
             
             <div className="flex flex-col space-y-4">

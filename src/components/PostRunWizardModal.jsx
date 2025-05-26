@@ -93,7 +93,7 @@ export const PostRunWizardModal = ({ run, onClose }) => {
     const allSuccess = publishResults && publishResults.every(r => r.success);
     return (
       <div>
-        <h3 className="text-lg font-semibold mb-4">Share to Nostr</h3>
+        <h3 className="text-lg font-semibold mb-4">Save to Nostr</h3>
         <p className="mb-3">The following data will be published:</p>
         <ul className="list-disc pl-6 mb-6">
           <li>Workout Record</li>
