@@ -11,7 +11,9 @@ let isConnecting = false;
 let connectionPromise = null;
 
 async function ensureRewardWalletConnected() {
-  if (runstrRewardWallet.provider && await runstrRewardWallet.provider.isEnabled()) {
+  // If the provider object exists we assume a previous `connect` + `enable` succeeded.
+  // Some SDK versions don't expose `isEnabled`, so we avoid calling it directly.
+  if (runstrRewardWallet.provider) {
     return true;
   }
   if (isConnecting && connectionPromise) {
@@ -209,7 +211,7 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
 
     if (paymentResponse && (paymentResponse.preimage || paymentResponse.payment_hash || (paymentResponse.data && paymentResponse.data.preimage))) {
       console.log(`[RewardService] Successfully sent ${amountSats} sats for ${zapType} to ${recipientPubkey}`);
-      return { success: true, message: `Successfully sent ${amountSats} sats!`, paymentResponse };
+      return { success: true, message: `Successfully sent ${amountSats} sats!`, paymentResponse, txid: (paymentResponse.payment_hash || paymentResponse.preimage || (paymentResponse.data && paymentResponse.data.payment_hash)) };
     }
 
     throw new Error('Payment failed or no preimage');
