@@ -280,3 +280,32 @@ button,
   transform: translateY(-2px);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
+
+/* Bottom Navigation Responsive Styles */
+@media (max-width: 360px) {
+  nav .text-xs {
+    font-size: 0.65rem;
+  }
+  
+  nav svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+}
+
+@media (max-width: 320px) {
+  nav .text-xs {
+    font-size: 0.6rem;
+    letter-spacing: 0;
+  }
+  
+  nav ul li {
+    padding: 0 2px;
+  }
+}
+
+/* Prevent text wrapping on narrow screens */
+nav span.text-xs {
+  display: block;
+  min-width: 0;
+}

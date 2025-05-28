@@ -42,30 +42,76 @@ export const PermissionDialog = ({ onContinue, onCancel }) => {
       
       // Request location permissions immediately after Amber permissions
       try {
+        // Create a temporary watcher to trigger permission request
+        // Use a unique ID for this temporary watcher
+        const tempWatcherId = 'permissionRequest_' + Date.now();
+        
         // Request location permissions using BackgroundGeolocation
-        await BackgroundGeolocation.addWatcher(
+        const watcherId = await BackgroundGeolocation.addWatcher(
           {
+            id: tempWatcherId,
             backgroundMessage: 'Tracking your runs',
             backgroundTitle: 'Runstr',
             requestPermissions: true,
             distanceFilter: 10,
             highAccuracy: true,
-            staleLocationThreshold: 30000
+            staleLocationThreshold: 30000,
+            // Add these specific settings for better compatibility
+            notificationTitle: 'Runstr',
+            notificationText: 'Location tracking is active',
+            interval: 5000, // Check every 5 seconds
+            fastestInterval: 5000,
+            activitiesInterval: 10000,
+            stopOnTerminate: false,
+            startOnBoot: false,
+            locationProvider: 'gps', // Explicitly use GPS provider
+            saveBatteryOnBackground: false
           },
           (location, error) => {
             if (error) {
               console.warn('Location permission error:', error);
+              
+              // If permission was denied, show a more helpful message
+              if (error.code === 'NOT_AUTHORIZED' || error.message?.includes('permission')) {
+                alert('Location permission is required for tracking runs. Please go to Settings > Apps > Runstr > Permissions and enable Location access.');
+                
+                // Try to open app settings directly
+                BackgroundGeolocation.openSettings();
+              }
               return;
             }
             
-            // Successfully got location, clean up this temporary watcher
-            BackgroundGeolocation.removeWatcher({
-              id: 'initialPermissionRequest'
-            });
+            // Successfully got location permission
+            console.log('Location permission granted successfully');
           }
         );
+        
+        // Clean up the temporary watcher after a short delay
+        // This ensures the permission request completes
+        setTimeout(async () => {
+          try {
+            await BackgroundGeolocation.removeWatcher({
+              id: watcherId
+            });
+          } catch (cleanupError) {
+            console.warn('Error cleaning up temporary watcher:', cleanupError);
+          }
+        }, 2000);
+        
       } catch (locationError) {
-        console.warn('Error requesting location permissions:', locationError);
+        console.error('Error requesting location permissions:', locationError);
+        
+        // Show a more helpful error message for GrapheneOS users
+        if (locationError.message?.includes('permission') || locationError.code === 'NOT_AUTHORIZED') {
+          alert('Location permission was not granted. Runstr requires location access to track your runs. Please enable location permission in your device settings and restart the app.');
+          
+          // Try to open settings
+          try {
+            await BackgroundGeolocation.openSettings();
+          } catch (settingsError) {
+            console.warn('Could not open settings:', settingsError);
+          }
+        }
       }
       
       // Ask user to whitelist the app from battery optimisations (GrapheneOS & Android)

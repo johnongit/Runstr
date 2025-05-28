@@ -8,6 +8,26 @@ const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 // Define average stride length for step estimation
 const AVERAGE_STRIDE_LENGTH_METERS = 0.762; // meters
 
+// Helper function to estimate stride length based on height
+const estimateStrideLength = (heightCm) => {
+  if (!heightCm || heightCm < 100 || heightCm > 250) {
+    // Return default if no height or unrealistic height
+    return AVERAGE_STRIDE_LENGTH_METERS;
+  }
+  
+  // Convert cm to inches
+  const heightInches = heightCm / 2.54;
+  
+  // Use gender-neutral average formula (average of male and female factors)
+  // Male: height × 0.415, Female: height × 0.413, Average: height × 0.414
+  const strideLengthInches = heightInches * 0.414;
+  
+  // Convert inches to meters
+  const strideLengthMeters = strideLengthInches * 0.0254;
+  
+  return strideLengthMeters;
+};
+
 class RunTracker extends EventEmitter {
   constructor() {
     super();
@@ -19,6 +39,9 @@ class RunTracker extends EventEmitter {
     this.currentSpeed = { value: 0, unit: 'km/h' }; // Default unit, will update based on preference
     this.splits = []; // Array to store split objects { km, time, pace }
     this.positions = [];
+    
+    // Add stride length property that can be customized
+    this.strideLength = this.getCustomStrideLength();
     
     // Add elevation tracking data
     this.elevation = {
@@ -152,7 +175,7 @@ class RunTracker extends EventEmitter {
 
         // If walking, calculate and emit steps
         if (this.activityType === ACTIVITY_TYPES.WALK) {
-          this.estimatedSteps = this.distance > 0 ? Math.round(this.distance / AVERAGE_STRIDE_LENGTH_METERS) : 0;
+          this.estimatedSteps = this.distance > 0 ? Math.round(this.distance / this.strideLength) : 0;
           this.emit('stepsChange', this.estimatedSteps);
         }
       } else {
@@ -275,33 +298,80 @@ class RunTracker extends EventEmitter {
       // First, ensure any existing watchers are cleaned up
       await this.cleanupWatchers();
       
+      // Generate a unique ID for this tracking session
+      const sessionId = 'tracking_' + Date.now();
+      
       this.watchId = await BackgroundGeolocation.addWatcher(
         {
+          id: sessionId,
           backgroundMessage: 'Tracking your run...',
           backgroundTitle: 'Runstr',
           foregroundService: true,
           foregroundServiceType: 'location',
-          requestPermissions: false, 
+          requestPermissions: false, // Don't request here, should already have them
           distanceFilter: 10,
           highAccuracy: true,
-          staleLocationThreshold: 30000
+          staleLocationThreshold: 30000,
+          // Additional settings for better compatibility
+          notificationTitle: 'Runstr - Tracking Active',
+          notificationText: 'Recording your run',
+          interval: 5000,
+          fastestInterval: 5000,
+          activitiesInterval: 10000,
+          locationProvider: 'gps',
+          saveBatteryOnBackground: false,
+          stopOnTerminate: false,
+          startOnBoot: false,
+          debug: false // Set to true for debugging
         },
         (location, error) => {
           if (error) {
-            if (error.code === 'NOT_AUTHORIZED') {
+            console.error('Location tracking error:', error);
+            
+            if (error.code === 'NOT_AUTHORIZED' || error.message?.includes('permission')) {
               // Permissions were revoked after being initially granted
               localStorage.setItem('permissionsGranted', 'false');
-              alert('Location permission is required for tracking. Please enable it in your device settings.');
-              BackgroundGeolocation.openSettings();
+              
+              // Emit an error event that the UI can listen to
+              this.emit('permissionError', error);
+              
+              // Try to clean up and stop tracking
+              this.cleanupWatchers();
+              
+              // Show a user-friendly message
+              alert('Location permission was revoked. Please go to Settings > Apps > Runstr > Permissions and re-enable Location access.');
+              
+              // Try to open settings
+              BackgroundGeolocation.openSettings().catch(err => {
+                console.warn('Could not open settings:', err);
+              });
             }
-            return console.error(error);
+            return;
           }
 
+          // Successfully got location
           this.addPosition(location);
         }
       );
+      
+      console.log('Background tracking started with ID:', this.watchId);
+      
     } catch (error) {
       console.error('Error starting background tracking:', error);
+      
+      // Check if it's a permission-related error
+      if (error.message?.includes('permission') || error.code === 'NOT_AUTHORIZED') {
+        localStorage.setItem('permissionsGranted', 'false');
+        this.emit('permissionError', error);
+        
+        alert('Location permission is required. Please enable it in Settings > Apps > Runstr > Permissions.');
+        
+        try {
+          await BackgroundGeolocation.openSettings();
+        } catch (settingsError) {
+          console.warn('Could not open settings:', settingsError);
+        }
+      }
     }
   }
 
@@ -426,7 +496,7 @@ class RunTracker extends EventEmitter {
             unit: unit === 'km' ? 'km/h' : 'mph'
         };
     } else if (this.activityType === ACTIVITY_TYPES.WALK) {
-        finalEstimatedSteps = this.distance > 0 ? Math.round(this.distance / AVERAGE_STRIDE_LENGTH_METERS) : 0;
+        finalEstimatedSteps = this.distance > 0 ? Math.round(this.distance / this.strideLength) : 0;
     }
 
     // Create the final run data object
@@ -545,6 +615,24 @@ class RunTracker extends EventEmitter {
     this.emit('elevationChange', {...this.elevation});
     this.emit('stepsChange', this.estimatedSteps);
     this.emit('speedChange', this.currentSpeed);
+  }
+
+  // Get custom stride length from settings or calculate from height
+  getCustomStrideLength() {
+    // First check if user has set a custom stride length
+    const customStrideLength = parseFloat(localStorage.getItem('customStrideLength'));
+    if (customStrideLength && customStrideLength > 0) {
+      return customStrideLength;
+    }
+    
+    // Otherwise, try to calculate from height
+    const userHeight = parseFloat(localStorage.getItem('userHeight')); // in cm
+    if (userHeight && userHeight > 0) {
+      return estimateStrideLength(userHeight);
+    }
+    
+    // Default to average if no custom settings
+    return AVERAGE_STRIDE_LENGTH_METERS;
   }
 
   // Make sure the off method is properly documented

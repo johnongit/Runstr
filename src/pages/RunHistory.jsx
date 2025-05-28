@@ -13,15 +13,38 @@ import { SaveRunExtrasModal } from '../components/SaveRunExtrasModal';
 import { rewardUserActivity } from '../services/rewardService';
 import { NostrContext } from '../contexts/NostrContext';
 
+const AVERAGE_STRIDE_LENGTH_METERS = 0.762; // average stride length
+
+// Helper function to estimate stride length based on height
+const estimateStrideLength = (heightCm) => {
+  if (!heightCm || heightCm < 100 || heightCm > 250) {
+    return AVERAGE_STRIDE_LENGTH_METERS;
+  }
+  const heightInches = heightCm / 2.54;
+  const strideLengthInches = heightInches * 0.414;
+  const strideLengthMeters = strideLengthInches * 0.0254;
+  return strideLengthMeters;
+};
+
+// Get custom stride length from settings or calculate from height
+const getCustomStrideLength = () => {
+  const customStrideLength = parseFloat(localStorage.getItem('customStrideLength'));
+  if (customStrideLength && customStrideLength > 0) {
+    return customStrideLength;
+  }
+  const userHeight = parseFloat(localStorage.getItem('userHeight'));
+  if (userHeight && userHeight > 0) {
+    return estimateStrideLength(userHeight);
+  }
+  return AVERAGE_STRIDE_LENGTH_METERS;
+};
+
 export const RunHistory = () => {
   const navigate = useNavigate();
   const { mode, getActivityText } = useActivityMode();
   const { distanceUnit, publishMode } = useSettings();
   const { publicKey } = useContext(NostrContext);
   
-  // Define average stride length for step estimation
-  const AVERAGE_STRIDE_LENGTH_METERS = 0.762; // meters
-
   // State for run history
   const [runHistory, setRunHistory] = useState([]);
   const [filteredHistory, setFilteredHistory] = useState([]);
@@ -562,7 +585,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
               // Ensure distance is in meters for step calculation
               // Assuming run.distance is already in meters as per typical GPS data
               const distanceInMeters = run.distance; 
-              displayMetricValue = distanceInMeters > 0 ? Math.round(distanceInMeters / AVERAGE_STRIDE_LENGTH_METERS) : 0;
+              displayMetricValue = distanceInMeters > 0 ? Math.round(distanceInMeters / getCustomStrideLength()) : 0;
               displayMetricLabel = 'Steps';
               displayMetricUnit = ''; // No unit for steps, or could be "steps"
             } else if (currentActivityType === ACTIVITY_TYPES.CYCLE) {

@@ -268,6 +268,88 @@ export const MenuBar = () => {
               {/* End of debug section – TEST PAYOUT button removed for production */}
             </div>
             
+            {/* Step Counting Settings Section */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold mb-3">Step Counting (Walking)</h4>
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="userHeightInput" className="text-sm text-gray-400 block mb-1">
+                    Your Height (cm) - Used to estimate stride length
+                  </label>
+                  <div className="flex">
+                    <input
+                      id="userHeightInput"
+                      type="number"
+                      min="100"
+                      max="250"
+                      defaultValue={localStorage.getItem('userHeight') || ''}
+                      placeholder="170"
+                      className="flex-1 bg-[#111827] p-2 rounded-l-lg text-white text-sm"
+                    />
+                    <button
+                      className="bg-indigo-600 px-4 rounded-r-lg text-white text-sm"
+                      onClick={() => {
+                        const val = document.getElementById('userHeightInput').value.trim();
+                        const height = parseFloat(val);
+                        if (height && height >= 100 && height <= 250) {
+                          localStorage.setItem('userHeight', val);
+                          // Clear custom stride length when height is set
+                          localStorage.removeItem('customStrideLength');
+                          alert('Height saved! Step counting will now use your height to estimate stride length.');
+                        } else {
+                          alert('Please enter a valid height between 100 and 250 cm');
+                        }
+                      }}
+                    >Save</button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Leave empty to use average stride length</p>
+                </div>
+                
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-600"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-[#1a222e] text-gray-400">OR</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="strideInput" className="text-sm text-gray-400 block mb-1">
+                    Custom Stride Length (meters) - For more accurate step counting
+                  </label>
+                  <div className="flex">
+                    <input
+                      id="strideInput"
+                      type="number"
+                      min="0.4"
+                      max="1.5"
+                      step="0.01"
+                      defaultValue={localStorage.getItem('customStrideLength') || ''}
+                      placeholder="0.76"
+                      className="flex-1 bg-[#111827] p-2 rounded-l-lg text-white text-sm"
+                    />
+                    <button
+                      className="bg-indigo-600 px-4 rounded-r-lg text-white text-sm"
+                      onClick={() => {
+                        const val = document.getElementById('strideInput').value.trim();
+                        const stride = parseFloat(val);
+                        if (stride && stride >= 0.4 && stride <= 1.5) {
+                          localStorage.setItem('customStrideLength', val);
+                          // Clear height when custom stride is set
+                          localStorage.removeItem('userHeight');
+                          alert('Custom stride length saved!');
+                        } else {
+                          alert('Please enter a valid stride length between 0.4 and 1.5 meters');
+                        }
+                      }}
+                    >Save</button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Average: 0.76m (men), 0.66m (women)</p>
+                </div>
+              </div>
+            </div>
+            
             <div className="flex flex-col space-y-4">
               <Link 
                 to="/nwc" 
@@ -296,16 +378,16 @@ export const MenuBar = () => {
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 w-full bg-[#0a1525] py-2 z-40">
-        <div className="max-w-[375px] mx-auto">
-          <ul className="flex justify-around">
+        <div className="max-w-[500px] mx-auto px-2">
+          <ul className="flex justify-between">
             {menuItems.map((item) => (
-              <li key={item.name} className="text-center">
+              <li key={item.name} className="flex-1">
                 <Link 
                   to={item.path} 
-                  className={`flex flex-col items-center px-2 py-1 rounded-md ${location.pathname === item.path ? 'text-indigo-400' : 'text-gray-400'}`}
+                  className={`flex flex-col items-center justify-center px-1 py-1 rounded-md h-full ${location.pathname === item.path ? 'text-indigo-400' : 'text-gray-400'}`}
                 >
                   {item.icon}
-                  <span className="text-xs font-medium tracking-wider">{item.name}</span>
+                  <span className="text-xs font-medium tracking-wider text-center whitespace-nowrap">{item.name}</span>
                 </Link>
               </li>
             ))}
