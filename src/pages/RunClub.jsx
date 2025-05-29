@@ -5,7 +5,7 @@ import { useRunFeed } from '../hooks/useRunFeed';
 import { usePostInteractions } from '../hooks/usePostInteractions';
 import { PostList } from '../components/PostList';
 import { handleAppBackground } from '../utils/nostr';
-import './RunClub.css';
+import '../components/RunClub.css';
 
 export const RunClub = () => {
   const { defaultZapAmount } = useContext(NostrContext);
