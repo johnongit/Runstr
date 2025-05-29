@@ -1,97 +1,95 @@
-import { useContext } from 'react';
-import { WalletContext } from '../contexts/WalletContext';
-import { useActivityFeed } from '../hooks/useActivityFeed';
-import { ActivityCard } from '../components/ActivityCard';
+import { useEffect, useContext, useState } from 'react';
+import { NostrContext } from '../contexts/NostrContext';
+import { WalletContext } from '../contexts/WalletContext.jsx';
+import { useRunFeed } from '../hooks/useRunFeed';
+import { usePostInteractions } from '../hooks/usePostInteractions';
+import { PostList } from '../components/PostList';
+import { handleAppBackground } from '../utils/nostr';
 import './RunClub.css';
 
 export const RunClub = () => {
+  const { defaultZapAmount } = useContext(NostrContext);
   const { wallet } = useContext(WalletContext);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // Feed hook
   const {
-    activities,
+    posts,
+    setPosts,
     loading,
     error,
     userLikes,
+    setUserLikes,
     userReposts,
+    setUserReposts,
+    loadSupplementaryData,
+    loadMorePosts,
+    fetchRunPostsViaSubscription,
+    loadedSupplementaryData
+  } = useRunFeed();
+  
+  // Interaction hook
+  const {
+    commentText,
+    setCommentText,
+    handleCommentClick,
     handleLike,
     handleRepost,
     handleZap,
-    handleComment,
-    refreshFeed
-  } = useActivityFeed();
-  
-  if (loading && activities.length === 0) {
-    return (
-      <div className="run-club-container">
-        <div className="feed-header">
-          <h2>RUNSTR FEED</h2>
-        </div>
-        <div className="loading-container">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-          </div>
-          <p>Loading activities...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  if (error && activities.length === 0) {
-    return (
-      <div className="run-club-container">
-        <div className="feed-header">
-          <h2>RUNSTR FEED</h2>
-        </div>
-        <div className="error-container">
-          <p>Failed to load activities</p>
-          <button onClick={refreshFeed} className="retry-button">
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-  
+    handleComment
+  } = usePostInteractions({
+    posts,
+    setPosts,
+    setUserLikes,
+    setUserReposts,
+    loadSupplementaryData,
+    loadedSupplementaryData,
+    defaultZapAmount
+  });
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      handleAppBackground();
+    };
+  }, []);
+
+  // Refresh feed helper
+  const refreshFeed = () => {
+    if (loading || isRefreshing) return;
+    setIsRefreshing(true);
+    fetchRunPostsViaSubscription().finally(() => setTimeout(() => setIsRefreshing(false), 500));
+  };
+
   return (
     <div className="run-club-container">
-      <div className="feed-header">
+      <div className="feed-header-static">
         <h2>RUNSTR FEED</h2>
-        <button 
-          onClick={refreshFeed} 
-          className="refresh-button"
-          disabled={loading}
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
       </div>
-      
-      <div className="activities-list">
-        {activities.length === 0 ? (
-          <div className="empty-feed">
-            <p>No activities yet. Be the first to post!</p>
-          </div>
-        ) : (
-          activities.map(activity => (
-            <ActivityCard
-              key={activity.id}
-              activity={activity}
-              isLiked={userLikes.has(activity.id)}
-              isReposted={userReposts.has(activity.id)}
-              onLike={handleLike}
-              onRepost={handleRepost}
-              onZap={handleZap}
-              onComment={handleComment}
-              wallet={wallet}
-            />
-          ))
-        )}
-      </div>
-      
-      {loading && activities.length > 0 && (
-        <div className="loading-more">
-          <div className="spinner-small"></div>
-          <span>Loading more...</span>
+
+      {loading && posts.length === 0 ? (
+        <div className="loading-indicator"><p>Loading posts...</p></div>
+      ) : error ? null : posts.length === 0 ? (
+        <div className="no-posts-message">
+          <p>No running posts found</p>
+          <button className="retry-button" onClick={refreshFeed}>Refresh</button>
         </div>
+      ) : (
+        <PostList
+          posts={posts}
+          loading={loading}
+          page={1}
+          userLikes={userLikes}
+          userReposts={userReposts}
+          handleLike={handleLike}
+          handleRepost={handleRepost}
+          handleZap={(post) => handleZap(post, wallet)}
+          handleCommentClick={handleCommentClick}
+          handleComment={handleComment}
+          commentText={commentText}
+          setCommentText={setCommentText}
+          wallet={wallet}
+        />
       )}
     </div>
   );
