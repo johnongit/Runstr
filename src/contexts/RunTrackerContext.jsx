@@ -1,9 +1,10 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { runTracker } from '../services/RunTracker';
 import { useActivityMode } from './ActivityModeContext';
 import { ACTIVITY_TYPES } from '../services/RunDataService';
 import { NostrContext } from './NostrContext';
+import { Pedometer } from '../services/PedometerService';
 
 // Create the context
 const RunTrackerContext = createContext(null);
@@ -25,6 +26,7 @@ export const useRunTracker = () => {
       splits: [],
       elevation: { current: null, gain: 0, loss: 0 },
       activityType: ACTIVITY_TYPES.RUN,
+      pedometerStatus: 'idle',
       startRun: () => console.warn('RunTracker not initialized'),
       pauseRun: () => console.warn('RunTracker not initialized'),
       resumeRun: () => console.warn('RunTracker not initialized'),
@@ -34,6 +36,9 @@ export const useRunTracker = () => {
   }
   return context;
 };
+
+// Add helper to check setting
+const isPedometerEnabled = () => localStorage.getItem('usePedometer') === 'true';
 
 // Provider component
 export const RunTrackerProvider = ({ children }) => {
@@ -53,7 +58,8 @@ export const RunTrackerProvider = ({ children }) => {
         currentSpeed: runTracker.currentSpeed || { value: 0, unit: 'km/h' },
         splits: runTracker.splits,
         elevation: runTracker.elevation,
-        activityType: runTracker.activityType || activityType
+        activityType: runTracker.activityType || activityType,
+        pedometerStatus: isPedometerEnabled() ? 'idle' : 'disabled'
       };
     } catch (error) {
       console.error('Error initializing run tracker state:', error);
@@ -67,10 +73,14 @@ export const RunTrackerProvider = ({ children }) => {
         currentSpeed: { value: 0, unit: activityType === ACTIVITY_TYPES.CYCLE ? (localStorage.getItem('distanceUnit') || 'km') === 'km' ? 'km/h' : 'mph' : 'km/h' },
         splits: [],
         elevation: { current: null, gain: 0, loss: 0, lastAltitude: null },
-        activityType: activityType
+        activityType: activityType,
+        pedometerStatus: isPedometerEnabled() ? 'idle' : 'disabled'
       };
     }
   });
+
+  // Add a ref for pedometer unsubscribe
+  const pedometerUnsubRef = useRef(null);
 
   // Listen for changes in the run tracker state
   useEffect(() => {
@@ -109,6 +119,39 @@ export const RunTrackerProvider = ({ children }) => {
           isTracking: runTracker.isTracking,
           isPaused: runTracker.isPaused
         }));
+
+        if (runTracker.isTracking && !runTracker.isPaused && isPedometerEnabled()) {
+          // Start pedometer if enabled by user, supported and not already listening
+          if (!Pedometer.listening && Pedometer.supported) {
+            Pedometer.start()
+              .then(() => {
+                setTrackingState(prev => ({ ...prev, pedometerStatus: 'tracking' }));
+                // Subscribe to step events
+                if (pedometerUnsubRef.current) pedometerUnsubRef.current();
+                pedometerUnsubRef.current = Pedometer.addListener((data) => {
+                  const steps = data.count ?? 0;
+                  // Update runTracker's estimatedSteps and emit event
+                  runTracker.estimatedSteps = steps;
+                  runTracker.emit('stepsChange', steps);
+                  setTrackingState(prev => ({ ...prev, estimatedSteps: steps }));
+                });
+              })
+              .catch(err => {
+                console.error('Could not start pedometer:', err);
+                setTrackingState(prev => ({ ...prev, pedometerStatus: 'error' }));
+              });
+          }
+        } else {
+          // Stop pedometer when run is stopped or pedometer disabled
+          if (Pedometer.listening) {
+            Pedometer.stop().catch(err => console.warn('Error stopping pedometer:', err));
+          }
+          if (pedometerUnsubRef.current) {
+            pedometerUnsubRef.current();
+            pedometerUnsubRef.current = null;
+          }
+          setTrackingState(prev => ({ ...prev, pedometerStatus: isPedometerEnabled() ? 'idle' : 'disabled', estimatedSteps: runTracker.estimatedSteps }));
+        }
       };
 
       // Handler for saving completed runs to localStorage
@@ -145,7 +188,8 @@ export const RunTrackerProvider = ({ children }) => {
             currentSpeed: runData.averageSpeed || { value: 0, unit: (runData.unit || localStorage.getItem('distanceUnit') || 'km') === 'km' ? 'km/h' : 'mph' },
             splits: runData.splits,
             elevation: runData.elevation,
-            activityType: runData.activityType || activityType
+            activityType: runData.activityType || activityType,
+            pedometerStatus: isPedometerEnabled() ? 'idle' : 'disabled'
           });
           
           // Restore tracking if active and not paused
@@ -203,6 +247,7 @@ export const RunTrackerProvider = ({ children }) => {
           splits: trackingState.splits,
           elevation: trackingState.elevation,
           activityType: trackingState.activityType,
+          pedometerStatus: trackingState.pedometerStatus,
           timestamp: new Date().getTime()
         };
         
@@ -240,11 +285,13 @@ export const RunTrackerProvider = ({ children }) => {
         currentSpeed: { value: 0, unit: activityType === ACTIVITY_TYPES.CYCLE ? (localStorage.getItem('distanceUnit') || 'km') === 'km' ? 'km/h' : 'mph' : 'km/h' },
         splits: [],
         elevation: { current: null, gain: 0, loss: 0, lastAltitude: null },
-        activityType: activityType
+        activityType: activityType,
+        pedometerStatus: isPedometerEnabled() ? 'starting' : 'disabled'
       });
     } catch (error) {
       console.error('Error starting run:', error);
       alert('Could not start tracking. Please check permissions and try again.');
+      setTrackingState(prev => ({ ...prev, pedometerStatus: 'error' }));
     }
   };
 
@@ -286,7 +333,8 @@ export const RunTrackerProvider = ({ children }) => {
         currentSpeed: { value: 0, unit: activityType === ACTIVITY_TYPES.CYCLE ? (localStorage.getItem('distanceUnit') || 'km') === 'km' ? 'km/h' : 'mph' : 'km/h' },
         splits: [],
         elevation: { current: null, gain: 0, loss: 0, lastAltitude: null },
-        activityType: activityType
+        activityType: activityType,
+        pedometerStatus: isPedometerEnabled() ? 'idle' : 'disabled'
       });
     }
   };
@@ -298,7 +346,8 @@ export const RunTrackerProvider = ({ children }) => {
     pauseRun,
     resumeRun,
     stopRun,
-    runTracker // Expose the original instance for advanced use cases
+    runTracker, // Expose the original instance for advanced use cases
+    pedometerStatus: trackingState.pedometerStatus
   };
 
   return (

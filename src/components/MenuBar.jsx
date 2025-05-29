@@ -313,6 +313,35 @@ export const MenuBar = () => {
                     <span className="px-2 bg-[#1a222e] text-gray-400">OR</span>
                   </div>
                 </div>
+
+                {/* NEW Pedometer Toggle */}
+                <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg mb-3">
+                  <span className="text-sm text-gray-400 mr-3">Use Device Step Counter</span>
+                  <div className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      id="pedometerToggle"
+                      defaultChecked={localStorage.getItem('usePedometer') === 'true'}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        localStorage.setItem('usePedometer', enabled ? 'true' : 'false');
+                        alert(`Device step counter ${enabled ? 'enabled' : 'disabled'}. This will take effect on your next walk.`);
+                      }}
+                    />
+                    <span className="toggle-slider"></span>
+                  </div>
+                </div>
+
+                {/* End Pedometer Toggle */}
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-600"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-[#1a222e] text-gray-400">OR</span>
+                  </div>
+                </div>
                 
                 <div>
                   <label htmlFor="strideInput" className="text-sm text-gray-400 block mb-1">

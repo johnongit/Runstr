@@ -73,7 +73,7 @@ const AchievementCard = () => {
               {!isAtCap ? (
                 <div className="tomorrow-reward">
                   <span className="reward-text">
-                    Run tomorrow (Day {tomorrowDay}) to earn {tomorrowReward} sats
+                    Run (Day {tomorrowDay}) to earn {tomorrowReward} sats
                   </span>
                 </div>
               ) : (
