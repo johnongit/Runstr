@@ -6,7 +6,7 @@ import { filterLocation } from '../utils/runCalculations';
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
 // Define average stride length for step estimation
-const AVERAGE_STRIDE_LENGTH_METERS = 0.762; // meters
+const AVERAGE_STRIDE_LENGTH_METERS = 0.73; // meters (adjusted from 0.762)
 
 // Helper function to estimate stride length based on height
 const estimateStrideLength = (heightCm) => {
@@ -622,13 +622,15 @@ class RunTracker extends EventEmitter {
     // First check if user has set a custom stride length
     const customStrideLength = parseFloat(localStorage.getItem('customStrideLength'));
     if (customStrideLength && customStrideLength > 0) {
-      return customStrideLength;
+      // UI for setting this is removed. To enforce default, we should make this function simply return AVERAGE_STRIDE_LENGTH_METERS
+      // return customStrideLength; 
     }
     
     // Otherwise, try to calculate from height
     const userHeight = parseFloat(localStorage.getItem('userHeight')); // in cm
     if (userHeight && userHeight > 0) {
-      return estimateStrideLength(userHeight);
+      // Similar to above, UI is removed. To enforce default:
+      // return estimateStrideLength(userHeight);
     }
     
     // Default to average if no custom settings

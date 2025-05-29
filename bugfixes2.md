@@ -122,35 +122,20 @@ This document tracks the progress and solutions for the identified issues. Solut
         *   Ensured text doesn't wrap on narrow screens
     *   These changes should fix the "DASHBOARD" text wrapping issue and prevent visual artifacts
 
-## 3. Step Counter - Count Accuracy
+## 3. Step Counter - Count Accuracy & UI Simplification
 
-*   **Description:** Multiple users report that the step counter is significantly inaccurate, undercounting by as much as 40%. For example, a user walked 7211 steps, but the app showed 4495.
-*   **Status:** In Progress
+*   **Description:** Users reported step counter inaccuracy. Also, a decision was made to simplify step estimation by removing custom height/stride inputs.
+*   **Status:** Completed (UI Removal & Default Adjustment)
+*   **Original Problem**: Step counter undercounting, complicated by user-configurable height/stride.
+*   **Solution Decided & Implemented**:
+    1.  **UI Removal**: Removed the input fields for user height and custom stride length from the Settings modal (`src/components/MenuBar.jsx`). Users can no longer set these.
+    2.  **Default Stride Adjustment**: Changed the hardcoded `AVERAGE_STRIDE_LENGTH_METERS` from `0.762` to `0.73` in both `src/pages/RunHistory.jsx` and `src/services/RunTracker.js`. Functions that previously used custom/height-based values now effectively default to this new average.
+*   **Impact**: This provides a simpler, consistent distance-based step estimation when the device pedometer is not used, with a slight general increase in reported steps compared to the old default.
+*   **Affected Files**: `src/components/MenuBar.jsx`, `src/pages/RunHistory.jsx`, `src/services/RunTracker.js`.
 *   **Progress:**
-    *   [x] Research step counting mechanisms on Android (SensorManager, step detector vs. step counter sensors).
-    *   [x] Review current step counting implementation in Runstr.
-    *   [x] Investigate potential issues: sensor batching, power-saving modes affecting sensor readings, algorithm sensitivity.
-    *   [x] Identify root cause: App uses fixed stride length (0.762m) for all users
-    *   [x] Implement height-based stride length calculation
-    *   [x] Add user settings for height and custom stride length
-    *   [ ] Test with different devices and walking patterns.
-    *   [ ] Consider implementing actual step sensor integration (future enhancement)
-*   **Details/Notes:**
-    *   Root cause identified: The app doesn't use actual step sensors, it estimates steps by dividing GPS distance by a fixed stride length (0.762m)
-    *   This is problematic because stride length varies by height, speed, and individual differences
-    *   For shorter users or those with shorter strides, this significantly undercounts steps
-*   **Implementation Details:**
-    *   Modified `RunTracker.js` to support customizable stride length
-    *   Added height-based stride length estimation using formula: Height (inches) × 0.414
-    *   Added settings UI in `MenuBar.jsx` for users to input:
-        *   Their height (cm) for automatic stride length calculation
-        *   OR a custom stride length (meters) for precise step counting
-    *   Updated `RunHistory.jsx` to use the same customizable stride length
-    *   Users can now get more accurate step counts based on their personal measurements
-*   **Future Enhancements:**
-    *   Consider integrating Android's TYPE_STEP_COUNTER sensor for actual step detection
-    *   Add automatic stride length calibration based on user's walking data
-    *   Support different stride lengths for walking vs running
+    *   [x] Remove Height/Stride UI from Settings.
+    *   [x] Update `AVERAGE_STRIDE_LENGTH_METERS` to 0.73 in relevant files.
+    *   [x] Ensure functions relying on custom inputs now use the new default.
 
 ## 4. Graphene - Location tracking
 

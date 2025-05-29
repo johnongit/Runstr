@@ -13,9 +13,11 @@ import { SaveRunExtrasModal } from '../components/SaveRunExtrasModal';
 import { rewardUserActivity } from '../services/rewardService';
 import { NostrContext } from '../contexts/NostrContext';
 
-const AVERAGE_STRIDE_LENGTH_METERS = 0.762; // average stride length
+const AVERAGE_STRIDE_LENGTH_METERS = 0.73; // average stride length (adjusted from 0.762)
 
 // Helper function to estimate stride length based on height
+// This function will now effectively always return AVERAGE_STRIDE_LENGTH_METERS
+// since userHeight and customStrideLength localStorage items are no longer set by UI.
 const estimateStrideLength = (heightCm) => {
   if (!heightCm || heightCm < 100 || heightCm > 250) {
     return AVERAGE_STRIDE_LENGTH_METERS;
@@ -23,18 +25,28 @@ const estimateStrideLength = (heightCm) => {
   const heightInches = heightCm / 2.54;
   const strideLengthInches = heightInches * 0.414;
   const strideLengthMeters = strideLengthInches * 0.0254;
-  return strideLengthMeters;
+  // Even if height was somehow set, we might want to ensure it doesn't override
+  // the new default approach if we are strictly moving away from height-based estimation.
+  // For now, leaving this part of the function as is, but its inputs from localStorage are gone.
+  return strideLengthMeters; 
 };
 
 // Get custom stride length from settings or calculate from height
+// This function will also now effectively always return AVERAGE_STRIDE_LENGTH_METERS
 const getCustomStrideLength = () => {
   const customStrideLength = parseFloat(localStorage.getItem('customStrideLength'));
   if (customStrideLength && customStrideLength > 0) {
-    return customStrideLength;
+    // UI for setting this is removed, but if old value exists, it might be used.
+    // To strictly enforce the new default, we could ignore this.
+    // For now, if an old value is there, it might still take precedence if not cleared.
+    // However, the intent is to move to the single default.
+    // To ensure the new default is used, we should make this function simply return AVERAGE_STRIDE_LENGTH_METERS
+    // return customStrideLength;
   }
   const userHeight = parseFloat(localStorage.getItem('userHeight'));
   if (userHeight && userHeight > 0) {
-    return estimateStrideLength(userHeight);
+    // Similar to above, UI is removed. To enforce default:
+    // return estimateStrideLength(userHeight);
   }
   return AVERAGE_STRIDE_LENGTH_METERS;
 };
