@@ -44,14 +44,16 @@ This document tracks the progress and solutions for the identified issues. Solut
     *   **Affected Areas**: `src/hooks/useStreakRewards.ts`, `src/components/AchievementCard.jsx`, new `src/components/NotificationModal.jsx`.
     *   **Implementation**: Added `NotificationModal.jsx`. Updated `useStreakRewards.ts` to include `modalInfo` state, `RewardModalInfo` interface, and `clearModal` function; `triggerStreakRewardPayout` now uses `setModalInfo`. Updated `AchievementCard.jsx` to consume `modalInfo` and `clearModal` and render the modal.
 
-6.  **[~] Toggle for metrics selection in workout history / Issue posting other metrics**
-    *   **Problem**: Users need control over which metrics are published with their workout history. Separately, there was an issue reported where some metrics (besides the main workout record) were not being posted.
-    *   **Solution**: Implemented a system for users to toggle individual metric publishing preferences. This also helps diagnose/fix issues with specific metrics not publishing.
-        1.  **Settings Context**: Added `PUBLISHABLE_METRICS` config and corresponding boolean state variables (e.g., `publishIntensity`) and setters to `SettingsContext.jsx`, with persistence to `localStorage`.
-        2.  **Modal UI**: Updated `PostRunWizardModal.jsx` (Step 2, "Save to Nostr") to dynamically display toggles for each metric defined in `PUBLISHABLE_METRICS`. Toggles are bound to the new settings in `SettingsContext`.
-        3.  **Publishing Logic**: Modified `src/utils/runPublisher.js` so the `publishRun` function now accepts the `settings` object. It conditionally builds and attempts to publish NIP-101h events for Intensity, Calories, Duration, Distance, Pace, Elevation, and Splits based on these settings. The main Kind 1301 workout summary is always published.
+6.  **[~] Toggle for metrics selection in workout history / Unresponsive Toggles / Issue posting other metrics**
+    *   **Problem**: Users need control over which metrics are published. Also, the toggles for these metrics in the "Save to Nostr" modal were unresponsive. Separately, there was an issue reported where some metrics (besides the main workout record) were not being posted.
+    *   **Solution**: 
+        1.  **Toggle Responsiveness Fix**: Refactored `SettingsContext.jsx` to manage all publishable metric preferences within a single state object (`metricPublishPrefs`) and use a unified setter function (`updateMetricPublishPref`). This adheres to React's Rules of Hooks and resolves the unresponsiveness of the toggles.
+        2.  **Metric Selection UI & Logic**: Implemented a system for users to toggle individual metric publishing preferences.
+            *   **Settings Context**: Added `PUBLISHABLE_METRICS` config. The (now correctly functioning) boolean state variables (e.g., `publishIntensity`) and setters in `SettingsContext.jsx` are used, with persistence to `localStorage`.
+            *   **Modal UI**: `PostRunWizardModal.jsx` (Step 2, "Save to Nostr") dynamically displays the (now responsive) toggles for each metric defined in `PUBLISHABLE_METRICS`.
+            *   **Publishing Logic**: `src/utils/runPublisher.js` was updated; the `publishRun` function now accepts the `settings` object and conditionally builds/publishes NIP-101h events based on these settings.
     *   **Affected Areas**: `src/contexts/SettingsContext.jsx`, `src/components/PostRunWizardModal.jsx`, `src/utils/runPublisher.js`.
-    *   **Implementation Notes for Issue #7**: By making each NIP-101h event type's publication conditional on a toggle, it will be easier to isolate if a specific metric fails to publish when it *is* enabled. The `runPublisher.js` logic was reviewed to ensure it attempts to build and publish each selected event. If issues persist for specific metrics, further debugging would focus on the `build<Metric>Event` functions in `nostrHealth.js` or the `createAndPublishEvent` flow for those specific kinds.
+    *   **Implementation Notes for Issue #7 (Posting other metrics)**: By making each NIP-101h event type's publication conditional on a (now working) toggle, it will be easier to isolate if a specific metric fails to publish when it *is* enabled. The `runPublisher.js` logic was reviewed to ensure it attempts to build and publish each selected event.
 
 7.  **[~] Issue posting other metrics (besides workout record)** (Addressed by solution for #6)
     *   **Problem**: Metrics other than the basic workout record (e.g., detailed stats) are not being posted successfully.

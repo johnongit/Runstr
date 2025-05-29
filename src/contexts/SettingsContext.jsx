@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { relays as defaultRelays } from '../config/relays.js';
 
@@ -39,12 +39,11 @@ export const useSettings = () => {
       setBlossomEndpoint: () => {},
       skipStartCountdown: false,
       setSkipStartCountdown: () => console.warn('Settings not initialized'),
-      // skipEndCountdown: false, // Removed as per previous bug fix
-      // setSkipEndCountdown: () => console.warn('Settings not initialized'),
     };
     PUBLISHABLE_METRICS.forEach(metric => {
-      fallbackSettings[`publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`] = metric.default;
-      fallbackSettings[`setPublish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`] = () => console.warn('Settings not initialized');
+      const keyName = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
+      fallbackSettings[keyName] = metric.default;
+      fallbackSettings[`set${keyName.charAt(0).toUpperCase() + keyName.slice(1)}`] = () => console.warn('Settings not initialized');
     });
     return fallbackSettings;
   }
@@ -74,17 +73,21 @@ export const SettingsProvider = ({ children }) => {
   const [privateRelayUrl, setPrivateRelayUrl] = useState(() => localStorage.getItem('privateRelayUrl') || '');
   const [blossomEndpoint, setBlossomEndpoint] = useState(() => localStorage.getItem('blossomEndpoint') || '');
   const [skipStartCountdown, setSkipStartCountdown] = useState(() => initBooleanState('skipStartCountdown', false));
-  // const [skipEndCountdown, setSkipEndCountdown] = useState(() => initBooleanState('skipEndCountdown', false)); // Removed
 
-  // Initialize states for publishable metrics
-  const metricStates = {};
-  PUBLISHABLE_METRICS.forEach(metric => {
-    const [state, setState] = useState(() => initBooleanState(`publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`, metric.default));
-    metricStates[`publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`] = state;
-    metricStates[`setPublish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`] = setState;
-  });
+  const initialMetricPrefs = PUBLISHABLE_METRICS.reduce((acc, metric) => {
+    const key = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
+    acc[key] = initBooleanState(key, metric.default);
+    return acc;
+  }, {});
+  const [metricPublishPrefs, setMetricPublishPrefs] = useState(initialMetricPrefs);
 
-  // Persist settings to localStorage
+  const updateMetricPublishPref = useCallback((metricSettingKey, value) => {
+    setMetricPublishPrefs(prevPrefs => ({
+      ...prevPrefs,
+      [metricSettingKey]: value,
+    }));
+  }, []);
+
   useEffect(() => localStorage.setItem('distanceUnit', distanceUnit), [distanceUnit]);
   useEffect(() => localStorage.setItem('calorieIntensityPref', calorieIntensityPref), [calorieIntensityPref]);
   useEffect(() => localStorage.setItem('healthEncryptionPrefIsPlaintext', (healthEncryptionPref === 'plaintext').toString()), [healthEncryptionPref]);
@@ -92,16 +95,16 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => localStorage.setItem('privateRelayUrl', privateRelayUrl), [privateRelayUrl]);
   useEffect(() => localStorage.setItem('blossomEndpoint', blossomEndpoint), [blossomEndpoint]);
   useEffect(() => localStorage.setItem('skipStartCountdown', skipStartCountdown.toString()), [skipStartCountdown]);
-  // useEffect(() => localStorage.setItem('skipEndCountdown', skipEndCountdown.toString()), [skipEndCountdown]); // Removed
 
-  PUBLISHABLE_METRICS.forEach(metric => {
-    const stateKey = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useEffect(() => {
-      localStorage.setItem(stateKey, metricStates[stateKey].toString());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [metricStates[stateKey], stateKey]); // stateKey added to dep array due to lint warning, though it's constant per metric
-  });
+  useEffect(() => {
+    try {
+      Object.entries(metricPublishPrefs).forEach(([key, value]) => {
+        localStorage.setItem(key, value.toString());
+      });
+    } catch (error) {
+      console.error('Error saving metric publish prefs:', error);
+    }
+  }, [metricPublishPrefs]);
 
   const toggleDistanceUnit = () => setDistanceUnit(prev => prev === 'km' ? 'mi' : 'km');
 
@@ -120,6 +123,13 @@ export const SettingsProvider = ({ children }) => {
     document.dispatchEvent(event);
   }, [healthEncryptionPref]);
 
+  const dynamicMetricSetters = PUBLISHABLE_METRICS.reduce((acc, metric) => {
+    const key = metric.key.charAt(0).toUpperCase() + metric.key.slice(1);
+    const fullKey = `publish${key}`;
+    acc[`setPublish${key}`] = (value) => updateMetricPublishPref(fullKey, value);
+    return acc;
+  }, {});
+
   const providerValue = {
     distanceUnit,
     setDistanceUnit,
@@ -137,9 +147,8 @@ export const SettingsProvider = ({ children }) => {
     setBlossomEndpoint,
     skipStartCountdown,
     setSkipStartCountdown,
-    // skipEndCountdown, // Removed
-    // setSkipEndCountdown, // Removed
-    ...metricStates
+    ...metricPublishPrefs,
+    ...dynamicMetricSetters
   };
 
   return (
