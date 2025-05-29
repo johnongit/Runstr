@@ -1,6 +1,52 @@
-# Bug Fixes (Batch 2)
+# Runstr App Bugfixes & Improvements (Round 2)
 
-This document tracks the progress of fixing a series of identified bugs. We will address them in order of estimated complexity, from easiest to hardest.
+This document tracks the progress and solutions for the identified issues. Solutions should prioritize simplicity and leverage existing application components and patterns, avoiding unnecessary complexity or code duplication.
+
+## Issues (Ordered Easiest to Hardest Estimate)
+
+1.  **[ ] Workout record shows 2 dates**
+    *   **Problem**: The workout record display shows two dates; the top one is redundant.
+    *   **Solution**: Remove the top, superfluous date from the UI.
+    *   **Affected Areas**: UI component for workout record display.
+
+2.  **[ ] Settings modal: "skip countdown" toggle not working**
+    *   **Problem**: The toggle switch for the "skip countdown" option in the settings modal is not functional.
+    *   **Solution**: Debug and fix the state management or event handling for this toggle.
+    *   **Affected Areas**: Settings modal component, state management for user settings.
+
+3.  **[ ] Dashboard: Incorrect sats display for run day streaks**
+    *   **Problem**: The dashboard shows "Run day 2 to earn 100 sats". It should be:
+        *   Day 2: 200 sats
+        *   Day 3: 300 sats
+        *   Day 4: 400 sats
+        *   Day 5: 500 sats
+    *   **Solution**: Update the displayed text and ensure the underlying logic (if any for display purposes) reflects these corrected amounts.
+    *   **Affected Areas**: Dashboard UI component, potentially reward display logic.
+
+4.  **[ ] Personal best is wrong**
+    *   **Problem**: The displayed personal best metrics are incorrect.
+    *   **Solution**: Investigate the source of the personal best data, how it's calculated/retrieved, and correct the logic or display.
+    *   **Affected Areas**: Personal best calculation logic, data storage/retrieval for activities, UI component displaying personal bests.
+
+5.  **[ ] Missing reward notification modal**
+    *   **Problem**: Users receive rewards for streaks but do not get an in-app notification modal confirming the reward.
+    *   **Solution**: Implement a notification modal that appears when a user earns rewards.
+    *   **Affected Areas**: Reward processing logic, UI notification system.
+
+6.  **[ ] Toggle for metrics selection in workout history**
+    *   **Problem**: Users need a way to select which specific metrics (e.g., pace, distance, heart rate if available) are sent with their workout history package.
+    *   **Solution**: Add toggles in user settings for individual metrics and modify the workout data packaging logic to respect these preferences.
+    *   **Affected Areas**: Settings UI, user preferences state, Nostr event creation logic for workout history.
+
+7.  **[ ] Issue posting other metrics (besides workout record)**
+    *   **Problem**: Metrics other than the basic workout record (e.g., detailed stats) are not being posted successfully.
+    *   **Solution**: Debug the process of collecting, formatting, and publishing these additional metrics via Nostr.
+    *   **Affected Areas**: Data collection for workouts, Nostr event creation for various metric types, relay publishing mechanism.
+
+8.  **[ ] Lightning address fallback for rewards**
+    *   **Problem**: There's no option for users to provide a fallback Lightning address if zaps fail. The reliability of fetching profile information from multiple relays to find a zap address is also a concern.
+    *   **Solution**: Add an input field in settings for a fallback Lightning address. Modify the reward payout logic to attempt zapping first, then use the fallback address if zapping isn't possible or profile information is insufficient.
+    *   **Affected Areas**: User settings UI, user profile data, reward payout logic, Lightning payment integration.
 
 ## 1. Language for Rewards - Is confusing
 

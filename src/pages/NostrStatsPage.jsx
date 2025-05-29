@@ -179,7 +179,6 @@ const NostrStatsPage = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     {/* <p className="text-sm text-gray-400">ID: {event.id.substring(0, 10)}... (Kind 1301)</p> */}
-                    <p className="text-lg font-semibold">{workoutName}</p>
                     <p className="text-gray-300">Date: {workoutDate}</p>
                   </div>
                   {/* Action buttons can go here later if needed (re-publish, etc.) */}
