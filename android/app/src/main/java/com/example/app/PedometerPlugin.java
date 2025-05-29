@@ -19,7 +19,6 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-import com.getcapacitor.annotation.PermissionState;
 
 @CapacitorPlugin(
     name = "Pedometer",
@@ -74,7 +73,7 @@ public class PedometerPlugin extends Plugin implements SensorEventListener {
 
     @PermissionCallback
     private void permissionCallback(PluginCall call) {
-        if (getPermissionState("activityRecognition") == PermissionState.GRANTED) {
+        if ("granted".equals(getPermissionState("activityRecognition"))) {
             startTracking(call);
         } else {
             call.reject("Permission denied for activity recognition.");

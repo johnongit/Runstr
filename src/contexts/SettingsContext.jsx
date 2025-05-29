@@ -25,7 +25,11 @@ export const useSettings = () => {
       privateRelayUrl: '',
       setPrivateRelayUrl: () => {},
       blossomEndpoint: '',
-      setBlossomEndpoint: () => {}
+      setBlossomEndpoint: () => {},
+      skipStartCountdown: false,
+      setSkipStartCountdown: () => console.warn('Settings not initialized'),
+      skipEndCountdown: false,
+      setSkipEndCountdown: () => console.warn('Settings not initialized')
     };
   }
   return context;
@@ -95,6 +99,24 @@ export const SettingsProvider = ({ children }) => {
     }
   });
 
+  const [skipStartCountdown, setSkipStartCountdown] = useState(() => {
+    try {
+      return localStorage.getItem('skipStartCountdown') === 'true';
+    } catch (error) {
+      console.error('Error initializing skipStartCountdown state:', error);
+      return false;
+    }
+  });
+
+  const [skipEndCountdown, setSkipEndCountdown] = useState(() => {
+    try {
+      return localStorage.getItem('skipEndCountdown') === 'true';
+    } catch (error) {
+      console.error('Error initializing skipEndCountdown state:', error);
+      return false;
+    }
+  });
+
   // Persist the above three values when they change
   useEffect(() => {
     localStorage.setItem('publishMode', publishMode);
@@ -107,6 +129,22 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('blossomEndpoint', blossomEndpoint);
   }, [blossomEndpoint]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('skipStartCountdown', skipStartCountdown.toString());
+    } catch (error) {
+      console.error('Error saving skipStartCountdown:', error);
+    }
+  }, [skipStartCountdown]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('skipEndCountdown', skipEndCountdown.toString());
+    } catch (error) {
+      console.error('Error saving skipEndCountdown:', error);
+    }
+  }, [skipEndCountdown]);
 
   // Toggle between km and mi units
   const toggleDistanceUnit = () => {
@@ -168,7 +206,11 @@ export const SettingsProvider = ({ children }) => {
       privateRelayUrl,
       setPrivateRelayUrl,
       blossomEndpoint,
-      setBlossomEndpoint
+      setBlossomEndpoint,
+      skipStartCountdown,
+      setSkipStartCountdown,
+      skipEndCountdown,
+      setSkipEndCountdown
     }}>
       {children}
     </SettingsContext.Provider>

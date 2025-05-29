@@ -13,7 +13,9 @@ export const MenuBar = () => {
     distanceUnit, toggleDistanceUnit,
     healthEncryptionPref, setHealthEncryptionPref,
     publishMode, setPublishMode,
-    privateRelayUrl, setPrivateRelayUrl
+    privateRelayUrl, setPrivateRelayUrl,
+    skipStartCountdown, setSkipStartCountdown,
+    skipEndCountdown, setSkipEndCountdown
   } = useSettings();
 
   const menuItems = [
@@ -141,6 +143,43 @@ export const MenuBar = () => {
               <p className="text-sm text-gray-400 mt-2">
                 Currently tracking: {getActivityText()}
               </p>
+            </div>
+            
+            {/* Run Behavior Section - NEW */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold mb-3">Run Behavior</h4>
+              <div className="bg-[#111827] p-3 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-400 mr-3">Skip Start Countdown</span>
+                  <div className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      id="skipStartCountdownToggleModal"
+                      checked={skipStartCountdown}
+                      onChange={(e) => setSkipStartCountdown(e.target.checked)}
+                    />
+                    <span className="toggle-slider"></span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Start the run immediately when you tap "Start Run".
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-400 mr-3">Skip End Countdown</span>
+                  <div className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      id="skipEndCountdownToggleModal"
+                      checked={skipEndCountdown}
+                      onChange={(e) => setSkipEndCountdown(e.target.checked)}
+                    />
+                    <span className="toggle-slider"></span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  End the run immediately when you tap "Stop Run".
+                </p>
+              </div>
             </div>
             
             {/* Distance Unit Section */}

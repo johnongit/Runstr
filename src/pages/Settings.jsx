@@ -18,7 +18,11 @@ const Settings = () => {
     privateRelayUrl,
     setPrivateRelayUrl,
     blossomEndpoint,
-    setBlossomEndpoint
+    setBlossomEndpoint,
+    // skipStartCountdown,
+    // setSkipStartCountdown,
+    // skipEndCountdown,
+    // setSkipEndCountdown
   } = useSettings();
   
   const [showPaceInMinutes, setShowPaceInMinutes] = useState(true);

@@ -33,7 +33,7 @@ export const RunTracker = () => {
   } = useRunTracker();
 
   const { getActivityText, mode } = useActivityMode();
-  const { distanceUnit } = useSettings();
+  const { distanceUnit, skipStartCountdown, skipEndCountdown } = useSettings();
   const { publicKey, lightningAddress } = useContext(NostrContext);
 
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -219,8 +219,12 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     const permissionsGranted = localStorage.getItem('permissionsGranted');
     
     if (permissionsGranted === 'true') {
-      // If permissions already granted, start the countdown
-      startCountdown('start');
+      // If permissions already granted, start the countdown or run directly
+      if (skipStartCountdown) {
+        startRun();
+      } else {
+        startCountdown('start');
+      }
     } else {
       // If permissions haven't been granted yet, show a message
       alert('Location permission is required for tracking. Please restart the app to grant permissions.');
@@ -550,7 +554,13 @@ ${additionalContent ? `\n${additionalContent}` : ''}
           )}
           <button 
             className="bg-red-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 ml-2 font-semibold"
-            onClick={() => startCountdown('stop')}
+            onClick={() => {
+              if (skipEndCountdown) {
+                stopRun();
+              } else {
+                startCountdown('stop');
+              }
+            }}
           >
             Stop
           </button>
