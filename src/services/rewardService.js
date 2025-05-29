@@ -169,7 +169,15 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
 
     let zapRequestEvent = {
       kind: 9734,
-      pubkey: runstrRewardWallet.pubKey || getPublicKey(runstrRewardWallet.secretKey),
+      pubkey: runstrRewardWallet.pubKey || (() => {
+        if (runstrRewardWallet.secretKey) {
+          const skHex = Array.from(runstrRewardWallet.secretKey)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+          return getPublicKey(skHex);
+        }
+        return undefined;
+      })(),
       created_at: Math.floor(Date.now() / 1000),
       content: message,
       tags: [
@@ -183,7 +191,11 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
       if (runstrRewardWallet.provider && typeof runstrRewardWallet.provider.signEvent === 'function') {
         zapRequestEvent = await runstrRewardWallet.provider.signEvent(zapRequestEvent);
       } else if (runstrRewardWallet.secretKey) {
-        zapRequestEvent = finalizeEvent(zapRequestEvent, runstrRewardWallet.secretKey);
+        // nostr-tools finaliseEvent expects a hex encoded private key string
+        const skHex = Array.from(runstrRewardWallet.secretKey)
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+        zapRequestEvent = finalizeEvent(zapRequestEvent, skHex);
       }
     } catch (signErr) {
       console.warn('[RewardService] Could not sign zap request, proceeding unsigned', signErr);

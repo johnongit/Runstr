@@ -41,12 +41,12 @@ const Wallet = safeLazy(() => import('./pages/Wallet'), 'Wallet');
 const Music = safeLazy(() => import('./pages/Music'), 'Music');
 const NWC = safeLazy(() => import('./pages/NWC'), 'NWC');
 const Goals = safeLazy(() => import('./pages/Goals'), 'Goals');
+const Teams = safeLazy(() => import('./pages/Teams'), 'Teams');
 const TeamDetail = safeLazy(() => import('./pages/TeamDetail'), 'TeamDetail');
 const Events = safeLazy(() => import('./pages/Events'), 'Events');
 const EventDetail = safeLazy(() => import('./pages/EventDetail'), 'EventDetail');
 const Profile = safeLazy(() => import('./pages/Profile'), 'Profile');
 const About = safeLazy(() => import('./pages/About'), 'About');
-const GroupDiscoveryScreen = safeLazy(() => import('./components/GroupDiscoveryScreen'), 'GroupDiscoveryScreen');
 const NostrStatsPage = safeLazy(() => import('./pages/NostrStatsPage'), 'NostrStatsPage');
 
 // Loading component to show while lazy loading
@@ -90,7 +90,7 @@ const AppRoutes = () => {
         <Route path="/about" element={<About />} />
         
         {/* Teams routes */}
-        <Route path="/teams" element={<GroupDiscoveryScreen />} />
+        <Route path="/teams" element={<Teams />} />
         <Route path="/teams/:teamId" element={<TeamDetail />} />
         
         <Route path="/nostr-stats" element={<NostrStatsPage />} />

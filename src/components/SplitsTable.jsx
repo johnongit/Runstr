@@ -78,9 +78,15 @@ const SplitsTable = ({ splits, distanceUnit = 'km' }) => {
                 const prevSplitTime = index > 0 ? splits[index - 1].time : 0;
                 splitTime = split.time - prevSplitTime;
                 
-                // Calculate the pace based on the individual split time
-                // For a standard unit (1km or 1mi), pace is just the time it took to complete that unit
-                paceMinutes = splitTime / 60; // Convert seconds to minutes
+                // Use the pre-calculated pace from the split object (it's in seconds/meter)
+                // Convert s/m to min/km or min/mi for formatPace function
+                if (split.pace && split.pace > 0) { // Ensure split.pace is valid
+                  const metersPerUnit = distanceUnit === 'km' ? 1000 : 1609.344;
+                  paceMinutes = (split.pace * metersPerUnit) / 60;
+                } else {
+                  // Fallback if split.pace is not valid, though this shouldn't happen with RunTracker.js logic
+                  paceMinutes = splitTime > 0 ? (splitTime / 60) : 0; 
+                }
               } else {
                 // For splits from runCalculations
                 splitTime = split.duration; // duration is already in seconds

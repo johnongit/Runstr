@@ -725,9 +725,23 @@ export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null
         publishResult.method = 'ndk';
         return { ...signedEvent, ...publishResult };
       }
+      // If NDK failed AND a specific relay list was provided, do NOT fallback.
+      // Throw an error indicating failure to publish to the specified relays.
+      if (opts.relays && Array.isArray(opts.relays) && opts.relays.length > 0) {
+        const specificRelayMessage = `Failed to publish to the specified relay(s): ${opts.relays.join(', ')}. Please check the relay URL and connection.`;
+        console.error(specificRelayMessage, ndkResult.error);
+        throw new Error(specificRelayMessage);
+      }
     } catch (ndkError) {
       console.error('Error in NDK publishing:', ndkError);
-      // Continue to fallback
+      // If a specific relay list was provided, and an error occurred within the NDK block (e.g., NDK not ready)
+      // we should also prevent fallback and re-throw or throw a specific error.
+      if (opts.relays && Array.isArray(opts.relays) && opts.relays.length > 0) {
+        const specificRelayMessage = `Error publishing to the specified relay(s): ${opts.relays.join(', ')}. ${ndkError.message}`;
+        console.error(specificRelayMessage);
+        throw new Error(specificRelayMessage);
+      }
+      // Otherwise, if no specific relays, allow progression to fallback.
     }
     
     // APPROACH 2: Fallback to nostr-tools if NDK failed
