@@ -168,8 +168,15 @@ const NostrStatsPage = () => {
               elevVal = `${elevationGainTagValues[0][0]} ${elevationGainTagValues[0][1]}`;
             }
 
-            const workoutDate = new Date(event.created_at * 1000)
-              .toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            const workoutDateTime = new Date(event.created_at * 1000)
+              .toLocaleString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              });
             const workoutContent = event.content;
 
             const currentDetailedMets = detailedMetrics[event.id];
@@ -179,7 +186,7 @@ const NostrStatsPage = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     {/* <p className="text-sm text-gray-400">ID: {event.id.substring(0, 10)}... (Kind 1301)</p> */}
-                    <p className="text-gray-300">Date: {workoutDate}</p>
+                    <p className="text-gray-300">Date: {workoutDateTime}</p>
                   </div>
                   {/* Action buttons can go here later if needed (re-publish, etc.) */}
                 </div>
