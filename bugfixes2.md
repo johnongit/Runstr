@@ -26,15 +26,23 @@ This document tracks the progress and solutions for the identified issues. Solut
     *   **Affected Areas**: `src/components/AchievementCard.jsx`, `src/config/rewardsConfig.ts` (for reference of `satsPerDay`)
     *   **Implementation**: Changed `tomorrowReward` calculation from `satsPerDay` to `(tomorrowDay * satsPerDay)`.
 
-4.  **[ ] Personal best is wrong**
-    *   **Problem**: The displayed personal best metrics are incorrect.
-    *   **Solution**: Investigate the source of the personal best data, how it's calculated/retrieved, and correct the logic or display.
-    *   **Affected Areas**: Personal best calculation logic, data storage/retrieval for activities, UI component displaying personal bests.
+4.  **[~] Personal best is wrong**
+    *   **Problem**: The displayed personal best metrics are incorrect (e.g., a 5k run in 25:21 was not updating a PB of 40:23). The previous logic incorrectly used the overall average pace of any qualifying run to extrapolate PB times, rather than using the actual time for the specific distance or the run's total time if it matched the PB distance.
+    *   **Solution**: Modified the personal best calculation in `src/hooks/useRunStats.js` for 5k, 10k, half marathon, and marathon.
+        *   If a run's total distance is approximately the benchmark distance (e.g., 4.95km-5.05km for a 5k), the run's actual total duration is now used as the potential PB.
+        *   If a run is longer than the benchmark distance (plus a small tolerance), the logic falls back to extrapolating the PB time from the run's overall average pace (this is less accurate for PBs achieved as splits in longer runs but retained as a fallback).
+    *   **Affected Areas**: `src/hooks/useRunStats.js`
+    *   **Implementation**: Updated the conditional logic for calculating `newStats.personalBests` for '5k', '10k', 'halfMarathon', and 'marathon' to check if the `run.distance` is within a tolerance band for the specific PB distance. If so, `run.duration / 60` is used; otherwise, the pace-extrapolated time is used.
 
-5.  **[ ] Missing reward notification modal**
+5.  **[~] Missing reward notification modal**
     *   **Problem**: Users receive rewards for streaks but do not get an in-app notification modal confirming the reward.
-    *   **Solution**: Implement a notification modal that appears when a user earns rewards.
-    *   **Affected Areas**: Reward processing logic, UI notification system.
+    *   **Solution**: Implemented a notification modal system.
+        1.  Created a reusable `NotificationModal.jsx` component.
+        2.  Modified the `useStreakRewards` hook (`src/hooks/useStreakRewards.ts`) to manage state (`modalInfo`) for this modal's content and visibility.
+        3.  When a streak reward payout is processed (success or failure), `useStreakRewards` now updates `modalInfo` to trigger the modal with relevant details, replacing the previous `alert`/`toast` messages.
+        4.  The `AchievementCard.jsx` component, which uses `useStreakRewards`, now imports and renders `NotificationModal`, passing the necessary props from the hook.
+    *   **Affected Areas**: `src/hooks/useStreakRewards.ts`, `src/components/AchievementCard.jsx`, new `src/components/NotificationModal.jsx`.
+    *   **Implementation**: Added `NotificationModal.jsx`. Updated `useStreakRewards.ts` to include `modalInfo` state, `RewardModalInfo` interface, and `clearModal` function; `triggerStreakRewardPayout` now uses `setModalInfo`. Updated `AchievementCard.jsx` to consume `modalInfo` and `clearModal` and render the modal.
 
 6.  **[ ] Toggle for metrics selection in workout history**
     *   **Problem**: Users need a way to select which specific metrics (e.g., pace, distance, heart rate if available) are sent with their workout history package.

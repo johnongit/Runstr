@@ -141,32 +141,60 @@ export const useRunStats = (runHistory, userProfile) => {
           const distanceInKm = run.distance / 1000;
           
           // 5K
-          if (distanceInKm >= 5) {
-            const timeFor5K = (5 * paceInMinutes); // minutes
+          if (distanceInKm >= 4.95 && distanceInKm < 5.05) { // Capture runs that are essentially 5km long
+            const actualTimeFor5K = run.duration / 60; // run.duration is in seconds, convert to minutes
+            if (actualTimeFor5K < newStats.personalBests['5k'] || newStats.personalBests['5k'] === 99999) {
+              newStats.personalBests['5k'] = actualTimeFor5K;
+            }
+          } else if (distanceInKm >= 5.05) { // For runs longer than 5km, use pace extrapolation (less accurate)
+            const timeFor5K = (5 * paceInMinutes); // paceInMinutes is already minutes per unit_distance
             if (timeFor5K < newStats.personalBests['5k'] || newStats.personalBests['5k'] === 99999) {
               newStats.personalBests['5k'] = timeFor5K;
             }
           }
           
           // 10K
-          if (distanceInKm >= 10) {
+          const tenKLowerBound = 9.9;
+          const tenKUpperBound = 10.1;
+          if (distanceInKm >= tenKLowerBound && distanceInKm < tenKUpperBound) {
+            const actualTimeFor10K = run.duration / 60; // minutes
+            if (actualTimeFor10K < newStats.personalBests['10k'] || newStats.personalBests['10k'] === 99999) {
+              newStats.personalBests['10k'] = actualTimeFor10K;
+            }
+          } else if (distanceInKm >= tenKUpperBound) { // For runs longer
             const timeFor10K = (10 * paceInMinutes); // minutes
             if (timeFor10K < newStats.personalBests['10k'] || newStats.personalBests['10k'] === 99999) {
               newStats.personalBests['10k'] = timeFor10K;
             }
           }
           
-          // Half Marathon (21.1km)
-          if (distanceInKm >= 21.1) {
-            const timeForHalfMarathon = (21.1 * paceInMinutes); // minutes
+          // Half Marathon (21.0975km, using 21.1km for multiplication)
+          const hmLowerBound = 20.9;
+          const hmUpperBound = 21.3;
+          const hmTargetDist = 21.1; // Using 21.1 for pace extrapolation consistency
+          if (distanceInKm >= hmLowerBound && distanceInKm < hmUpperBound) {
+            const actualTimeForHM = run.duration / 60; // minutes
+            if (actualTimeForHM < newStats.personalBests['halfMarathon'] || newStats.personalBests['halfMarathon'] === 99999) {
+              newStats.personalBests['halfMarathon'] = actualTimeForHM;
+            }
+          } else if (distanceInKm >= hmUpperBound) { // For runs longer
+            const timeForHalfMarathon = (hmTargetDist * paceInMinutes); // minutes
             if (timeForHalfMarathon < newStats.personalBests['halfMarathon'] || newStats.personalBests['halfMarathon'] === 99999) {
               newStats.personalBests['halfMarathon'] = timeForHalfMarathon;
             }
           }
           
-          // Marathon (42.2km)
-          if (distanceInKm >= 42.2) {
-            const timeForMarathon = (42.2 * paceInMinutes); // minutes
+          // Marathon (42.195km, using 42.2km for multiplication)
+          const mLowerBound = 41.9;
+          const mUpperBound = 42.5; // Adjusted for a slightly wider tolerance
+          const mTargetDist = 42.2; // Using 42.2 for pace extrapolation consistency
+          if (distanceInKm >= mLowerBound && distanceInKm < mUpperBound) {
+            const actualTimeForM = run.duration / 60; // minutes
+            if (actualTimeForM < newStats.personalBests['marathon'] || newStats.personalBests['marathon'] === 99999) {
+              newStats.personalBests['marathon'] = actualTimeForM;
+            }
+          } else if (distanceInKm >= mUpperBound) { // For runs longer
+            const timeForMarathon = (mTargetDist * paceInMinutes); // minutes
             if (timeForMarathon < newStats.personalBests['marathon'] || newStats.personalBests['marathon'] === 99999) {
               newStats.personalBests['marathon'] = timeForMarathon;
             }

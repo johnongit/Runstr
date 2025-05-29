@@ -2,6 +2,7 @@ import { useStreakRewards as useLinearStreakRewards } from '../hooks/useStreakRe
 import PropTypes from 'prop-types';
 import { useNostr } from '../hooks/useNostr';
 import { REWARDS } from '../config/rewardsConfig';
+import NotificationModal from './NotificationModal';
 // import AchievementModal from './AchievementModal';
 import '../assets/styles/achievements.css';
 
@@ -14,7 +15,8 @@ const AchievementCard = () => {
   const nostrContext = useNostr();
   const pubkey = nostrContext?.publicKey || null;
   
-  const { streakData, rewardState } = useLinearStreakRewards(pubkey);
+  // Get modalInfo and clearModal from the hook
+  const { streakData, rewardState, modalInfo, clearModal } = useLinearStreakRewards(pubkey);
   
   // Compute next milestone details from reward config
   const { satsPerDay, capDays } = REWARDS.STREAK;
@@ -33,70 +35,73 @@ const AchievementCard = () => {
   const isAtCap = currentDays >= capDays && streakData.lastRewardedDay >= capDays;
   
   return (
-    <div className="achievement-card modern">
-      {/*
-      <div className="achievement-header">
-        <h3>Achievements & Rewards</h3>
-        <button 
-          className="view-details-button"
-          onClick={() => setModalOpen(true)}
-        >
-          View Details
-          <span className="chevron-right">→</span>
-        </button>
-      </div>
-      */}
-      
-      <div className="achievement-content">
-        <div className="achievement-grid">
-          {/* Streak Card */}
-          <div className="achievement-item">
-            <div className="icon-container">
-              <span className="icon">🔥</span>
+    <>
+      <div className="achievement-card modern">
+        {/*
+        <div className="achievement-header">
+          <h3>Achievements & Rewards</h3>
+          <button 
+            className="view-details-button"
+            onClick={() => setModalOpen(true)}
+          >
+            View Details
+            <span className="chevron-right">→</span>
+          </button>
+        </div>
+        */}
+        
+        <div className="achievement-content">
+          <div className="achievement-grid">
+            {/* Streak Card */}
+            <div className="achievement-item">
+              <div className="icon-container">
+                <span className="icon">🔥</span>
+              </div>
+              <div className="item-details">
+                <span className="item-label">Current Streak</span>
+                <span className="item-value">{currentDays} {currentDays === 1 ? 'day' : 'days'}</span>
+              </div>
             </div>
-            <div className="item-details">
-              <span className="item-label">Current Streak</span>
-              <span className="item-value">{currentDays} {currentDays === 1 ? 'day' : 'days'}</span>
-            </div>
-          </div>
-          
-          {/* Reward Information */}
-          <div className="achievement-item full-width">
-            <div className="reward-info-container">
-              {todaysReward > 0 && (
-                <div className="today-reward">
-                  <span className="reward-label">Today's Reward (Day {currentDays})</span>
-                  <span className="reward-amount">{todaysReward} sats</span>
-                </div>
-              )}
-              
-              {!isAtCap ? (
-                <div className="tomorrow-reward">
-                  <span className="reward-text">
-                    Run (Day {tomorrowDay}) to earn {tomorrowReward} sats
-                  </span>
-                </div>
-              ) : (
-                <div className="reward-capped">
-                  <span className="reward-text">
-                    Maximum {capDays}-day reward reached! Keep the streak alive! 🔥
-                  </span>
-                </div>
-              )}
+            
+            {/* Reward Information */}
+            <div className="achievement-item full-width">
+              <div className="reward-info-container">
+                {todaysReward > 0 && (
+                  <div className="today-reward">
+                    <span className="reward-label">Today's Reward (Day {currentDays})</span>
+                    <span className="reward-amount">{todaysReward} sats</span>
+                  </div>
+                )}
+                
+                {!isAtCap ? (
+                  <div className="tomorrow-reward">
+                    <span className="reward-text">
+                      Run (Day {tomorrowDay}) to earn {tomorrowReward} sats
+                    </span>
+                  </div>
+                ) : (
+                  <div className="reward-capped">
+                    <span className="reward-text">
+                      Maximum {capDays}-day reward reached! Keep the streak alive! 🔥
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-      
-      {/*
-      {modalOpen && (
-        <AchievementModal 
-          onClose={() => setModalOpen(false)}
-          currentStreak={currentStreak}
+
+      {/* Render the NotificationModal */}
+      {modalInfo && modalInfo.isVisible && (
+        <NotificationModal
+          title={modalInfo.title}
+          message={modalInfo.message}
+          isVisible={modalInfo.isVisible}
+          onClose={clearModal} 
         />
       )}
-      */}
-    </div>
+    </>
   );
 };
 
