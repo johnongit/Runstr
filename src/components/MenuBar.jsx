@@ -164,21 +164,6 @@ export const MenuBar = () => {
                 <p className="text-xs text-gray-500">
                   Start the run immediately when you tap "Start Run".
                 </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400 mr-3">Skip End Countdown</span>
-                  <div className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      id="skipEndCountdownToggleModal"
-                      checked={skipEndCountdown}
-                      onChange={(e) => setSkipEndCountdown(e.target.checked)}
-                    />
-                    <span className="toggle-slider"></span>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500">
-                  End the run immediately when you tap "Stop Run".
-                </p>
               </div>
             </div>
             

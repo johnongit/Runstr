@@ -27,7 +27,7 @@ const AchievementCard = () => {
   // Calculate tomorrow's reward
   const tomorrowDay = Math.min(currentDays + 1, capDays);
   const tomorrowReward = tomorrowDay > streakData.lastRewardedDay ? 
-    satsPerDay : 0;
+    (tomorrowDay * satsPerDay) : 0;
   
   // Check if we're at the cap
   const isAtCap = currentDays >= capDays && streakData.lastRewardedDay >= capDays;

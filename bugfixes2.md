@@ -4,24 +4,27 @@ This document tracks the progress and solutions for the identified issues. Solut
 
 ## Issues (Ordered Easiest to Hardest Estimate)
 
-1.  **[ ] Workout record shows 2 dates**
-    *   **Problem**: The workout record display shows two dates; the top one is redundant.
-    *   **Solution**: Remove the top, superfluous date from the UI.
-    *   **Affected Areas**: UI component for workout record display.
+1.  **[~] Workout record shows 2 dates**
+    *   **Problem**: The workout record display shows two dates; the top one is redundant and incorrect.
+    *   **Solution**: The primary date displayed at the top of the workout card, which was derived from the `workoutName` variable (e.g., "5/28/2025 Run"), was incorrect. This line has been removed. The correct date, sourced from `event.created_at` (e.g., "Date: May 29, 2025"), remains.
+    *   **Affected Areas**: `src/pages/NostrStatsPage.jsx`
+    *   **Implementation**: Removed the `<p className="text-lg font-semibold">{workoutName}</p>` line from the component.
 
-2.  **[ ] Settings modal: "skip countdown" toggle not working**
-    *   **Problem**: The toggle switch for the "skip countdown" option in the settings modal is not functional.
-    *   **Solution**: Debug and fix the state management or event handling for this toggle.
-    *   **Affected Areas**: Settings modal component, state management for user settings.
+2.  **[~] Settings modal: "skip countdown" toggle not working**
+    *   **Problem**: The toggle switch for the "Skip End Countdown" option in the settings modal was not functional. The "Skip Start Countdown" toggle worked correctly.
+    *   **Solution**: As an immediate fix, the "Skip End Countdown" toggle and its associated descriptive text have been removed from the UI. The underlying cause was not immediately apparent as the code in `MenuBar.jsx` and `SettingsContext.jsx` appeared symmetrical for both start and end countdown toggles. Further investigation would be needed to fix the toggle itself.
+    *   **Affected Areas**: `src/components/MenuBar.jsx`
+    *   **Implementation**: Removed the JSX block for the "Skip End Countdown" toggle from `src/components/MenuBar.jsx`.
 
-3.  **[ ] Dashboard: Incorrect sats display for run day streaks**
+3.  **[~] Dashboard: Incorrect sats display for run day streaks**
     *   **Problem**: The dashboard shows "Run day 2 to earn 100 sats". It should be:
         *   Day 2: 200 sats
         *   Day 3: 300 sats
         *   Day 4: 400 sats
-        *   Day 5: 500 sats
-    *   **Solution**: Update the displayed text and ensure the underlying logic (if any for display purposes) reflects these corrected amounts.
-    *   **Affected Areas**: Dashboard UI component, potentially reward display logic.
+        *   Day 5: 500 sats (and so on, up to `capDays` from config, at 100 sats per day number).
+    *   **Solution**: Updated the calculation for `tomorrowReward` in `src/components/AchievementCard.jsx`.
+    *   **Affected Areas**: `src/components/AchievementCard.jsx`, `src/config/rewardsConfig.ts` (for reference of `satsPerDay`)
+    *   **Implementation**: Changed `tomorrowReward` calculation from `satsPerDay` to `(tomorrowDay * satsPerDay)`.
 
 4.  **[ ] Personal best is wrong**
     *   **Problem**: The displayed personal best metrics are incorrect.
