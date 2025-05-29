@@ -58,10 +58,12 @@ This document tracks the progress and solutions for the identified issues. Solut
     *   **Solution**: The changes for issue #6 (metric toggles) directly address this by ensuring the `runPublisher.js` attempts to publish each metric type only if its corresponding toggle is enabled. This clarifies the publishing flow for each metric, aiding in debugging any remaining individual metric publishing failures.
     *   **Affected Areas**: `src/utils/runPublisher.js`.
 
-8.  **[ ] Lightning address fallback for rewards**
-    *   **Problem**: There's no option for users to provide a fallback Lightning address if zaps fail. The reliability of fetching profile information from multiple relays to find a zap address is also a concern.
-    *   **Solution**: Add an input field in settings for a fallback Lightning address. Modify the reward payout logic to attempt zapping first, then use the fallback address if zapping isn't possible or profile information is insufficient.
-    *   **Affected Areas**: User settings UI, user profile data, reward payout logic, Lightning payment integration.
+8.  **[~] Lightning address fallback for rewards / Reward sending reliability**
+    *   **Problem**: Users may not always receive Zap rewards due to difficulties in fetching their Lightning Address from Nostr profiles, or their profile might not be on the relays the app queries. A fallback LN address in settings was requested, but improving current discovery is a priority.
+    *   **Solution (Initial step - Enhanced Profile Discovery)**: Investigated the reward payout process. The NDK instance (`src/lib/ndkSingleton.js`) was found to use a fixed list of explicit relays from `src/config/relays.js` for all fetches, including profile (kind 0) lookups. To improve the chances of finding user profiles (and thus their `lud16`/`lud06` for Zaps), `wss://cache.primal.net` (a broad profile cache relay) has been added to this default relay list.
+    *   **Affected Areas**: `src/config/relays.js` (primary change), indirectly affects `src/utils/nostr.js` (profile fetching) and `src/services/rewardService.js` (zap sending).
+    *   **Implementation**: Added `wss://cache.primal.net` to the `relays` array in `src/config/relays.js`.
+    *   **Next Steps (if issues persist)**: If reward delivery is still inconsistent, implementing the user-specified fallback Lightning Address in settings would be the next logical step.
 
 ## 1. Language for Rewards - Is confusing
 
