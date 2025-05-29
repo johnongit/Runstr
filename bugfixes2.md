@@ -44,15 +44,19 @@ This document tracks the progress and solutions for the identified issues. Solut
     *   **Affected Areas**: `src/hooks/useStreakRewards.ts`, `src/components/AchievementCard.jsx`, new `src/components/NotificationModal.jsx`.
     *   **Implementation**: Added `NotificationModal.jsx`. Updated `useStreakRewards.ts` to include `modalInfo` state, `RewardModalInfo` interface, and `clearModal` function; `triggerStreakRewardPayout` now uses `setModalInfo`. Updated `AchievementCard.jsx` to consume `modalInfo` and `clearModal` and render the modal.
 
-6.  **[ ] Toggle for metrics selection in workout history**
-    *   **Problem**: Users need a way to select which specific metrics (e.g., pace, distance, heart rate if available) are sent with their workout history package.
-    *   **Solution**: Add toggles in user settings for individual metrics and modify the workout data packaging logic to respect these preferences.
-    *   **Affected Areas**: Settings UI, user preferences state, Nostr event creation logic for workout history.
+6.  **[~] Toggle for metrics selection in workout history / Issue posting other metrics**
+    *   **Problem**: Users need control over which metrics are published with their workout history. Separately, there was an issue reported where some metrics (besides the main workout record) were not being posted.
+    *   **Solution**: Implemented a system for users to toggle individual metric publishing preferences. This also helps diagnose/fix issues with specific metrics not publishing.
+        1.  **Settings Context**: Added `PUBLISHABLE_METRICS` config and corresponding boolean state variables (e.g., `publishIntensity`) and setters to `SettingsContext.jsx`, with persistence to `localStorage`.
+        2.  **Modal UI**: Updated `PostRunWizardModal.jsx` (Step 2, "Save to Nostr") to dynamically display toggles for each metric defined in `PUBLISHABLE_METRICS`. Toggles are bound to the new settings in `SettingsContext`.
+        3.  **Publishing Logic**: Modified `src/utils/runPublisher.js` so the `publishRun` function now accepts the `settings` object. It conditionally builds and attempts to publish NIP-101h events for Intensity, Calories, Duration, Distance, Pace, Elevation, and Splits based on these settings. The main Kind 1301 workout summary is always published.
+    *   **Affected Areas**: `src/contexts/SettingsContext.jsx`, `src/components/PostRunWizardModal.jsx`, `src/utils/runPublisher.js`.
+    *   **Implementation Notes for Issue #7**: By making each NIP-101h event type's publication conditional on a toggle, it will be easier to isolate if a specific metric fails to publish when it *is* enabled. The `runPublisher.js` logic was reviewed to ensure it attempts to build and publish each selected event. If issues persist for specific metrics, further debugging would focus on the `build<Metric>Event` functions in `nostrHealth.js` or the `createAndPublishEvent` flow for those specific kinds.
 
-7.  **[ ] Issue posting other metrics (besides workout record)**
+7.  **[~] Issue posting other metrics (besides workout record)** (Addressed by solution for #6)
     *   **Problem**: Metrics other than the basic workout record (e.g., detailed stats) are not being posted successfully.
-    *   **Solution**: Debug the process of collecting, formatting, and publishing these additional metrics via Nostr.
-    *   **Affected Areas**: Data collection for workouts, Nostr event creation for various metric types, relay publishing mechanism.
+    *   **Solution**: The changes for issue #6 (metric toggles) directly address this by ensuring the `runPublisher.js` attempts to publish each metric type only if its corresponding toggle is enabled. This clarifies the publishing flow for each metric, aiding in debugging any remaining individual metric publishing failures.
+    *   **Affected Areas**: `src/utils/runPublisher.js`.
 
 8.  **[ ] Lightning address fallback for rewards**
     *   **Problem**: There's no option for users to provide a fallback Lightning address if zaps fail. The reliability of fetching profile information from multiple relays to find a zap address is also a concern.

@@ -2,6 +2,18 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { relays as defaultRelays } from '../config/relays.js';
 
+// Define publishable metrics configuration
+export const PUBLISHABLE_METRICS = [
+  { key: 'intensity', label: 'Workout Intensity', NIP101Kind: 1356, default: true },
+  { key: 'calories', label: 'Calories burned', NIP101Kind: 1357, default: true },
+  { key: 'durationMetric', label: 'Duration (detailed)', NIP101Kind: 1358, default: true }, // NIP-101h duration
+  { key: 'distanceMetric', label: 'Distance (detailed)', NIP101Kind: 1359, default: true }, // NIP-101h distance
+  { key: 'paceMetric', label: 'Pace (detailed)', NIP101Kind: 1360, default: true },      // NIP-101h pace
+  { key: 'elevationMetric', label: 'Elevation (detailed)', NIP101Kind: 1361, default: true },// NIP-101h elevation
+  { key: 'steps', label: 'Steps', NIP101Kind: null, default: true }, // Steps might be a tag on main workout or separate if detailed
+  { key: 'splits', label: 'Splits', NIP101Kind: 1362, default: true },
+];
+
 // Create the context
 const SettingsContext = createContext(null);
 
@@ -10,8 +22,7 @@ export const useSettings = () => {
   const context = useContext(SettingsContext);
   if (!context) {
     console.error('useSettings must be used within a SettingsProvider');
-    // Return fallback object to prevent crashes
-    return {
+    const fallbackSettings = {
       distanceUnit: 'km',
       toggleDistanceUnit: () => console.warn('Settings not initialized'),
       setDistanceUnit: () => console.warn('Settings not initialized'),
@@ -28,190 +39,111 @@ export const useSettings = () => {
       setBlossomEndpoint: () => {},
       skipStartCountdown: false,
       setSkipStartCountdown: () => console.warn('Settings not initialized'),
-      skipEndCountdown: false,
-      setSkipEndCountdown: () => console.warn('Settings not initialized')
+      // skipEndCountdown: false, // Removed as per previous bug fix
+      // setSkipEndCountdown: () => console.warn('Settings not initialized'),
     };
+    PUBLISHABLE_METRICS.forEach(metric => {
+      fallbackSettings[`publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`] = metric.default;
+      fallbackSettings[`setPublish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`] = () => console.warn('Settings not initialized');
+    });
+    return fallbackSettings;
   }
   return context;
 };
 
+// Helper to initialize boolean state from localStorage
+const initBooleanState = (key, defaultValue) => {
+  try {
+    const storedValue = localStorage.getItem(key);
+    return storedValue === null ? defaultValue : storedValue === 'true';
+  } catch (error) {
+    console.error(`Error initializing ${key} state:`, error);
+    return defaultValue;
+  }
+};
+
 // Provider component
 export const SettingsProvider = ({ children }) => {
-  // Initialize distanceUnit state from localStorage
-  const [distanceUnit, setDistanceUnit] = useState(() => {
-    try {
-      return localStorage.getItem('distanceUnit') || 'km';
-    } catch (error) {
-      console.error('Error initializing distance unit state:', error);
-      return 'km';
-    }
-  });
-
-  // Initialize calorieIntensityPref state from localStorage
+  const [distanceUnit, setDistanceUnit] = useState(() => localStorage.getItem('distanceUnit') || 'km');
   const [calorieIntensityPref, setCalorieIntensityPref] = useState(() => {
-    try {
-      const storedPref = localStorage.getItem('calorieIntensityPref');
-      return storedPref && ['autoAccept', 'autoIgnore', 'manual'].includes(storedPref) ? storedPref : 'manual';
-    } catch (error) {
-      console.error('Error initializing calorie/intensity preference state:', error);
-      return 'manual';
-    }
+    const storedPref = localStorage.getItem('calorieIntensityPref');
+    return storedPref && ['autoAccept', 'autoIgnore', 'manual'].includes(storedPref) ? storedPref : 'manual';
+  });
+  const [healthEncryptionPref, setHealthEncryptionPref] = useState(() => initBooleanState('healthEncryptionPrefIsPlaintext', false) ? 'plaintext' : 'encrypted');
+  const [publishMode, setPublishMode] = useState(() => localStorage.getItem('publishMode') || 'public');
+  const [privateRelayUrl, setPrivateRelayUrl] = useState(() => localStorage.getItem('privateRelayUrl') || '');
+  const [blossomEndpoint, setBlossomEndpoint] = useState(() => localStorage.getItem('blossomEndpoint') || '');
+  const [skipStartCountdown, setSkipStartCountdown] = useState(() => initBooleanState('skipStartCountdown', false));
+  // const [skipEndCountdown, setSkipEndCountdown] = useState(() => initBooleanState('skipEndCountdown', false)); // Removed
+
+  // Initialize states for publishable metrics
+  const metricStates = {};
+  PUBLISHABLE_METRICS.forEach(metric => {
+    const [state, setState] = useState(() => initBooleanState(`publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`, metric.default));
+    metricStates[`publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`] = state;
+    metricStates[`setPublish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`] = setState;
   });
 
-  // Initialize healthEncryptionPref state from localStorage ("encrypted" | "plaintext")
-  const [healthEncryptionPref, setHealthEncryptionPref] = useState(() => {
-    try {
-      const stored = localStorage.getItem('healthEncryptionPref');
-      return stored === 'plaintext' ? 'plaintext' : 'encrypted';
-    } catch (e) {
-      console.error('Error initializing health encryption pref:', e);
-      return 'encrypted';
-    }
+  // Persist settings to localStorage
+  useEffect(() => localStorage.setItem('distanceUnit', distanceUnit), [distanceUnit]);
+  useEffect(() => localStorage.setItem('calorieIntensityPref', calorieIntensityPref), [calorieIntensityPref]);
+  useEffect(() => localStorage.setItem('healthEncryptionPrefIsPlaintext', (healthEncryptionPref === 'plaintext').toString()), [healthEncryptionPref]);
+  useEffect(() => localStorage.setItem('publishMode', publishMode), [publishMode]);
+  useEffect(() => localStorage.setItem('privateRelayUrl', privateRelayUrl), [privateRelayUrl]);
+  useEffect(() => localStorage.setItem('blossomEndpoint', blossomEndpoint), [blossomEndpoint]);
+  useEffect(() => localStorage.setItem('skipStartCountdown', skipStartCountdown.toString()), [skipStartCountdown]);
+  // useEffect(() => localStorage.setItem('skipEndCountdown', skipEndCountdown.toString()), [skipEndCountdown]); // Removed
+
+  PUBLISHABLE_METRICS.forEach(metric => {
+    const stateKey = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useEffect(() => {
+      localStorage.setItem(stateKey, metricStates[stateKey].toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [metricStates[stateKey], stateKey]); // stateKey added to dep array due to lint warning, though it's constant per metric
   });
 
-  // ADD STATE FOR PUBLISH DESTINATION -----------------
-  // Initialize publishMode: 'public' | 'private' | 'blossom' | 'mixed'
-  const [publishMode, setPublishMode] = useState(() => {
-    try {
-      const stored = localStorage.getItem('publishMode');
-      return stored || 'public';
-    } catch (e) {
-      console.warn('init publishMode failed', e);
-      return 'public';
-    }
-  });
-
-  // Private relay URL (if publishMode === 'private' or mixed)
-  const [privateRelayUrl, setPrivateRelayUrl] = useState(() => {
-    try {
-      return localStorage.getItem('privateRelayUrl') || '';
-    } catch {
-      return '';
-    }
-  });
-
-  // Blossom endpoint (for export – kept here so UI can store it)
-  const [blossomEndpoint, setBlossomEndpoint] = useState(() => {
-    try {
-      return localStorage.getItem('blossomEndpoint') || '';
-    } catch {
-      return '';
-    }
-  });
-
-  const [skipStartCountdown, setSkipStartCountdown] = useState(() => {
-    try {
-      return localStorage.getItem('skipStartCountdown') === 'true';
-    } catch (error) {
-      console.error('Error initializing skipStartCountdown state:', error);
-      return false;
-    }
-  });
-
-  const [skipEndCountdown, setSkipEndCountdown] = useState(() => {
-    try {
-      return localStorage.getItem('skipEndCountdown') === 'true';
-    } catch (error) {
-      console.error('Error initializing skipEndCountdown state:', error);
-      return false;
-    }
-  });
-
-  // Persist the above three values when they change
-  useEffect(() => {
-    localStorage.setItem('publishMode', publishMode);
-  }, [publishMode]);
+  const toggleDistanceUnit = () => setDistanceUnit(prev => prev === 'km' ? 'mi' : 'km');
 
   useEffect(() => {
-    localStorage.setItem('privateRelayUrl', privateRelayUrl);
-  }, [privateRelayUrl]);
-
-  useEffect(() => {
-    localStorage.setItem('blossomEndpoint', blossomEndpoint);
-  }, [blossomEndpoint]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('skipStartCountdown', skipStartCountdown.toString());
-    } catch (error) {
-      console.error('Error saving skipStartCountdown:', error);
-    }
-  }, [skipStartCountdown]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('skipEndCountdown', skipEndCountdown.toString());
-    } catch (error) {
-      console.error('Error saving skipEndCountdown:', error);
-    }
-  }, [skipEndCountdown]);
-
-  // Toggle between km and mi units
-  const toggleDistanceUnit = () => {
-    const newUnit = distanceUnit === 'km' ? 'mi' : 'km';
-    setDistanceUnit(newUnit);
-  };
-
-  // Save distanceUnit to localStorage when it changes
-  useEffect(() => {
-    try {
-      localStorage.setItem('distanceUnit', distanceUnit);
-      
-      // Dispatch an event so other components can listen for changes
-      const event = new CustomEvent('distanceUnitChanged', { detail: distanceUnit });
-      document.dispatchEvent(event);
-    } catch (error) {
-      console.error('Error saving distance unit:', error);
-    }
+    const event = new CustomEvent('distanceUnitChanged', { detail: distanceUnit });
+    document.dispatchEvent(event);
   }, [distanceUnit]);
 
-  // Save calorieIntensityPref to localStorage when it changes
   useEffect(() => {
-    try {
-      localStorage.setItem('calorieIntensityPref', calorieIntensityPref);
-      
-      // Dispatch an event so other components can listen for changes
-      const event = new CustomEvent('calorieIntensityPrefChanged', { detail: calorieIntensityPref });
-      document.dispatchEvent(event);
-    } catch (error) {
-      console.error('Error saving calorie/intensity preference:', error);
-    }
+    const event = new CustomEvent('calorieIntensityPrefChanged', { detail: calorieIntensityPref });
+    document.dispatchEvent(event);
   }, [calorieIntensityPref]);
 
-  // Save healthEncryptionPref to localStorage when it changes
   useEffect(() => {
-    try {
-      localStorage.setItem('healthEncryptionPref', healthEncryptionPref);
-      
-      // Dispatch an event so other components can listen for changes
-      const event = new CustomEvent('healthEncryptionPrefChanged', { detail: healthEncryptionPref });
-      document.dispatchEvent(event);
-    } catch (error) {
-      console.error('Error saving health encryption preference:', error);
-    }
+    const event = new CustomEvent('healthEncryptionPrefChanged', { detail: healthEncryptionPref });
+    document.dispatchEvent(event);
   }, [healthEncryptionPref]);
 
+  const providerValue = {
+    distanceUnit,
+    setDistanceUnit,
+    toggleDistanceUnit,
+    calorieIntensityPref,
+    setCalorieIntensityPref,
+    healthEncryptionPref,
+    setHealthEncryptionPref,
+    isHealthEncryptionEnabled: () => healthEncryptionPref === 'encrypted',
+    publishMode,
+    setPublishMode,
+    privateRelayUrl,
+    setPrivateRelayUrl,
+    blossomEndpoint,
+    setBlossomEndpoint,
+    skipStartCountdown,
+    setSkipStartCountdown,
+    // skipEndCountdown, // Removed
+    // setSkipEndCountdown, // Removed
+    ...metricStates
+  };
+
   return (
-    <SettingsContext.Provider value={{ 
-      distanceUnit, 
-      setDistanceUnit,
-      toggleDistanceUnit,
-      calorieIntensityPref,
-      setCalorieIntensityPref,
-      healthEncryptionPref,
-      setHealthEncryptionPref,
-      isHealthEncryptionEnabled: () => healthEncryptionPref === 'encrypted',
-      publishMode,
-      setPublishMode,
-      privateRelayUrl,
-      setPrivateRelayUrl,
-      blossomEndpoint,
-      setBlossomEndpoint,
-      skipStartCountdown,
-      setSkipStartCountdown,
-      skipEndCountdown,
-      setSkipEndCountdown
-    }}>
+    <SettingsContext.Provider value={providerValue}>
       {children}
     </SettingsContext.Provider>
   );
@@ -221,7 +153,6 @@ SettingsProvider.propTypes = {
   children: PropTypes.node.isRequired
 };
 
-// Helper accessible from non-React modules
 export const getActiveRelayList = () => {
   try {
     const mode = localStorage.getItem('publishMode') || 'public';
