@@ -183,13 +183,57 @@ export const useActivityFeed = () => {
     return content.match(imageRegex) || [];
   };
   
+  const handleReactionEvent = async (event) => {
+    const targetId = event.tags.find(t => t[0] === 'e')?.[1];
+    if (!targetId) return;
+
+    // Update activity with reaction
+    setActivities(prev => prev.map(activity => {
+      if (activity.id !== targetId) return activity;
+
+      const updated = { ...activity };
+
+      switch (event.kind) {
+        case 7: // Like
+          updated.reactions.likes++;
+          if (event.pubkey === ndk.activeUser?.pubkey) {
+            setUserLikes(prevLikes => new Set(prevLikes).add(targetId));
+          }
+          break;
+        case 6: // Repost
+          updated.reactions.reposts++;
+          if (event.pubkey === ndk.activeUser?.pubkey) {
+            setUserReposts(prevReposts => new Set(prevReposts).add(targetId));
+          }
+          break;
+        case 9735: // Zap
+          updated.reactions.zaps++;
+          break;
+        case 1: // Comment
+          // Fetch commenter profile
+          const profile = getProfile(event.pubkey);
+          updated.reactions.comments.push({
+            id: event.id,
+            content: event.content,
+            created_at: event.created_at,
+            author: {
+              pubkey: event.pubkey,
+              profile: profile || {}
+            }
+          });
+          break;
+      }
+      return updated;
+    }));
+  };
+  
   const subscribeToReactions = useCallback((activityIds) => {
     if (reactionSubRef.current) {
       reactionSubRef.current.stop();
     }
-    
+
     if (activityIds.length === 0) return;
-    
+
     const sub = ndk.subscribe(
       [
         { kinds: [7], '#e': activityIds }, // Likes
@@ -199,52 +243,9 @@ export const useActivityFeed = () => {
       ],
       { closeOnEose: false }
     );
-    
-    sub.on('event', async (event) => {
-      const targetId = event.tags.find(t => t[0] === 'e')?.[1];
-      if (!targetId) return;
-      
-      // Update activity with reaction
-      setActivities(prev => prev.map(activity => {
-        if (activity.id !== targetId) return activity;
-        
-        const updated = { ...activity };
-        
-        switch (event.kind) {
-          case 7: // Like
-            updated.reactions.likes++;
-            if (event.pubkey === ndk.activeUser?.pubkey) {
-              setUserLikes(prev => new Set(prev).add(targetId));
-            }
-            break;
-          case 6: // Repost
-            updated.reactions.reposts++;
-            if (event.pubkey === ndk.activeUser?.pubkey) {
-              setUserReposts(prev => new Set(prev).add(targetId));
-            }
-            break;
-          case 9735: // Zap
-            updated.reactions.zaps++;
-            break;
-          case 1: // Comment
-            // Fetch commenter profile
-            const profile = await getProfile(event.pubkey);
-            updated.reactions.comments.push({
-              id: event.id,
-              content: event.content,
-              created_at: event.created_at,
-              author: {
-                pubkey: event.pubkey,
-                profile: profile || {}
-              }
-            });
-            break;
-        }
-        
-        return updated;
-      }));
-    });
-    
+
+    sub.on('event', handleReactionEvent);
+
     reactionSubRef.current = sub;
   }, [getProfile]);
   
@@ -313,7 +314,7 @@ export const useActivityFeed = () => {
       await event.publish();
       
       // Optimistic update
-      const profile = await getProfile(ndk.activeUser?.pubkey);
+      const profile = getProfile(ndk.activeUser?.pubkey);
       setActivities(prev => prev.map(a => {
         if (a.id === activityId) {
           return {
