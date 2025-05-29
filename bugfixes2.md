@@ -4,6 +4,16 @@ This document tracks the progress and solutions for the identified issues. Solut
 
 ## Issues (Ordered Easiest to Hardest Estimate)
 
+0.  **[~] General Toggle Unresponsiveness**
+    *   **Problem**: All toggle switches throughout the app (e.g., in settings, modals) were unresponsive, requiring multiple taps to change state.
+    *   **Solution**: Refactored `SettingsContext.jsx` to correctly follow React's Rules of Hooks and improve performance. Specifically:
+        *   The main `providerValue` object passed to `SettingsContext.Provider` is now memoized using `useMemo`. Its dependency array includes all state values and memoized functions it provides.
+        *   Functions defined within `SettingsProvider` and included in the context value (like `toggleDistanceUnit`, `isHealthEncryptionEnabled`) are memoized with `useCallback`.
+        *   The `dynamicMetricSetters` object and `initialMetricPrefs` are also memoized using `useMemo`.
+        *   This ensures stable references for the context value and its functions, preventing unnecessary re-renders of consumer components, which was the likely cause of the UI unresponsiveness.
+    *   **Affected Areas**: `src/contexts/SettingsContext.jsx`, and indirectly all components consuming this context, especially those with toggles.
+    *   **Implementation**: Applied `useMemo` and `useCallback` to `providerValue` and its constituent functions/objects in `SettingsContext.jsx`.
+
 1.  **[~] Workout record shows 2 dates**
     *   **Problem**: The workout record display shows two dates; the top one is redundant and incorrect.
     *   **Solution**: The primary date displayed at the top of the workout card, which was derived from the `workoutName` variable (e.g., "5/28/2025 Run"), was incorrect. This line has been removed. The correct date, sourced from `event.created_at` (e.g., "Date: May 29, 2025"), remains.

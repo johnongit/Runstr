@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { relays as defaultRelays } from '../config/relays.js';
 
@@ -74,11 +74,11 @@ export const SettingsProvider = ({ children }) => {
   const [blossomEndpoint, setBlossomEndpoint] = useState(() => localStorage.getItem('blossomEndpoint') || '');
   const [skipStartCountdown, setSkipStartCountdown] = useState(() => initBooleanState('skipStartCountdown', false));
 
-  const initialMetricPrefs = PUBLISHABLE_METRICS.reduce((acc, metric) => {
+  const initialMetricPrefs = useMemo(() => PUBLISHABLE_METRICS.reduce((acc, metric) => {
     const key = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
     acc[key] = initBooleanState(key, metric.default);
     return acc;
-  }, {});
+  }, {}), []);
   const [metricPublishPrefs, setMetricPublishPrefs] = useState(initialMetricPrefs);
 
   const updateMetricPublishPref = useCallback((metricSettingKey, value) => {
@@ -106,7 +106,8 @@ export const SettingsProvider = ({ children }) => {
     }
   }, [metricPublishPrefs]);
 
-  const toggleDistanceUnit = () => setDistanceUnit(prev => prev === 'km' ? 'mi' : 'km');
+  const toggleDistanceUnit = useCallback(() => setDistanceUnit(prev => prev === 'km' ? 'mi' : 'km'), []);
+  const isHealthEncryptionEnabled = useCallback(() => healthEncryptionPref === 'encrypted', [healthEncryptionPref]);
 
   useEffect(() => {
     const event = new CustomEvent('distanceUnitChanged', { detail: distanceUnit });
@@ -123,14 +124,16 @@ export const SettingsProvider = ({ children }) => {
     document.dispatchEvent(event);
   }, [healthEncryptionPref]);
 
-  const dynamicMetricSetters = PUBLISHABLE_METRICS.reduce((acc, metric) => {
-    const key = metric.key.charAt(0).toUpperCase() + metric.key.slice(1);
-    const fullKey = `publish${key}`;
-    acc[`setPublish${key}`] = (value) => updateMetricPublishPref(fullKey, value);
-    return acc;
-  }, {});
+  const dynamicMetricSetters = useMemo(() => {
+    return PUBLISHABLE_METRICS.reduce((acc, metric) => {
+      const key = metric.key.charAt(0).toUpperCase() + metric.key.slice(1);
+      const fullKey = `publish${key}`;
+      acc[`setPublish${key}`] = (value) => updateMetricPublishPref(fullKey, value);
+      return acc;
+    }, {});
+  }, [updateMetricPublishPref]);
 
-  const providerValue = {
+  const providerValue = useMemo(() => ({
     distanceUnit,
     setDistanceUnit,
     toggleDistanceUnit,
@@ -138,7 +141,7 @@ export const SettingsProvider = ({ children }) => {
     setCalorieIntensityPref,
     healthEncryptionPref,
     setHealthEncryptionPref,
-    isHealthEncryptionEnabled: () => healthEncryptionPref === 'encrypted',
+    isHealthEncryptionEnabled,
     publishMode,
     setPublishMode,
     privateRelayUrl,
@@ -149,7 +152,17 @@ export const SettingsProvider = ({ children }) => {
     setSkipStartCountdown,
     ...metricPublishPrefs,
     ...dynamicMetricSetters
-  };
+  }), [
+    distanceUnit, setDistanceUnit, toggleDistanceUnit,
+    calorieIntensityPref, setCalorieIntensityPref,
+    healthEncryptionPref, setHealthEncryptionPref, isHealthEncryptionEnabled,
+    publishMode, setPublishMode,
+    privateRelayUrl, setPrivateRelayUrl,
+    blossomEndpoint, setBlossomEndpoint,
+    skipStartCountdown, setSkipStartCountdown,
+    metricPublishPrefs,
+    dynamicMetricSetters
+  ]);
 
   return (
     <SettingsContext.Provider value={providerValue}>
