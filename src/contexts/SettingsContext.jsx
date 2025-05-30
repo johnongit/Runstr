@@ -73,6 +73,7 @@ export const SettingsProvider = ({ children }) => {
   const [privateRelayUrl, setPrivateRelayUrl] = useState(() => localStorage.getItem('privateRelayUrl') || '');
   const [blossomEndpoint, setBlossomEndpoint] = useState(() => localStorage.getItem('blossomEndpoint') || '');
   const [skipStartCountdown, setSkipStartCountdown] = useState(() => initBooleanState('skipStartCountdown', false));
+  const [usePedometer, setUsePedometer] = useState(() => initBooleanState('usePedometer', true));
 
   const initialMetricPrefs = useMemo(() => PUBLISHABLE_METRICS.reduce((acc, metric) => {
     const key = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
@@ -95,6 +96,7 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => localStorage.setItem('privateRelayUrl', privateRelayUrl), [privateRelayUrl]);
   useEffect(() => localStorage.setItem('blossomEndpoint', blossomEndpoint), [blossomEndpoint]);
   useEffect(() => localStorage.setItem('skipStartCountdown', skipStartCountdown.toString()), [skipStartCountdown]);
+  useEffect(() => localStorage.setItem('usePedometer', usePedometer.toString()), [usePedometer]);
 
   useEffect(() => {
     try {
@@ -150,6 +152,8 @@ export const SettingsProvider = ({ children }) => {
     setBlossomEndpoint,
     skipStartCountdown,
     setSkipStartCountdown,
+    usePedometer,
+    setUsePedometer,
     ...metricPublishPrefs,
     ...dynamicMetricSetters
   }), [
@@ -160,6 +164,7 @@ export const SettingsProvider = ({ children }) => {
     privateRelayUrl, setPrivateRelayUrl,
     blossomEndpoint, setBlossomEndpoint,
     skipStartCountdown, setSkipStartCountdown,
+    usePedometer, setUsePedometer,
     metricPublishPrefs,
     dynamicMetricSetters
   ]);

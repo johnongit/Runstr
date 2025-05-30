@@ -98,10 +98,7 @@ export const PostRunWizardModal = ({ run, onClose }) => {
         <div className="space-y-2 mb-6">
           <div className="flex items-center justify-between py-1">
             <span className="text-sm text-gray-300">Workout Record (Summary)</span>
-            <div className="toggle-switch opacity-50">
-              <input type="checkbox" checked readOnly disabled />
-              <span className="toggle-slider"></span>
-            </div>
+            <span className={`px-4 py-1 rounded text-xs text-white opacity-50 ${true ? 'bg-green-600' : 'bg-red-600'}`}>ON</span>
           </div>
           {PUBLISHABLE_METRICS.map(metric => {
             const settingKey = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
@@ -112,16 +109,13 @@ export const PostRunWizardModal = ({ run, onClose }) => {
             return (
               <div key={metric.key} className="flex items-center justify-between py-1">
                 <span className="text-sm text-gray-300">{metric.label}</span>
-                <div className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    id={`publish-${metric.key}-toggle`}
-                    checked={isChecked}
-                    onChange={(e) => setter(e.target.checked)}
-                    disabled={publishing || !!publishResults}
-                  />
-                  <span className="toggle-slider"></span>
-                </div>
+                <button
+                  className={`px-4 py-1 rounded text-xs ${isChecked ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
+                  onClick={() => setter(!isChecked)}
+                  disabled={publishing || !!publishResults}
+                >
+                  {isChecked ? 'ON' : 'OFF'}
+                </button>
               </div>
             );
           })}

@@ -15,7 +15,7 @@ export const MenuBar = () => {
     publishMode, setPublishMode,
     privateRelayUrl, setPrivateRelayUrl,
     skipStartCountdown, setSkipStartCountdown,
-    skipEndCountdown, setSkipEndCountdown
+    usePedometer, setUsePedometer
   } = useSettings();
 
   const menuItems = [
@@ -151,15 +151,12 @@ export const MenuBar = () => {
               <div className="bg-[#111827] p-3 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-400 mr-3">Skip Start Countdown</span>
-                  <div className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      id="skipStartCountdownToggleModal"
-                      checked={skipStartCountdown}
-                      onChange={(e) => setSkipStartCountdown(e.target.checked)}
-                    />
-                    <span className="toggle-slider"></span>
-                  </div>
+                  <button 
+                    className={`px-4 py-1 rounded text-xs ${skipStartCountdown ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}
+                    onClick={() => setSkipStartCountdown(!skipStartCountdown)}
+                  >
+                    {skipStartCountdown ? 'ON' : 'OFF'}
+                  </button>
                 </div>
                 <p className="text-xs text-gray-500">
                   Start the run immediately when you tap "Start Run".
@@ -196,15 +193,24 @@ export const MenuBar = () => {
               <h4 className="text-lg font-semibold mb-3">Health Data Privacy</h4>
               <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg mb-3">
                 <span className="text-sm text-gray-400 mr-3">Encrypt Health Data (NIP-44)</span>
-                <div className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    id="encryptionToggleModal"
-                    checked={healthEncryptionPref === 'encrypted'}
-                    onChange={handleHealthEncryptionToggle}
-                  />
-                  <span className="toggle-slider"></span>
-                </div>
+                <button
+                  className={`px-4 py-1 rounded text-xs ${healthEncryptionPref === 'encrypted' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
+                  onClick={() => {
+                    const currentPref = healthEncryptionPref === 'encrypted';
+                    const newPrefValue = !currentPref;
+                    if (newPrefValue === false) {
+                      const confirmDisable = window.confirm(
+                        'Publishing health data unencrypted will make the values publicly visible on relays. Are you sure you want to disable encryption?'
+                      );
+                      if (!confirmDisable) {
+                        return;
+                      }
+                    }
+                    setHealthEncryptionPref(newPrefValue ? 'encrypted' : 'plaintext');
+                  }}
+                >
+                  {healthEncryptionPref === 'encrypted' ? 'ON' : 'OFF'}
+                </button>
               </div>
 
               {/* Publish Destination Section - ADDED HERE */}
@@ -296,24 +302,17 @@ export const MenuBar = () => {
             <div className="mb-6">
               <h4 className="text-lg font-semibold mb-3">Step Counting (Walking)</h4>
               <div className="space-y-3">
-                {/* NEW Pedometer Toggle */}
+                {/* NEW Pedometer Toggle - Replaced with Button */}
                 <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg mb-3">
                   <span className="text-sm text-gray-400 mr-3">Use Device Step Counter</span>
-                  <div className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      id="pedometerToggle"
-                      defaultChecked={localStorage.getItem('usePedometer') === 'true'}
-                      onChange={(e) => {
-                        const enabled = e.target.checked;
-                        localStorage.setItem('usePedometer', enabled ? 'true' : 'false');
-                        alert(`Device step counter ${enabled ? 'enabled' : 'disabled'}. This will take effect on your next walk.`);
-                      }}
-                    />
-                    <span className="toggle-slider"></span>
-                  </div>
+                  <button
+                    className={`px-4 py-1 rounded text-xs ${usePedometer ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
+                    onClick={() => setUsePedometer(!usePedometer)}
+                  >
+                    {usePedometer ? 'ON' : 'OFF'}
+                  </button>
                 </div>
-                {/* End Pedometer Toggle */}
+                {/* End Pedometer Button */}
               </div>
             </div>
             
