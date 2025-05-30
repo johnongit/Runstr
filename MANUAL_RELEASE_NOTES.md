@@ -1,43 +1,29 @@
-# RUNSTR v0.4.5 (NIP101h & Relays)
+## RUNSTR v0.4.7 - Bug Squashing 
 
-We're thrilled to bring you our latest update to RUNSTR with comprehensive NIP101h integration and enhanced activity tracking!
+Hey Nostr, v0.4.7 update is all about bug fixes and small improvements
 
-## 📊 Enhanced Activity Tracking
+🌟 **Step Tracking Sharpened:**
+*   **Pedometer Precision:** We've fine-tuned how we count your steps when using your device's pedometer for better accuracy.
+*   **Smarter Step Estimations:** For times when the pedometer isn't in play, we've updated our estimation logic. By simplifying how we calculate stride length (goodbye, custom height/stride inputs!), and adjusting the average stride to a more consistent 0.73 meters, your estimated steps should feel more on point.
 
-Track more aspects of your fitness journey with mode-specific metrics:
+🔒 **Nostr & Privacy Enhancements:**
+*   **You Control Your Metrics (NIP-101h):** Now you get to decide exactly what fitness details (like intensity, cadence, or heart rate) you share on Nostr. Look for the new, responsive toggle controls in the "Save to Nostr" screen to customize your NIP-101h posts.
+*   **Private Relays Stay Private:** When you've chosen to use private relays for your NIP-101h and NIP-101e health and fitness events, we've removed the fallback to public relays. Your private data stays where you want it.
 
-- **Step Counter**: Estimated step tracking for walk mode
-- **Speed Tracker**: Dedicated speed metrics for cycle mode
-- **Activity-Specific Posts**: Share different metrics based on your activity type
+💰 **Rewards System Refinements:**
+*   **More Reliable Payouts:** We've boosted the reliability of reward Zaps by improving how we find user profiles and Lightning Addresses on Nostr 
+*   **Clearer Rewards Language:** No more guessing! The `AchievementCard` now clearly shows "Today's Reward (Day X)" and exactly what you'll earn for your next run in a streak, like "Run tomorrow (Day Y) to earn [amount] sats."
 
-## 🌐 Comprehensive NIP101h Integration
+📱 **UI & OS Specific Tune-Ups:**
+*   **CalyxOS Display Polish:** We've addressed layout quirks on CalyxOS, especially for slimmer screens. Expect more flexible navigation in the `MenuBar` and better font sizing. Plus, the `FloatingMusicPlayer` should now behave without any visual hiccups.
+*   **GrapheneOS Location Smarts:** Location tracking on GrapheneOS just got more robust. We've enhanced permission handling and updated our app's manifest to better align with GrapheneOS's requirements, making it easier for the app to get and keep location permissions.
 
-Full implementation of the NIP101h standard with support for:
+📋 **Workout Record Accuracy & Details:**
+*   **Correct Date & Time on Records:** Your workout records will now show the correct date (sourced reliably from `event.created_at`) without any confusing duplicates.
 
-- **NIP101h.9**: Step data tracking and sharing
-- **NIP101h.10**: Elevation data tracking and sharing
-- **NIP101h.11**: Split times data tracking and sharing
-- **NIP101h.12**: Pace data tracking and sharing
+⏱️ **Countdown Controls:**
+*   **"Skip Start Countdown" Check Box:** Gives you the option to jump straight into a run or walk without using a countdown timer.
 
-## 🔄 Improved Nostr Integration
+Feel free to send a DM for feature requests or bug reports. 
 
-Better control over your data sharing and privacy:
-
-- **Flexible Relay Options**: Send NIP101h events to public and/or private relays
-- **Private Relay Support**: Enhanced privacy options for your fitness data
-
-## 🏆 Enhanced Rewards System
-
-Get more value from your activities:
-
-- **NIP101h Rewards**: Earn rewards for saving NIP101h and NIP101e events
-- **Private Relay Bonus**: Additional rewards when saving to your own private relay
-- **Anonymous Zaps**: Improved rewards payout flow using anonymous zaps
-
-## ⚡ Performance & Stability
-
-We've made several improvements to ensure a smooth experience:
-
-- **Offline Mode Reliability**: Fixed several bugs affecting offline performance
-
-Let's Go!
+Lets Go!
