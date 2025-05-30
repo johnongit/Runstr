@@ -151,12 +151,12 @@ export const MenuBar = () => {
               <div className="bg-[#111827] p-3 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-400 mr-3">Skip Start Countdown</span>
-                  <button 
-                    className={`px-4 py-1 rounded text-xs ${skipStartCountdown ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}
-                    onClick={() => setSkipStartCountdown(!skipStartCountdown)}
-                  >
-                    {skipStartCountdown ? 'ON' : 'OFF'}
-                  </button>
+                  <input 
+                    type="checkbox"
+                    className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
+                    checked={skipStartCountdown}
+                    onChange={() => setSkipStartCountdown(!skipStartCountdown)}
+                  />
                 </div>
                 <p className="text-xs text-gray-500">
                   Start the run immediately when you tap "Start Run".
@@ -193,12 +193,14 @@ export const MenuBar = () => {
               <h4 className="text-lg font-semibold mb-3">Health Data Privacy</h4>
               <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg mb-3">
                 <span className="text-sm text-gray-400 mr-3">Encrypt Health Data (NIP-44)</span>
-                <button
-                  className={`px-4 py-1 rounded text-xs ${healthEncryptionPref === 'encrypted' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
-                  onClick={() => {
-                    const currentPref = healthEncryptionPref === 'encrypted';
-                    const newPrefValue = !currentPref;
-                    if (newPrefValue === false) {
+                <input
+                  type="checkbox"
+                  className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
+                  checked={healthEncryptionPref === 'encrypted'}
+                  onChange={() => {
+                    const currentPrefIsEncrypted = healthEncryptionPref === 'encrypted';
+                    const newPrefWillBeEncrypted = !currentPrefIsEncrypted;
+                    if (newPrefWillBeEncrypted === false) {
                       const confirmDisable = window.confirm(
                         'Publishing health data unencrypted will make the values publicly visible on relays. Are you sure you want to disable encryption?'
                       );
@@ -206,11 +208,9 @@ export const MenuBar = () => {
                         return;
                       }
                     }
-                    setHealthEncryptionPref(newPrefValue ? 'encrypted' : 'plaintext');
+                    setHealthEncryptionPref(newPrefWillBeEncrypted ? 'encrypted' : 'plaintext');
                   }}
-                >
-                  {healthEncryptionPref === 'encrypted' ? 'ON' : 'OFF'}
-                </button>
+                />
               </div>
 
               {/* Publish Destination Section - ADDED HERE */}
@@ -302,17 +302,17 @@ export const MenuBar = () => {
             <div className="mb-6">
               <h4 className="text-lg font-semibold mb-3">Step Counting (Walking)</h4>
               <div className="space-y-3">
-                {/* NEW Pedometer Toggle - Replaced with Button */}
+                {/* NEW Pedometer Button - Replaced with Checkbox */}
                 <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg mb-3">
                   <span className="text-sm text-gray-400 mr-3">Use Device Step Counter</span>
-                  <button
-                    className={`px-4 py-1 rounded text-xs ${usePedometer ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
-                    onClick={() => setUsePedometer(!usePedometer)}
-                  >
-                    {usePedometer ? 'ON' : 'OFF'}
-                  </button>
+                  <input
+                    type="checkbox"
+                    className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
+                    checked={usePedometer}
+                    onChange={() => setUsePedometer(!usePedometer)}
+                  />
                 </div>
-                {/* End Pedometer Button */}
+                {/* End Pedometer Checkbox */}
               </div>
             </div>
             
