@@ -41,13 +41,13 @@ const Wallet = safeLazy(() => import('./pages/Wallet'), 'Wallet');
 const Music = safeLazy(() => import('./pages/Music'), 'Music');
 const NWC = safeLazy(() => import('./pages/NWC'), 'NWC');
 const Goals = safeLazy(() => import('./pages/Goals'), 'Goals');
-const TeamDetail = safeLazy(() => import('./pages/TeamDetail'), 'TeamDetail');
 const Events = safeLazy(() => import('./pages/Events'), 'Events');
 const EventDetail = safeLazy(() => import('./pages/EventDetail'), 'EventDetail');
 const Profile = safeLazy(() => import('./pages/Profile'), 'Profile');
 const About = safeLazy(() => import('./pages/About'), 'About');
-const GroupDiscoveryScreen = safeLazy(() => import('./components/GroupDiscoveryScreen'), 'GroupDiscoveryScreen');
 const NostrStatsPage = safeLazy(() => import('./pages/NostrStatsPage'), 'NostrStatsPage');
+const GroupDiscoveryScreen = safeLazy(() => import('./components/GroupDiscoveryScreen'), 'GroupDiscoveryScreen');
+const TeamDetail = safeLazy(() => import('./pages/TeamDetail'), 'TeamDetail');
 
 // Loading component to show while lazy loading
 const LoadingComponent = () => (

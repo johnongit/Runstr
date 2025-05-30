@@ -161,3 +161,28 @@ export const formatDuration = (seconds, alwaysShowHours = false) => {
   // Fallback to HH:MM:SS with zero-padded hours
   return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
+
+/**
+ * Determine time of day based on timestamp
+ * @param {number | string} timestamp - UTC timestamp or a date string
+ * @returns {string} Time of day ("Morning", "Afternoon", "Evening", "Night", or "Regular")
+ */
+export const getTimeOfDay = (timestamp) => {
+  if (!timestamp) {
+    // For runs without timestamp, use a generic name
+    return "Regular";
+  }
+  
+  const date = new Date(timestamp);
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return "Regular"; // Or handle error as appropriate
+  }
+  
+  const hours = date.getHours();
+  
+  if (hours >= 5 && hours < 12) return "Morning";
+  if (hours >= 12 && hours < 17) return "Afternoon";
+  if (hours >= 17 && hours < 21) return "Evening";
+  return "Night";
+};

@@ -22,6 +22,12 @@ interface ClaimStatus {
   txid?: string;
 }
 
+export interface RewardModalInfo {
+  title: string;
+  message: string;
+  isVisible: boolean;
+}
+
 /**
  * Custom hook to manage streak rewards based on the new linear model.
  * @param {string} pubkey - User's public key for Bitcoin rewards.
@@ -40,6 +46,7 @@ export const useStreakRewards = (pubkey: string | null) => {
     success: false,
     error: null,
   });
+  const [modalInfo, setModalInfo] = useState<RewardModalInfo | null>(null);
 
   // Recalculate reward state when streak data changes
   useEffect(() => {
@@ -94,12 +101,12 @@ export const useStreakRewards = (pubkey: string | null) => {
           txid: result.txid,
         });
 
-        const toastMsg = `Streak reward sent! +${amountToReward} sats`;
-        if ((window as any).Android && (window as any).Android.showToast) {
-          (window as any).Android.showToast(toastMsg);
-        } else {
-          alert(toastMsg);
-        }
+        // Show success modal
+        setModalInfo({
+          title: "🎉 Streak Reward! 🎉",
+          message: `Congratulations!\nYou've earned +${amountToReward} sats for reaching Day ${effectiveDaysForReward} of your streak!`,
+          isVisible: true,
+        });
         return { success: true, txid: result.txid, amount: amountToReward };
       } else {
         throw new Error(result.error || 'Failed to send streak reward.');
@@ -112,15 +119,19 @@ export const useStreakRewards = (pubkey: string | null) => {
         error: error.message || 'Payout failed.',
       });
 
-      // show failure toast
-      if ((window as any).Android && (window as any).Android.showToast) {
-        (window as any).Android.showToast(`Streak reward failed: ${error.message || 'Unknown error'}`);
-      } else {
-        alert(`Streak reward failed: ${error.message || 'Unknown error'}`);
-      }
+      // Show failure modal or toast
+      setModalInfo({
+        title: " Reward Attempt Failed",
+        message: `Could not send streak reward: ${error.message || 'Unknown error'}`,
+        isVisible: true,
+      });
       return { success: false, error: error.message };
     }
   }, [pubkey, streakData]);
+
+  const clearModal = useCallback(() => {
+    setModalInfo(null);
+  }, []);
 
   // Expose current state and the trigger function
   // The hook now reflects the current state rather than managing milestones.
@@ -131,6 +142,8 @@ export const useStreakRewards = (pubkey: string | null) => {
     rewardState,
     claimStatus,
     triggerStreakRewardPayout,
+    modalInfo,
+    clearModal,
     // Consider adding a function to manually refresh streakData if needed:
     // refreshStreakData: () => setStreakData(getStreakData()),
   };

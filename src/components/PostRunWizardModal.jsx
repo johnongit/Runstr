@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import runDataService from '../services/RunDataService';
 import { publishRun } from '../utils/runPublisher';
 import { NostrContext } from '../contexts/NostrContext';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings, PUBLISHABLE_METRICS } from '../contexts/SettingsContext';
 
 const intensities = [
   { value: 'easy', label: 'Easy' },
@@ -18,7 +18,7 @@ export const PostRunWizardModal = ({ run, onClose }) => {
   const [publishResults, setPublishResults] = useState(null);
 
   const { lightningAddress, publicKey } = useContext(NostrContext);
-  const { publishMode } = useSettings();
+  const settings = useSettings();
 
   // helper save intensity into run record once selected
   const persistIntensity = (value) => {
@@ -36,7 +36,7 @@ export const PostRunWizardModal = ({ run, onClose }) => {
     setPublishing(true);
     try {
       const unit = localStorage.getItem('distanceUnit') || 'km';
-      const results = await publishRun(run, unit);
+      const results = await publishRun(run, unit, settings);
       setPublishResults(results);
 
       const allSuccess = results && results.every(r => r.success);
@@ -44,7 +44,7 @@ export const PostRunWizardModal = ({ run, onClose }) => {
         try {
           const { rewardUserActivity } = await import('../services/rewardService');
           if (publicKey) {
-            const res = await rewardUserActivity(publicKey, 'workout_record', publishMode === 'private', lightningAddress);
+            const res = await rewardUserActivity(publicKey, 'workout_record', settings.publishMode === 'private', lightningAddress);
             const toastMsg = res.success ? `Reward sent: ${res.message}` : `Reward failed: ${res.error || res.message}`;
             if (window.Android && window.Android.showToast) {
               window.Android.showToast(toastMsg);
@@ -94,31 +94,54 @@ export const PostRunWizardModal = ({ run, onClose }) => {
     return (
       <div>
         <h3 className="text-lg font-semibold mb-4">Save to Nostr</h3>
-        <p className="mb-3">The following data will be published:</p>
-        <ul className="list-disc pl-6 mb-6">
-          <li>Workout Record</li>
-          <li>Workout Intensity</li>
-          <li>Calories burned</li>
-          <li>Distance</li>
-          <li>Pace</li>
-          <li>Steps</li>
-          <li>Elevation</li>
-          <li>Splits</li>
-        </ul>
+        <p className="mb-3">The following data will be (or was) published:</p>
+        <div className="space-y-2 mb-6">
+          <div className="flex items-center justify-between py-1">
+            <span className="text-sm text-gray-300">Workout Record (Summary)</span>
+            <input 
+              type="checkbox" 
+              className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded opacity-50"
+              checked 
+              readOnly 
+              disabled 
+            />
+          </div>
+          {PUBLISHABLE_METRICS.map(metric => {
+            const settingKey = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
+            const setSettingKey = `setPublish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
+            const isChecked = settings[settingKey];
+            const setter = settings[setSettingKey];
+
+            return (
+              <div key={metric.key} className="flex items-center justify-between py-1">
+                <span className="text-sm text-gray-300">{metric.label}</span>
+                <input
+                  type="checkbox"
+                  className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
+                  id={`publish-${metric.key}-checkbox`}
+                  checked={isChecked}
+                  onChange={() => setter(!isChecked)}
+                  disabled={publishing || !!publishResults}
+                />
+              </div>
+            );
+          })}
+        </div>
+        
         {publishResults && (
           <div className="mb-4 text-sm">
             {allSuccess ? (
-              <span className="text-green-400">Successfully published!</span>
+              <span className="text-green-400">Successfully published selected events!</span>
             ) : (
-              <span className="text-red-400">Some events failed. See console for details.</span>
+              <span className="text-red-400">Some selected events may have failed. See console.</span>
             )}
           </div>
         )}
         <div className="flex justify-end gap-2">
-          <button className="button-secondary" onClick={onClose} disabled={publishing}>Close</button>
+          <button className="button-secondary" onClick={onClose} disabled={publishing && !publishResults}>Close</button>
           {!publishResults && (
             <button className="button-primary" onClick={handlePublish} disabled={publishing}>
-              {publishing ? 'Publishing…' : 'Publish'}
+              {publishing ? 'Publishing…' : 'Publish Selected'}
             </button>
           )}
         </div>

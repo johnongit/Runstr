@@ -119,5 +119,12 @@ export const useProfileCache = () => {
     return resultMap;
   }, []); // NDK dependency might be needed if it can change, but it's imported as a module constant.
 
-  return { fetchProfiles };
+  const getProfile = useCallback((pubkey) => {
+    if (typeof pubkey !== 'string' || pubkey.trim() === '') {
+      return undefined;
+    }
+    return profileCache.get(pubkey);
+  }, []);
+
+  return { fetchProfiles, getProfile };
 }; 

@@ -7,5 +7,6 @@ export const relays = [
   'wss://purplepag.es',
   'wss://relayable.org',      // NEW – extra high-uptime
   'wss://nostr.wine',         // NEW – extra high-uptime
+  'wss://cache.primal.net',   // ADDED - Primal cache for better profile discovery
   'wss://groups.0xchat.com'  // NIP-29 group support
 ]; 

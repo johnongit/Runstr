@@ -1,4 +1,5 @@
 import { createAndPublishEvent } from './nostr';
+import { getActiveRelayList } from '../contexts/SettingsContext';
 
 /**
  * Create a weight event (kind 1351)
@@ -265,6 +266,15 @@ export const publishHealthProfile = async (profile, units = { weight: 'kg', heig
     throw new Error('No profile data provided');
   }
   
+  // Ensure we honour the user's relay privacy settings.
+  // If callers did not specify a `relays` array, look it up from SettingsContext.
+  const relayList = Array.isArray(opts.relays) && opts.relays.length > 0
+    ? opts.relays
+    : getActiveRelayList();
+
+  // Merge back into opts so downstream createAndPublishEvent receives it.
+  const publishOpts = { ...opts, relays: relayList };
+  
   // Create events for each health metric
   const events = [];
   
@@ -292,7 +302,7 @@ export const publishHealthProfile = async (profile, units = { weight: 'kg', heig
   const results = [];
   for (const event of events) {
     try {
-      const result = await createAndPublishEvent(event, null, opts);
+      const result = await createAndPublishEvent(event, null, publishOpts);
       results.push({
         kind: event.kind,
         success: true,
