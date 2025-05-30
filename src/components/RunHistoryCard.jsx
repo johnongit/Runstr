@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { ACTIVITY_TYPES } from '../services/RunDataService'; // Assuming ACTIVITY_TYPES is exported here
+import { getTimeOfDay } from '../utils/formatters'; // Import getTimeOfDay
 
 const styles = {
   card: {
@@ -154,7 +155,7 @@ export const RunHistoryCard = ({
     <div style={styles.card}>
       {/* Header with date and delete icon */}
       <div style={styles.header}>
-        <span style={styles.date}>{formatDate(run.date)}</span>
+        <span style={styles.date}>{formatDate(run.date)} - {getTimeOfDay(run.date)}</span>
         <button 
           style={styles.deleteButton}
           onClick={() => onDeleteClick(run)}
