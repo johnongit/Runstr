@@ -9,24 +9,25 @@ import {
   getTeamUUID,
 } from '../services/nostr/NostrTeamsService';
 import { useNostr } from '../hooks/useNostr';
-import { awaitNDKReady } from '../lib/ndkSingleton';
 
 const TeamsPage: React.FC = () => {
   const [teams, setTeams] = useState<NostrTeamEvent[]>([]);
-  const [isLoadingTeams, setIsLoadingTeams] = useState<boolean>(true);
+  const [isLoadingTeams, setIsLoadingTeams] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const { ndk, ndkReady: ndkReadyFromContext, ndkError: ndkErrorFromContext } = useNostr();
 
   const loadTeamsCallback = useCallback(async () => {
     if (!ndk) { 
-        console.warn("TeamsPage: NDK instance not available from context even after readiness check.");
+        console.warn("TeamsPage: NDK instance not available from context.");
         setFetchError("Nostr client (NDK) not available.");
         setIsLoadingTeams(false);
         return;
     }
+    setIsLoadingTeams(true);
+    setFetchError(null);
     try {
-      console.log("TeamsPage: NDK is ready, fetching public teams...");
+      console.log("TeamsPage: NDK is ready (from context), fetching public teams...");
       const fetchedTeams = await fetchPublicTeams(ndk);
       setTeams(fetchedTeams);
       if (fetchedTeams.length === 0) {
@@ -41,26 +42,17 @@ const TeamsPage: React.FC = () => {
   }, [ndk]);
 
   useEffect(() => {
-    const initializeAndLoad = async () => {
-      setIsLoadingTeams(true);
-      setFetchError(null);
+    if (ndkReadyFromContext && ndk) {
+      console.log("TeamsPage: ndkReadyFromContext is true. Loading teams.");
+      loadTeamsCallback();
+    } else if (!ndkReadyFromContext && !isLoadingTeams) { 
+      console.warn("TeamsPage: NDK not ready from context.");
       setTeams([]); 
-
-      console.log("TeamsPage: Checking NDK readiness via awaitNDKReady...");
-      const isSingletonReady = await awaitNDKReady(); 
-
-      if (isSingletonReady && ndk) { 
-        console.log("TeamsPage: NDK Singleton is ready. Proceeding to load teams.");
-        loadTeamsCallback(); 
-      } else {
-        console.warn("TeamsPage: NDK Singleton not ready or NDK instance not available from context.");
-        setFetchError(ndkErrorFromContext || "Could not connect to Nostr relays to fetch teams.");
-        setIsLoadingTeams(false);
+      if (ndkErrorFromContext) {
+          setFetchError(ndkErrorFromContext);
       }
-    };
-
-    initializeAndLoad();
-  }, [ndk, ndkReadyFromContext, loadTeamsCallback, ndkErrorFromContext]);
+    }
+  }, [ndk, ndkReadyFromContext, loadTeamsCallback, ndkErrorFromContext, isLoadingTeams]);
 
   return (
     <div className="p-4 max-w-3xl mx-auto text-white">
@@ -75,23 +67,35 @@ const TeamsPage: React.FC = () => {
       </div>
 
       <div className="mt-4">
-        {isLoadingTeams && (
+        {!ndkReadyFromContext && !isLoadingTeams && !ndkErrorFromContext && (
+           <div className="text-center text-yellow-400 py-10 bg-gray-800 rounded-lg p-4">
+             <p className="text-lg">Connecting to Nostr to fetch public teams...</p>
+             <p className="text-sm mt-2">You can still create a new team.</p>
+           </div>
+        )}
+        {!ndkReadyFromContext && !isLoadingTeams && ndkErrorFromContext && (
+            <div className="text-center text-red-400 py-10 bg-gray-800 rounded-lg p-4">
+                <p className="text-lg">Could not connect to Nostr.</p>
+                <p className="text-sm mt-2">{ndkErrorFromContext}</p>
+                <p className="text-sm mt-2">Please check your relay connections. You can still create a new team.</p>
+            </div>
+        )}
+        {ndkReadyFromContext && isLoadingTeams && (
           <div className="p-4 text-white text-center">Loading teams...</div>
         )}
-        {!isLoadingTeams && fetchError && (
+        {ndkReadyFromContext && !isLoadingTeams && fetchError && (
           <div className="text-center text-yellow-400 py-10 bg-gray-800 rounded-lg p-4">
             <p className="text-lg">Could not load teams.</p>
             <p className="text-sm text-red-400 mt-2">{fetchError}</p>
-            <p className="text-sm mt-2">You can still try to create a new team.</p>
           </div>
         )}
-        {!isLoadingTeams && !fetchError && teams.length === 0 && (
+        {ndkReadyFromContext && !isLoadingTeams && !fetchError && teams.length === 0 && (
           <div className="text-center text-gray-400 py-10 bg-gray-800 rounded-lg p-4">
             <p className="text-lg">No public NIP-101e teams found.</p>
             <p>Why not be the first to create one?</p>
           </div>
         )}
-        {!isLoadingTeams && !fetchError && teams.length > 0 && (
+        {ndkReadyFromContext && !isLoadingTeams && !fetchError && teams.length > 0 && (
           <ul className="space-y-4">
             {teams.map((team) => {
               const teamNameStr = getTeamName(team);
