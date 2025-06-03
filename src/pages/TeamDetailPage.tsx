@@ -14,16 +14,16 @@ import {
   addMemberToTeamEvent, // Import new function
   removeMemberFromTeamEvent, // Import new function
   KIND_FITNESS_TEAM,
-  // New imports for chat and NIP-101e activities
-  getTeamChatGroupRef,
-  subscribeToTeamChatMessages,
-  prepareTeamChatMessage,
+  // Updated imports for NIP-101e native chat
+  // getTeamChatGroupRef, // REMOVED
+  subscribeToTeamChatMessages, // Will now use teamAIdentifier
+  prepareTeamChatMessage,      // Will now use teamAIdentifier
   subscribeToTeamActivities,
   prepareTeamActivityEvent,
-  TeamActivityDetails, // Interface for activity creation form
+  TeamActivityDetails, 
   KIND_NIP101_TEAM_EVENT,
   KIND_NIP101_TEAM_CHALLENGE,
-  KIND_NIP29_CHAT_MESSAGE, // For typing chat messages
+  KIND_NIP101_TEAM_CHAT_MESSAGE, // Added for the new chat message kind
 } from '../services/nostr/NostrTeamsService'; // Corrected path
 import { useNostr } from '../hooks/useNostr'; // Corrected path
 import { NDKEvent, NDKSubscription, NDKKind } from '@nostr-dev-kit/ndk'; // For NDK operations, added NDKSubscription and NDKKind
@@ -69,8 +69,9 @@ const TeamDetailPage: React.FC = () => {
   const [isProcessingMembership, setIsProcessingMembership] = useState<string | null>(null); // Stores pubkey of member being processed or 'self' for leaving
   const [membershipError, setMembershipError] = useState<string | null>(null);
 
-  // State for Chat
-  const [chatGroupRef, setChatGroupRef] = useState<string | null>(null);
+  // State for Chat - chatGroupRef is no longer needed
+  // const [chatGroupRef, setChatGroupRef] = useState<string | null>(null); // REMOVED
+  const [teamAIdentifierForChat, setTeamAIdentifierForChat] = useState<string | null>(null); // Added: e.g. "33404:captain:uuid"
   const [chatMessages, setChatMessages] = useState<NostrEventBase[]>([]);
   const [newChatMessage, setNewChatMessage] = useState<string>('');
   const [isSendingChatMessage, setIsSendingChatMessage] = useState<boolean>(false);
@@ -81,7 +82,16 @@ const TeamDetailPage: React.FC = () => {
   const [teamActivities, setTeamActivities] = useState<NostrEventBase[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState<boolean>(false);
   const [activitiesSubscription, setActivitiesSubscription] = useState<NDKSubscription | null>(null);
-  // TODO: Add state for new activity form if implementing inline
+  
+  const [activityForm, setActivityForm] = useState<Omit<TeamActivityDetails, 'type'> & {type: 'event' | 'challenge', startTimeString?: string}>({
+    type: 'event',
+    name: '',
+    description: '',
+    startTimeString: '',
+    location: '',
+    rules: '',
+  });
+  const [isCreatingActivity, setIsCreatingActivity] = useState(false);
 
   const loadTeamDetails = useCallback(async (forceRefetch = false) => {
     if (!captainPubkey || !teamUUID || !ndkReady || !ndk) return;
@@ -92,16 +102,16 @@ const TeamDetailPage: React.FC = () => {
       const fetchedTeam = await fetchTeamById(ndk, captainPubkey, teamUUID);
       if (fetchedTeam) {
         setTeam(fetchedTeam);
-        // Extract chatGroupRef after team is fetched
-        const ref = getTeamChatGroupRef(fetchedTeam);
-        setChatGroupRef(ref);
-        if (!ref) {
-          console.warn("Team does not have a chat_group_ref tag.");
+        // Set the NIP-101e team's 'a' identifier for chat and activities
+        const teamId = getTeamUUID(fetchedTeam);
+        const capt = getTeamCaptain(fetchedTeam);
+        if (teamId && capt) {
+          setTeamAIdentifierForChat(`${KIND_FITNESS_TEAM}:${capt}:${teamId}`);
         }
       } else {
         setError('Team not found or failed to load.');
-        setTeam(null); // Clear team if not found
-        setChatGroupRef(null); // Clear ref if team not found
+        setTeam(null);
+        setTeamAIdentifierForChat(null); // Clear if team not found
       }
     } catch (err) {
       console.error("Error fetching team details:", err);
@@ -142,78 +152,60 @@ const TeamDetailPage: React.FC = () => {
     // };
   }, [activeTab, team, loadTeamFeed]); // Removed subscriptions from here, handle in specific effect hooks
 
-  // Effect for Chat Subscription
+  // Effect for Chat Subscription (uses teamAIdentifierForChat)
   useEffect(() => {
-    if (activeTab === 'chat' && chatGroupRef && ndk && ndkReady) {
+    if (activeTab === 'chat' && teamAIdentifierForChat && ndk && ndkReady) {
       setIsLoadingChat(true);
-      setChatMessages([]); // Clear previous messages
-      const sub = subscribeToTeamChatMessages(ndk, chatGroupRef, (newEvent) => {
+      setChatMessages([]); 
+      // Subscribe using the team's direct 'a' identifier and the new chat message kind
+      const sub = subscribeToTeamChatMessages(ndk, teamAIdentifierForChat, (newEvent) => {
         setChatMessages(prevMessages => {
-          // Avoid duplicates and sort by created_at
           if (prevMessages.find(msg => msg.id === newEvent.id)) return prevMessages;
           return [...prevMessages, newEvent].sort((a, b) => a.created_at - b.created_at);
         });
-      }, 50); // Load initial 50 messages
+      }, 50);
       if (sub) {
         setChatSubscription(sub);
-        // NDK usually auto-starts, but if not:
-        // sub.start(); 
-        // console.log("Chat subscription started for:", chatGroupRef);
       }
-      setIsLoadingChat(false); // Initial load might be quick, subscription handles ongoing
+      setIsLoadingChat(false); 
       return () => {
-        if (sub) {
-          // console.log("Stopping chat subscription for:", chatGroupRef);
-          sub.stop();
-        }
+        if (sub) sub.stop();
         setChatSubscription(null);
       };
     } else {
       if (chatSubscription) {
-        // console.log("Stopping chat subscription due to condition change for:", chatGroupRef);
         chatSubscription.stop();
         setChatSubscription(null);
       }
     }
-  }, [activeTab, chatGroupRef, ndk, ndkReady]);
+  }, [activeTab, teamAIdentifierForChat, ndk, ndkReady]);
 
-  // Effect for Team Activities Subscription
+  // Effect for Team Activities Subscription (uses teamAIdentifierForChat)
   useEffect(() => {
-    if (activeTab === 'activities' && team && ndk && ndkReady) {
-      const teamCaptain = getTeamCaptain(team);
-      const teamId = getTeamUUID(team);
-      if (!teamCaptain || !teamId) return;
-      const teamAIdentifier = `${KIND_FITNESS_TEAM}:${teamCaptain}:${teamId}`;
-
+    if (activeTab === 'activities' && teamAIdentifierForChat && ndk && ndkReady) {
       setIsLoadingActivities(true);
-      setTeamActivities([]); // Clear previous activities
-      const sub = subscribeToTeamActivities(ndk, teamAIdentifier, (newEvent) => {
+      setTeamActivities([]); 
+      const sub = subscribeToTeamActivities(ndk, teamAIdentifierForChat, (newEvent) => {
         setTeamActivities(prevActivities => {
           if (prevActivities.find(act => act.id === newEvent.id)) return prevActivities;
-          return [...prevActivities, newEvent].sort((a, b) => b.created_at - a.created_at); // Newest first
+          return [...prevActivities, newEvent].sort((a, b) => b.created_at - a.created_at); 
         });
       });
       if (sub) {
         setActivitiesSubscription(sub);
-        // sub.start();
-        // console.log("Activities subscription started for:", teamAIdentifier);
       }
       setIsLoadingActivities(false);
       return () => {
-        if (sub) {
-          // console.log("Stopping activities subscription for:", teamAIdentifier);
-          sub.stop();
-        }
+        if (sub) sub.stop();
         setActivitiesSubscription(null);
       };
     } else {
       if (activitiesSubscription) {
-        // console.log("Stopping activities subscription due to condition change");
         activitiesSubscription.stop();
         setActivitiesSubscription(null);
       }
     }
-  }, [activeTab, team, ndk, ndkReady]);
+  }, [activeTab, teamAIdentifierForChat, ndk, ndkReady]); // Changed from `team` to `teamAIdentifierForChat`
 
   const handleAddMember = async () => {
     if (!ndk || !currentUserPubkey || !team || !newMemberPubkey.trim()) {
@@ -224,37 +216,27 @@ const TeamDetailPage: React.FC = () => {
         setAddMemberError("Only the team captain can add members.");
         return;
     }
-
     setIsAddingMember(true);
     setAddMemberError(null);
-
     const updatedEventTemplate = addMemberToTeamEvent(team, newMemberPubkey.trim());
-
     if (!updatedEventTemplate) {
-      setAddMemberError("Failed to prepare updated team event (member might already exist or original event invalid).");
+      setAddMemberError("Failed to prepare updated team event.");
       setIsAddingMember(false);
       return;
     }
-
     try {
-      // The template needs pubkey for NDKEvent constructor if it's to be signed by current user
       const eventToSign = new NDKEvent(ndk, { ...updatedEventTemplate, pubkey: currentUserPubkey });
-      await eventToSign.sign(); // Sign with captain's (current user) key
+      await eventToSign.sign(); 
       const publishedRelays = await eventToSign.publish();
-
       if (publishedRelays.size > 0) {
-        console.log("Team updated (member added):");
-        setNewMemberPubkey(''); // Clear input
-        // Optimistically update UI or refetch team details for consistency
-        // Forcing a refetch is simpler for now
+        setNewMemberPubkey(''); 
         alert('Member added successfully! Team data will refresh.');
-        await loadTeamDetails(true); // Force refetch
+        await loadTeamDetails(true); 
       } else {
         setAddMemberError("Failed to publish team update. Check relay connections.");
       }
     } catch (err: any) {
-      console.error("Error adding member:", err);
-      setAddMemberError(err.message || "An unknown error occurred while adding member.");
+      setAddMemberError(err.message || "An unknown error occurred.");
     } finally {
       setIsAddingMember(false);
     }
@@ -267,32 +249,24 @@ const TeamDetailPage: React.FC = () => {
         return;
     }
     if (memberToRemovePk === currentUserPubkey) {
-        setMembershipError("Captain cannot remove themselves. To delete team, (future feature: use delete team option).");
-        // Or, if captain leaving means deleting the team (as it's replaceable by d+author):
-        // if (window.confirm("Are you sure you want to leave and effectively delete this team? This action might be irreversible if you are the only captain.")) {
-        //   // Proceed to delete/invalidate the team event - complex, handle later
-        // }
+        setMembershipError("Captain cannot remove themselves.");
         return;
     }
-
     setIsProcessingMembership(memberToRemovePk);
     setMembershipError(null);
-
     const updatedEventTemplate = removeMemberFromTeamEvent(team, memberToRemovePk);
     if (!updatedEventTemplate) {
-        setMembershipError("Failed to prepare team update for removing member (member might not exist or event invalid).");
+        setMembershipError("Failed to prepare team update for removing member.");
         setIsProcessingMembership(null);
         return;
     }
-
     try {
         const eventToSign = new NDKEvent(ndk, { ...updatedEventTemplate, pubkey: currentUserPubkey });
         await eventToSign.sign();
         const publishedRelays = await eventToSign.publish();
-
         if (publishedRelays.size > 0) {
             alert('Member removed successfully! Team data will refresh.');
-            await loadTeamDetails(true); // Refresh team details
+            await loadTeamDetails(true); 
         } else {
             setMembershipError("Failed to publish team update for removing member.");
         }
@@ -306,28 +280,11 @@ const TeamDetailPage: React.FC = () => {
   const handleLeaveTeam = async () => {
     if (!ndk || !currentUserPubkey || !team) return;
     const teamCaptain = getTeamCaptain(team);
-
     if (currentUserPubkey === teamCaptain) {
-        alert("Captains cannot leave the team using this option. Consider transferring captaincy or deleting the team (future features).");
-        // Or if captain leaving implies deleting the team event (since it's replaceable and identified by author+d)
-        // if (window.confirm("As the captain, leaving will effectively delete this team event. Are you sure?")) {
-        //   // Call a function to publish an empty/archived version of the Kind 33404 event or a Kind 5 deletion event.
-        //   // This is complex, for future: for now, captain cannot "leave" via this button.
-        //   // For now, we just prevent it.
-        //   console.log("Captain tried to leave. Future: Implement team deletion or captain transfer.");
-        // }
+        alert("Captains cannot leave the team using this option.");
         return;
     }
-
-    // For non-captains, leaving means the captain needs to remove them.
-    // For this phase, we simulate this by directly calling removeMember logic IF the current user is the one leaving
-    // In a more robust system, this would be a request to the captain.
-    // However, for simplicity, if a user clicks "Leave", and they are NOT captain, we allow them to trigger their own removal event if they could somehow sign it.
-    // But NIP-101e is captain-managed. So, this button should ideally just inform them to ask the captain.
-    alert(`To leave the team, please ask the captain (${getPubkeyDisplayName(teamCaptain)}) to remove you. (Functionality for captain to remove members will be added).`);
-    // If we wanted a user to signal they've left (client-side interpretation):
-    // They could publish a Kind 334XX (e.g. Team Left Signal) event tagging the team.
-    // Clients would then filter them out from member lists.
+    alert(`To leave the team, please ask the captain (${getPubkeyDisplayName(teamCaptain)}) to remove you.`);
   };
 
   if (isLoading && !team) {
@@ -354,8 +311,8 @@ const TeamDetailPage: React.FC = () => {
   const teamIsPublic = isTeamPublic(team);
   const confirmedTeamUUID = getTeamUUID(team);
 
-  const isCurrentUserCaptain = currentUserPubkey === actualCaptain;
-  const isCurrentUserMember = members.includes(currentUserPubkey || ' ');
+  const isCurrentUserCaptain = currentUserPubkey === actualCaptain && !!actualCaptain;
+  const isCurrentUserMember = !!currentUserPubkey && members.includes(currentUserPubkey);
 
   const renderTabs = () => {
     return (
@@ -374,7 +331,7 @@ const TeamDetailPage: React.FC = () => {
                 ${activeTab === tabName 
                   ? 'border-blue-500 text-blue-400' 
                   : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'}
-                transition-colors duration-150`}
+                capitalize transition-colors duration-150`}
             >
               {displayName}
             </button>
@@ -386,13 +343,13 @@ const TeamDetailPage: React.FC = () => {
   };
 
   const handleSendChatMessage = async () => {
-    if (!ndk || !ndkReady || !currentUserPubkey || !chatGroupRef || !newChatMessage.trim()) {
-      alert("Cannot send message: Missing NDK, user, chat group reference, or message content.");
+    if (!ndk || !ndkReady || !currentUserPubkey || !teamAIdentifierForChat || !newChatMessage.trim()) {
+      alert("Cannot send message: Missing NDK, user, team identifier, or message content.");
       return;
     }
     setIsSendingChatMessage(true);
     try {
-      const chatMessageTemplate = prepareTeamChatMessage(chatGroupRef, newChatMessage, currentUserPubkey);
+      const chatMessageTemplate = prepareTeamChatMessage(teamAIdentifierForChat, newChatMessage, currentUserPubkey);
       if (!chatMessageTemplate) {
         alert("Failed to prepare chat message.");
         setIsSendingChatMessage(false);
@@ -402,8 +359,7 @@ const TeamDetailPage: React.FC = () => {
       await ndkChatMessage.sign();
       const publishedRelays = await ndkChatMessage.publish();
       if (publishedRelays.size > 0) {
-        setNewChatMessage(''); // Clear input on success
-        // Message will appear via subscription
+        setNewChatMessage(''); 
       } else {
         alert("Failed to send chat message to any relays.");
       }
@@ -415,25 +371,29 @@ const TeamDetailPage: React.FC = () => {
     }
   };
 
-  // TODO: Implement handleCreateTeamActivity function
-  const handleCreateTeamActivity = async (activityDetails: TeamActivityDetails) => {
-    if (!ndk || !ndkReady || !currentUserPubkey || !team) {
-        alert("Cannot create activity: Missing NDK, user, or team data.");
+  // Updated handleCreateTeamActivity to use teamAIdentifierForChat (which is the team's 'a' tag)
+  const handleCreateTeamActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ndk || !ndkReady || !currentUserPubkey || !teamAIdentifierForChat) { // Check teamAIdentifierForChat
+        alert("Cannot create activity: Missing NDK, user, or team identifier.");
         return;
     }
-    const teamCaptain = getTeamCaptain(team);
-    const teamId = getTeamUUID(team);
-    if (!teamCaptain || !teamId) {
-        alert("Team captain or ID missing.");
-        return;
-    }
-    const teamAIdentifier = `${KIND_FITNESS_TEAM}:${teamCaptain}:${teamId}`;
+    // teamCaptain and teamId are implicit in teamAIdentifierForChat
 
-    // Add loading state for activity creation if needed
-    console.log("Creating team activity:", activityDetails, "for team:", teamAIdentifier);
-    const activityTemplate = prepareTeamActivityEvent(teamAIdentifier, activityDetails, currentUserPubkey);
+    const details: TeamActivityDetails = {
+        type: activityForm.type,
+        name: activityForm.name,
+        description: activityForm.description,
+        startTime: activityForm.startTimeString ? Math.floor(new Date(activityForm.startTimeString).getTime() / 1000) : undefined,
+        location: activityForm.type === 'event' ? activityForm.location : undefined,
+        rules: activityForm.type === 'challenge' ? activityForm.rules : undefined,
+    };
+
+    setIsCreatingActivity(true);
+    const activityTemplate = prepareTeamActivityEvent(teamAIdentifierForChat, details, currentUserPubkey);
     if (!activityTemplate) {
         alert("Failed to prepare team activity event.");
+        setIsCreatingActivity(false);
         return;
     }
     try {
@@ -442,24 +402,32 @@ const TeamDetailPage: React.FC = () => {
         const publishedRelays = await ndkActivityEvent.publish();
         if (publishedRelays.size > 0) {
             alert("Team activity created successfully!");
-            // Activity will appear via subscription. Optionally clear form.
+            setActivityForm({ type: 'event', name: '', description: '', startTimeString: '', location: '', rules: '' });
         } else {
             alert("Failed to publish team activity to any relays.");
         }
     } catch (err: any) {
         console.error("Error creating team activity:", err);
         alert(`Error creating activity: ${err.message}`);
+    } finally {
+        setIsCreatingActivity(false);
     }
+  };
+  
+  const handleActivityFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setActivityForm(prev => ({ ...prev, [name]: value }));
   };
 
   const renderChatTabContent = () => {
     if (isLoadingChat && chatMessages.length === 0) return <div className="text-gray-400 p-4 text-center">Loading chat...</div>;
-    if (!chatGroupRef) return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">Chat is not available for this team (missing chat_group_ref).</div>;
+    // Check teamAIdentifierForChat instead of chatGroupRef
+    if (!teamAIdentifierForChat) return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">Chat not available for this team.</div>;
     
     return (
-      <div className="flex flex-col h-[500px]"> {/* Example fixed height for chat area */}
+      <div className="flex flex-col h-[500px]"> 
         <div className="flex-grow overflow-y-auto p-4 space-y-3 bg-gray-800 rounded-t-md">
-          {chatMessages.length === 0 && <p className="text-gray-400 text-center">No messages yet. Start the conversation!</p>}
+          {chatMessages.length === 0 && !isLoadingChat && <p className="text-gray-400 text-center">No messages yet.</p>}
           {chatMessages.map(msg => (
             <div key={msg.id} className={`flex ${msg.pubkey === currentUserPubkey ? 'justify-end' : 'justify-start'}`}>
               <div 
@@ -470,7 +438,8 @@ const TeamDetailPage: React.FC = () => {
               >
                 <p className="text-xs font-semibold mb-0.5">
                   {getPubkeyDisplayName(msg.pubkey)}
-                  {msg.pubkey === getTeamCaptain(team || {} as NostrTeamEvent) && <span className="text-yellow-300 text-xs ml-1">(C)</span>} 
+                  {/* Ensure team is not null before accessing getTeamCaptain */}
+                  {team && msg.pubkey === getTeamCaptain(team) && <span className="text-yellow-300 text-xs ml-1">(C)</span>} 
                 </p>
                 <p className="text-sm">{msg.content}</p>
                 <p className="text-xxs text-gray-400 mt-1 text-right opacity-75">
@@ -489,11 +458,11 @@ const TeamDetailPage: React.FC = () => {
               onKeyPress={(e) => e.key === 'Enter' && !isSendingChatMessage && handleSendChatMessage()}
               placeholder="Type your message..."
               className="flex-grow p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
-              disabled={isSendingChatMessage}
+              disabled={isSendingChatMessage || !teamAIdentifierForChat} // Disable if no team identifier for chat
             />
             <button 
               onClick={handleSendChatMessage}
-              disabled={isSendingChatMessage || !newChatMessage.trim()}
+              disabled={isSendingChatMessage || !newChatMessage.trim() || !teamAIdentifierForChat} // Disable if no team identifier
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md disabled:opacity-50 transition-colors"
             >
               {isSendingChatMessage ? 'Sending...' : 'Send'}
@@ -505,78 +474,51 @@ const TeamDetailPage: React.FC = () => {
   };
 
   const renderActivitiesTabContent = () => {
-    // Basic placeholder for now - a real implementation would have a form to create new activities
-    // and a list to display them, distinguishing events/challenges.
     if (isLoadingActivities && teamActivities.length === 0) return <div className="text-gray-400 p-4 text-center">Loading team activities...</div>;
-    
-    // Example form for creating a new activity (can be moved to a separate component)
-    const ActivityCreationForm = () => {
-        const [type, setType] = useState<'event' | 'challenge'>('event');
-        const [name, setName] = useState('');
-        const [description, setDescription] = useState('');
-        const [startTime, setStartTime] = useState('');
-        const [location, setLocation] = useState(''); // For events
-        const [rules, setRules] = useState('');     // For challenges
+    if (!teamAIdentifierForChat) return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">Activities not available for this team.</div>;
 
-        const submitActivity = (e: React.FormEvent) => {
-            e.preventDefault();
-            const details: TeamActivityDetails = {
-                type,
-                name,
-                description,
-                startTime: startTime ? Math.floor(new Date(startTime).getTime() / 1000) : undefined,
-                location: type === 'event' ? location : undefined,
-                rules: type === 'challenge' ? rules : undefined,
-            };
-            handleCreateTeamActivity(details);
-            // Clear form optionally
-            setName(''); setDescription(''); setStartTime(''); setLocation(''); setRules('');
-        };
-
-        return (
-            <form onSubmit={submitActivity} className="p-4 bg-gray-750 rounded-lg mb-6 space-y-3">
+    return (
+        <div>
+            <form onSubmit={handleCreateTeamActivity} className="p-4 bg-gray-750 rounded-lg mb-6 space-y-3 border border-gray-700">
                 <h4 className="text-lg font-semibold text-gray-100">Create New Team Activity</h4>
                 <div>
                     <label className="block text-sm font-medium text-gray-300">Type</label>
-                    <select value={type} onChange={e => setType(e.target.value as any)} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white">
+                    <select name="type" value={activityForm.type} onChange={handleActivityFormChange} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white">
                         <option value="event">Event (e.g., Group Run)</option>
                         <option value="challenge">Challenge (e.g., Monthly Mileage)</option>
                     </select>
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-300">Name</label>
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white" />
+                    <input type="text" name="name" value={activityForm.name} onChange={handleActivityFormChange} required className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-300">Description</label>
-                    <textarea value={description} onChange={e => setDescription(e.target.value)} required rows={3} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white"></textarea>
+                    <textarea name="description" value={activityForm.description} onChange={handleActivityFormChange} required rows={3} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white"></textarea>
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-300">Start Time (Optional)</label>
-                    <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white" />
+                    <input type="datetime-local" name="startTimeString" value={activityForm.startTimeString} onChange={handleActivityFormChange} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white" />
                 </div>
-                {type === 'event' && (
+                {activityForm.type === 'event' && (
                     <div>
                         <label className="block text-sm font-medium text-gray-300">Location (for Event)</label>
-                        <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white" />
+                        <input type="text" name="location" value={activityForm.location} onChange={handleActivityFormChange} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white" />
                     </div>
                 )}
-                {type === 'challenge' && (
+                {activityForm.type === 'challenge' && (
                     <div>
                         <label className="block text-sm font-medium text-gray-300">Rules (for Challenge)</label>
-                        <textarea value={rules} onChange={e => setRules(e.target.value)} rows={2} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white"></textarea>
+                        <textarea name="rules" value={activityForm.rules} onChange={handleActivityFormChange} rows={2} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white"></textarea>
                     </div>
                 )}
-                <button type="submit" className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md">Create Activity</button>
+                <button type="submit" disabled={isCreatingActivity} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md disabled:opacity-50">
+                    {isCreatingActivity ? 'Creating...' : 'Create Activity'}
+                </button>
             </form>
-        );
-    };
 
-    return (
-        <div>
-            <ActivityCreationForm />
             <h3 className="text-xl font-semibold mb-3 text-gray-100">Scheduled Activities & Challenges</h3>
-            {teamActivities.length === 0 && <p className="text-gray-400 p-4 bg-gray-750 rounded-md">No activities scheduled for this team yet.</p>}
+            {teamActivities.length === 0 && !isLoadingActivities && <p className="text-gray-400 p-4 bg-gray-750 rounded-md">No activities scheduled for this team yet.</p>}
             <div className="space-y-4">
                 {teamActivities.map(act => {
                     const actName = act.tags.find(t => t[0] === 'name')?.[1] || 'Unnamed Activity';
@@ -586,7 +528,7 @@ const TeamDetailPage: React.FC = () => {
                     const isChallenge = act.kind === KIND_NIP101_TEAM_CHALLENGE;
 
                     return (
-                        <div key={act.id} className="p-4 bg-gray-750 rounded-lg shadow">
+                        <div key={act.id} className="p-4 bg-gray-750 rounded-lg shadow border border-gray-700">
                             <div className="flex justify-between items-start">
                                 <h4 className="text-lg font-semibold text-blue-300 mb-1">{actName} <span className="text-xs font-normal text-gray-400">({isChallenge ? 'Challenge' : 'Event'})</span></h4>
                                 <p className="text-xs text-gray-500">By: {getPubkeyDisplayName(act.pubkey)}</p>
@@ -594,7 +536,6 @@ const TeamDetailPage: React.FC = () => {
                             <p className="text-sm text-gray-300 whitespace-pre-wrap mb-2">{actDesc}</p>
                             {actStart && <p className="text-xs text-gray-400">Start: {new Date(parseInt(actStart) * 1000).toLocaleString()}</p>}
                             {actLocation && <p className="text-xs text-gray-400">Location: {actLocation}</p>}
-                            {/* TODO: Display more details like rules for challenges, end time etc. */}
                         </div>
                     );
                 })}
@@ -604,16 +545,19 @@ const TeamDetailPage: React.FC = () => {
   };
 
   const renderCurrentTabContent = () => {
+    if (!team && !isLoading) return <div className="p-4 text-white text-center">Team data could not be loaded.</div>;
+    if (isLoading && !team) return <div className="p-4 text-white text-center">Loading team details...</div>;
+    if (!team) return null; 
+
     switch (activeTab) {
-      case 'chat':
+      case 'chat': 
         return renderChatTabContent();
-      case 'activities':
-        return renderActivitiesTabContent(); // Replaces old 'events' and 'challenges' placeholders
+      case 'activities': 
+        return renderActivitiesTabContent();
       case 'members':
         return (
           <div>
             <h3 className="text-xl font-semibold mb-3 text-gray-100">Members ({members.length})</h3>
-            
             {isCurrentUserCaptain && (
               <div className="my-4 p-3 bg-gray-750 border border-gray-700 rounded-md">
                 <h4 className="text-md font-semibold text-gray-200 mb-2">Add New Member (Captain Only)</h4>
@@ -636,9 +580,7 @@ const TeamDetailPage: React.FC = () => {
                 {addMemberError && <p className="text-red-400 text-xs mt-2">{addMemberError}</p>}
               </div>
             )}
-
             {membershipError && <p className="text-red-400 text-sm my-3 p-2 bg-red-900/30 rounded-md">Error: {membershipError}</p>}
-
             {members.length > 0 ? (
               <ul className="space-y-2">
                 {members.map((memberPubkey, index) => (
@@ -666,7 +608,7 @@ const TeamDetailPage: React.FC = () => {
             {!isCurrentUserCaptain && isCurrentUserMember && (
                 <button 
                     onClick={handleLeaveTeam}
-                    disabled={isProcessingMembership === 'self'} // Example, if we had direct leave
+                    disabled={isProcessingMembership === 'self'} 
                     className="mt-4 px-4 py-2 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded disabled:opacity-50"
                 >
                    {isProcessingMembership === 'self' ? 'Processing...' : 'Request to Leave Team'} 
@@ -676,7 +618,7 @@ const TeamDetailPage: React.FC = () => {
         );
       case 'feed':
         if (isLoadingFeed) return <div className="text-gray-400 p-4 text-center">Loading team feed...</div>;
-        if (teamFeed.length === 0) return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">No activity in this team's feed yet.</div>;
+        if (teamFeed.length === 0 && !isLoadingFeed) return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">No activity in this team's feed yet.</div>;
         return (
           <div className="space-y-4">
             <h3 className="text-xl font-semibold mb-3 text-gray-100">Team Activity Feed</h3>
@@ -703,15 +645,11 @@ const TeamDetailPage: React.FC = () => {
 
   const renderJoinButton = () => {
       if (!team || !currentUserPubkey) return null;
-      if (isCurrentUserCaptain || isCurrentUserMember) return null; // Already in team or is captain
-      if (!teamIsPublic) return <p className="text-sm text-gray-400 mt-4">This is a private team. Contact the captain to join.</p>; // Private team
-
-      // For public teams, non-members see a join request button
-      // TODO: Implement actual join request logic (e.g., DM to captain, or specific event kind)
+      if (isCurrentUserCaptain || isCurrentUserMember) return null; 
+      if (!teamIsPublic) return <p className="text-sm text-gray-400 mt-4">This is a private team. Contact the captain to join.</p>; 
       return (
           <button 
-            // onClick={handleRequestToJoin} // Future implementation
-            onClick={() => alert(`To join, please contact the captain: ${getPubkeyDisplayName(actualCaptain)} (npub... or hex)`)}
+            onClick={() => alert(`To join, please contact the captain: ${getPubkeyDisplayName(actualCaptain)}`)}
             className="mt-4 w-full sm:w-auto px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition-colors"
             title={`Captain: ${actualCaptain}`}
           >

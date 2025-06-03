@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../../hooks/useNostr'; // Adjust path as needed
 import {
-  prepareNip101eTeamAndChatGroupEvents,
+  prepareNip101eTeamEventTemplate,
   getTeamUUID,
   getTeamCaptain,
   TeamData,
 } from '../../services/nostr/NostrTeamsService'; // Adjust path as needed
-import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk'; // For casting if needed, or NDK operations
+import { NDKEvent } from '@nostr-dev-kit/ndk'; // For casting if needed, or NDK operations
 
 const CreateTeamForm: React.FC = () => {
   const [teamName, setTeamName] = useState('');
@@ -46,48 +46,39 @@ const CreateTeamForm: React.FC = () => {
       image: teamImage.trim() || undefined,
     };
 
-    const preparedEvents = prepareNip101eTeamAndChatGroupEvents(
+    const teamEventTemplate = prepareNip101eTeamEventTemplate(
       teamData,
       publicKey
     );
 
-    if (!preparedEvents || !preparedEvents.teamEventTemplate || !preparedEvents.chatGroupEventTemplate) {
-      setError('Failed to prepare team and chat group events.');
+    if (!teamEventTemplate) {
+      setError('Failed to prepare team event.');
       setIsLoading(false);
       return;
     }
 
     try {
-      const ndkTeamEvent = new NDKEvent(ndk, preparedEvents.teamEventTemplate);
-      const ndkChatGroupEvent = new NDKEvent(ndk, preparedEvents.chatGroupEventTemplate);
-
+      const ndkTeamEvent = new NDKEvent(ndk, teamEventTemplate);
       await ndkTeamEvent.sign();
-      await ndkChatGroupEvent.sign();
       
-      const [teamPublishedRelays, chatGroupPublishedRelays] = await Promise.all([
-        ndkTeamEvent.publish(),
-        ndkChatGroupEvent.publish(),
-      ]);
+      const teamPublishedRelays = await ndkTeamEvent.publish();
       
-      console.log('Team event published to relays:', teamPublishedRelays);
-      console.log('Chat group event published to relays:', chatGroupPublishedRelays);
+      console.log('NIP-101e Team event published to relays:', teamPublishedRelays);
 
       if (teamPublishedRelays.size > 0) {
-        if (chatGroupPublishedRelays.size === 0) {
-          console.warn('Team event published, but NIP-29 chat group event failed to publish to any relays.');
-        }
         const newTeamUUID = getTeamUUID(ndkTeamEvent.rawEvent());
         const captain = getTeamCaptain(ndkTeamEvent.rawEvent());
         if (newTeamUUID && captain) {
           navigate(`/teams/${captain}/${newTeamUUID}`);
         } else {
+          console.error("Failed to get UUID or captain from published team event.");
           navigate('/teams');
         }
       } else {
         setError('Team event was signed but failed to publish to any relays. Please check your relay connections.');
       }
-    } catch (err) {
-      console.error('Error creating team:', err);
+    } catch (err: any) {
+      console.error('Error creating NIP-101e team:', err);
       setError(err.message || 'An unknown error occurred while creating the team.');
     } finally {
       setIsLoading(false);

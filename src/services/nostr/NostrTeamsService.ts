@@ -1,6 +1,6 @@
 import { Event as NostrEvent, EventTemplate } from 'nostr-tools'; // Added EventTemplate
 import { v4 as uuidv4 } from 'uuid';
-import NDK, { NDKEvent, NDKFilter, NDKKind, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk'; // Import NDK
+import NDK, { NDKEvent, NDKFilter, NDKKind, NDKSubscription, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk'; // Import NDK
 
 // Assume an NDK instance or similar service is available for actual Nostr operations
 // e.g., ndk.publish(event), ndk.fetchEvents(filter)
@@ -9,9 +9,14 @@ import NDK, { NDKEvent, NDKFilter, NDKKind, NDKSubscriptionCacheUsage } from '@n
 export const KIND_FITNESS_TEAM = 33404; // Your NIP-101e Team Kind
 export const KIND_WORKOUT_RECORD = 1301; // Define Kind 1301
 
-// New Kinds for NIP-29 Chat and NIP-101e Activities
-export const KIND_NIP29_GROUP_METADATA = 10009;
-export const KIND_NIP29_CHAT_MESSAGE = 9; // Standard kind for NIP-29 chat messages
+// NIP-29 Kinds - to be removed or repurposed if NIP-29 integration is fully removed
+// export const KIND_NIP29_GROUP_METADATA = 10009;
+// export const KIND_NIP29_CHAT_MESSAGE = 9; 
+
+// New Kind for NIP-101e Native Team Chat
+export const KIND_NIP101_TEAM_CHAT_MESSAGE = 133404; // Example custom kind
+
+// New Kinds for NIP-101e Activities
 export const KIND_NIP101_TEAM_EVENT = 31012; // NIP-101e Team Event
 export const KIND_NIP101_TEAM_CHALLENGE = 31013; // NIP-101e Team Challenge
 
@@ -32,13 +37,16 @@ export interface NostrTeamEvent extends NostrEvent {
 export interface NostrWorkoutEvent extends NostrEvent {} // Basic type for workout events
 
 /**
- * Prepares a new Fitness Team (Kind 33404) event.
+ * Prepares a new NIP-101e Fitness Team (Kind 33404) event template.
  * The actual signing and publishing will be handled by the app's NDK/Nostr client instance.
  * The creator automatically becomes the captain and a member.
  */
-export function prepareNewTeamEvent(teamData: TeamData, creatorPubkey: string): NostrTeamEvent | null {
+export function prepareNip101eTeamEventTemplate(
+  teamData: TeamData,
+  creatorPubkey: string
+): EventTemplate | null {
   if (!creatorPubkey) {
-    console.error("Creator pubkey is required to prepare a team event.");
+    console.error("Creator pubkey is required to prepare a NIP-101e team event.");
     return null;
   }
 
@@ -49,100 +57,24 @@ export function prepareNewTeamEvent(teamData: TeamData, creatorPubkey: string): 
     ["name", teamData.name],
     ["public", teamData.isPublic.toString()],
     ["captain", creatorPubkey],
-    ["member", creatorPubkey], // Captain is the first member
-    ["t", "team"],
-    ["t", "running"], // Default type, can be made configurable
-    ["type", "running_club"] // Default type
-    // Add other optional tags like location if provided
-  ];
-
-  const event: NostrTeamEvent = {
-    kind: KIND_FITNESS_TEAM as number,
-    pubkey: creatorPubkey,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: tags,
-    content: teamData.description, // Team description goes into content
-    id: '', // ID will be set after signing
-    sig: '', // Signature will be set after signing
-  };
-
-  // The event returned here is unsigned.
-  // The calling code will need to pass this to the NDK or equivalent for signing and publishing.
-  // e.g., const signedEvent = await ndk.signEvent(event);
-  //       await ndk.publish(signedEvent);
-  console.log("Prepared team creation event (unsigned):", event);
-  return event;
-}
-
-/**
- * Prepares event templates for a new NIP-101e Fitness Team (Kind 33404) 
- * AND its associated NIP-29 Chat Group (Kind 10009).
- * The actual signing and publishing will be handled by the app's NDK/Nostr client instance.
- * The creator automatically becomes the captain and a member of the NIP-101e team.
- * @returns An object containing the teamEventTemplate and chatGroupEventTemplate, or null if error.
- */
-export function prepareNip101eTeamAndChatGroupEvents(
-  teamData: TeamData,
-  creatorPubkey: string
-): { teamEventTemplate: EventTemplate; chatGroupEventTemplate: EventTemplate } | null {
-  if (!creatorPubkey) {
-    console.error("Creator pubkey is required to prepare team and chat group events.");
-    return null;
-  }
-
-  const teamUUID = uuidv4(); // This is the 'd' tag for the NIP-101e team
-  const nip29GroupDUUID = `runstr-chat-${teamUUID}`; // 'd' tag for the NIP-29 chat group
-
-  // 1. Prepare NIP-101e Team Event (Kind 33404)
-  const teamTags = [
-    ["d", teamUUID],
-    ["name", teamData.name],
-    ["public", teamData.isPublic.toString()],
-    ["captain", creatorPubkey],
-    ["member", creatorPubkey], // Captain is the first member
+    ["member", creatorPubkey], 
     ["t", "team"],
     ["t", "running"],
     ["type", "running_club"],
-    // Reference to the NIP-29 chat group
-    ["chat_group_ref", `${KIND_NIP29_GROUP_METADATA}:${creatorPubkey}:${nip29GroupDUUID}`],
   ];
   if (teamData.image) {
-    teamTags.push(["image", teamData.image]);
+    tags.push(["image", teamData.image]);
   }
 
-  const teamEventTemplate: EventTemplate = {
+  const eventTemplate: EventTemplate = {
     kind: KIND_FITNESS_TEAM,
     created_at: Math.floor(Date.now() / 1000),
-    tags: teamTags,
+    tags: tags,
     content: teamData.description,
   };
-  console.log("Prepared NIP-101e team creation event template (unsigned):", teamEventTemplate);
 
-  // 2. Prepare NIP-29 Chat Group Metadata Event (Kind 10009)
-  const chatGroupTags = [
-    ["d", nip29GroupDUUID], // Unique identifier for the NIP-29 group
-    ["name", `${teamData.name} Chat`], // Name for the chat group
-    // Reference back to the NIP-101e team
-    ["a", `${KIND_FITNESS_TEAM}:${creatorPubkey}:${teamUUID}`],
-    ["t", "chat"], // General chat tag
-    ["t", "runstr-team-chat"], // App-specific tag if needed
-  ];
-  if (teamData.image) {
-    chatGroupTags.push(["picture", teamData.image]); // NIP-29 uses 'picture'
-  }
-  // NIP-29 groups often list initial members or admins. For simplicity,
-  // we'll rely on the NIP-101e team's membership.
-  // If needed, ["p", creatorPubkey, "admin"] could be added.
-
-  const chatGroupEventTemplate: EventTemplate = {
-    kind: KIND_NIP29_GROUP_METADATA,
-    created_at: teamEventTemplate.created_at, // Use same timestamp or slightly after
-    tags: chatGroupTags,
-    content: `Chat for the Runstr team: ${teamData.name}. Associated NIP-101e team: ${KIND_FITNESS_TEAM}:${creatorPubkey}:${teamUUID}`,
-  };
-  console.log("Prepared NIP-29 chat group creation event template (unsigned):", chatGroupEventTemplate);
-  
-  return { teamEventTemplate, chatGroupEventTemplate };
+  console.log("Prepared NIP-101e team creation event template (unsigned):", eventTemplate);
+  return eventTemplate;
 }
 
 // --- Updated NDK-based fetch functions ---
@@ -388,11 +320,6 @@ export function getTeamUUID(teamEvent: NostrTeamEvent): string | undefined {
     return dTag ? dTag[1] : undefined;
 }
 
-export function getTeamChatGroupRef(teamEvent: NostrTeamEvent): string | null {
-  const chatRefTag = teamEvent.tags.find(tag => tag[0] === 'chat_group_ref');
-  return chatRefTag ? chatRefTag[1] : null;
-}
-
 export function isTeamPublic(teamEvent: NostrTeamEvent): boolean {
     const publicTag = teamEvent.tags.find(tag => tag[0] === 'public');
     return publicTag ? publicTag[1].toLowerCase() === 'true' : false; // Default to false if tag missing
@@ -497,38 +424,32 @@ export function removeMemberFromTeamEvent(
   return updatedEventTemplate;
 }
 
-// --- NIP-29 Chat Message Functions ---
+// --- NIP-101e Native Team Chat Functions ---
 
 /**
- * Prepares an unsigned NIP-29 chat message (Kind 9) event template.
- * @param chatGroupRef The 'a' tag reference of the NIP-29 group (e.g., "10009:pubkey:d_identifier").
+ * Prepares an unsigned NIP-101e native team chat message (e.g., Kind 133404) event template.
+ * @param teamAIdentifier The 'a' tag reference of the NIP-101e team (e.g., "33404:captain_pubkey:team_uuid").
  * @param messageContent The content of the chat message.
  * @param senderPubkey The pubkey of the user sending the message.
  * @returns An EventTemplate ready for signing, or null if inputs are invalid.
  */
 export function prepareTeamChatMessage(
-  chatGroupRef: string, // e.g., "10009:pubkey_of_kind10009:d_identifier_of_kind10009"
+  teamAIdentifier: string, // e.g., "33404:captain_pubkey:team_uuid"
   messageContent: string,
-  senderPubkey: string
+  senderPubkey: string // senderPubkey is needed to be passed to NDKEvent for signing
 ): EventTemplate | null {
-  if (!chatGroupRef || !messageContent || !senderPubkey) {
+  if (!teamAIdentifier || !messageContent || !senderPubkey) {
     console.error("Missing required parameters for prepareTeamChatMessage");
     return null;
   }
 
-  const dTagValue = chatGroupRef.split(':')[2]; // Extract d from "KIND:PK:D"
-
   const tags = [
-    ["a", chatGroupRef], // Main NIP-29 group reference
+    ["a", teamAIdentifier], // Link to the NIP-101e team event
+    // Optional: Add a specific tag for easier client-side filtering if needed, e.g., ["t", "nip101e-chat"]
   ];
-  if (dTagValue) {
-     tags.push(["d", dTagValue]); // Some clients might look for the 'd' tag directly on kind 9
-  }
-  // For replies, an 'e' tag pointing to the replied message_id and 'p' tag to its author would be added.
-  // For now, simple broadcast messages to the group.
 
   const eventTemplate: EventTemplate = {
-    kind: KIND_NIP29_CHAT_MESSAGE,
+    kind: KIND_NIP101_TEAM_CHAT_MESSAGE, // Use the new custom kind
     created_at: Math.floor(Date.now() / 1000),
     tags: tags,
     content: messageContent,
@@ -537,59 +458,41 @@ export function prepareTeamChatMessage(
 }
 
 /**
- * Subscribes to NIP-29 chat messages (Kind 9) for a specific team's chat group.
+ * Subscribes to NIP-101e native team chat messages for a specific team.
  * @param ndk NDK instance.
- * @param chatGroupRef The 'a' tag reference of the NIP-29 group (e.g., "10009:pubkey:d_identifier").
+ * @param teamAIdentifier The 'a' tag reference of the NIP-101e team (e.g., "33404:captain_pubkey:team_uuid").
  * @param callback Function to call with each new chat message event.
  * @param limit Optional limit for initial fetch.
- * @param since Optional timestamp to fetch messages since.
  * @returns NDKSubscription instance, or null if error.
  */
 export function subscribeToTeamChatMessages(
   ndk: NDK,
-  chatGroupRef: string, // e.g., "10009:pubkey_of_kind10009:d_identifier_of_kind10009"
+  teamAIdentifier: string, 
   callback: (event: NostrEvent) => void,
-  limit: number = 50, // Number of past messages to load initially
-  since?: number      // To load messages after a certain point (for pagination/updates)
-) {
-  if (!ndk || !chatGroupRef) {
-    console.error("NDK instance or chatGroupRef missing for subscribeToTeamChatMessages");
+  limit: number = 50 
+): NDKSubscription | null {
+  if (!ndk || !teamAIdentifier) {
+    console.error("NDK instance or teamAIdentifier missing for subscribeToTeamChatMessages");
     return null;
   }
   
   const filter: NDKFilter = {
-    kinds: [KIND_NIP29_CHAT_MESSAGE as NDKKind],
-    "#a": [chatGroupRef], // Filter by the NIP-29 group's 'a' tag
+    kinds: [KIND_NIP101_TEAM_CHAT_MESSAGE as NDKKind],
+    "#a": [teamAIdentifier], // Filter by the NIP-101e team's 'a' tag
     limit: limit,
   };
-
-  if (since) {
-    // If 'since' is provided, we are likely fetching newer messages, so remove limit or set to a higher value
-    // For real-time updates, 'limit' is usually small for the initial load, then 'since' is used.
-    // NDK subscriptions will keep delivering new events that match after the initial fetch.
-    // For fetching older messages, you'd use 'until' and decrement.
-    // Here, 'since' is more for "load messages newer than this", which NDK handles with live updates.
-    // NDK's default subscription behavior will fetch `limit` and then keep connection open for new ones.
-    // If you want to load messages *after* a certain point without a limit on how many,
-    // you might omit `limit` when `since` is present, or NDK might handle this fine.
-    // For now, we'll keep `limit` for the initial load even with `since`.
-    // filter.since = since; // NDK handles this automatically for ongoing subscriptions after initial limit
-  }
-  console.log("Subscribing to team chat messages with filter:", filter, chatGroupRef);
+  console.log("Subscribing to NIP-101e team chat messages with filter:", filter, teamAIdentifier);
 
   const subscription = ndk.subscribe(filter, { closeOnEose: false, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
 
   subscription.on('event', (ndkEvent: NDKEvent) => {
-    // console.log("Raw chat event received:", ndkEvent.rawEvent());
     callback(ndkEvent.rawEvent() as NostrEvent);
   });
 
   subscription.on('eose', () => {
-    console.log(`EOSE received for team chat messages: ${chatGroupRef}`);
+    console.log(`EOSE received for NIP-101e team chat messages: ${teamAIdentifier}`);
   });
   
-  // Call start() explicitly if not auto-starting (NDK usually auto-starts)
-  // subscription.start(); 
   return subscription;
 }
 
