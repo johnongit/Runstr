@@ -18,6 +18,10 @@ import { storeFeedCache, isCacheFresh } from './utils/feedCache';
 import { NostrContext } from './contexts/NostrContext.jsx';
 import './utils/errorSilencer';
 
+// Import AmberAuth and Linking from react-native
+import { Linking, Platform } from 'react-native'; // Platform might already be in your react-native-shim
+import AmberAuth from './services/AmberAuth';
+
 console.log("App.jsx is loading");
 
 // Improved error boundary fallback
@@ -76,7 +80,7 @@ const App = () => {
     console.log('~~ GLOBAL App.jsx: isInitialized changed to:', isInitialized);
   }, [isInitialized]);
   
-  // Initialize app services
+  // Initialize app services and Amber deep link handler
   useEffect(() => {
     const initializeApp = async () => {
       try {
@@ -151,6 +155,39 @@ const App = () => {
     };
     
     initializeApp();
+
+    // Amber Deep Link Handling
+    if (Platform.OS === 'android') {
+      console.log('[App.jsx] Setting up Amber deep link listener.');
+      const handleDeepLink = (event) => {
+        console.log('[App.jsx] Deep link event received:', event.url);
+        if (event.url && event.url.startsWith('runstr://callback')) {
+          AmberAuth.handleAmberSignCallback(event.url);
+        }
+        // Add other deep link routing logic if your app has more
+      };
+
+      // Listen for incoming app links
+      const linkingSubscription = Linking.addEventListener('url', handleDeepLink);
+
+      // Check for initial URL (if the app was opened via a deep link)
+      Linking.getInitialURL().then(url => {
+        if (url && url.startsWith('runstr://callback')) {
+          console.log('[App.jsx] Initial URL is an Amber callback:', url);
+          AmberAuth.handleAmberSignCallback(url);
+        }
+      }).catch(err => console.warn('[App.jsx] Error getting initial URL for Amber:', err));
+
+      // Cleanup listener on component unmount
+      return () => {
+        console.log('[App.jsx] Removing Amber deep link listener.');
+        linkingSubscription.remove();
+      };
+    } 
+    // For other platforms, or if not using Amber, this block can be skipped.
+    // No cleanup function needed if Platform.OS !== 'android'
+    return undefined; 
+
   }, []);
   
   // Global error handler

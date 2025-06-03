@@ -13,8 +13,8 @@ export function NostrProvider({ children }) {
     return stored ? parseInt(stored, 10) : 1000; // Default to 1000 sats if not set
   });
   
-  // Set up Amber deep linking handler
-  useEffect(() => {
+  // Set up Amber deep linking handler -- THIS useEffect block will be removed.
+  /*useEffect(() => {
     if (Platform.OS === 'android') {
       // Check if Amber is installed
       AmberAuth.isAmberInstalled().then(installed => {
@@ -35,6 +35,20 @@ export function NostrProvider({ children }) {
         removeListener();
       };
     }
+  }, []);*/
+
+  // Check Amber availability on mount for Android
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      AmberAuth.isAmberInstalled().then(installed => {
+        setIsAmberAvailable(installed);
+        if (installed) {
+          console.log('[NostrProvider] Amber is installed.');
+        } else {
+          console.log('[NostrProvider] Amber is NOT installed.');
+        }
+      });
+    }
   }, []);
 
   const updateDefaultZapAmount = useCallback((amount) => {
@@ -52,11 +66,25 @@ export function NostrProvider({ children }) {
     // For Android, use Amber if available
     if (Platform.OS === 'android' && isAmberAvailable) {
       try {
-        const result = await AmberAuth.requestAuthentication();
-        // The actual public key will be set by the deep link handler
-        return result;
+        console.log('[NostrProvider] Requesting Amber authentication via AmberAuth.requestAuthentication...');
+        // AmberAuth.requestAuthentication() now returns a Promise that resolves with the pubkey
+        const pubkeyFromAmber = await AmberAuth.requestAuthentication();
+        
+        if (pubkeyFromAmber && typeof pubkeyFromAmber === 'string') {
+          console.log('[NostrProvider] Amber authentication successful, pubkey:', pubkeyFromAmber);
+          setPublicKey(pubkeyFromAmber);
+          setIsNostrReady(true); // Indicate that Nostr is ready with a signer
+          localStorage.setItem('userPublicKey', pubkeyFromAmber); // Persist for other parts of the app
+          localStorage.setItem('permissionsGranted', 'true');
+          return true; // Indicate success
+        } else {
+          // This case should ideally be handled by the promise rejecting in AmberAuth
+          console.warn('[NostrProvider] Amber authentication did not return a valid pubkey.');
+          return false;
+        }
       } catch (error) {
-        console.error('Error requesting Amber authentication:', error);
+        console.error('[NostrProvider] Error requesting Amber authentication:', error);
+        // Optionally, update UI to inform the user, e.g., set an error state
         return false;
       }
     } 
@@ -85,7 +113,8 @@ export function NostrProvider({ children }) {
   const signEvent = useCallback(async (event) => {
     // For Android, use Amber if available
     if (Platform.OS === 'android' && isAmberAvailable) {
-      return AmberAuth.signEvent(event);
+      console.log('[NostrProvider] Signing event with Amber...');
+      return AmberAuth.signEvent(event); // This now returns a Promise<SignedEvent>
     } 
     // For web or if Amber is not available, use window.nostr
     else if (window.nostr) {
@@ -99,24 +128,26 @@ export function NostrProvider({ children }) {
     const initNostr = async () => {
       // Only auto-initialize if permissions were already granted
       const permissionsGranted = localStorage.getItem('permissionsGranted') === 'true';
+      const storedPubkey = localStorage.getItem('userPublicKey');
       
-      if (permissionsGranted) {
-        // For Android, we rely on the deep link handler to set the public key
-        if (Platform.OS === 'android' && isAmberAvailable) {
-          // We don't need to do anything here, as the deep link handler will handle it
-          return;
-        } 
-        // For web or if Amber is not available, use window.nostr
-        else if (window.nostr) {
-          try {
-            const pubkey = await window.nostr.getPublicKey();
-            setPublicKey(pubkey);
-            setIsNostrReady(true);
-          } catch (error) {
-            console.error('Error getting Nostr public key:', error);
-          }
+      if (permissionsGranted && storedPubkey) {
+        console.log('[NostrProvider] Permissions previously granted and pubkey found. Initializing with pubkey:', storedPubkey);
+        setPublicKey(storedPubkey);
+        setIsNostrReady(true);
+        // For Android, also check Amber's availability as it might have been uninstalled/reinstalled
+        if (Platform.OS === 'android') {
+          const installed = await AmberAuth.isAmberInstalled();
+          setIsAmberAvailable(installed);
         }
+      } else if (permissionsGranted && Platform.OS === 'android') {
+        // Permissions granted but no pubkey stored - this might mean app was closed before callback.
+        // AmberAuth.requestAuthentication() during a login attempt will handle this.
+        // We can check Amber availability here.
+        const installed = await AmberAuth.isAmberInstalled();
+        setIsAmberAvailable(installed);
+        console.log('[NostrProvider] Permissions granted on Android, Amber availability:', installed);
       }
+      // For web, if permissionsGranted but no storedPubkey, NIP-07 will be prompted on next action
     };
 
     initNostr();
