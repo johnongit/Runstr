@@ -1,8 +1,12 @@
-import PropTypes from 'prop-types';
-import { ACTIVITY_TYPES } from '../services/RunDataService'; // Assuming ACTIVITY_TYPES is exported here
+import React, { useState } from 'react'; // Assuming useState might be needed for loading/error states
+import { useNavigate } from 'react-router-dom';
+import { useNostr } from '../hooks/useNostr'; // Adjust path as needed
+import { getDefaultPostingTeamIdentifier } from '../utils/settingsManager'; // Adjust path
+import { createWorkoutEvent, createAndPublishEvent } from '../utils/nostr'; // Adjust path
 import { getTimeOfDay } from '../utils/formatters'; // Import getTimeOfDay
+import { ACTIVITY_TYPES } from '../services/RunDataService'; // Ensuring this import is present
 
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   card: {
     width: '100%',
     margin: '0 auto 16px auto',
@@ -108,7 +112,46 @@ const styles = {
   }
 };
 
-export const RunHistoryCard = ({
+interface RunData {
+  id: string; // Assuming each run has an ID
+  distance: number;
+  duration: number;
+  activityType?: string;
+  notes?: string;
+  title?: string;
+  date?: number | string; // timestamp or ISO string
+  elevation?: { gain: number; loss: number };
+  // Add other fields that runDataService.saveRun and createWorkoutEvent expect
+  unit?: string; // 'km' or 'mi' - Important for createWorkoutEvent
+  // Ensure all fields used by createWorkoutEvent are present from the local run object
+  splits?: any[]; // Added to match usage, define more strictly if possible
+}
+
+interface RunHistoryCardProps {
+  run: RunData;
+  distanceUnit: string;
+  formatDate: (date?: number | string) => string; // Optional date
+  formatTime: (secs: number) => string;
+  displayDistance: (meters: number, unit: string) => string;
+  formatElevation: (gain?: number, loss?: number, unit?: string) => string; // Optional gain/loss/unit
+  pace: string;
+  caloriesBurned: number;
+  activityType: string | undefined;
+  displayMetricValue: string | number | undefined;
+  displayMetricLabel: string | undefined;
+  displayMetricUnit: string | undefined;
+  isWorkoutSaved: boolean;
+  isSavingWorkout: boolean;
+  savingWorkoutRunId: string | undefined;
+  expandedRuns: Set<string>;
+  onPostToNostr: (run: RunData) => void;
+  onSaveWorkout: (run: RunData) => void;
+  onDeleteClick: (run: RunData) => void;
+  onToggleSplits: (e: React.MouseEvent<HTMLButtonElement>, runId: string) => void;
+  SplitsTable: React.ElementType;
+}
+
+export const RunHistoryCard: React.FC<RunHistoryCardProps> = ({
   run,
   distanceUnit,
   formatDate,
@@ -131,6 +174,12 @@ export const RunHistoryCard = ({
   onToggleSplits,
   SplitsTable
 }) => {
+  const navigate = useNavigate();
+  const { ndk, publicKey, ndkReady } = useNostr();
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareSuccess, setShareSuccess] = useState<string | null>(null);
+
   let metricLabelToDisplay;
   let metricValueToDisplay;
   let metricUnitToDisplay = '';
@@ -139,7 +188,7 @@ export const RunHistoryCard = ({
 
   if (currentActivityType === ACTIVITY_TYPES.WALK && displayMetricValue !== undefined) {
     metricLabelToDisplay = displayMetricLabel || 'Steps';
-    metricValueToDisplay = Math.round(displayMetricValue);
+    metricValueToDisplay = Math.round(typeof displayMetricValue === 'number' ? displayMetricValue : parseFloat(displayMetricValue));
     metricUnitToDisplay = displayMetricUnit || '';
   } else if (currentActivityType === ACTIVITY_TYPES.CYCLE && displayMetricValue !== undefined) {
     metricLabelToDisplay = displayMetricLabel || 'Speed';
@@ -151,11 +200,97 @@ export const RunHistoryCard = ({
     metricUnitToDisplay = `min/${distanceUnit}`;
   }
   
+  const handleShareToNostr = async () => {
+    if (!ndkReady || !ndk || !publicKey) {
+      setShareError('Nostr client not ready or not logged in.');
+      setTimeout(() => setShareError(null), 5000);
+      return;
+    }
+    if (!run) {
+      setShareError('Run data is missing.');
+      setTimeout(() => setShareError(null), 5000);
+      return;
+    }
+
+    setIsSharing(true);
+    setShareError(null);
+    setShareSuccess(null);
+
+    let teamAssociation: { teamCaptainPubkey: string; teamUUID: string; relayHint?: string } | undefined = undefined;
+    const defaultTeamId = getDefaultPostingTeamIdentifier();
+
+    if (defaultTeamId) {
+      const parts = defaultTeamId.split(':');
+      if (parts.length === 2) {
+        const [teamCaptainPubkey, teamUUIDValue] = parts; // Renamed to avoid conflict with teamUUID from useParams
+        teamAssociation = { teamCaptainPubkey, teamUUID: teamUUIDValue };
+      }
+    }
+    
+    const eventRunData: RunData = {
+        ...run,
+        activityType: run.activityType || 'run',
+        date: run.date || Date.now(),
+        title: run.title || `${run.activityType || 'Activity'} on ${new Date(run.date || Date.now()).toLocaleDateString()}`,
+        notes: run.notes || '',
+        unit: distanceUnit,
+    };
+
+    const eventTemplate = createWorkoutEvent(eventRunData, distanceUnit, { teamAssociation });
+
+    if (!eventTemplate) {
+      setShareError('Failed to prepare workout event for Nostr.');
+      setIsSharing(false);
+      setTimeout(() => setShareError(null), 5000);
+      return;
+    }
+
+    try {
+      const publishedEventOutcome = await createAndPublishEvent(eventTemplate, publicKey);
+      if (publishedEventOutcome && publishedEventOutcome.success) {
+        console.log('RunHistoryCard: Workout event published:', publishedEventOutcome);
+        setShareSuccess('Successfully shared to Nostr!');
+      } else {
+        console.error("RunHistoryCard: Publishing failed:", publishedEventOutcome?.error);
+        setShareError(publishedEventOutcome?.error || 'Failed to share to Nostr. Check relay connections.');
+      }
+    } catch (err: any) {
+      console.error('RunHistoryCard: Error sharing to Nostr:', err);
+      setShareError(err.message || 'An unknown error occurred during sharing.');
+    } finally {
+      setIsSharing(false);
+      setTimeout(() => { 
+        setShareError(null); 
+        setShareSuccess(null); 
+      }, 5000);
+    }
+  };
+  
+  const handleSaveWorkoutRecord = async () => {
+    alert('"Save Workout Record" currently saves locally. Use "Share to Nostr" to publish a NIP-101e event with team tags.');
+  };
+
+  const displayDuration = (secs: number = 0) => {
+    const hours = Math.floor(secs / 3600);
+    const minutes = Math.floor((secs % 3600) / 60);
+    const seconds = Math.floor(secs % 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const displayPace = () => {
+    if (run.distance > 0 && run.duration > 0) {
+        const paceMinPerUnit = (run.duration / 60) / (distanceUnit === 'km' ? run.distance / 1000 : run.distance / 1609.344);
+        const minutes = Math.floor(paceMinPerUnit);
+        const seconds = Math.round((paceMinPerUnit - minutes) * 60);
+        return `${minutes}:${seconds.toString().padStart(2, '0')} min/${distanceUnit}`;
+    }
+    return '--:--';
+  };
+
   return (
     <div style={styles.card}>
-      {/* Header with date and delete icon */}
       <div style={styles.header}>
-        <span style={styles.date}>{formatDate(run.date)} - {getTimeOfDay(run.date)}</span>
+        <span style={styles.date}>{formatDate(run.date)} - {getTimeOfDay(run.date || Date.now())}</span>
         <button 
           style={styles.deleteButton}
           onClick={() => onDeleteClick(run)}
@@ -170,11 +305,10 @@ export const RunHistoryCard = ({
         </button>
       </div>
       
-      {/* Metrics grid */}
       <div style={styles.metricsGrid}>
         <div style={styles.metricItem}>
           <span style={styles.metricLabel}>Duration</span>
-          <span style={styles.metricValue}>{formatTime(run.duration)}</span>
+          <span style={styles.metricValue}>{displayDuration(run.duration)}</span>
         </div>
         
         <div style={styles.metricItem}>
@@ -202,18 +336,17 @@ export const RunHistoryCard = ({
           <>
             <div style={styles.metricItem}>
               <span style={styles.metricLabel}>Elevation Gain</span>
-              <span style={styles.metricValue}>{formatElevation(run.elevation.gain, distanceUnit)}</span>
+              <span style={styles.metricValue}>{formatElevation(run.elevation.gain, run.elevation.loss, distanceUnit)}</span>
             </div>
             
             <div style={styles.metricItem}>
               <span style={styles.metricLabel}>Elevation Loss</span>
-              <span style={styles.metricValue}>{formatElevation(run.elevation.loss, distanceUnit)}</span>
+              <span style={styles.metricValue}>{formatElevation(run.elevation.gain, run.elevation.loss, distanceUnit)}</span>
             </div>
           </>
         )}
       </div>
       
-      {/* Splits toggle */}
       {run.splits && run.splits.length > 0 && (
         <button 
           style={styles.splitsToggle}
@@ -223,25 +356,24 @@ export const RunHistoryCard = ({
         </button>
       )}
       
-      {/* Splits table */}
       {expandedRuns.has(run.id) && run.splits && run.splits.length > 0 && (
         <div style={styles.splitsContainer}>
           <SplitsTable splits={run.splits} distanceUnit={distanceUnit} />
         </div>
       )}
       
-      {/* Action buttons */}
       <div style={styles.actionsContainer}>
         <button
           style={styles.actionButton}
-          onClick={() => onPostToNostr(run)}
+          onClick={handleShareToNostr}
+          disabled={isSharing || !ndkReady}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
             <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
             <polyline points="16 6 12 2 8 6"></polyline>
             <line x1="12" y1="2" x2="12" y2="15"></line>
           </svg>
-          Share to Nostr
+          {isSharing ? 'Sharing to Nostr...' : 'Share to Nostr'}
         </button>
         
         <button
@@ -249,7 +381,7 @@ export const RunHistoryCard = ({
             ...styles.actionButton,
             ...(isSavingWorkout || isWorkoutSaved ? styles.disabled : {})
           }}
-          onClick={() => onSaveWorkout(run)}
+          onClick={handleSaveWorkoutRecord}
           disabled={isSavingWorkout || isWorkoutSaved}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
@@ -272,32 +404,9 @@ export const RunHistoryCard = ({
           Delete
         </button>
       </div>
+      {!ndkReady && <p className="text-xs text-yellow-500 mt-1 text-center sm:text-right">Nostr not ready</p>}
     </div>
   );
-};
-
-RunHistoryCard.propTypes = {
-  run: PropTypes.object.isRequired,
-  distanceUnit: PropTypes.string.isRequired,
-  formatDate: PropTypes.func.isRequired,
-  formatTime: PropTypes.func.isRequired,
-  displayDistance: PropTypes.func.isRequired,
-  formatElevation: PropTypes.func.isRequired,
-  pace: PropTypes.string.isRequired,
-  caloriesBurned: PropTypes.number.isRequired,
-  activityType: PropTypes.oneOf(Object.values(ACTIVITY_TYPES)),
-  displayMetricValue: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  displayMetricLabel: PropTypes.string,
-  displayMetricUnit: PropTypes.string,
-  isWorkoutSaved: PropTypes.bool.isRequired,
-  isSavingWorkout: PropTypes.bool.isRequired,
-  savingWorkoutRunId: PropTypes.string,
-  expandedRuns: PropTypes.instanceOf(Set).isRequired,
-  onPostToNostr: PropTypes.func.isRequired,
-  onSaveWorkout: PropTypes.func.isRequired,
-  onDeleteClick: PropTypes.func.isRequired,
-  onToggleSplits: PropTypes.func.isRequired,
-  SplitsTable: PropTypes.elementType.isRequired
 };
 
 export default RunHistoryCard; 

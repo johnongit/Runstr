@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FloatingMusicPlayer } from './FloatingMusicPlayer';
 import { useActivityMode, ACTIVITY_TYPES } from '../contexts/ActivityModeContext';
@@ -15,8 +15,23 @@ export const MenuBar = () => {
     publishMode, setPublishMode,
     privateRelayUrl, setPrivateRelayUrl,
     skipStartCountdown, setSkipStartCountdown,
-    usePedometer, setUsePedometer
+    usePedometer, setUsePedometer,
   } = useSettings();
+
+  // State for the fallback lightning address in the modal
+  const [manualLnAddress, setManualLnAddress] = useState('');
+  const [lnAddressStatusMessage, setLnAddressStatusMessage] = useState('');
+
+  // Load manualLnAddress when settings modal becomes visible or component mounts
+  useEffect(() => {
+    // Only load if the modal might be opened, or simply on mount.
+    // If settingsOpen state is not directly accessible here, loading on mount is fine.
+    const savedLnAddress = localStorage.getItem('manualLightningAddress');
+    if (savedLnAddress) {
+      setManualLnAddress(savedLnAddress);
+    }
+  }, []); // Empty dependency array: runs once on mount.
+           // Or, if settingsOpen is available: [settingsOpen] to run when modal visibility changes
 
   const menuItems = [
     { 
@@ -86,6 +101,19 @@ export const MenuBar = () => {
       }
     }
     setHealthEncryptionPref(enable ? 'encrypted' : 'plaintext');
+  };
+
+  const handleSaveLnAddress = () => {
+    if (manualLnAddress && manualLnAddress.includes('@') && manualLnAddress.includes('.')) {
+      localStorage.setItem('manualLightningAddress', manualLnAddress);
+      setLnAddressStatusMessage('Lightning Address saved!');
+    } else if (!manualLnAddress) {
+      localStorage.removeItem('manualLightningAddress');
+      setLnAddressStatusMessage('Lightning Address cleared.');
+    } else {
+      setLnAddressStatusMessage('Please enter a valid Lightning Address (e.g., user@domain.com)');
+    }
+    setTimeout(() => setLnAddressStatusMessage(''), 3000);
   };
 
   return (
@@ -316,6 +344,31 @@ export const MenuBar = () => {
               </div>
             </div>
             
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold mb-2 text-gray-200">Rewards</h4>
+              <div className="setting-item bg-gray-800 p-3 rounded-md">
+                <label htmlFor="manualLnAddressInput" className="block text-sm font-medium text-gray-300 mb-1">Fallback Lightning Address</label>
+                <input
+                  type="email"
+                  id="manualLnAddressInput"
+                  placeholder="yourname@example.com"
+                  value={manualLnAddress}
+                  onChange={(e) => setManualLnAddress(e.target.value)}
+                  className="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button 
+                  onClick={handleSaveLnAddress} 
+                  className="mt-2 w-full px-4 py-2 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                >
+                  Save Address
+                </button>
+                {lnAddressStatusMessage && <p className="mt-2 text-xs text-center text-gray-400">{lnAddressStatusMessage}</p>}
+                <p className="mt-2 text-xs text-gray-500">
+                  This is a global fallback. If Runstr attempts to send a reward and cannot find the recipient's Lightning Address from their Nostr profile, it will use this address instead.
+                </p>
+              </div>
+            </div>
+
             <div className="flex flex-col space-y-4">
               <Link 
                 to="/nwc" 

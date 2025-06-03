@@ -1,0 +1,141 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useNostr } from '../../hooks/useNostr'; // Adjust path as needed
+import {
+  prepareNewTeamEvent,
+  getTeamUUID,
+  getTeamCaptain,
+} from '../../services/nostr/NostrTeamsService'; // Adjust path as needed
+import { NDKEvent } from '@nostr-dev-kit/ndk'; // For casting if needed, or NDK operations
+
+const CreateTeamForm: React.FC = () => {
+  const [teamName, setTeamName] = useState('');
+  const [teamDescription, setTeamDescription] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const navigate = useNavigate();
+  const { ndk, publicKey, ndkReady } = useNostr();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!ndkReady || !ndk) {
+      setError('Nostr client is not ready. Please try again later.');
+      return;
+    }
+    if (!publicKey) {
+      setError('Public key not found. Please make sure you are logged in.');
+      return;
+    }
+    if (!teamName.trim()) {
+      setError('Team name is required.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    const preparedEvent = prepareNewTeamEvent(
+      { name: teamName, description: teamDescription, isPublic },
+      publicKey
+    );
+
+    if (!preparedEvent) {
+      setError('Failed to prepare team event.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const ndkEvent = new NDKEvent(ndk, preparedEvent);
+      // NDK will use the signer attached to the NDK instance from NostrContext
+      await ndkEvent.sign(); // This uses the NDK's signer
+      const publishedRelays = await ndkEvent.publish();
+      
+      console.log('Team event published to relays:', publishedRelays);
+
+      if (publishedRelays.size > 0) {
+        // Navigate to the new team's detail page
+        const newTeamUUID = getTeamUUID(ndkEvent.rawEvent());
+        const captain = getTeamCaptain(ndkEvent.rawEvent());
+        if (newTeamUUID && captain) {
+          navigate(`/teams/${captain}/${newTeamUUID}`);
+        } else {
+          navigate('/teams'); // Fallback to teams list
+        }
+      } else {
+        setError('Team event was signed but failed to publish to any relays. Please check your relay connections.');
+      }
+    } catch (err) {
+      console.error('Error creating team:', err);
+      setError(err.message || 'An unknown error occurred while creating the team.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-4 max-w-md mx-auto bg-gray-800 text-white rounded-lg shadow-lg mt-5">
+      <h2 className="text-2xl font-bold mb-6 text-center">Create New Team</h2>
+      <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label htmlFor="teamName" className="block text-sm font-medium text-gray-300 mb-1">
+            Team Name
+          </label>
+          <input
+            type="text"
+            id="teamName"
+            value={teamName}
+            onChange={(e) => setTeamName(e.target.value)}
+            className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
+            required
+          />
+        </div>
+
+        <div className="mb-4">
+          <label htmlFor="teamDescription" className="block text-sm font-medium text-gray-300 mb-1">
+            Team Description
+          </label>
+          <textarea
+            id="teamDescription"
+            value={teamDescription}
+            onChange={(e) => setTeamDescription(e.target.value)}
+            rows={3}
+            className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
+          ></textarea>
+        </div>
+
+        <div className="mb-6">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              className="h-4 w-4 text-blue-600 border-gray-500 rounded bg-gray-700 focus:ring-blue-500"
+            />
+            <span className="ml-2 text-sm text-gray-300">Publicly visible team</span>
+          </label>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-700/50 text-red-200 border border-red-600 rounded-md">
+            <p>{error}</p>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isLoading || !ndkReady}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
+        >
+          {isLoading ? 'Creating Team...' : 'Create Team'}
+        </button>
+        {!ndkReady && <p className="text-xs text-yellow-400 mt-2 text-center">Nostr connection not ready...</p>}
+      </form>
+    </div>
+  );
+};
+
+export default CreateTeamForm; 

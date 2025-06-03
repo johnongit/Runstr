@@ -6,6 +6,7 @@ import { createAndPublishEvent as publishWithNostrTools } from './nostrClient.js
 import { getFastestRelays, directFetchRunningPosts } from './feedFetcher.js';
 import { encryptContentNip44 } from './nip44.js';
 import { getEventTargetId, chunkArray } from './eventHelpers.js';
+import { v4 as uuidv4 } from 'uuid'; // Import uuid
 
 // Import the NDK singleton
 import { ndk, ndkReadyPromise } from '../lib/ndkSingleton.js'; // Adjusted path
@@ -85,36 +86,36 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
     try {
       const defaultSince = Math.floor(Date.now() / 1000) - 14 * 24 * 60 * 60;
       const sinceTimestamp = sinceArg ? Math.floor(sinceArg / 1000) : defaultSince;
-      console.log(`[nostr.js] Fetching posts with #runstr hashtag from ${new Date(sinceTimestamp * 1000).toLocaleString()}`);
+      console.log(`[nostr.js] Fetching Kind 1301 Workout Records from ${new Date(sinceTimestamp * 1000).toLocaleString()}`);
       
       const uniqueEvents = new Map();
       let receivedEvents = false;
       
       return await new Promise((resolve) => {
         const maxTimeout = setTimeout(async () => {
-          console.log(`[nostr.js] Timeout (6s) reached with ${uniqueEvents.size} posts collected`);
+          console.log(`[nostr.js] Timeout (6s) reached with ${uniqueEvents.size} Kind 1301 events collected`);
           let eventArray = Array.from(uniqueEvents.values())
             .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
             .slice(0, limit);
 
-          // Fallback: if nothing collected, run direct fetch on fastest relays
-          if (eventArray.length === 0) {
-            console.log('[nostr.js] Falling back to directFetchRunningPosts due to empty result set.');
-            try {
-              eventArray = await directFetchRunningPosts(limit, 7, 5000);
-            } catch (fallbackErr) {
-              console.warn('[nostr.js] directFetchRunningPosts fallback failed:', fallbackErr);
-            }
-          }
+          // Fallback removed for Phase 1 simplification with Kind 1301
+          // if (eventArray.length === 0) {
+          //   console.log('[nostr.js] Falling back to directFetchRunningPosts due to empty result set.');
+          //   try {
+          //     eventArray = await directFetchRunningPosts(limit, 7, 5000);
+          //   } catch (fallbackErr) {
+          //     console.warn('[nostr.js] directFetchRunningPosts fallback failed:', fallbackErr);
+          //   }
+          // }
           resolve(eventArray);
         }, 6000);
         
         const fastRelays = getFastestRelays(3);
         const relaySet = NDKRelaySet.fromRelayUrls(fastRelays, ndk);
         const sub = ndk.subscribe({
-          kinds: [1],
-          limit: limit * 2,
-          "#t": ["runstr"],
+          kinds: [1301], // Changed to Kind 1301
+          limit: limit * 3, // Fetch more to allow for client-side filtering
+          // "#t": ["runstr"], // Removed hashtag filter, will filter client-side for activity_type
           since: sinceTimestamp
         }, { closeOnEose: false, relaySet });
         
@@ -128,7 +129,10 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
           receivedEvents = true;
           uniqueEvents.set(event.id, event);
           
-          if (uniqueEvents.size >= limit) {
+          // Client-side filter for running activity
+          const isRunningActivity = event.tags.some(tag => tag[0] === 'activity_type' && tag[1] === 'running');
+          
+          if (uniqueEvents.size >= limit && Array.from(uniqueEvents.values()).filter(e => e.tags.some(t => t[0] === 'activity_type' && t[1] === 'running')).length >= limit ) {
             setTimeout(() => {
               clearTimeout(maxTimeout);
               try {
@@ -145,9 +149,11 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
                 console.warn('[nostr.js] Could not save relay performance data', err);
               }
               const eventArray = Array.from(uniqueEvents.values())
+                // Filter for running activity before sorting and slicing
+                .filter(e => e.tags.some(t => t[0] === 'activity_type' && t[1] === 'running'))
                 .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
                 .slice(0, limit);
-              console.log(`[nostr.js] Resolved early with ${eventArray.length} posts with #runstr hashtag`);
+              console.log(`[nostr.js] Resolved early with ${eventArray.length} Kind 1301 running events`);
               sub.stop();
               resolve(eventArray);
             }, 1000);
@@ -155,10 +161,14 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
         });
         
         sub.on('eose', () => {
-          if (receivedEvents && uniqueEvents.size > 0 && sub.started && (Date.now() - sub.started > 3000)) {
+          // Filter for running activity before resolving
+          const filteredEvents = Array.from(uniqueEvents.values())
+              .filter(e => e.tags.some(t => t[0] === 'activity_type' && t[1] === 'running'));
+
+          if (receivedEvents && filteredEvents.length > 0 && sub.started && (Date.now() - sub.started > 3000)) {
             clearTimeout(maxTimeout);
-            console.log(`[nostr.js] EOSE received with ${uniqueEvents.size} posts collected`);
-            const eventArray = Array.from(uniqueEvents.values())
+            console.log(`[nostr.js] EOSE received with ${filteredEvents.length} Kind 1301 running events collected`);
+            const eventArray = filteredEvents
               .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
               .slice(0, limit);
             sub.stop();
@@ -167,7 +177,7 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
         });
       });
     } catch (error) {
-      console.error('[nostr.js] Error fetching hashtag posts:', error);
+      console.error('[nostr.js] Error fetching Kind 1301 events:', error);
       return [];
     }
   };
@@ -477,7 +487,7 @@ export const processPostsWithData = async (posts, supplementaryData) => {
     // Helper function to extract image URLs from content
     const extractImagesFromContent = (content) => {
       if (!content) return [];
-      const urlRegex = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif))/gi;
+      const urlRegex = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp))/gi;
       return content.match(urlRegex) || [];
     };
     
@@ -506,9 +516,60 @@ export const processPostsWithData = async (posts, supplementaryData) => {
       const postLikes = likesByPost.get(post.id) || new Set();
       const postReposts = repostsByPost.get(post.id) || new Set();
       const postComments = commentsByPost.get(post.id) || [];
+
+      // Kind 1301 specific processing (similar to lightweightProcessPosts)
+      let workoutTitle = post.title; // If already processed by lightweightProcessPosts
+      let metrics = post.metrics || []; // If already processed
+      const eventKind = post.kind || 1; // Default to 1 if not present, but should be 1301 now
+      const allTags = post.tags || [];
+
+      if (eventKind === 1301 && (!workoutTitle || metrics.length === 0)) {
+        const workoutTitleTagOld = allTags.find(tag => tag[0] === 'title');
+        workoutTitle = workoutTitleTagOld ? workoutTitleTagOld[1] : 'Workout Record';
+
+        const distanceTag = allTags.find(tag => tag[0] === 'distance');
+        if (distanceTag && distanceTag[1] && !metrics.find(m => m.label === "Distance")) {
+          metrics.push({
+            label: "Distance",
+            value: distanceTag[1],
+            unit: distanceTag[2] || '',
+          });
+        }
+
+        const durationTag = allTags.find(tag => tag[0] === 'duration');
+        if (durationTag && durationTag[1] && !metrics.find(m => m.label === "Duration")) {
+          metrics.push({
+            label: "Duration",
+            value: durationTag[1],
+            unit: durationTag[2] || '',
+          });
+        }
+        // Add more detailed NIP-101e exercise tag parsing if necessary here
+        // For now, keeping it consistent with lightweightProcessPosts
+        const exerciseTag = allTags.find(tag => tag[0] === 'exercise');
+        if (exerciseTag && exerciseTag.length >= 3) {
+          if (exerciseTag[2] && exerciseTag[3] && metrics.length < 3) {
+            if (!metrics.find(m => m.label.toLowerCase() === exerciseTag[3].toLowerCase())) { 
+                metrics.push({ label: exerciseTag[3], value: exerciseTag[2], unit: ''});
+            }
+          }
+          if (exerciseTag[4] && exerciseTag[5] && metrics.length < 3) {
+            if (!metrics.find(m => m.label.toLowerCase() === exerciseTag[5].toLowerCase())) { 
+                metrics.push({ label: exerciseTag[5], value: exerciseTag[4], unit: ''});
+            }
+          }
+           if (exerciseTag[6] && exerciseTag[7] && metrics.length < 3) {
+             if (!metrics.find(m => m.label.toLowerCase() === exerciseTag[7].toLowerCase())) {
+                metrics.push({ label: exerciseTag[7], value: exerciseTag[6], unit: ''});
+              }
+          }
+        }
+      }
       
       return {
         id: post.id || `post-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        kind: eventKind, // Ensure kind is passed through
+        title: eventKind === 1301 ? workoutTitle : undefined, // Title only for kind 1301
         content: post.content || '',
         created_at: post.created_at || Math.floor(Date.now() / 1000),
         author: {
@@ -517,13 +578,15 @@ export const processPostsWithData = async (posts, supplementaryData) => {
           lud16: profile.lud16,
           lud06: profile.lud06
         },
+        metrics: eventKind === 1301 ? metrics : [], // Metrics only for kind 1301
+        tags: allTags, // Pass through all tags
         comments: postComments,
-        showComments: false,
+        showComments: false, // This is UI state, might be better managed in the component/hook
         likes: postLikes.size,
         reposts: postReposts.size,
         zaps: postZaps.ids.size,
         zapAmount: postZaps.amount,
-        images: images,  // Add extracted images to the post object
+        images: images,
         needsProfile: !hasProfile
       };
     });
@@ -871,59 +934,83 @@ export const diagnoseConnection = async () => {
 
 /**
  * Create a NIP-101e kind 1301 workout event from run data
- * @param {Object} run - Run data containing distance, duration, elevation
+ * @param {Object} run - Run data containing distance, duration, elevation, activityType, date, notes
  * @param {string} distanceUnit - The unit of distance measurement ('km' or 'mi')
+ * @param {Object} [options] - Optional parameters
+ * @param {Object} [options.teamAssociation] - Optional team to associate with the workout
+ * @param {string} [options.teamAssociation.teamCaptainPubkey]
+ * @param {string} [options.teamAssociation.teamUUID]
+ * @param {string} [options.teamAssociation.relayHint]
  * @returns {Object} Event template for a kind 1301 event
  */
-export const createWorkoutEvent = (run, distanceUnit) => {
+export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
   if (!run) {
     throw new Error('No run data provided');
   }
+
+  const { teamAssociation } = options;
+  const workoutUUID = uuidv4(); // Unique ID for this workout record
 
   const activity = (run.activityType || 'run').toLowerCase();
   const activityVerb = activity === 'walk' ? 'walk' : (activity === 'cycle' ? 'cycle' : 'run');
   const activityEmoji = activity === 'walk' ? '🚶‍♀️' : (activity === 'cycle' ? '🚴' : '🏃‍♂️');
   const primaryHashtag = activity === 'walk' ? 'Walking' : (activity === 'cycle' ? 'Cycling' : 'Running');
 
-  // Format the distance
   const distanceValue = distanceUnit === 'km' 
     ? (run.distance / 1000).toFixed(2) 
     : (run.distance / 1609.344).toFixed(2);
   
-  // Format the duration (in HH:MM:SS format)
   const hours = Math.floor(run.duration / 3600);
   const minutes = Math.floor((run.duration % 3600) / 60);
   const seconds = Math.floor(run.duration % 60);
   const durationFormatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   
-  // Format the elevation gain if available
   let elevationTags = [];
   if (run.elevation && run.elevation.gain) {
     const elevationUnit = distanceUnit === 'km' ? 'm' : 'ft';
     const elevationValue = distanceUnit === 'km' 
       ? run.elevation.gain 
-      : Math.round(run.elevation.gain * 3.28084); // Convert meters to feet for imperial units
-    
+      : Math.round(run.elevation.gain * 3.28084);
     elevationTags = [['elevation_gain', elevationValue.toString(), elevationUnit]];
   }
 
-  // Create the run name based on date/time
   const runDate = new Date(run.date);
-  const runName = `${runDate.toLocaleDateString()} Run`;
+  // Using a more generic title for the workout, can be overridden by user if UI allows
+  const workoutTitle = run.title || `${primaryHashtag} on ${runDate.toLocaleDateString()}`;
 
-  // Create event template with kind 1301 for workout record
+  const tags = [
+    ["d", workoutUUID], // NIP-101e unique workout ID
+    ["title", workoutTitle],
+    // ['workout', runName], // Older tag, replaced by title and d
+    ['exercise', activityVerb], // Simplified exercise tag, can be expanded per NIP-101e exercise template linking
+    ['distance', distanceValue, distanceUnit],
+    ['duration', durationFormatted],
+    ...elevationTags,
+    ['source', 'RUNSTR'], // Keep source
+    ['client', 'Runstr', 'vCurrentAppVersion'], // Standard client tag, replace vCurrentAppVersion
+    ['t', primaryHashtag],
+    // Add other NIP-101e suggested tags if data is available:
+    // ["type", "cardio"], (activityVerb already covers this somewhat)
+    // ["start", Math.floor(run.startTimeEpochMs / 1000).toString()], (if run.startTimeEpochMs is available)
+    // ["end", Math.floor(run.endTimeEpochMs / 1000).toString()], (if run.endTimeEpochMs is available)
+    // ["gps_polyline", run.polyline || ""], (if available)
+    // ["device", run.deviceInfo || "Runstr Mobile App"], (if available)
+  ];
+
+  // Add team tag if teamAssociation is provided
+  if (teamAssociation && teamAssociation.teamCaptainPubkey && teamAssociation.teamUUID) {
+    tags.push([
+      "team", 
+      `33404:${teamAssociation.teamCaptainPubkey}:${teamAssociation.teamUUID}`,
+      teamAssociation.relayHint || "" 
+    ]);
+  }
+
   return {
     kind: 1301,
-    content: `Completed a ${activityVerb} with RUNSTR! ${activityEmoji}`,
-    tags: [
-      ['workout', runName],
-      ['exercise', activityVerb],
-      ['distance', distanceValue, distanceUnit],
-      ['duration', durationFormatted],
-      ...elevationTags,
-      ['source', 'RUNSTR'],
-      ['t', primaryHashtag]
-    ]
+    content: run.notes || `Completed a ${activityVerb}. ${activityEmoji}`, // User notes or default content
+    tags: tags,
+    // created_at will be set by createAndPublishEvent or the signing process
   };
 };
 

@@ -16,30 +16,82 @@ export const lightweightProcessPosts = (posts) => {
   }
   
   // Extract just the essential data for display
-  return posts.map(post => ({
-    id: post.id || `post-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-    content: post.content || '',
-    created_at: post.created_at || Math.floor(Date.now() / 1000),
-    pubkey: post.pubkey || '',
-    author: {
-      pubkey: post.pubkey || '',
-      profile: { 
-        name: undefined,
-        picture: undefined
+  return posts.map(post => {
+    const workoutTitleTag = post.tags?.find(tag => tag[0] === 'title');
+    const workoutTitle = workoutTitleTag ? workoutTitleTag[1] : 'Workout Record';
+
+    const metrics = [];
+    const distanceTag = post.tags?.find(tag => tag[0] === 'distance');
+    if (distanceTag && distanceTag[1]) {
+      metrics.push({
+        label: "Distance",
+        value: distanceTag[1],
+        unit: distanceTag[2] || '',
+        // icon: <TrendingUp className="h-3 w-3" /> // Placeholder, requires import
+      });
+    }
+
+    const durationTag = post.tags?.find(tag => tag[0] === 'duration');
+    if (durationTag && durationTag[1]) {
+      metrics.push({
+        label: "Duration",
+        value: durationTag[1],
+        unit: durationTag[2] || '',
+        // icon: <Timer className="h-3 w-3" /> // Placeholder, requires import
+      });
+    }
+    
+    // Potentially parse NIP-101e exercise tag for more detailed metrics
+    // Example: ["exercise", "running", "10", "km", "00:55:00", "05:30 min/km"]
+    const exerciseTag = post.tags?.find(tag => tag[0] === 'exercise');
+    if (exerciseTag && exerciseTag.length >= 3) {
+      // Assuming structure: ["exercise", type, val1, unit1, val2, unit2, ...]
+      // This is a simplified example; more robust parsing would be needed for NIP-101e
+      if (exerciseTag[2] && exerciseTag[3] && metrics.length < 3) { // Add if not already from distance/duration specific tags
+          if (!metrics.find(m => m.label.toLowerCase() === exerciseTag[0])) { // crude check to avoid duplicate distance
+            metrics.push({ label: exerciseTag[3], value: exerciseTag[2], unit: '', /* icon: ... */ });
+          }
       }
-    },
-    // Basic placeholders for UI that will be filled in later
-    comments: [],
-    showComments: false,
-    commentsLoaded: false,
-    likes: 0,
-    reposts: 0,
-    zaps: 0,
-    zapAmount: 0,
-    images: extractImagesFromContent(post.content || ''),
-    _needsEnrichment: true, // Flag for background enhancement
-    needsProfile: true // Explicitly mark that we still need to fetch author profile
-  })).sort((a, b) => b.created_at - a.created_at);
+      if (exerciseTag[4] && exerciseTag[5] && metrics.length < 3) {
+         if (!metrics.find(m => m.label.toLowerCase() === exerciseTag[0])) { // crude check to avoid duplicate duration
+            metrics.push({ label: exerciseTag[5], value: exerciseTag[4], unit: '', /* icon: ... */ });
+          }
+      }
+       if (exerciseTag[6] && exerciseTag[7] && metrics.length < 3) {
+            metrics.push({ label: exerciseTag[7], value: exerciseTag[6], unit: '', /* icon: ... */ });
+      }
+    }
+
+
+    return {
+      id: post.id || `post-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      kind: post.kind, // Pass through the event kind
+      title: workoutTitle, // Add workout title
+      content: post.content || '',
+      created_at: post.created_at || Math.floor(Date.now() / 1000),
+      pubkey: post.pubkey || '',
+      author: {
+        pubkey: post.pubkey || '',
+        profile: { 
+          name: undefined,
+          picture: undefined
+        }
+      },
+      metrics: metrics, // Add extracted metrics
+      tags: post.tags || [], // Pass through all tags for potential use later
+      // Basic placeholders for UI that will be filled in later
+      comments: [],
+      showComments: false,
+      commentsLoaded: false,
+      likes: 0,
+      reposts: 0,
+      zaps: 0,
+      zapAmount: 0,
+      images: extractImagesFromContent(post.content || ''), // May be less relevant for Kind 1301
+      _needsEnrichment: true, // Flag for background enhancement
+      needsProfile: true // Explicitly mark that we still need to fetch author profile
+    }
+  }).sort((a, b) => b.created_at - a.created_at);
 };
 
 /**
