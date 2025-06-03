@@ -47,7 +47,7 @@ const Profile = safeLazy(() => import('./pages/Profile'), 'Profile');
 const About = safeLazy(() => import('./pages/About'), 'About');
 const NostrStatsPage = safeLazy(() => import('./pages/NostrStatsPage'), 'NostrStatsPage');
 const TeamsPage = safeLazy(() => import('./pages/TeamsPage'), 'TeamsPage');
-const CreateTeamForm = safeLazy(() => import('./components/Teams/CreateTeamForm'), 'CreateTeamForm');
+const CreateTeamForm = safeLazy(() => import('./components/Teams/CreateTeamForm.tsx'), 'CreateTeamForm');
 const TeamDetailPage = safeLazy(() => import('./pages/TeamDetailPage'), 'TeamDetailPage');
 
 // Loading component to show while lazy loading

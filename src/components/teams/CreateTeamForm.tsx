@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../../hooks/useNostr'; // Adjust path as needed
 import {
-  prepareNewTeamEvent,
+  prepareNip101eTeamAndChatGroupEvents,
   getTeamUUID,
   getTeamCaptain,
+  TeamData,
 } from '../../services/nostr/NostrTeamsService'; // Adjust path as needed
-import { NDKEvent } from '@nostr-dev-kit/ndk'; // For casting if needed, or NDK operations
+import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk'; // For casting if needed, or NDK operations
 
 const CreateTeamForm: React.FC = () => {
   const [teamName, setTeamName] = useState('');
   const [teamDescription, setTeamDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
+  const [teamImage, setTeamImage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,33 +39,49 @@ const CreateTeamForm: React.FC = () => {
 
     setIsLoading(true);
 
-    const preparedEvent = prepareNewTeamEvent(
-      { name: teamName, description: teamDescription, isPublic },
+    const teamData: TeamData = {
+      name: teamName,
+      description: teamDescription,
+      isPublic,
+      image: teamImage.trim() || undefined,
+    };
+
+    const preparedEvents = prepareNip101eTeamAndChatGroupEvents(
+      teamData,
       publicKey
     );
 
-    if (!preparedEvent) {
-      setError('Failed to prepare team event.');
+    if (!preparedEvents || !preparedEvents.teamEventTemplate || !preparedEvents.chatGroupEventTemplate) {
+      setError('Failed to prepare team and chat group events.');
       setIsLoading(false);
       return;
     }
 
     try {
-      const ndkEvent = new NDKEvent(ndk, preparedEvent);
-      // NDK will use the signer attached to the NDK instance from NostrContext
-      await ndkEvent.sign(); // This uses the NDK's signer
-      const publishedRelays = await ndkEvent.publish();
-      
-      console.log('Team event published to relays:', publishedRelays);
+      const ndkTeamEvent = new NDKEvent(ndk, preparedEvents.teamEventTemplate);
+      const ndkChatGroupEvent = new NDKEvent(ndk, preparedEvents.chatGroupEventTemplate);
 
-      if (publishedRelays.size > 0) {
-        // Navigate to the new team's detail page
-        const newTeamUUID = getTeamUUID(ndkEvent.rawEvent());
-        const captain = getTeamCaptain(ndkEvent.rawEvent());
+      await ndkTeamEvent.sign();
+      await ndkChatGroupEvent.sign();
+      
+      const [teamPublishedRelays, chatGroupPublishedRelays] = await Promise.all([
+        ndkTeamEvent.publish(),
+        ndkChatGroupEvent.publish(),
+      ]);
+      
+      console.log('Team event published to relays:', teamPublishedRelays);
+      console.log('Chat group event published to relays:', chatGroupPublishedRelays);
+
+      if (teamPublishedRelays.size > 0) {
+        if (chatGroupPublishedRelays.size === 0) {
+          console.warn('Team event published, but NIP-29 chat group event failed to publish to any relays.');
+        }
+        const newTeamUUID = getTeamUUID(ndkTeamEvent.rawEvent());
+        const captain = getTeamCaptain(ndkTeamEvent.rawEvent());
         if (newTeamUUID && captain) {
           navigate(`/teams/${captain}/${newTeamUUID}`);
         } else {
-          navigate('/teams'); // Fallback to teams list
+          navigate('/teams');
         }
       } else {
         setError('Team event was signed but failed to publish to any relays. Please check your relay connections.');
@@ -105,6 +123,20 @@ const CreateTeamForm: React.FC = () => {
             rows={3}
             className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
           ></textarea>
+        </div>
+
+        <div className="mb-4">
+          <label htmlFor="teamImage" className="block text-sm font-medium text-gray-300 mb-1">
+            Team Image URL (Optional)
+          </label>
+          <input
+            type="url"
+            id="teamImage"
+            value={teamImage}
+            onChange={(e) => setTeamImage(e.target.value)}
+            className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
+            placeholder="https://example.com/image.png"
+          />
         </div>
 
         <div className="mb-6">
