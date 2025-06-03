@@ -46,8 +46,9 @@ const EventDetail = safeLazy(() => import('./pages/EventDetail'), 'EventDetail')
 const Profile = safeLazy(() => import('./pages/Profile'), 'Profile');
 const About = safeLazy(() => import('./pages/About'), 'About');
 const NostrStatsPage = safeLazy(() => import('./pages/NostrStatsPage'), 'NostrStatsPage');
-const GroupDiscoveryScreen = safeLazy(() => import('./components/GroupDiscoveryScreen'), 'GroupDiscoveryScreen');
-const TeamDetail = safeLazy(() => import('./pages/TeamDetail'), 'TeamDetail');
+const TeamsPage = safeLazy(() => import('./pages/TeamsPage'), 'TeamsPage');
+const CreateTeamForm = safeLazy(() => import('./components/Teams/CreateTeamForm'), 'CreateTeamForm');
+const TeamDetailPage = safeLazy(() => import('./pages/TeamDetailPage'), 'TeamDetailPage');
 
 // Loading component to show while lazy loading
 const LoadingComponent = () => (
@@ -89,9 +90,9 @@ const AppRoutes = () => {
         <Route path="/event/:eventId" element={<EventDetail />} />
         <Route path="/about" element={<About />} />
         
-        {/* Teams routes */}
-        <Route path="/teams" element={<GroupDiscoveryScreen />} />
-        <Route path="/teams/:teamId" element={<TeamDetail />} />
+        <Route path="/teams" element={<TeamsPage />} />
+        <Route path="/teams/new" element={<CreateTeamForm />} />
+        <Route path="/teams/:captainPubkey/:teamUUID" element={<TeamDetailPage />} />
         
         <Route path="/nostr-stats" element={<NostrStatsPage />} />
         <Route path="/" element={<RunTracker />} />

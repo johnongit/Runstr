@@ -70,7 +70,7 @@ const TeamsPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Nostr Teams</h1>
         <Link 
-          to="/teams/create" 
+          to="/teams/new"
           className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out"
         >
           Create New Team
