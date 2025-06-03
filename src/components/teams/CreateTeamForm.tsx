@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNostr } from '../../hooks/useNostr'; // Adjust path as needed
+import { useNostr } from '../../hooks/useNostr';
 import {
   prepareNip101eTeamEventTemplate,
   getTeamUUID,
   getTeamCaptain,
   TeamData,
-} from '../../services/nostr/NostrTeamsService'; // Adjust path as needed
-import { NDKEvent } from '@nostr-dev-kit/ndk'; // For casting if needed, or NDK operations
+} from '../../services/nostr/NostrTeamsService';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { awaitNDKReady, ndk as ndkSingleton } from '../../lib/ndkSingleton'; // Import awaitNDKReady and ndkSingleton
 
 const CreateTeamForm: React.FC = () => {
   const [teamName, setTeamName] = useState('');
@@ -16,28 +17,34 @@ const CreateTeamForm: React.FC = () => {
   const [teamImage, setTeamImage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  
+  const { ndk: ndkFromContext, publicKey, ndkReady: ndkReadyFromContext } = useNostr();
   const navigate = useNavigate();
-  const { ndk, publicKey, ndkReady } = useNostr();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true); 
 
-    if (!ndkReady || !ndk) {
-      setError('Nostr client is not ready. Please try again later.');
+    console.log("CreateTeamForm: Checking NDK readiness in handleSubmit...");
+    const isNdkActuallyReady = await awaitNDKReady();
+    const ndkToUse = (isNdkActuallyReady && ndkFromContext) ? ndkFromContext : (isNdkActuallyReady ? ndkSingleton : null);
+
+    if (!isNdkActuallyReady || !ndkToUse) {
+      setError('Nostr client is not ready. Please check your connection and try again.');
+      setIsLoading(false);
       return;
     }
     if (!publicKey) {
       setError('Public key not found. Please make sure you are logged in.');
+      setIsLoading(false);
       return;
     }
     if (!teamName.trim()) {
       setError('Team name is required.');
+      setIsLoading(false);
       return;
     }
-
-    setIsLoading(true);
 
     const teamData: TeamData = {
       name: teamName,
@@ -58,7 +65,7 @@ const CreateTeamForm: React.FC = () => {
     }
 
     try {
-      const ndkTeamEvent = new NDKEvent(ndk, teamEventTemplate);
+      const ndkTeamEvent = new NDKEvent(ndkToUse, teamEventTemplate); 
       await ndkTeamEvent.sign();
       
       const teamPublishedRelays = await ndkTeamEvent.publish();
@@ -150,12 +157,14 @@ const CreateTeamForm: React.FC = () => {
 
         <button
           type="submit"
-          disabled={isLoading || !ndkReady}
+          disabled={isLoading} // Only disable when actively submitting
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
         >
           {isLoading ? 'Creating Team...' : 'Create Team'}
         </button>
-        {!ndkReady && <p className="text-xs text-yellow-400 mt-2 text-center">Nostr connection not ready...</p>}
+        {!ndkReadyFromContext && !isLoading && (
+            <p className="text-xs text-yellow-400 mt-2 text-center">Nostr connection not ready... (Submit will attempt connection)</p>
+        )}
       </form>
     </div>
   );
