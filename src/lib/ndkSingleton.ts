@@ -16,25 +16,33 @@ if (!g.__RUNSTR_NDK_INSTANCE__) {
 
   g.__RUNSTR_NDK_READY_PROMISE__ = (async () => {
     try {
-      console.log('[NDK Singleton] Connecting to NDK relays...');
-      await g.__RUNSTR_NDK_INSTANCE__.connect(); // Default timeout is 2 seconds per relay
-      console.log('[NDK Singleton] NDK connected. Awaiting at least 1 relay connection (timeout 8s)...');
-      // Wait for at least one relay to connect, with an 8-second timeout
-      if (typeof g.__RUNSTR_NDK_INSTANCE__.awaitConnection === 'function') {
-        await (g.__RUNSTR_NDK_INSTANCE__ as any).awaitConnection(1, 8000);
+      const connectTimeoutMs = 15000; // Increased timeout for the connect call itself (e.g., 15 seconds)
+      console.log(`[NDK Singleton] Connecting to NDK relays (timeout: ${connectTimeoutMs}ms)...`);
+      await g.__RUNSTR_NDK_INSTANCE__.connect(connectTimeoutMs);
+      
+      const connectedCount = g.__RUNSTR_NDK_INSTANCE__.pool?.stats()?.connected || 0;
+      console.log(`[NDK Singleton] NDK connect() call completed. Connected relays: ${connectedCount}`);
+
+      if (connectedCount > 0) {
+        console.log('[NDK Singleton] NDK is ready (at least 1 relay connected after connect() call).');
+        return true; // Resolve promise with true indicating readiness
       } else {
-        // Fallback polling: check pool stats every 500ms up to timeout
-        const start = Date.now();
-        while (Date.now() - start < 8000) {
-          if (g.__RUNSTR_NDK_INSTANCE__.pool?.stats()?.connected > 0) break;
-          await new Promise(res => setTimeout(res, 500));
+        // If still 0, try awaitConnection as a brief secondary check, though connect() should have handled it.
+        console.log('[NDK Singleton] No relays connected after connect(). Trying awaitConnection (short timeout 3s)... ');
+        if (typeof g.__RUNSTR_NDK_INSTANCE__.awaitConnection === 'function') {
+          try {
+            await (g.__RUNSTR_NDK_INSTANCE__ as any).awaitConnection(1, 3000); // Shorter timeout here
+            const finalConnectedCount = g.__RUNSTR_NDK_INSTANCE__.pool?.stats()?.connected || 0;
+            if (finalConnectedCount > 0) {
+              console.log(`[NDK Singleton] NDK is ready after awaitConnection. Connected: ${finalConnectedCount}`);
+              return true;
+            }
+          } catch (awaitConnError) {
+            console.warn('[NDK Singleton] awaitConnection also failed or timed out:', awaitConnError);
+          }
         }
-        if (g.__RUNSTR_NDK_INSTANCE__.pool?.stats()?.connected === 0) {
-          throw new Error('No relays connected within timeout');
-        }
+        throw new Error('No relays connected after connect() and awaitConnection() attempts.');
       }
-      console.log('[NDK Singleton] NDK is ready (at least 1 relay connected).');
-      return true; // Resolve promise with true indicating readiness
     } catch (err) {
       console.error('[NDK Singleton] Failed to initialize NDK or connect to relays:', err);
       return false; // Resolve promise with false indicating failure
