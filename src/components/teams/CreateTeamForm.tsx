@@ -21,13 +21,23 @@ const CreateTeamForm: React.FC = () => {
   const { ndk: ndkFromContext, publicKey, ndkReady: ndkReadyFromContext } = useNostr();
   const navigate = useNavigate();
 
+  // Determine signer status for debug UI
+  const debugSignerStatus = ndkFromContext?.signer ? 'Signer Available' : 'Signer NOT Available';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true); 
 
     console.log("CreateTeamForm: Checking NDK readiness in handleSubmit...");
-    const isNdkActuallyReady = await awaitNDKReady();
+    // Use ndkReadyFromContext first, then try awaitNDKReady as a fallback check if needed.
+    // The primary check should be if the context already indicates readiness.
+    let isNdkActuallyReady = ndkReadyFromContext;
+    if (!isNdkActuallyReady) {
+        console.log("CreateTeamForm: NDK not ready from context, trying awaitNDKReady()...");
+        isNdkActuallyReady = await awaitNDKReady(); 
+    }
+    
     const ndkToUse = (isNdkActuallyReady && ndkFromContext) ? ndkFromContext : (isNdkActuallyReady ? ndkSingleton : null);
 
     if (!isNdkActuallyReady || !ndkToUse) {
@@ -36,9 +46,14 @@ const CreateTeamForm: React.FC = () => {
       return;
     }
     if (!publicKey) {
-      setError('Public key not found. Please make sure you are logged in.');
+      setError('Public key not found. Please make sure you are logged in with Amber or another signer.');
       setIsLoading(false);
       return;
+    }
+    if (!ndkToUse.signer) { // Explicitly check for signer on the NDK instance to be used
+        setError('Nostr signer (e.g., Amber) is not attached to the NDK instance. Please connect your signer.');
+        setIsLoading(false);
+        return;
     }
     if (!teamName.trim()) {
       setError('Team name is required.');
@@ -66,7 +81,8 @@ const CreateTeamForm: React.FC = () => {
 
     try {
       const ndkTeamEvent = new NDKEvent(ndkToUse, teamEventTemplate); 
-      await ndkTeamEvent.sign();
+      // Signer should be pre-attached to ndkToUse (from NostrContext)
+      await ndkTeamEvent.sign(); 
       
       const teamPublishedRelays = await ndkTeamEvent.publish();
       
@@ -79,7 +95,7 @@ const CreateTeamForm: React.FC = () => {
           navigate(`/teams/${captain}/${newTeamUUID}`);
         } else {
           console.error("Failed to get UUID or captain from published team event.");
-          navigate('/teams');
+          navigate('/teams'); // Navigate to the main teams page as a fallback
         }
       } else {
         setError('Team event was signed but failed to publish to any relays. Please check your relay connections.');
@@ -94,6 +110,18 @@ const CreateTeamForm: React.FC = () => {
 
   return (
     <div className="p-4 max-w-md mx-auto bg-gray-800 text-white rounded-lg shadow-lg mt-5">
+      {/* Debug Display Section */}
+      <div style={{ padding: '10px', marginBottom: '15px', backgroundColor: '#374151', border: '1px solid #4B5563', borderRadius: '5px' }}>
+        <h4 style={{ fontWeight: 'bold', marginBottom: '5px', color: '#D1D5DB' }}>DEBUG INFO (CreateTeamForm.tsx)</h4>
+        <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Ready (from useNostr context): <span style={{ fontWeight: 'bold' }}>{ndkReadyFromContext ? 'YES' : 'NO'}</span></p>
+        <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>Public Key (from useNostr context): <span style={{ fontWeight: 'bold' }}>{publicKey || 'Not available'}</span></p>
+        <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Signer Status (ndkFromContext?.signer): <span style={{ fontWeight: 'bold' }}>{debugSignerStatus}</span></p>
+        {/* ndkErrorFromContext is not directly available from useNostr, it's part of NostrContext but useNostr() might not expose it directly */}
+        {/* <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Init Error (from Context): <span style={{ fontWeight: 'bold' }}>{ndkErrorFromContext || 'None'}</span></p> */}
+        <p style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>Current Form Error: <span style={{ fontWeight: 'bold' }}>{error || 'None'}</span></p>
+      </div>
+      {/* End Debug Display Section */}
+
       <h2 className="text-2xl font-bold mb-6 text-center">Create New Team</h2>
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
@@ -157,13 +185,19 @@ const CreateTeamForm: React.FC = () => {
 
         <button
           type="submit"
-          disabled={isLoading} // Only disable when actively submitting
+          disabled={isLoading || !ndkReadyFromContext || !publicKey || !ndkFromContext?.signer} // Disable if NDK not ready, no pubkey, or no signer
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
         >
           {isLoading ? 'Creating Team...' : 'Create Team'}
         </button>
-        {!ndkReadyFromContext && !isLoading && (
-            <p className="text-xs text-yellow-400 mt-2 text-center">Nostr connection not ready... (Submit will attempt connection)</p>
+        {/* Updated conditional message based on more specific checks */}
+        {!isLoading && (!ndkReadyFromContext || !publicKey || !ndkFromContext?.signer) && (
+            <p className="text-xs text-yellow-400 mt-2 text-center">
+                {!ndkReadyFromContext ? "Nostr connection not ready... " : ""}
+                {ndkReadyFromContext && !publicKey ? "Public key not found (Signer not connected)... " : ""}
+                {ndkReadyFromContext && publicKey && !ndkFromContext?.signer ? "Signer not attached to NDK... " : ""}
+                (Submit will attempt connection)
+            </p>
         )}
       </form>
     </div>
