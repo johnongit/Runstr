@@ -389,8 +389,22 @@ export const Team = () => {
   };
   
   const renderCreateTeamTab = () => {
+    // Debug information
+    const debugSignerStatus = ndk.signer ? 'Signer Available' : 'Signer NOT Available';
+
     return (
       <div className="create-team-tab space-y-4">
+        {/* Debug Display Section */}
+        <div style={{ padding: '10px', marginBlock: '15px', backgroundColor: '#374151', border: '1px solid #4B5563', borderRadius: '5px', color: 'white' }}>
+          <h4 style={{ fontWeight: 'bold', marginBottom: '5px', color: '#D1D5DB' }}>DEBUG INFO (Create Group Tab)</h4>
+          <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Initialized (isNdkInitialized): <span style={{ fontWeight: 'bold' }}>{isNdkInitialized ? 'YES' : 'NO'}</span></p>
+          <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>Public Key (pubkey): <span style={{ fontWeight: 'bold' }}>{pubkey || 'Not available'}</span></p>
+          <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Signer Status: <span style={{ fontWeight: 'bold' }}>{debugSignerStatus}</span></p>
+          <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Init Error (from Context): <span style={{ fontWeight: 'bold' }}>{ndkInitError || 'None'}</span></p>
+          <p style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>Current Form Error (from setError): <span style={{ fontWeight: 'bold' }}>{error || 'None'}</span></p>
+        </div>
+        {/* End Debug Display Section */}
+
         <h3 className="text-xl font-semibold text-white">Create New Group</h3>
         <input
           type="text"
