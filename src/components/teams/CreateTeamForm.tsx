@@ -1,14 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch'; // Assuming you have a Switch component
+import { Textarea } from '@/components/ui/textarea'; // For team description
+import { useToast } from '@/components/ui/use-toast';
 import { useNostr } from '../../hooks/useNostr';
+import { NDKEvent, NDKKind, NDKTag } from '@nostr-dev-kit/ndk';
+import NDK from '@nostr-dev-kit/ndk'; // Import NDK type - Corrected import
+import { RefreshCw } from "lucide-react"; // Changed from ReloadIcon @radix-ui/react-icons
 import {
+  TeamData,
   prepareNip101eTeamEventTemplate,
   getTeamUUID,
-  getTeamCaptain,
-  TeamData,
-} from '../../services/nostr/NostrTeamsService';
-import { NDKEvent } from '@nostr-dev-kit/ndk';
+  getTeamCaptain
+} from '../../services/nostr/NostrTeamsService'; // Added imports
+// Ensure awaitNDKReady and the ndk singleton are correctly imported if needed directly
+// For now, assuming useNostr provides the configured NDK instance
 import { awaitNDKReady, ndk as ndkSingleton } from '../../lib/ndkSingleton'; // Import awaitNDKReady and ndkSingleton
+
+// Define an interface for the Nostr context values
+interface NostrContextValues {
+  ndk: NDK;
+  publicKey: string | null;
+  ndkReady: boolean;
+  ndkError: string | null;
+  setPublicKey: (pk: string | null) => void;
+  lightningAddress: string | null;
+  isInitialized: boolean;
+  relayCount: number;
+  connectSigner: () => Promise<{ pubkey: string | null; error: string | null; }>;
+}
 
 const CreateTeamForm: React.FC = () => {
   const [teamName, setTeamName] = useState('');
@@ -18,7 +41,12 @@ const CreateTeamForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { ndk: ndkFromContext, publicKey, ndkReady: ndkReadyFromContext } = useNostr();
+  const {
+    ndk: ndkFromContext,
+    publicKey,
+    ndkReady: ndkReadyFromContext,
+    ndkError: ndkErrorFromContext
+  } = useNostr() as NostrContextValues; // Type assertion
   const navigate = useNavigate();
 
   // Determine signer status for debug UI
@@ -117,7 +145,7 @@ const CreateTeamForm: React.FC = () => {
         <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>Public Key (from useNostr context): <span style={{ fontWeight: 'bold' }}>{publicKey || 'Not available'}</span></p>
         <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Signer Status (ndkFromContext?.signer): <span style={{ fontWeight: 'bold' }}>{debugSignerStatus}</span></p>
         {/* ndkErrorFromContext is not directly available from useNostr, it's part of NostrContext but useNostr() might not expose it directly */}
-        {/* <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Init Error (from Context): <span style={{ fontWeight: 'bold' }}>{ndkErrorFromContext || 'None'}</span></p> */}
+        <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Init Error (from Context): <span style={{ fontWeight: 'bold' }}>{ndkErrorFromContext || 'None'}</span></p>
         <p style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>Current Form Error: <span style={{ fontWeight: 'bold' }}>{error || 'None'}</span></p>
       </div>
       {/* End Debug Display Section */}
@@ -188,7 +216,14 @@ const CreateTeamForm: React.FC = () => {
           disabled={isLoading || !ndkReadyFromContext || !publicKey || !ndkFromContext?.signer} // Disable if NDK not ready, no pubkey, or no signer
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
         >
-          {isLoading ? 'Creating Team...' : 'Create Team'}
+          {isLoading ? (
+            <div className="flex items-center justify-center">
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> {/* Using RefreshCw here */}
+              Creating Team...
+            </div>
+          ) : (
+            'Create Team'
+          )}
         </button>
         {/* Updated conditional message based on more specific checks */}
         {!isLoading && (!ndkReadyFromContext || !publicKey || !ndkFromContext?.signer) && (

@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 // Import the NDK singleton
-import { ndk, ndkReadyPromise } from '../lib/ndkSingleton'; // Corrected import without alias
+import { ndk, ndkReadyPromise } from '../lib/ndkSingleton.ts'; // Explicitly import .ts version
 import { NDKNip07Signer, NDKPrivateKeySigner } from '@nostr-dev-kit/ndk'; // Keep NDKSigner types
 
 // Function to attach the appropriate signer TO THE SINGLETON NDK
