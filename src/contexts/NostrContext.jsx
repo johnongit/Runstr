@@ -142,22 +142,28 @@ export const NostrProvider = ({ children }) => {
       console.log('>>> NostrProvider: Awaiting ndkReadyPromise (initial connection attempt) <<<');
       let initialNdkConnectionSuccess = false;
       try {
+        console.log('[NostrProvider] About to await ndkReadyPromise from ndkSingleton.');
         initialNdkConnectionSuccess = await ndkReadyPromise;
+        console.log(`[NostrProvider] ndkReadyPromise resolved. Success: ${initialNdkConnectionSuccess}`);
       } catch (err) {
         console.error("NostrProvider: Error awaiting ndkReadyPromise:", err);
         if (isMounted) {
+          console.log(`[NostrProvider] Setting ndkError due to ndkReadyPromise rejection: ${err.message || 'Error awaiting NDK singleton readiness.'}`);
           setNdkError(err.message || 'Error awaiting NDK singleton readiness.');
         }
         // updateNdkStatus will set ndkReady based on current pool count (likely 0)
       }
 
       if (isMounted) {
+        console.log('[NostrProvider] Calling updateNdkStatus after ndkReadyPromise.');
         updateNdkStatus(); // Set initial ndkReady/relayCount based on promise outcome & pool state
 
         if (initialNdkConnectionSuccess) {
           console.log('>>> NostrProvider: Initial NDK connection reported success. Proceeding to attach signer. <<<');
+          console.log('[NostrProvider] Setting ndkError to null because initialNdkConnectionSuccess is true.');
           setNdkError(null); // Clear any previous generic NDK errors if initial connect was ok
         } else if (!ndkError) { // Only set error if a more specific one isn't already there
+          console.log('[NostrProvider] initialNdkConnectionSuccess is false and ndkError is not set. Setting NDK error.');
           setNdkError('NDK Singleton failed to initialize or connect to relays initially.');
         }
         

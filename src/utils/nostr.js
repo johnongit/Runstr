@@ -646,171 +646,186 @@ const publishWithRetry = async (ndkEvent, relaySet = null, maxRetries = 3, delay
  * @returns {Promise<Object>} Published event
  */
 export const createAndPublishEvent = async (eventTemplate, pubkeyOverride = null, opts = {}) => {
-  let signedEvent = null;
-  let eventToSign = null; // Will hold the unsigned event details
-  const publishResult = { success: false, eventId: null, error: null, relays: [], signMethod: null };
-
   try {
-    await ndkReadyPromise; // Ensure NDK singleton and its initial relays are ready
-
-    let currentPubkey = pubkeyOverride; // Use passed pubkey first
-    if (!currentPubkey) {
-      currentPubkey = localStorage.getItem('userPublicKey');
-    }
-
-    if (!currentPubkey && Platform.OS !== 'android') { // For non-Amber, pubkey is essential earlier
-      // Try to get from window.nostr if not on Android and no pubkey found yet
-      if (typeof window !== 'undefined' && window.nostr && typeof window.nostr.getPublicKey === 'function') {
-        try {
-          console.log('[nostr.js] Attempting to get public key from window.nostr');
-          currentPubkey = await window.nostr.getPublicKey();
-        } catch (e) {
-          console.error('[nostr.js] Error getting public key from window.nostr:', e);
-          publishResult.error = 'Failed to get public key from NIP-07 extension.';
-          return publishResult;
-        }
-      } else {
-        publishResult.error = 'Public key not found and no NIP-07 extension available.';
-        return publishResult;
-      }
-    }
-    // For Amber, pubkey is needed for the event, but might be re-confirmed by Amber itself.
-    // The AmberAuth.signEvent will now need the pubkey in the event object it signs.
-
-    // Construct the base event template
-    let processedTemplate = { ...eventTemplate };
-    if (opts.tags) {
-      processedTemplate.tags = processedTemplate.tags ? [...processedTemplate.tags, ...opts.tags] : [...opts.tags];
-    }
-    if (opts.content) {
-      processedTemplate.content = opts.content;
-    }
-
-    // Encryption if needed (must happen before signing)
-    if (opts.encrypt && opts.encryptToPubkey && opts.content) {
-      if (!currentPubkey) {
-        publishResult.error = 'Cannot encrypt without sender public key.';
-        return publishResult;
-      }
-      try {
-        // Assuming ndk.signer or window.nostr is available for nip04.encrypt
-        // This part might need adjustment based on where encryption capabilities reside
-        if (ndk.signer && typeof ndk.signer.nip04Encrypt === 'function') {
-          processedTemplate.content = await ndk.signer.nip04Encrypt(opts.encryptToPubkey, opts.content);
-        } else if (typeof window !== 'undefined' && window.nostr && typeof window.nostr.nip04 === 'object' && typeof window.nostr.nip04.encrypt === 'function') {
-          processedTemplate.content = await window.nostr.nip04.encrypt(opts.encryptToPubkey, opts.content);
-        } else {
-          throw new Error('NIP-04 encryption method not available.');
-        }
-        processedTemplate.tags.push(['p', opts.encryptToPubkey]);
-      } catch (encryptionError) {
-        console.error('[nostr.js] Encryption failed:', encryptionError);
-        publishResult.error = `Encryption failed: ${encryptionError.message}`;
-        return publishResult;
-      }
-    }
-
-    eventToSign = {
-      ...processedTemplate,
-      pubkey: currentPubkey, // Ensure pubkey is in the event for Amber and NIP-07
-      created_at: Math.floor(Date.now() / 1000),
-      // id and sig will be added by the signer
+    // Get publishing strategy metadata to return to caller
+    const publishResult = {
+      success: false,
+      method: null,
+      signMethod: null,
+      error: null
     };
 
-    // Platform-specific signing
+    let pubkey = pubkeyOverride;
+    let signedEvent;
+    
+    // Determine encryption preference (default false to avoid breaking existing flows)
+    const shouldEncrypt = !!opts.encrypt;
+    let recipientPubkey = opts.recipientPubkey || null; // if null we will fill with user's pubkey once known
+    
+    // Use platform-specific signing
     if (Platform.OS === 'android') {
+      // Check if Amber is available
       const isAmberAvailable = await AmberAuth.isAmberInstalled();
+      
       if (isAmberAvailable) {
-        if (!eventToSign.pubkey) {
-            // This should ideally be caught earlier or by AmberAuth.signEvent itself.
-            console.error('[nostr.js] Public key missing for Amber signing.');
-            throw new Error('Public key is required for Amber signing.');
-        }
-        console.log('[nostr.js] Requesting signature from Amber for event:', JSON.parse(JSON.stringify(eventToSign))); // Log a clone
-        try {
-          signedEvent = await AmberAuth.signEvent(eventToSign); // AmberAuth.signEvent now returns a Promise<SignedEvent>
-          publishResult.signMethod = 'amber';
-          console.log('[nostr.js] Received signed event from Amber:', signedEvent);
-
-          if (!signedEvent || !signedEvent.sig || !signedEvent.id) {
-            console.error('[nostr.js] Amber did not return a valid signed event object.', signedEvent);
-            throw new Error('Amber signing failed or returned invalid data.');
+        // For Android with Amber, we use Amber for signing
+        if (!pubkey) {
+          // If no pubkey provided, we need to get it first
+          pubkey = localStorage.getItem('userPublicKey');
+          
+          if (!pubkey) {
+            throw new Error('No public key available. Please log in first.');
           }
-        } catch (amberError) {
-          console.error('[nostr.js] Error signing with Amber:', amberError.message);
-          // Decide on fallback or rethrow
-          // For now, let's allow fallback by not setting signedEvent if Amber fails, so the next block is tried.
-          // If no fallback is desired, rethrow: throw amberError;
-          publishResult.error = `Amber signing failed: ${amberError.message}`;
-          // Do not return yet, allow potential fallback to window.nostr if applicable
+        }
+        
+        // Encrypt content if requested (encrypt-to-self by default)
+        let processedTemplate = { ...eventTemplate };
+        if (shouldEncrypt) {
+          if (!recipientPubkey) recipientPubkey = pubkey;
+          const { cipherText, nip44Tags } = await encryptContentNip44(
+            String(processedTemplate.content),
+            recipientPubkey
+          );
+          processedTemplate = {
+            ...processedTemplate,
+            content: cipherText,
+            tags: [...(processedTemplate.tags || []), ...nip44Tags]
+          };
+        }
+        
+        // Create the event with user's pubkey
+        const event = {
+          ...processedTemplate,
+          pubkey,
+          created_at: Math.floor(Date.now() / 1000)
+        };
+        
+        // Sign using Amber
+        signedEvent = await AmberAuth.signEvent(event);
+        publishResult.signMethod = 'amber';
+        
+        // If signedEvent is null, the signing is happening asynchronously
+        // and we'll need to handle it via deep linking
+        if (!signedEvent) {
+          // In a real implementation, you would return a Promise that
+          // resolves when the deep link callback is received
+          return null;
         }
       }
     }
     
-    // Fallback to window.nostr if not Android, Amber not available, or Amber signing failed allowing fallback
-    if (!signedEvent) { 
-      if (typeof window !== 'undefined' && window.nostr && typeof window.nostr.signEvent === 'function') {
-        console.log('[nostr.js] Using window.nostr (NIP-07) for signing.');
-        if (!eventToSign.pubkey) {
-            // NIP-07 signEvent also needs the pubkey in the event template it receives
-            console.error('[nostr.js] Public key missing for NIP-07 signing.');
-            throw new Error('Public key is required for NIP-07 signing.');
-        }
+    // For web or if Amber is not available/failed, use window.nostr
+    if (!signedEvent) {
+      if (!window.nostr) {
+        throw new Error('No signing method available');
+      }
+      
+      // Get the public key from nostr extension if not provided
+      if (!pubkey) {
+        pubkey = await window.nostr.getPublicKey();
+      }
+      
+      // Encrypt content if requested (encrypt-to-self by default)
+      let processedTemplate = { ...eventTemplate };
+      if (shouldEncrypt) {
+        if (!recipientPubkey) recipientPubkey = pubkey;
+        const { cipherText, nip44Tags } = await encryptContentNip44(
+          String(processedTemplate.content),
+          recipientPubkey
+        );
+        processedTemplate = {
+          ...processedTemplate,
+          content: cipherText,
+          tags: [...(processedTemplate.tags || []), ...nip44Tags]
+        };
+      }
+      
+      // Create the event with user's pubkey
+      const event = {
+        ...processedTemplate,
+        pubkey,
+        created_at: Math.floor(Date.now() / 1000)
+      };
+      
+      // Sign the event using the browser extension
+      signedEvent = await window.nostr.signEvent(event);
+      publishResult.signMethod = 'extension';
+    }
+    
+    // APPROACH 1: Try NDK first
+    try {
+      // Make sure we're connected before attempting to publish
+      await ndkReadyPromise;
+      
+      // Create relay set that excludes relays which block this kind
+      let relaySet = null;
+      if (opts.relays && Array.isArray(opts.relays)) {
+        relaySet = NDKRelaySet.fromRelayUrls(opts.relays, ndk);
+      } else {
         try {
-            signedEvent = await window.nostr.signEvent(eventToSign);
-            publishResult.signMethod = 'extension';
-            console.log('[nostr.js] Received signed event from NIP-07 extension:', signedEvent);
-        } catch (nip07Error) {
-            console.error('[nostr.js] Error signing with NIP-07 extension:', nip07Error);
-            publishResult.error = `NIP-07 signing failed: ${nip07Error.message}`;
-            return publishResult; // Hard stop if NIP-07 fails
+          const allRelays = Array.from(ndk.pool.relays.values()).map(r => r.url);
+          const filtered = allRelays.filter(url => {
+            if (url.includes('purplepag.es')) {
+              // Purple Pages only allows kinds 0,3,10002
+              return [0, 3, 10002].includes(signedEvent.kind);
+            }
+            return true;
+          });
+          if (filtered.length > 0 && filtered.length < allRelays.length) {
+            relaySet = NDKRelaySet.fromRelayUrls(filtered, ndk);
+          }
+        } catch (filterErr) {
+          console.warn('Relay filtering failed:', filterErr);
         }
-      } else if (publishResult.signMethod !== 'amber') { // Only throw if Amber wasn't tried or failed AND no NIP-07
-        publishResult.error = 'No signing method available (Amber not used/failed and no NIP-07).';
-        return publishResult;
       }
+      
+      // Create NDK Event and publish with retry
+      const ndkEvent = new NDKEvent(ndk, signedEvent);
+      const ndkResult = await publishWithRetry(ndkEvent, relaySet);
+      
+      if (ndkResult.success) {
+        publishResult.success = true;
+        publishResult.method = 'ndk';
+        return { ...signedEvent, ...publishResult };
+      }
+      // If NDK failed AND a specific relay list was provided, do NOT fallback.
+      // Throw an error indicating failure to publish to the specified relays.
+      if (opts.relays && Array.isArray(opts.relays) && opts.relays.length > 0) {
+        const specificRelayMessage = `Failed to publish to the specified relay(s): ${opts.relays.join(', ')}. Please check the relay URL and connection.`;
+        console.error(specificRelayMessage, ndkResult.error);
+        throw new Error(specificRelayMessage);
+      }
+    } catch (ndkError) {
+      console.error('Error in NDK publishing:', ndkError);
+      // If a specific relay list was provided, and an error occurred within the NDK block (e.g., NDK not ready)
+      // we should also prevent fallback and re-throw or throw a specific error.
+      if (opts.relays && Array.isArray(opts.relays) && opts.relays.length > 0) {
+        const specificRelayMessage = `Error publishing to the specified relay(s): ${opts.relays.join(', ')}. ${ndkError.message}`;
+        console.error(specificRelayMessage);
+        throw new Error(specificRelayMessage);
+      }
+      // Otherwise, if no specific relays, allow progression to fallback.
     }
     
-    if (!signedEvent || !signedEvent.id || !signedEvent.sig) {
-      console.error('[nostr.js] Event signing failed or produced an invalid event structure:', signedEvent);
-      publishResult.error = publishResult.error || 'Event signing failed or produced an invalid event.';
-      return publishResult;
-    }
-
-    // Publishing the signed event
-    let relaySet = null;
-    if (opts.relays && opts.relays.length > 0) {
-      relaySet = new NDKRelaySet(new Set(opts.relays.map(url => ndk.pool.getRelay(url))), ndk);
-      console.log('[nostr.js] Publishing to custom relay set:', opts.relays);
-    } else {
-      console.log('[nostr.js] Publishing to default NDK relay set.');
-      // NDK's publish method will use its explicit relay set or pool if `relaySet` is null
-    }
-
-    console.log('[nostr.js] Creating NDKEvent from fully signed event:', signedEvent);
-    const ndkEvent = new NDKEvent(ndk, signedEvent); // Create NDKEvent from the ALREADY signed event
-
-    // NDK's publish method should handle already signed events correctly.
-    const publishedToRelays = await ndkEvent.publish(relaySet); 
-    
-    console.log('[nostr.js] Event publish attempted. NDK publish returned (count of relays event was published to):', publishedToRelays.size);
-
-    if (publishedToRelays.size > 0) {
+    // APPROACH 2: Fallback to nostr-tools if NDK failed
+    console.log('NDK publishing failed, falling back to nostr-tools...');
+    try {
+      // Use nostr-tools as fallback
+      await publishWithNostrTools(signedEvent);
       publishResult.success = true;
-      publishResult.eventId = signedEvent.id;
-      publishResult.relays = Array.from(publishedToRelays).map(r => r.url);
-      console.log(`[nostr.js] Event ${signedEvent.id} published successfully to ${publishedToRelays.size} relays.`);
-    } else {
-      publishResult.error = publishResult.error || 'Event was not published to any relays.';
-      console.warn('[nostr.js] Event publishing failed or reported no relays.', signedEvent.id);
+      publishResult.method = 'nostr-tools';
+      console.log('Successfully published with nostr-tools fallback');
+    } catch (fallbackError) {
+      console.error('Fallback to nostr-tools also failed:', fallbackError);
+      publishResult.error = fallbackError.message;
+      throw new Error(`Failed to publish with both NDK and nostr-tools: ${fallbackError.message}`);
     }
-
+    
+    return { ...signedEvent, ...publishResult };
   } catch (error) {
-    console.error('[nostr.js] Error in createAndPublishEvent:', error.message, error.stack);
-    publishResult.error = publishResult.error || error.message || 'An unexpected error occurred during event publishing.';
+    console.error('Error in createAndPublishEvent:', error);
+    throw error;
   }
-  
-  return publishResult;
 };
 
 /**

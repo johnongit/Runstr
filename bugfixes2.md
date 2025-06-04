@@ -207,4 +207,31 @@ This document tracks the progress and solutions for the identified issues. Solut
     *   [ ] Add robust logging around Amber interactions.
 *   **Details/Notes:**
     *   The need to fully reset the connection points to potential state corruption or stale connection data.
-    *   This involves interaction between Runstr, the Amber app, and CalyxOS, adding layers of complexity. 
+    *   This involves interaction between Runstr, the Amber app, and CalyxOS, adding layers of complexity.
+
+## Bug: NDK Instance Never Ready / Signer Required Error (Ongoing)
+
+**Reported:** User experiences "Signer required" error and UI shows "Nostr connection not ready..." when trying to create a team on Android with Amber Signer.
+
+**Initial Analysis:**
+- The issue might stem from the application not recognizing Amber signer's availability or attempting actions before the asynchronous connection with Amber is complete.
+- There appear to be two Nostr context systems: `NostrProvider.jsx` (older, handles Amber directly) and `NostrContext.jsx` (newer, NDK-centric singleton).
+- The UI indicating "NDK not ready" points to a problem with the NDK singleton's initialization, specifically its connection to relays, managed in `NostrContext.jsx` and `ndkSingleton.js`.
+
+**Troubleshooting Steps Taken:**
+
+1.  **Proposed Solutions (Conceptual):**
+    *   **Option 1 (Easiest):** UI/UX enhancements (disable submit, prominent connection prompt, clear loading state).
+    *   **Option 2 (Medium):** Review/refine Amber integration in `NostrContext` & deep link handling.
+    *   **Option 3 (Hardest):** Re-evaluate/refactor signer abstraction for Amber with NDK.
+
+2.  **Investigation into NDK Readiness:**
+    *   **Focus:** Why the NDK instance (from `ndkSingleton.js`, managed by `NostrContext.jsx`) never reports as ready.
+    *   **Hypothesis:** `ndk.connect()` within `ndkSingleton.js` is failing, likely due to issues with configured relays or network connectivity.
+    *   **Read `src/lib/ndkSingleton.js`:** Confirmed NDK is initialized with `explicitRelayUrls` from `src/config/relays.js`. `ndkReadyPromise` directly reflects the success/failure of `ndk.connect()`.
+    *   **Read `src/config/relays.js`:** Identified the currently configured relays: `wss://relay.damus.io`, `wss://nos.lol`, `wss://relay.nostr.band`.
+    *   **Added Detailed Logging:**
+        *   In `src/lib/ndkSingleton.js`: Logged relay list, messages before/after `ndk.connect()`, and detailed error if `connect()` fails.
+        *   In `src/contexts/NostrContext.jsx`: Logged steps around awaiting `ndkReadyPromise` and subsequent state updates for `ndkReady` and `ndkError`.
+
+**Next Step:** User to run the application and provide the new console logs to analyze the NDK connection flow and pinpoint failures. 
