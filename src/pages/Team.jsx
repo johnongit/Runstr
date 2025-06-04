@@ -24,6 +24,8 @@ export const Team = () => {
     isPublic: true
   });
   
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  
   const loadProfiles = useCallback(async (pubkeys) => {
     try {
       const uniquePubkeys = [...new Set(pubkeys)].filter(Boolean);
@@ -40,19 +42,19 @@ export const Team = () => {
         authors: uniquePubkeys
       });
       
-      const newProfiles = new Map(profiles);
+      const newProfilesMap = new Map(profiles);
       
-      Array.from(profileEvents).forEach((profile) => {
+      Array.from(profileEvents).forEach((profileEvent) => {
         try {
-          const content = JSON.parse(profile.content);
-          newProfiles.set(profile.pubkey, content);
+          const content = JSON.parse(profileEvent.content);
+          newProfilesMap.set(profileEvent.pubkey, content);
         } catch (err) {
           console.error('Error parsing profile:', err);
-          newProfiles.set(profile.pubkey, { name: 'Unknown User' });
+          newProfilesMap.set(profileEvent.pubkey, { name: 'Unknown User' });
         }
       });
       
-      setProfiles(newProfiles);
+      setProfiles(newProfilesMap);
     } catch (err) {
       console.error('Error loading profiles:', err);
     }
@@ -158,14 +160,14 @@ export const Team = () => {
          }
       });
 
-      const userTeams = Array.from(allGroupsMap.values()).map(event => {
+      const userTeamsArray = Array.from(allGroupsMap.values()).map(event => {
         const dTag = event.tags.find(tag => tag[0] === 'd');
         const groupId = dTag ? dTag[1] : null;
         if (!groupId) return null;
         
-        let metadata = {};
+        let teamMetadata = {};
         try {
-          metadata = JSON.parse(event.content);
+          teamMetadata = JSON.parse(event.content);
         } catch { /* ignore parse error */ }
         
         return {
@@ -175,14 +177,14 @@ export const Team = () => {
           created_at: event.created_at,
           kind: event.kind,
           tags: event.tags,
-          metadata: metadata, 
+          metadata: teamMetadata, 
         };
       }).filter(Boolean);
 
-      console.log("loadUserTeams: Final combined user teams for display:", userTeams);
-      setMyTeams(userTeams);
+      console.log("loadUserTeams: Final combined user teams for display:", userTeamsArray);
+      setMyTeams(userTeamsArray);
       
-      const creatorPubkeys = [...new Set(userTeams.map(team => team.pubkey))];
+      const creatorPubkeys = [...new Set(userTeamsArray.map(team => team.pubkey))];
       await loadProfiles(creatorPubkeys);
       
     } catch (err) {
@@ -224,7 +226,7 @@ export const Team = () => {
         return;
       }
       if (!ndk.signer) {
-        setError('Nostr signer not available.');
+        setError('Nostr signer not available. Please ensure your Nostr extension is connected or Amber signer is authorized.');
         console.error('createTeam: NDK signer is missing.');
         return;
       }
@@ -249,8 +251,10 @@ export const Team = () => {
       event.tags.push(['p', pubkey, 'admin']);
 
       console.log('createTeam: Publishing Kind 39000 event:', event.rawEvent());
+      setLoading(true);
       await event.publish();
       console.log(`createTeam: Group metadata event ${event.id} published.`);
+      setLoading(false);
       
       setNewTeamData({
         name: '',
@@ -259,12 +263,14 @@ export const Team = () => {
         isPublic: true,
       });
       
+      setIsCreateModalOpen(false);
       setActiveTab('myTeams');
       await loadUserTeams(); 
       
     } catch (err) {
       console.error('Error creating NIP-29 group:', err);
       setError(`Failed to create group: ${err.message}`);
+      setLoading(false);
     }
   };
 
@@ -292,18 +298,18 @@ export const Team = () => {
       console.log(`searchTeams: Found ${teamEvents.size} potential groups from search.`);
 
       const results = [];
-      const creatorPubkeys = new Set();
+      const creatorPubkeysFromSearch = new Set();
       
       teamEvents.forEach(event => {
         try {
-          const metadata = JSON.parse(event.content);
+          const teamMetadata = JSON.parse(event.content);
           const dTag = event.tags.find(tag => tag[0] === 'd');
           const groupId = dTag ? dTag[1] : null;
 
           if (!groupId) return;
 
-          const nameMatch = metadata.name?.toLowerCase().includes(searchQuery.toLowerCase());
-          const descMatch = metadata.about?.toLowerCase().includes(searchQuery.toLowerCase());
+          const nameMatch = teamMetadata.name?.toLowerCase().includes(searchQuery.toLowerCase());
+          const descMatch = teamMetadata.about?.toLowerCase().includes(searchQuery.toLowerCase());
           
           if (nameMatch || descMatch) {
               results.push({
@@ -313,9 +319,9 @@ export const Team = () => {
                   created_at: event.created_at,
                   kind: event.kind,
                   tags: event.tags,
-                  metadata: metadata, 
+                  metadata: teamMetadata, 
               });
-              creatorPubkeys.add(event.pubkey);
+              creatorPubkeysFromSearch.add(event.pubkey);
           }
         } catch (err) {
           console.error('Error processing search result event:', err);
@@ -325,7 +331,7 @@ export const Team = () => {
       console.log(`searchTeams: Filtered results:`, results);
       setSearchResults(results);
       
-      await loadProfiles(Array.from(creatorPubkeys));
+      await loadProfiles(Array.from(creatorPubkeysFromSearch));
       
     } catch (err) {
         console.error('Error searching for NIP-29 groups:', err);
@@ -337,7 +343,7 @@ export const Team = () => {
   };
   
   const renderTeamItem = (team, isUserTeam = false) => {
-    const { groupId, pubkey: creatorPubkey, metadata } = team;
+    const { groupId, pubkey: creatorPubkey, metadata: teamMetadata } = team;
     
     let naddr = '';
     try {
@@ -363,13 +369,13 @@ export const Team = () => {
       >
         <div className="flex items-center space-x-4">
           <img 
-            src={metadata?.picture || 'default-avatar.png'} 
-            alt={metadata?.name || 'Group'} 
+            src={teamMetadata?.picture || 'default-avatar.png'} 
+            alt={teamMetadata?.name || 'Group'} 
             className="w-12 h-12 rounded-full object-cover bg-gray-600"
           />
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white">{metadata?.name || 'Unnamed Group'}</h3>
-            <p className="text-sm text-gray-400 truncate">{metadata?.about || 'No description'}</p>
+            <h3 className="text-lg font-semibold text-white">{teamMetadata?.name || 'Unnamed Group'}</h3>
+            <p className="text-sm text-gray-400 truncate">{teamMetadata?.about || 'No description'}</p>
             <p className="text-xs text-gray-500 mt-1">Created by: {creatorName}</p>
           </div>
           {!isUserTeam && (
@@ -388,51 +394,43 @@ export const Team = () => {
     );
   };
   
-  const renderCreateTeamTab = () => {
-    // Debug information
+  const renderCreateTeamModal = () => {
+    if (!isCreateModalOpen) return null;
+
     const debugSignerStatus = ndk.signer ? 'Signer Available' : 'Signer NOT Available';
 
     return (
-      <div className="create-team-tab space-y-4">
-        {/* Debug Display Section */}
-        <div style={{ padding: '10px', marginBlock: '15px', backgroundColor: '#374151', border: '1px solid #4B5563', borderRadius: '5px', color: 'white' }}>
-          <h4 style={{ fontWeight: 'bold', marginBottom: '5px', color: '#D1D5DB' }}>DEBUG INFO (Create Group Tab)</h4>
-          <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Initialized (isNdkInitialized): <span style={{ fontWeight: 'bold' }}>{isNdkInitialized ? 'YES' : 'NO'}</span></p>
-          <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>Public Key (pubkey): <span style={{ fontWeight: 'bold' }}>{pubkey || 'Not available'}</span></p>
-          <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Signer Status: <span style={{ fontWeight: 'bold' }}>{debugSignerStatus}</span></p>
-          <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Init Error (from Context): <span style={{ fontWeight: 'bold' }}>{ndkInitError || 'None'}</span></p>
-          <p style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>Current Form Error (from setError): <span style={{ fontWeight: 'bold' }}>{error || 'None'}</span></p>
-        </div>
-        {/* End Debug Display Section */}
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+        <div style={{ background: '#1F2937', padding: '20px', borderRadius: '8px', width: '90%', maxWidth: '500px', color: 'white' }}>
+          {/* Debug Display Section */}
+          <div style={{ padding: '10px', marginBottom: '15px', backgroundColor: '#374151', border: '1px solid #4B5563', borderRadius: '5px' }}>
+            <h4 style={{ fontWeight: 'bold', marginBottom: '5px', color: '#D1D5DB' }}>DEBUG INFO (Create Team Modal)</h4>
+            <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Initialized: <span style={{ fontWeight: 'bold' }}>{isNdkInitialized ? 'YES' : 'NO'}</span></p>
+            <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>Public Key: <span style={{ fontWeight: 'bold' }}>{pubkey || 'Not available'}</span></p>
+            <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Signer: <span style={{ fontWeight: 'bold' }}>{debugSignerStatus}</span></p>
+            <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Init Error: <span style={{ fontWeight: 'bold' }}>{ndkInitError || 'None'}</span></p>
+            <p style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>Form Error: <span style={{ fontWeight: 'bold' }}>{error || 'None'}</span></p>
+          </div>
+          {/* End Debug Display Section */}
 
-        <h3 className="text-xl font-semibold text-white">Create New Group</h3>
-        <input
-          type="text"
-          placeholder="Group Name"
-          className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500"
-          value={newTeamData.name}
-          onChange={(e) => setNewTeamData({ ...newTeamData, name: e.target.value })}
-        />
-        <textarea
-          placeholder="Group Description (About)"
-          className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500 h-24"
-          value={newTeamData.description}
-          onChange={(e) => setNewTeamData({ ...newTeamData, description: e.target.value })}
-        />
-         <input
-          type="text"
-          placeholder="Group Picture URL (Optional)"
-          className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500"
-          value={newTeamData.picture}
-          onChange={(e) => setNewTeamData({ ...newTeamData, picture: e.target.value })}
-        />
-        <button 
-            onClick={createTeam}
-            className="w-full py-2 px-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded disabled:opacity-50"
-            disabled={loading || !newTeamData.name}
-        >
-            {loading ? 'Creating...' : 'Create Group'}
-        </button>
+          <h3 className="text-xl font-semibold text-white mb-4">Create New Group</h3>
+          <input type="text" placeholder="Group Name" className="w-full p-2 mb-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500" value={newTeamData.name} onChange={(e) => setNewTeamData({ ...newTeamData, name: e.target.value })} />
+          <textarea placeholder="Group Description (About)" className="w-full p-2 mb-3 rounded bg-gray-700 text-white border border-gray-600 h-24 focus:outline-none focus:border-blue-500" value={newTeamData.description} onChange={(e) => setNewTeamData({ ...newTeamData, description: e.target.value })} />
+          <input type="text" placeholder="Group Picture URL (Optional)" className="w-full p-2 mb-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500" value={newTeamData.picture} onChange={(e) => setNewTeamData({ ...newTeamData, picture: e.target.value })} />
+          
+          <div className="flex justify-end space-x-3 mt-4">
+            <button onClick={() => { setIsCreateModalOpen(false); setError(null); }} className="py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded">
+              Cancel
+            </button>
+            <button 
+              onClick={createTeam}
+              className="py-2 px-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded disabled:opacity-50"
+              disabled={loading || !newTeamData.name}
+            >
+              {loading ? 'Creating...' : 'Create Group'}
+            </button>
+          </div>
+        </div>
       </div>
     );
   };
@@ -490,7 +488,15 @@ export const Team = () => {
   
   return (
     <div className="container run-club-theme p-4">
-      <h2 className="text-2xl font-bold text-white mb-6">Groups</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-white">Groups</h2>
+        <button 
+          onClick={() => { setError(null); setIsCreateModalOpen(true); }} 
+          className="py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded"
+        >
+          Create New Group
+        </button>
+      </div>
       
       {error && (
         <div className="bg-red-900/30 border border-red-700 text-red-300 p-3 rounded-lg mb-4">
@@ -511,12 +517,6 @@ export const Team = () => {
          >
              Find Groups
          </button>
-         <button
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg ${activeTab === 'create' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
-            onClick={() => setActiveTab('create')}
-         >
-             Create Group
-         </button>
       </div>
 
       {loading && (
@@ -529,11 +529,11 @@ export const Team = () => {
         {!loading && (
             <> 
                 {activeTab === 'myTeams' && renderMyTeamsTab()}
-                {activeTab === 'create' && renderCreateTeamTab()}
                 {activeTab === 'join' && renderJoinTeamTab()}
             </>
         )}
       </div>
+      {renderCreateTeamModal()}
     </div>
   );
 }; 
