@@ -47,10 +47,10 @@ const attachSigner = async () => {
             console.error('NostrContext: Error during NIP-07 signer interaction (blockUntilReady/user):', nip07Error);
             if (nip07Error.message && (nip07Error.message.toLowerCase().includes('rejected') || nip07Error.message.toLowerCase().includes('cancelled'))) {
                 console.warn('NostrContext: NIP-07 operation rejected by user.');
-            } else {
-                console.error('NostrContext: Potentially an issue with the NIP-07 extension or its communication.', nip07Error);
             }
-            ndk.signer = undefined;
+            // If blockUntilReady or user fetch fails, the signer isn't fully usable with the NDK instance.
+            ndk.signer = undefined; // Clear the signer on the NDK singleton.
+            return null; // Indicate failure to get a usable pubkey AND signer.
         }
       }
     }
@@ -102,6 +102,7 @@ export const NostrContext = createContext({
   lightningAddress: null,
   setPublicKey: () => console.warn('NostrContext not yet initialized'),
   ndkReady: false,
+  signerAvailable: false,
   isInitialized: false,
   relayCount: 0,
   ndkError: null,
@@ -112,6 +113,7 @@ export const NostrContext = createContext({
 export const NostrProvider = ({ children }) => {
   const [publicKey, setPublicKeyInternal] = useState(null);
   const [ndkReady, setNdkReady] = useState(false);
+  const [signerAvailable, setSignerAvailable] = useState(false);
   const [currentRelayCount, setCurrentRelayCount] = useState(0);
   const [ndkError, setNdkError] = useState(null);
   // Lightning address cached from Nostr metadata (lud16/lud06)
@@ -198,8 +200,15 @@ export const NostrProvider = ({ children }) => {
           } else if (signerError) {
             setNdkError(prevError => prevError ? `${prevError} Signer: ${signerError}` : `Signer: ${signerError}`);
           }
+
+          // *** After any signer attachment attempt, update the signerAvailable state ***
+          setSignerAvailable(!!ndk.signer);
+
         }).catch(err => {
-            if(isMounted) setNdkError(prevError => prevError ? `${prevError} Signer Attach Exception: ${err.message}` : `Signer Attach Exception: ${err.message}`);
+            if(isMounted) {
+              setNdkError(prevError => prevError ? `${prevError} Signer Attach Exception: ${err.message}` : `Signer Attach Exception: ${err.message}`);
+              setSignerAvailable(false); // Ensure signer is marked as unavailable on error
+            }
         });
       }
     };
@@ -237,6 +246,8 @@ export const NostrProvider = ({ children }) => {
     } else if (signerError) {
         setNdkError(prevError => prevError ? `${prevError} Signer: ${signerError}` : `Signer: ${signerError}`);
     }
+    // After connection attempt, update the signer state
+    setSignerAvailable(!!ndk.signer);
     return signerResult;
   }, []);
 
@@ -249,6 +260,7 @@ export const NostrProvider = ({ children }) => {
         ndk.signer = undefined; // Clear signer on explicit logout
         signerAttachmentPromise = null; // Allow re-attachment
         setLightningAddress(null);
+        setSignerAvailable(false); // Update signer state on logout
     }
   }, []);
 
@@ -257,12 +269,13 @@ export const NostrProvider = ({ children }) => {
     lightningAddress,
     setPublicKey,
     ndkReady, // Dynamically updated based on relay connections
+    signerAvailable, // Pass the new state through the context
     isInitialized: ndkReady, // Maintained for compatibility, reflects current ndkReady
     relayCount: currentRelayCount,
     ndkError,
     ndk, // The singleton NDK instance
     connectSigner,
-  }), [publicKey, lightningAddress, setPublicKey, ndkReady, currentRelayCount, ndkError, connectSigner]);
+  }), [publicKey, lightningAddress, setPublicKey, ndkReady, signerAvailable, currentRelayCount, ndkError, connectSigner]);
 
   return (
     <NostrContext.Provider value={value}>

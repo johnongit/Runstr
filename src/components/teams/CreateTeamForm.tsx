@@ -25,6 +25,7 @@ interface NostrContextValues {
   ndk: NDK;
   publicKey: string | null;
   ndkReady: boolean;
+  signerAvailable: boolean;
   ndkError: string | null;
   setPublicKey: (pk: string | null) => void;
   lightningAddress: string | null;
@@ -45,12 +46,13 @@ const CreateTeamForm: React.FC = () => {
     ndk: ndkFromContext,
     publicKey,
     ndkReady: ndkReadyFromContext,
+    signerAvailable,
     ndkError: ndkErrorFromContext
   } = useNostr() as NostrContextValues; // Type assertion
   const navigate = useNavigate();
 
-  // Determine signer status for debug UI
-  const debugSignerStatus = ndkFromContext?.signer ? 'Signer Available' : 'Signer NOT Available';
+  // Determine signer status for debug UI using the new state
+  const debugSignerStatus = signerAvailable ? 'Signer Available' : 'Signer NOT Available';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,7 +145,7 @@ const CreateTeamForm: React.FC = () => {
         <h4 style={{ fontWeight: 'bold', marginBottom: '5px', color: '#D1D5DB' }}>DEBUG INFO (CreateTeamForm.tsx)</h4>
         <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Ready (from useNostr context): <span style={{ fontWeight: 'bold' }}>{ndkReadyFromContext ? 'YES' : 'NO'}</span></p>
         <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>Public Key (from useNostr context): <span style={{ fontWeight: 'bold' }}>{publicKey || 'Not available'}</span></p>
-        <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Signer Status (ndkFromContext?.signer): <span style={{ fontWeight: 'bold' }}>{debugSignerStatus}</span></p>
+        <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Signer Status (from Context State): <span style={{ fontWeight: 'bold' }}>{debugSignerStatus}</span></p>
         {/* ndkErrorFromContext is not directly available from useNostr, it's part of NostrContext but useNostr() might not expose it directly */}
         <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Init Error (from Context): <span style={{ fontWeight: 'bold' }}>{ndkErrorFromContext || 'None'}</span></p>
         <p style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>Current Form Error: <span style={{ fontWeight: 'bold' }}>{error || 'None'}</span></p>
@@ -213,7 +215,7 @@ const CreateTeamForm: React.FC = () => {
 
         <button
           type="submit"
-          disabled={isLoading || !ndkReadyFromContext || !publicKey || !ndkFromContext?.signer} // Disable if NDK not ready, no pubkey, or no signer
+          disabled={isLoading || !ndkReadyFromContext || !publicKey || !signerAvailable} // Disable if signer not available
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
         >
           {isLoading ? (
@@ -226,11 +228,11 @@ const CreateTeamForm: React.FC = () => {
           )}
         </button>
         {/* Updated conditional message based on more specific checks */}
-        {!isLoading && (!ndkReadyFromContext || !publicKey || !ndkFromContext?.signer) && (
+        {!isLoading && (!ndkReadyFromContext || !publicKey || !signerAvailable) && (
             <p className="text-xs text-yellow-400 mt-2 text-center">
                 {!ndkReadyFromContext ? "Nostr connection not ready... " : ""}
                 {ndkReadyFromContext && !publicKey ? "Public key not found (Signer not connected)... " : ""}
-                {ndkReadyFromContext && publicKey && !ndkFromContext?.signer ? "Signer not attached to NDK... " : ""}
+                {ndkReadyFromContext && publicKey && !signerAvailable ? "Signer not attached to NDK... " : ""}
                 (Submit will attempt connection)
             </p>
         )}
