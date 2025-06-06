@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch'; // Assuming you have a Switch component
-import { Textarea } from '@/components/ui/textarea'; // For team description
-import { useToast } from '@/components/ui/use-toast';
 import { useNostr } from '../../hooks/useNostr';
 import { NDKEvent, NDKKind, NDKTag } from '@nostr-dev-kit/ndk';
 import NDK from '@nostr-dev-kit/ndk'; // Import NDK type - Corrected import
@@ -16,9 +10,7 @@ import {
   getTeamUUID,
   getTeamCaptain
 } from '../../services/nostr/NostrTeamsService'; // Added imports
-// Ensure awaitNDKReady and the ndk singleton are correctly imported if needed directly
-// For now, assuming useNostr provides the configured NDK instance
-import { awaitNDKReady, ndk as ndkSingleton } from '../../lib/ndkSingleton'; // Import awaitNDKReady and ndkSingleton
+import { createAndPublishEvent } from '../../utils/nostr';
 
 // Define an interface for the Nostr context values
 interface NostrContextValues {
@@ -48,7 +40,8 @@ const CreateTeamForm: React.FC = () => {
     ndkReady: ndkReadyFromContext,
     signerAvailable,
     ndkError: ndkErrorFromContext,
-    connectSigner
+    connectSigner,
+    relayCount
   } = useNostr() as NostrContextValues; // Type assertion
   const navigate = useNavigate();
 
@@ -58,47 +51,27 @@ const CreateTeamForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setIsLoading(true); 
+    setIsLoading(true);
 
-    console.log("CreateTeamForm: Checking NDK readiness in handleSubmit...");
-    // Use ndkReadyFromContext first, then try awaitNDKReady as a fallback check if needed.
-    // The primary check should be if the context already indicates readiness.
-    let isNdkActuallyReady = ndkReadyFromContext;
-    if (!isNdkActuallyReady) {
-        console.log("CreateTeamForm: NDK not ready from context, trying awaitNDKReady()...");
-        isNdkActuallyReady = await awaitNDKReady(); 
-    }
-    
-    const ndkToUse = (isNdkActuallyReady && ndkFromContext) ? ndkFromContext : (isNdkActuallyReady ? ndkSingleton : null);
-
-    if (!isNdkActuallyReady || !ndkToUse) {
-      setError('Nostr client is not ready. Please check your connection and try again.');
+    // Ensure relays are connected
+    if (!ndkReadyFromContext) {
+      setError('Nostr not yet connected. Please wait a moment.');
       setIsLoading(false);
       return;
     }
-    // Ensure signer is attached – if not, attempt to connect now
-    if (!publicKey || !ndkToUse.signer) {
-      console.log('CreateTeamForm: No signer or pubkey found, attempting connectSigner()...');
-      try {
-        const signerResult = await connectSigner();
-        if (signerResult?.pubkey) {
-          console.log('CreateTeamForm: Signer connected during submit. Pubkey:', signerResult.pubkey);
-        }
-      } catch(connErr){
-        console.warn('CreateTeamForm: connectSigner threw error', connErr);
+
+    // Ensure signer & pubkey
+    let finalPubkey = publicKey;
+    if (!finalPubkey) {
+      const signerAttempt = await connectSigner();
+      finalPubkey = signerAttempt?.pubkey || null;
+      if (!finalPubkey) {
+        setError('No signer connected.');
+        setIsLoading(false);
+        return;
       }
     }
 
-    if (!publicKey) {
-      setError('Public key not found. Please make sure you are logged in with Amber or another signer.');
-      setIsLoading(false);
-      return;
-    }
-    if (!ndkToUse.signer) { // Explicitly check for signer on the NDK instance to be used
-        setError('Nostr signer (e.g., Amber) is not attached to the NDK instance. Please connect your signer.');
-        setIsLoading(false);
-        return;
-    }
     if (!teamName.trim()) {
       setError('Team name is required.');
       setIsLoading(false);
@@ -112,11 +85,7 @@ const CreateTeamForm: React.FC = () => {
       image: teamImage.trim() || undefined,
     };
 
-    const teamEventTemplate = prepareNip101eTeamEventTemplate(
-      teamData,
-      publicKey
-    );
-
+    const teamEventTemplate = prepareNip101eTeamEventTemplate(teamData, finalPubkey!);
     if (!teamEventTemplate) {
       setError('Failed to prepare team event.');
       setIsLoading(false);
@@ -124,29 +93,16 @@ const CreateTeamForm: React.FC = () => {
     }
 
     try {
-      const ndkTeamEvent = new NDKEvent(ndkToUse, teamEventTemplate); 
-      // Signer should be pre-attached to ndkToUse (from NostrContext)
-      await ndkTeamEvent.sign(); 
-      
-      const teamPublishedRelays = await ndkTeamEvent.publish();
-      
-      console.log('NIP-101e Team event published to relays:', teamPublishedRelays);
-
-      if (teamPublishedRelays.size > 0) {
-        const newTeamUUID = getTeamUUID(ndkTeamEvent.rawEvent());
-        const captain = getTeamCaptain(ndkTeamEvent.rawEvent());
-        if (newTeamUUID && captain) {
-          navigate(`/teams/${captain}/${newTeamUUID}`);
-        } else {
-          console.error("Failed to get UUID or captain from published team event.");
-          navigate('/teams'); // Navigate to the main teams page as a fallback
-        }
+      const result: any = await createAndPublishEvent(teamEventTemplate, null);
+      if (result && result.success) {
+        const newTeamUUID = getTeamUUID(result);
+        const captainPk = getTeamCaptain(result);
+        navigate(newTeamUUID && captainPk ? `/teams/${captainPk}/${newTeamUUID}` : '/teams');
       } else {
-        setError('Team event was signed but failed to publish to any relays. Please check your relay connections.');
+        setError(result?.error || 'Failed to publish team.');
       }
     } catch (err: any) {
-      console.error('Error creating NIP-101e team:', err);
-      setError(err.message || 'An unknown error occurred while creating the team.');
+      setError(err.message || 'Error publishing team');
     } finally {
       setIsLoading(false);
     }
@@ -160,6 +116,7 @@ const CreateTeamForm: React.FC = () => {
         <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Ready (from useNostr context): <span style={{ fontWeight: 'bold' }}>{ndkReadyFromContext ? 'YES' : 'NO'}</span></p>
         <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>Public Key (from useNostr context): <span style={{ fontWeight: 'bold' }}>{publicKey || 'Not available'}</span></p>
         <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Signer Status (from Context State): <span style={{ fontWeight: 'bold' }}>{debugSignerStatus}</span></p>
+        <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>Relay Count (from Context): <span style={{ fontWeight: 'bold' }}>{relayCount}</span></p>
         {/* ndkErrorFromContext is not directly available from useNostr, it's part of NostrContext but useNostr() might not expose it directly */}
         <p style={{ fontSize: '0.875rem', color: '#E5E7EB' }}>NDK Init Error (from Context): <span style={{ fontWeight: 'bold' }}>{ndkErrorFromContext || 'None'}</span></p>
         <p style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>Current Form Error: <span style={{ fontWeight: 'bold' }}>{error || 'None'}</span></p>
@@ -229,7 +186,7 @@ const CreateTeamForm: React.FC = () => {
 
         <button
           type="submit"
-          disabled={isLoading || !ndkReadyFromContext} // Allow clicking even if signer isn't yet connected – we'll attempt connection on submit
+          disabled={isLoading || !ndkReadyFromContext}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
         >
           {isLoading ? (
