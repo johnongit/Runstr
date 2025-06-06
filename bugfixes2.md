@@ -235,3 +235,38 @@ This document tracks the progress and solutions for the identified issues. Solut
         *   In `src/contexts/NostrContext.jsx`: Logged steps around awaiting `ndkReadyPromise` and subsequent state updates for `ndkReady` and `ndkError`.
 
 **Next Step:** User to run the application and provide the new console logs to analyze the NDK connection flow and pinpoint failures. 
+
+## Fix: Duplicate NDK Singleton Instance Causing Team Creation Failure (CreateTeamForm & NostrContext)
+
+**Date:** {{DATE}}
+
+**Problem:** The *Create Team* page never detected a ready NDK or an attached signer even when the rest of the app worked.  The in-form debug panel always showed:
+* `NDK Ready: NO`
+* `Signer NOT Available`
+
+Meanwhile other pages (e.g. Feed) could post events successfully.  Investigation revealed that two **different** NDK singleton modules were being instantiated:
+
+* `import { ndk } from '../lib/ndkSingleton.ts'` – (note the explicit `.ts` extension) used only in `src/contexts/NostrContext.jsx`.
+* `import { ndk } from '../lib/ndkSingleton'` – used everywhere else (including the Feed page and `CreateTeamForm`).
+
+Because module specifiers are treated literally by the bundler, the differing suffix meant two separate module instances were created, so the provider's state referenced one NDK while the form and other pages referenced another.  The provider's copy never connected to relays or gained a signer, so `ndkReady` / `signerAvailable` were always false inside the Teams view.
+
+**Root Cause:**  Inconsistent import path (with and without the `.ts` extension) resulted in duplicate singleton creation and divergent runtime state.
+
+**Fix (Simple, No Extra Complexity):**
+* Replaced the import in `src/contexts/NostrContext.jsx` with the extension-less form used elsewhere:
+  ```diff
+- import { ndk, ndkReadyPromise } from '../lib/ndkSingleton.ts';
++ import { ndk, ndkReadyPromise } from '../lib/ndkSingleton';
+  ```
+* No other code changes were required.  All pages now share the exact same NDK instance, so the Teams page correctly detects readiness, signer availability, and can publish the NIP-101e team creation event.
+
+**Affected Files:**
+* `src/contexts/NostrContext.jsx`
+
+**Testing & Validation:**
+1. Start the app, open *Create Team* page.
+2. After relays connect and Amber (or private key) signer is attached, the debug section now shows `NDK Ready: YES` and `Signer Available`.
+3. Submit the form – a kind 33404 event is signed and published successfully (verified in relay logs and via Feed page display).
+
+**Side Effects:** None – change only affects the import path, ensuring the intended singleton pattern. 
