@@ -47,7 +47,8 @@ const CreateTeamForm: React.FC = () => {
     publicKey,
     ndkReady: ndkReadyFromContext,
     signerAvailable,
-    ndkError: ndkErrorFromContext
+    ndkError: ndkErrorFromContext,
+    connectSigner
   } = useNostr() as NostrContextValues; // Type assertion
   const navigate = useNavigate();
 
@@ -75,6 +76,19 @@ const CreateTeamForm: React.FC = () => {
       setIsLoading(false);
       return;
     }
+    // Ensure signer is attached – if not, attempt to connect now
+    if (!publicKey || !ndkToUse.signer) {
+      console.log('CreateTeamForm: No signer or pubkey found, attempting connectSigner()...');
+      try {
+        const signerResult = await connectSigner();
+        if (signerResult?.pubkey) {
+          console.log('CreateTeamForm: Signer connected during submit. Pubkey:', signerResult.pubkey);
+        }
+      } catch(connErr){
+        console.warn('CreateTeamForm: connectSigner threw error', connErr);
+      }
+    }
+
     if (!publicKey) {
       setError('Public key not found. Please make sure you are logged in with Amber or another signer.');
       setIsLoading(false);
@@ -215,7 +229,7 @@ const CreateTeamForm: React.FC = () => {
 
         <button
           type="submit"
-          disabled={isLoading || !ndkReadyFromContext || !publicKey || !signerAvailable} // Disable if signer not available
+          disabled={isLoading || !ndkReadyFromContext} // Allow clicking even if signer isn't yet connected – we'll attempt connection on submit
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
         >
           {isLoading ? (
@@ -228,11 +242,9 @@ const CreateTeamForm: React.FC = () => {
           )}
         </button>
         {/* Updated conditional message based on more specific checks */}
-        {!isLoading && (!ndkReadyFromContext || !publicKey || !signerAvailable) && (
+        {!isLoading && (!ndkReadyFromContext) && (
             <p className="text-xs text-yellow-400 mt-2 text-center">
                 {!ndkReadyFromContext ? "Nostr connection not ready... " : ""}
-                {ndkReadyFromContext && !publicKey ? "Public key not found (Signer not connected)... " : ""}
-                {ndkReadyFromContext && publicKey && !signerAvailable ? "Signer not attached to NDK... " : ""}
                 (Submit will attempt connection)
             </p>
         )}
