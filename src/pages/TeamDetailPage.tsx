@@ -29,10 +29,11 @@ import {
   KIND_TEAM_MEMBERSHIP,
 } from '../services/nostr/NostrTeamsService'; // Corrected path
 import { useNostr } from '../hooks/useNostr'; // Corrected path
-import { NDKEvent, NDKSubscription, NDKKind } from '@nostr-dev-kit/ndk'; // For NDK operations, added NDKSubscription and NDKKind
-import { Event as NostrEventBase } from 'nostr-tools'; // For typing Nostr events from subscriptions
+import { NDKEvent, NDKSubscription, NDKKind } from '@nostr-dev-kit/ndk';
+import { Event as NostrEventBase } from 'nostr-tools';
 import { createAndPublishEvent } from '../utils/nostr';
-import { handleTeamJoinPayment } from '../services/paymentService';
+import { payLnurl } from '../utils/lnurlPay';
+import { useAuth } from '../hooks/useAuth';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -56,6 +57,7 @@ const getWorkoutTitle = (workoutEvent: NostrWorkoutEvent): string => {
 const TeamDetailPage: React.FC = () => {
   const { captainPubkey, teamUUID } = useParams<TeamDetailParams>();
   const { ndk, ndkReady, publicKey: currentUserPubkey } = useNostr(); // Get NDK from your context
+  const { wallet } = useAuth();
   const navigate = useNavigate(); // For redirecting if team is deleted by captain leaving
 
   const [team, setTeam] = useState<NostrTeamEvent | null>(null);
@@ -304,34 +306,25 @@ const TeamDetailPage: React.FC = () => {
   };
 
   const handleJoinTeam = async () => {
-      if (!ndkReady || !ndk || !currentUserPubkey || !teamAIdentifierForChat) {
-          alert("Nostr connection not ready. Please wait.");
-          return;
-      }
-      if (!team) {
-          alert("Team data not loaded yet.");
-          return;
-      }
-
-      // Initiate payment
-      const paymentSuccessful = await handleTeamJoinPayment(2000, getTeamName(team));
-
-      if (paymentSuccessful) {
-          try {
-              const membershipTemplate = prepareTeamMembershipEvent(teamAIdentifierForChat, currentUserPubkey);
-              if (!membershipTemplate) throw new Error('Failed to prepare membership event');
-              
-              await createAndPublishEvent(membershipTemplate, null);
-              alert('Successfully joined the team! Welcome!');
-
-              // Refresh members list
-              const joinedMembers = await fetchTeamMemberships(ndk, teamAIdentifierForChat);
-              setExtraMembers(joinedMembers);
-          } catch (err: any) {
-              alert(`Failed to publish join event: ${err.message || err}`);
-          }
-      } else {
-          alert('Join process cancelled or payment failed.');
+      if (!ndkReady || !ndk || !currentUserPubkey || !teamAIdentifierForChat) return;
+      if (!wallet) throw new Error('Please connect a wallet in Settings first');
+      try {
+        // 1. Pay the fee to RUNSTR lightning address
+        await payLnurl({
+          lightning: 'runstr@geyser.fund',
+          amount: 2000,
+          wallet,
+          comment: 'Runstr team join fee',
+        });
+        // 2. Publish membership event
+        const membershipTemplate = prepareTeamMembershipEvent(teamAIdentifierForChat, currentUserPubkey);
+        if (!membershipTemplate) throw new Error('Failed to prepare membership event');
+        await createAndPublishEvent(membershipTemplate, null);
+        alert('Successfully joined the team!');
+        const joinedMembers = await fetchTeamMemberships(ndk, teamAIdentifierForChat);
+        setExtraMembers(joinedMembers);
+      } catch (err: any) {
+        alert(`Failed to join team: ${err.message || err}`);
       }
   };
 
