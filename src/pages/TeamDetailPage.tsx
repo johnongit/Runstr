@@ -61,7 +61,7 @@ const TeamDetailPage: React.FC = () => {
   const navigate = useNavigate(); // For redirecting if team is deleted by captain leaving
 
   const [team, setTeam] = useState<NostrTeamEvent | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'activities' | 'members' | 'feed'>('chat'); // Changed default tab
 

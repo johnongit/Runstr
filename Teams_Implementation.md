@@ -140,6 +140,50 @@
 3. **Planning**: Finalize NIP101e extensions for events/challenges
 4. **Architecture**: Design membership and participation tracking system
 
+## Analysis – Why the Team Detail Page is still stuck on "Loading"
+
+| Suspected Cause | Evidence/Notes | Quick Check |
+|-----------------|----------------|------------|
+| 1. `loadTeamDetails` early-returns because `ndkReady` is still `false` when the component mounts | Page shows the *exact* fallback branch: `isLoading && !team` ➜ "Loading team details…" | Add a `console.log(ndkReady)` in the effect or wait a few seconds and see if it flips |
+| 2. `fetchTeamById` fails (relay not returning the event) | Would set `error` state and show an error div, **not** the loading one | The fact we never reach the error branch suggests the call is never made |
+| 3. The `a`-identifier format in `TeamDetailPage` mismatches what `CreateTeamFormV2` publishes | Would prevent follow-up chat/activity loads but **not** initial team fetch | Low priority for the loading spinner |
+
+**Hypothesis:** The component renders before `ndkReady === true`; the early-return stops the fetch and `isLoading` never flips back because the effect's dependency list requires `ndkReady`.
+
+### Immediate Fix Plan
+1. Inside `useEffect` that calls `loadTeamDetails`, ensure it **re-runs** when `ndkReady` becomes `true`.
+2. Add a *secondary* `useEffect` that, once `ndkReady` is true and `team` is still `null`, triggers `loadTeamDetails(true)` (forced refetch).
+3. Log relay count + `ndkReady` in the UI temporarily to confirm.
+
+---
+
+## Road-map to Finish the Teams Feature (Phase 1 & 2)
+
+| Priority | Feature | Key Tasks | Notes |
+|----------|---------|-----------|-------|
+| P0 | **Unblock Team Detail Loading** | • Fix `loadTeamDetails` trigger<br>• Verify event filter in `fetchTeamById` | Must show basic team info asap |
+| P0 | **Join Button** | • Render when user ≠ captain & not member<br>• Calls `handleJoinTeam` (already coded)<br>• Show state ("Joining…", error) | Depends on wallet connected |
+| P1 | **Member List** | • Combine `members` + `extraMembers`<br>• Show avatar/short-pubkey<br>• Show captain badge | Needed for social proof |
+| P1 | **Captain Pinned Message** | • Add `pinned_msg` tag to team event<br>• Provide inline edit (captain only) that republishes event | Minimal rich-text for now |
+| P1 | **In-App Chat (Team-only)** | • Subscribe to kind `KIND_NIP101_TEAM_CHAT_MESSAGE` filtered by team `a` tag<br>• Simple feed + send box<br>• Re-use `createAndPublishEvent` helper | Text-only MVP |
+| P2 | **Events Tab** | • List kind 33403 events with `a` tag to team<br>• Captain can create Event (modal) | Use same LN pay flow for paid events later |
+| P2 | **Challenges Tab** | • Same as Events but allow all members to create | Distinguish by `type` field in tags |
+| P2 | **Workout Association** | • When user saves a run, if default team set ➜ auto-tag workout record | Logic largely exists in `SaveRunModal` |
+| P3 | **Payment UX Polish** | • Replace `alert/confirm` with custom modal<br>• Show invoice & status<br>• Handle failure gracefully | Tied to wallet
+
+---
+
+## Next Coding Steps (Proposed)
+1. **Fix loading spinner:** patch the `useEffect` dependencies in `TeamDetailPage` to ensure re-fetch after `ndkReady`.
+2. **Render Join Button:** quick UI check, ensure `combinedMembers` logic works.
+3. **Display Member List + Captain badge** (read-only).
+4. **Add basic Chat Tab** re-using existing event publish helper.
+
+Once these are stable, proceed to Events/Challenges tabs.
+
+---
+*Last updated: {{DATE}}*
+
 ---
 
 *This document serves as our central reference for the Teams implementation. Update as we make progress and decisions.* 
