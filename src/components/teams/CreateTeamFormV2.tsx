@@ -33,12 +33,6 @@ const CreateTeamFormV2: React.FC = () => {
     setError(null);
     setIsLoading(true);
 
-    if (!ndkReady) {
-      setError('Nostr is not connected. Please wait.');
-      setIsLoading(false);
-      return;
-    }
-
     let finalPubkey = publicKey;
     if (!finalPubkey) {
       const signerResult = await connectSigner();
@@ -159,7 +153,7 @@ const CreateTeamFormV2: React.FC = () => {
 
         <button
           type="submit"
-          disabled={isLoading || !ndkReady}
+          disabled={isLoading}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
         >
           {isLoading ? (
@@ -171,11 +165,6 @@ const CreateTeamFormV2: React.FC = () => {
             'Create Team'
           )}
         </button>
-        {!ndkReady && (
-            <p className="text-xs text-yellow-400 mt-2 text-center">
-                Waiting for Nostr connection...
-            </p>
-        )}
       </form>
     </div>
   );
