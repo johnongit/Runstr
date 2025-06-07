@@ -10,7 +10,7 @@ const RELAYS = [
   "wss://relay.primal.net",
   "wss://relay.nostr.band",
 ];
-const RUNSTR_TAG = "runstr";
+const RUNSTR_SOURCE_TAG = "RUNSTR";
 const WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
 // -------------------
 
@@ -32,7 +32,7 @@ async function main() {
 
   const filter = {
     kinds: [1301],
-    "#t": [RUNSTR_TAG],
+    '#s': [RUNSTR_SOURCE_TAG],
     since: since,
   };
 
@@ -48,7 +48,6 @@ async function main() {
 
   if (events.size === 0) {
     rl.close();
-    ndk.disconnect();
     return;
   }
 
@@ -65,7 +64,6 @@ async function main() {
     }
     console.log("--- End of List ---\n");
     rl.close();
-    ndk.disconnect();
   });
 }
 
