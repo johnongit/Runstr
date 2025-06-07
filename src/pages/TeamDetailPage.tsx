@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom'; // Added useNavigate
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'; // Added useNavigate, useLocation
 import {
   fetchTeamById,
   NostrTeamEvent,
@@ -56,11 +56,13 @@ const getWorkoutTitle = (workoutEvent: NostrWorkoutEvent): string => {
 
 const TeamDetailPage: React.FC = () => {
   const { captainPubkey, teamUUID } = useParams<TeamDetailParams>();
+  const location = useLocation();
+  const seededEvent = (location.state as any)?.teamEvent ?? null;
   const { ndk, ndkReady, publicKey: currentUserPubkey } = useNostr(); // Get NDK from your context
   const { wallet } = useAuth();
   const navigate = useNavigate(); // For redirecting if team is deleted by captain leaving
 
-  const [team, setTeam] = useState<NostrTeamEvent | null>(null);
+  const [team, setTeam] = useState<NostrTeamEvent | null>(seededEvent);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'activities' | 'members' | 'feed'>('chat'); // Changed default tab

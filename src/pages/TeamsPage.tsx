@@ -50,7 +50,11 @@ const TeamsPage: React.FC = () => {
             {teams.map((team) => {
               return (
                 <li key={team.id || `${team.captainPubkey}-${team.teamUUID}`} className="bg-gray-800 shadow-lg rounded-lg p-5 hover:bg-gray-700 transition-colors duration-150">
-                  <Link to={`/teams/${team.captainPubkey}/${team.teamUUID}`} className="block">
+                  <Link 
+                    to={`/teams/${team.captainPubkey}/${team.teamUUID}`}
+                    state={{ teamEvent: team.originalEvent }}
+                    className="block"
+                  >
                     <h2 className="text-xl font-semibold text-blue-400 hover:text-blue-300 mb-2">
                       {team.name}
                     </h2>
