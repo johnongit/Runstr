@@ -8,6 +8,7 @@ import NDK, { NDKEvent, NDKFilter, NDKKind, NDKSubscription, NDKSubscriptionCach
 
 export const KIND_FITNESS_TEAM = 33404; // Your NIP-101e Team Kind
 export const KIND_WORKOUT_RECORD = 1301; // Define Kind 1301
+export const KIND_TEAM_MEMBERSHIP = 33406; // New kind: membership join event
 
 // NIP-29 Kinds - to be removed or repurposed if NIP-29 integration is fully removed
 // export const KIND_NIP29_GROUP_METADATA = 10009;
@@ -594,4 +595,58 @@ export function subscribeToTeamActivities(
   });
   
   return subscription;
+}
+
+// --- NIP-101e Team Membership (Join) Functions ---
+
+/**
+ * Prepare an unsigned team membership event. This represents a user joining a team.
+ * Kind 33406, with an 'a' tag linking to the team and a 'member' tag = joining pubkey.
+ */
+export function prepareTeamMembershipEvent(
+  teamAIdentifier: string, // e.g., "33404:captain_pubkey:team_uuid"
+  joiningPubkey: string
+): EventTemplate | null {
+  if (!teamAIdentifier || !joiningPubkey) {
+    console.error("Missing parameters for prepareTeamMembershipEvent");
+    return null;
+  }
+  const tags = [
+    ["a", teamAIdentifier],
+    ["member", joiningPubkey],
+  ];
+  const eventTemplate: EventTemplate = {
+    kind: KIND_TEAM_MEMBERSHIP,
+    created_at: Math.floor(Date.now() / 1000),
+    tags,
+    content: "joined team", // Minimal content
+  };
+  return eventTemplate;
+}
+
+/**
+ * Fetch membership events for a team and return unique member pubkeys.
+ */
+export async function fetchTeamMemberships(
+  ndk: NDK,
+  teamAIdentifier: string
+): Promise<string[]> {
+  if (!ndk || !teamAIdentifier) return [];
+  const filter: NDKFilter = {
+    kinds: [KIND_TEAM_MEMBERSHIP as NDKKind],
+    "#a": [teamAIdentifier],
+    limit: 1000,
+  };
+  try {
+    const events = await ndk.fetchEvents(filter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    const members = new Set<string>();
+    events.forEach(e => {
+      const memberTag = e.rawEvent().tags.find(t => t[0] === "member");
+      if (memberTag) members.add(memberTag[1]);
+    });
+    return Array.from(members);
+  } catch (err) {
+    console.error("Error fetching membership events", err);
+    return [];
+  }
 } 

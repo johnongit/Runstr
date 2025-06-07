@@ -24,10 +24,15 @@ import {
   KIND_NIP101_TEAM_EVENT,
   KIND_NIP101_TEAM_CHALLENGE,
   KIND_NIP101_TEAM_CHAT_MESSAGE, // Added for the new chat message kind
+  prepareTeamMembershipEvent,
+  fetchTeamMemberships,
+  KIND_TEAM_MEMBERSHIP,
 } from '../services/nostr/NostrTeamsService'; // Corrected path
 import { useNostr } from '../hooks/useNostr'; // Corrected path
 import { NDKEvent, NDKSubscription, NDKKind } from '@nostr-dev-kit/ndk'; // For NDK operations, added NDKSubscription and NDKKind
 import { Event as NostrEventBase } from 'nostr-tools'; // For typing Nostr events from subscriptions
+import { createAndPublishEvent } from '../utils/nostr';
+import { handleTeamJoinPayment } from '../services/paymentService';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -68,6 +73,7 @@ const TeamDetailPage: React.FC = () => {
 
   const [isProcessingMembership, setIsProcessingMembership] = useState<string | null>(null); // Stores pubkey of member being processed or 'self' for leaving
   const [membershipError, setMembershipError] = useState<string | null>(null);
+  const [extraMembers, setExtraMembers] = useState<string[]>([]); // members from membership events
 
   // State for Chat - chatGroupRef is no longer needed
   // const [chatGroupRef, setChatGroupRef] = useState<string | null>(null); // REMOVED
@@ -207,6 +213,16 @@ const TeamDetailPage: React.FC = () => {
     }
   }, [activeTab, teamAIdentifierForChat, ndk, ndkReady]); // Changed from `team` to `teamAIdentifierForChat`
 
+  // Fetch membership events and merge into members list
+  useEffect(() => {
+    const loadMemberships = async () => {
+      if (!ndk || !ndkReady || !teamAIdentifierForChat) return;
+      const joinedMembers = await fetchTeamMemberships(ndk, teamAIdentifierForChat);
+      setExtraMembers(joinedMembers);
+    };
+    loadMemberships();
+  }, [ndk, ndkReady, teamAIdentifierForChat]);
+
   const handleAddMember = async () => {
     if (!ndk || !currentUserPubkey || !team || !newMemberPubkey.trim()) {
       setAddMemberError("Missing NDK, captain pubkey, team data, or new member pubkey.");
@@ -287,6 +303,38 @@ const TeamDetailPage: React.FC = () => {
     alert(`To leave the team, please ask the captain (${getPubkeyDisplayName(teamCaptain)}) to remove you.`);
   };
 
+  const handleJoinTeam = async () => {
+      if (!ndkReady || !ndk || !currentUserPubkey || !teamAIdentifierForChat) {
+          alert("Nostr connection not ready. Please wait.");
+          return;
+      }
+      if (!team) {
+          alert("Team data not loaded yet.");
+          return;
+      }
+
+      // Initiate payment
+      const paymentSuccessful = await handleTeamJoinPayment(2000, getTeamName(team));
+
+      if (paymentSuccessful) {
+          try {
+              const membershipTemplate = prepareTeamMembershipEvent(teamAIdentifierForChat, currentUserPubkey);
+              if (!membershipTemplate) throw new Error('Failed to prepare membership event');
+              
+              await createAndPublishEvent(membershipTemplate, null);
+              alert('Successfully joined the team! Welcome!');
+
+              // Refresh members list
+              const joinedMembers = await fetchTeamMemberships(ndk, teamAIdentifierForChat);
+              setExtraMembers(joinedMembers);
+          } catch (err: any) {
+              alert(`Failed to publish join event: ${err.message || err}`);
+          }
+      } else {
+          alert('Join process cancelled or payment failed.');
+      }
+  };
+
   if (isLoading && !team) {
     return <div className="p-4 text-white text-center">Loading team details...</div>;
   }
@@ -311,8 +359,11 @@ const TeamDetailPage: React.FC = () => {
   const teamIsPublic = isTeamPublic(team);
   const confirmedTeamUUID = getTeamUUID(team);
 
+  // Combine members from team event and membership events
+  const combinedMembers = Array.from(new Set([...members, ...extraMembers]));
+
   const isCurrentUserCaptain = currentUserPubkey === actualCaptain && !!actualCaptain;
-  const isCurrentUserMember = !!currentUserPubkey && members.includes(currentUserPubkey);
+  const isCurrentUserMember = !!currentUserPubkey && combinedMembers.includes(currentUserPubkey);
 
   const renderTabs = () => {
     return (
@@ -557,7 +608,7 @@ const TeamDetailPage: React.FC = () => {
       case 'members':
         return (
           <div>
-            <h3 className="text-xl font-semibold mb-3 text-gray-100">Members ({members.length})</h3>
+            <h3 className="text-xl font-semibold mb-3 text-gray-100">Members ({combinedMembers.length})</h3>
             {isCurrentUserCaptain && (
               <div className="my-4 p-3 bg-gray-750 border border-gray-700 rounded-md">
                 <h4 className="text-md font-semibold text-gray-200 mb-2">Add New Member (Captain Only)</h4>
@@ -581,9 +632,9 @@ const TeamDetailPage: React.FC = () => {
               </div>
             )}
             {membershipError && <p className="text-red-400 text-sm my-3 p-2 bg-red-900/30 rounded-md">Error: {membershipError}</p>}
-            {members.length > 0 ? (
+            {combinedMembers.length > 0 ? (
               <ul className="space-y-2">
-                {members.map((memberPubkey, index) => (
+                {combinedMembers.map((memberPubkey, index) => (
                   <li key={index} className="flex items-center justify-between text-gray-300 bg-gray-750 p-2 rounded-md font-mono text-xs">
                     <span className="truncate hover:text-clip">
                         {getPubkeyDisplayName(memberPubkey)}
@@ -649,11 +700,11 @@ const TeamDetailPage: React.FC = () => {
       if (!teamIsPublic) return <p className="text-sm text-gray-400 mt-4">This is a private team. Contact the captain to join.</p>; 
       return (
           <button 
-            onClick={() => alert(`To join, please contact the captain: ${getPubkeyDisplayName(actualCaptain)}`)}
+            onClick={handleJoinTeam}
             className="mt-4 w-full sm:w-auto px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition-colors"
             title={`Captain: ${actualCaptain}`}
           >
-            Request to Join Team
+            Join Team (2000 sats)
           </button>
       );
   }
