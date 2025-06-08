@@ -270,13 +270,13 @@ export async function fetchTeamActivityFeed(
     return [];
   }
 
-  const teamTagValue = `33404:${teamCaptainPubkey}:${teamUUID}`;
+  // For A2 tagging strategy we use the simple hashtag-style t tag: "team:<uuid>"
+  const teamTagValue = `team:${teamUUID}`;
 
   const filter: NDKFilter = {
     kinds: [KIND_WORKOUT_RECORD as NDKKind],
-    '#team': [teamTagValue], // Query for the specific team tag value
+    '#t': [teamTagValue], // Query by t-tag value
     limit: limit,
-    // until: Math.floor(Date.now() / 1000), // Optional: to paginate or get latest
   };
 
   try {

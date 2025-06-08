@@ -997,13 +997,10 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
     // ["device", run.deviceInfo || "Runstr Mobile App"], (if available)
   ];
 
-  // Add team tag if teamAssociation is provided
-  if (teamAssociation && teamAssociation.teamCaptainPubkey && teamAssociation.teamUUID) {
-    tags.push([
-      "team", 
-      `33404:${teamAssociation.teamCaptainPubkey}:${teamAssociation.teamUUID}`,
-      teamAssociation.relayHint || "" 
-    ]);
+  // Add team tag if teamAssociation is provided (A2 strategy: use hashtag-style "t" tag)
+  if (teamAssociation && teamAssociation.teamUUID) {
+    // Tag format: ["t", "team:<uuid>"]  (A2 – simple hashtag for team association)
+    tags.push(["t", `team:${teamAssociation.teamUUID}`]);
   }
 
   return {

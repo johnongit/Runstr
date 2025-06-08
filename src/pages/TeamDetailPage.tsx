@@ -34,6 +34,7 @@ import { Event as NostrEventBase } from 'nostr-tools';
 import { createAndPublishEvent } from '../utils/nostr';
 import { payLnurl } from '../utils/lnurlPay';
 import { useAuth } from '../hooks/useAuth';
+import LocalTeamChat from '../components/teams/LocalTeamChat';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -466,57 +467,10 @@ const TeamDetailPage: React.FC = () => {
   };
 
   const renderChatTabContent = () => {
-    if (isLoadingChat && chatMessages.length === 0) return <div className="text-gray-400 p-4 text-center">Loading chat...</div>;
-    // Check teamAIdentifierForChat instead of chatGroupRef
-    if (!teamAIdentifierForChat) return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">Chat not available for this team.</div>;
-    
-    return (
-      <div className="flex flex-col h-[500px]"> 
-        <div className="flex-grow overflow-y-auto p-4 space-y-3 bg-gray-800 rounded-t-md">
-          {chatMessages.length === 0 && !isLoadingChat && <p className="text-gray-400 text-center">No messages yet.</p>}
-          {chatMessages.map(msg => (
-            <div key={msg.id} className={`flex ${msg.pubkey === currentUserPubkey ? 'justify-end' : 'justify-start'}`}>
-              <div 
-                className={`p-3 rounded-lg max-w-xs lg:max-w-md break-words 
-                  ${msg.pubkey === currentUserPubkey 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-700 text-gray-200'}`}
-              >
-                <p className="text-xs font-semibold mb-0.5">
-                  {getPubkeyDisplayName(msg.pubkey)}
-                  {/* Ensure team is not null before accessing getTeamCaptain */}
-                  {team && msg.pubkey === getTeamCaptain(team) && <span className="text-yellow-300 text-xs ml-1">(C)</span>} 
-                </p>
-                <p className="text-sm">{msg.content}</p>
-                <p className="text-xxs text-gray-400 mt-1 text-right opacity-75">
-                  {new Date(msg.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="p-3 border-t border-gray-700 bg-gray-800 rounded-b-md">
-          <div className="flex items-center space-x-2">
-            <input 
-              type="text"
-              value={newChatMessage}
-              onChange={(e) => setNewChatMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && !isSendingChatMessage && handleSendChatMessage()}
-              placeholder="Type your message..."
-              className="flex-grow p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
-              disabled={isSendingChatMessage || !teamAIdentifierForChat} // Disable if no team identifier for chat
-            />
-            <button 
-              onClick={handleSendChatMessage}
-              disabled={isSendingChatMessage || !newChatMessage.trim() || !teamAIdentifierForChat} // Disable if no team identifier
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md disabled:opacity-50 transition-colors"
-            >
-              {isSendingChatMessage ? 'Sending...' : 'Send'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    if (!teamUUID) {
+      return <div className="text-gray-400 p-4 text-center">Chat unavailable – missing team ID</div>;
+    }
+    return <LocalTeamChat teamId={teamUUID} userPubkey={currentUserPubkey} />;
   };
 
   const renderActivitiesTabContent = () => {

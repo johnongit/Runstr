@@ -22,10 +22,26 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}) => {
   const results = [];
   const relayList = getActiveRelayList();
 
+  // 🏷️ Determine default posting team (A2 strategy – simple hashtag tag)
+  let teamAssociation = undefined;
+  try {
+    const { getDefaultPostingTeamIdentifier } = await import('./settingsManager.ts');
+    const defaultTeamId = getDefaultPostingTeamIdentifier ? getDefaultPostingTeamIdentifier() : null;
+    if (defaultTeamId) {
+      const parts = defaultTeamId.split(':');
+      if (parts.length === 2) {
+        const [teamCaptainPubkey, teamUUID] = parts;
+        teamAssociation = { teamCaptainPubkey, teamUUID };
+      }
+    }
+  } catch (err) {
+    console.warn('runPublisher: could not resolve default posting team', err);
+  }
+
   // 1️⃣ Publish workout summary if not already published earlier (ALWAYS PUBLISHED)
   if (!run.nostrWorkoutEventId) {
     // Pass settings to createWorkoutEvent if it needs to conditionally add tags like steps
-    const summaryTemplate = createWorkoutEvent(run, distanceUnit /*, settings */); // Potential future enhancement for steps tag
+    const summaryTemplate = createWorkoutEvent(run, distanceUnit, { teamAssociation }); // Adds A2 team tag if available
     try {
       const summaryResult = await createAndPublishEvent(summaryTemplate, null, { relays: relayList });
       results.push({ kind: 1301, success: true, result: summaryResult });
