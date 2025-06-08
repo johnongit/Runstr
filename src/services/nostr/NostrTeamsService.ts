@@ -649,4 +649,104 @@ export async function fetchTeamMemberships(
     console.error("Error fetching membership events", err);
     return [];
   }
+}
+
+/**
+ * Prepares an unsigned NIP-101e Team Challenge event (Kind 31013).
+ * Tag scheme (A2 + C1):
+ *   ["d", <challengeUUID>]
+ *   ["a", <teamAIdentifier>]
+ *   ["name", <challengeName>]
+ *   ["description", <description>]
+ *   ["start", <unixTs>]
+ *   ["end",   <unixTs>]
+ *   ["goal_type", "distance_total"]
+ *   ["goal_value", <value>, <unit>]  // e.g. 100 km
+ *   ["t", "challenge"]
+ *   ["t", "challenge:<challengeUUID>"]
+ */
+export interface ChallengeGoal {
+  goalType: 'distance_total';
+  value: number;
+  unit: 'km' | 'mi';
+}
+
+export interface ChallengeDetails {
+  name: string;
+  description: string;
+  startTime?: number; // unix seconds
+  endTime?: number;   // unix seconds
+  goal: ChallengeGoal;
+}
+
+export function prepareTeamChallengeEvent(
+  teamAIdentifier: string,
+  details: ChallengeDetails,
+  creatorPubkey: string
+): EventTemplate | null {
+  if (!teamAIdentifier || !details || !creatorPubkey) {
+    console.error('prepareTeamChallengeEvent missing params');
+    return null;
+  }
+
+  const challengeUUID = uuidv4();
+
+  const tags: string[][] = [
+    ['d', challengeUUID],
+    ['a', teamAIdentifier],
+    ['name', details.name],
+    ['description', details.description],
+    ['t', 'challenge'],
+    ['t', `challenge:${challengeUUID}`],
+    ['goal_type', details.goal.goalType],
+    ['goal_value', details.goal.value.toString(), details.goal.unit],
+  ];
+  if (details.startTime) tags.push(['start', details.startTime.toString()]);
+  if (details.endTime) tags.push(['end', details.endTime.toString()]);
+
+  const tmpl: EventTemplate = {
+    kind: KIND_NIP101_TEAM_CHALLENGE,
+    created_at: Math.floor(Date.now() / 1000),
+    tags,
+    content: details.description,
+  };
+  return tmpl;
+}
+
+/** Fetch challenges for a given team (Kind 31013 filtered by #a). */
+export async function fetchTeamChallenges(
+  ndk: NDK,
+  teamAIdentifier: string,
+  limit: number = 100
+): Promise<NostrEvent[]> {
+  if (!ndk || !teamAIdentifier) return [];
+  const filter: NDKFilter = {
+    kinds: [KIND_NIP101_TEAM_CHALLENGE as NDKKind],
+    '#a': [teamAIdentifier],
+    limit,
+  };
+  try {
+    const set = await ndk.fetchEvents(filter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    return Array.from(set).map(e => e.rawEvent());
+  } catch (err) {
+    console.error('fetchTeamChallenges error', err);
+    return [];
+  }
+}
+
+export function subscribeToTeamChallenges(
+  ndk: NDK,
+  teamAIdentifier: string,
+  cb: (evt: NostrEvent) => void,
+  limit: number = 50
+): NDKSubscription | null {
+  if (!ndk || !teamAIdentifier) return null;
+  const filter: NDKFilter = {
+    kinds: [KIND_NIP101_TEAM_CHALLENGE as NDKKind],
+    '#a': [teamAIdentifier],
+    limit,
+  };
+  const sub = ndk.subscribe(filter, { closeOnEose: false, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+  sub.on('event', (e: NDKEvent) => cb(e.rawEvent()));
+  return sub;
 } 

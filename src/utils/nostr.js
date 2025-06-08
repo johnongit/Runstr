@@ -941,6 +941,7 @@ export const diagnoseConnection = async () => {
  * @param {string} [options.teamAssociation.teamCaptainPubkey]
  * @param {string} [options.teamAssociation.teamUUID]
  * @param {string} [options.teamAssociation.relayHint]
+ * @param {Array} [options.challengeUUIDs] - Array of challenge UUIDs
  * @returns {Object} Event template for a kind 1301 event
  */
 export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
@@ -948,7 +949,7 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
     throw new Error('No run data provided');
   }
 
-  const { teamAssociation } = options;
+  const { teamAssociation, challengeUUIDs } = options;
   const workoutUUID = uuidv4(); // Unique ID for this workout record
 
   const activity = (run.activityType || 'run').toLowerCase();
@@ -1001,6 +1002,13 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
   if (teamAssociation && teamAssociation.teamUUID) {
     // Tag format: ["t", "team:<uuid>"]  (A2 – simple hashtag for team association)
     tags.push(["t", `team:${teamAssociation.teamUUID}`]);
+  }
+
+  // Add challenge tags if provided (A2 strategy hashtag)
+  if (Array.isArray(challengeUUIDs)) {
+    challengeUUIDs.forEach(uuid => {
+      if (uuid && typeof uuid === 'string') tags.push(["t", `challenge:${uuid}`]);
+    });
   }
 
   return {

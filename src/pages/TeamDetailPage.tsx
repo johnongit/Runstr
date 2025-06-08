@@ -35,6 +35,7 @@ import { createAndPublishEvent } from '../utils/nostr';
 import { payLnurl } from '../utils/lnurlPay';
 import { useAuth } from '../hooks/useAuth';
 import LocalTeamChat from '../components/teams/LocalTeamChat';
+import TeamChallengesTab from '../components/teams/TeamChallengesTab';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -66,7 +67,7 @@ const TeamDetailPage: React.FC = () => {
   const [team, setTeam] = useState<NostrTeamEvent | null>(seededEvent);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'chat' | 'activities' | 'members' | 'feed'>('chat'); // Changed default tab
+  const [activeTab, setActiveTab] = useState<'chat' | 'challenges' | 'members' | 'feed'>('chat');
 
   const [teamFeed, setTeamFeed] = useState<NostrWorkoutEvent[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState<boolean>(false);
@@ -90,19 +91,13 @@ const TeamDetailPage: React.FC = () => {
   const [chatSubscription, setChatSubscription] = useState<NDKSubscription | null>(null);
 
   // State for NIP-101e Team Activities (Events & Challenges)
-  const [teamActivities, setTeamActivities] = useState<NostrEventBase[]>([]);
-  const [isLoadingActivities, setIsLoadingActivities] = useState<boolean>(false);
-  const [activitiesSubscription, setActivitiesSubscription] = useState<NDKSubscription | null>(null);
+  const [teamChallenges, setTeamChallenges] = useState<NostrEventBase[]>([]);
+  const [isLoadingChallenges, setIsLoadingChallenges] = useState<boolean>(false);
+  const [challengesSubscription, setChallengesSubscription] = useState<NDKSubscription | null>(null);
   
-  const [activityForm, setActivityForm] = useState<Omit<TeamActivityDetails, 'type'> & {type: 'event' | 'challenge', startTimeString?: string}>({
-    type: 'event',
-    name: '',
-    description: '',
-    startTimeString: '',
-    location: '',
-    rules: '',
-  });
-  const [isCreatingActivity, setIsCreatingActivity] = useState(false);
+  const [challengeForm, setChallengeForm] = useState<{name:string;description:string;goalValue:number;goalUnit:'km'|'mi';startTimeString?:string;endTimeString?:string}>({
+    name:'',description:'',goalValue:0,goalUnit:'km',startTimeString:'',endTimeString:''});
+  const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
 
   const loadTeamDetails = useCallback(async (forceRefetch = false) => {
     if (!captainPubkey || !teamUUID || !ndkReady || !ndk) return;
@@ -193,30 +188,22 @@ const TeamDetailPage: React.FC = () => {
 
   // Effect for Team Activities Subscription (uses teamAIdentifierForChat)
   useEffect(() => {
-    if (activeTab === 'activities' && teamAIdentifierForChat && ndk && ndkReady) {
-      setIsLoadingActivities(true);
-      setTeamActivities([]); 
-      const sub = subscribeToTeamActivities(ndk, teamAIdentifierForChat, (newEvent) => {
-        setTeamActivities(prevActivities => {
-          if (prevActivities.find(act => act.id === newEvent.id)) return prevActivities;
-          return [...prevActivities, newEvent].sort((a, b) => b.created_at - a.created_at); 
-        });
+    if (activeTab === 'challenges' && teamAIdentifierForChat && ndk && ndkReady) {
+      setIsLoadingChallenges(true);
+      setTeamChallenges([]);
+      const { subscribeToTeamChallenges } = require('../services/nostr/NostrTeamsService');
+      const sub = subscribeToTeamChallenges(ndk, teamAIdentifierForChat, (evt:any)=>{
+          setTeamChallenges(prev=>{
+             if(prev.find(c=>c.id===evt.id)) return prev;
+             return [...prev,evt].sort((a,b)=>b.created_at - a.created_at);
+          });
       });
-      if (sub) {
-        setActivitiesSubscription(sub);
-      }
-      setIsLoadingActivities(false);
-      return () => {
-        if (sub) sub.stop();
-        setActivitiesSubscription(null);
-      };
+      if(sub){setChallengesSubscription(sub);} 
+      setIsLoadingChallenges(false);
+      return ()=>{ if(sub) sub.stop(); setChallengesSubscription(null); };
     } else {
-      if (activitiesSubscription) {
-        activitiesSubscription.stop();
-        setActivitiesSubscription(null);
-      }
-    }
-  }, [activeTab, teamAIdentifierForChat, ndk, ndkReady]); // Changed from `team` to `teamAIdentifierForChat`
+      if(challengesSubscription){challengesSubscription.stop(); setChallengesSubscription(null);} }
+  },[activeTab,teamAIdentifierForChat,ndk,ndkReady]);
 
   // Fetch membership events and merge into members list
   useEffect(() => {
@@ -365,9 +352,9 @@ const TeamDetailPage: React.FC = () => {
     return (
       <div className="mb-4 border-b border-gray-700">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto pb-px" aria-label="Tabs">
-          {['chat', 'activities', 'members', 'feed'].map((tabName) => {
+          {['chat', 'challenges', 'members', 'feed'].map((tabName) => {
             let displayName = tabName;
-            if (tabName === 'activities') displayName = 'Team Activities';
+            if (tabName === 'challenges') displayName = 'Team Challenges';
             else displayName = tabName.charAt(0).toUpperCase() + tabName.slice(1);
 
             return (
@@ -419,51 +406,33 @@ const TeamDetailPage: React.FC = () => {
   };
 
   // Updated handleCreateTeamActivity to use teamAIdentifierForChat (which is the team's 'a' tag)
-  const handleCreateTeamActivity = async (e: React.FormEvent) => {
+  const handleCreateChallenge = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ndk || !ndkReady || !currentUserPubkey || !teamAIdentifierForChat) { // Check teamAIdentifierForChat
-        alert("Cannot create activity: Missing NDK, user, or team identifier.");
+    if(!ndk||!ndkReady||!currentUserPubkey||!teamAIdentifierForChat){
+        alert('Cannot create challenge: missing requirements');
         return;
     }
-    // teamCaptain and teamId are implicit in teamAIdentifierForChat
-
-    const details: TeamActivityDetails = {
-        type: activityForm.type,
-        name: activityForm.name,
-        description: activityForm.description,
-        startTime: activityForm.startTimeString ? Math.floor(new Date(activityForm.startTimeString).getTime() / 1000) : undefined,
-        location: activityForm.type === 'event' ? activityForm.location : undefined,
-        rules: activityForm.type === 'challenge' ? activityForm.rules : undefined,
+    const { prepareTeamChallengeEvent } = require('../services/nostr/NostrTeamsService');
+    const details={
+        name:challengeForm.name,
+        description:challengeForm.description,
+        goal:{goalType:'distance_total',value:challengeForm.goalValue,unit:challengeForm.goalUnit},
+        startTime:challengeForm.startTimeString?Math.floor(new Date(challengeForm.startTimeString).getTime()/1000):undefined,
+        endTime:challengeForm.endTimeString?Math.floor(new Date(challengeForm.endTimeString).getTime()/1000):undefined
     };
-
-    setIsCreatingActivity(true);
-    const activityTemplate = prepareTeamActivityEvent(teamAIdentifierForChat, details, currentUserPubkey);
-    if (!activityTemplate) {
-        alert("Failed to prepare team activity event.");
-        setIsCreatingActivity(false);
-        return;
-    }
-    try {
-        const ndkActivityEvent = new NDKEvent(ndk, activityTemplate);
-        await ndkActivityEvent.sign();
-        const publishedRelays = await ndkActivityEvent.publish();
-        if (publishedRelays.size > 0) {
-            alert("Team activity created successfully!");
-            setActivityForm({ type: 'event', name: '', description: '', startTimeString: '', location: '', rules: '' });
-        } else {
-            alert("Failed to publish team activity to any relays.");
-        }
-    } catch (err: any) {
-        console.error("Error creating team activity:", err);
-        alert(`Error creating activity: ${err.message}`);
-    } finally {
-        setIsCreatingActivity(false);
-    }
+    setIsCreatingChallenge(true);
+    const tmpl=prepareTeamChallengeEvent(teamAIdentifierForChat,details,currentUserPubkey);
+    if(!tmpl){alert('Failed to prepare challenge');setIsCreatingChallenge(false);return;}
+    try{
+       const ev=new NDKEvent(ndk,tmpl); await ev.sign(); const relays=await ev.publish();
+       if(relays.size>0){alert('Challenge created!'); setChallengeForm({name:'',description:'',goalValue:0,goalUnit:'km',startTimeString:'',endTimeString:''});}
+       else alert('Failed to publish challenge');
+    }catch(err:any){console.error('create challenge err',err);alert(err.message||'Error');}
+    finally{setIsCreatingChallenge(false);}    
   };
   
-  const handleActivityFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setActivityForm(prev => ({ ...prev, [name]: value }));
+  const handleChallengeFormChange=(e:React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>)=>{
+     const {name,value}=e.target; setChallengeForm(prev=>({...prev,[name]:name==='goalValue'?Number(value):value}));
   };
 
   const renderChatTabContent = () => {
@@ -473,74 +442,20 @@ const TeamDetailPage: React.FC = () => {
     return <LocalTeamChat teamId={teamUUID} userPubkey={currentUserPubkey} />;
   };
 
-  const renderActivitiesTabContent = () => {
-    if (isLoadingActivities && teamActivities.length === 0) return <div className="text-gray-400 p-4 text-center">Loading team activities...</div>;
-    if (!teamAIdentifierForChat) return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">Activities not available for this team.</div>;
+  const renderChallengesTabContent = () => {
+    if(isLoadingChallenges&&teamChallenges.length===0)return <div className="text-gray-400 p-4 text-center">Loading challenges...</div>;
+    if(!teamAIdentifierForChat)return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">Challenges not available.</div>;
 
     return (
-        <div>
-            <form onSubmit={handleCreateTeamActivity} className="p-4 bg-gray-750 rounded-lg mb-6 space-y-3 border border-gray-700">
-                <h4 className="text-lg font-semibold text-gray-100">Create New Team Activity</h4>
-                <div>
-                    <label className="block text-sm font-medium text-gray-300">Type</label>
-                    <select name="type" value={activityForm.type} onChange={handleActivityFormChange} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white">
-                        <option value="event">Event (e.g., Group Run)</option>
-                        <option value="challenge">Challenge (e.g., Monthly Mileage)</option>
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-300">Name</label>
-                    <input type="text" name="name" value={activityForm.name} onChange={handleActivityFormChange} required className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-300">Description</label>
-                    <textarea name="description" value={activityForm.description} onChange={handleActivityFormChange} required rows={3} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white"></textarea>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-300">Start Time (Optional)</label>
-                    <input type="datetime-local" name="startTimeString" value={activityForm.startTimeString} onChange={handleActivityFormChange} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white" />
-                </div>
-                {activityForm.type === 'event' && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300">Location (for Event)</label>
-                        <input type="text" name="location" value={activityForm.location} onChange={handleActivityFormChange} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white" />
-                    </div>
-                )}
-                {activityForm.type === 'challenge' && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300">Rules (for Challenge)</label>
-                        <textarea name="rules" value={activityForm.rules} onChange={handleActivityFormChange} rows={2} className="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white"></textarea>
-                    </div>
-                )}
-                <button type="submit" disabled={isCreatingActivity} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md disabled:opacity-50">
-                    {isCreatingActivity ? 'Creating...' : 'Create Activity'}
-                </button>
-            </form>
-
-            <h3 className="text-xl font-semibold mb-3 text-gray-100">Scheduled Activities & Challenges</h3>
-            {teamActivities.length === 0 && !isLoadingActivities && <p className="text-gray-400 p-4 bg-gray-750 rounded-md">No activities scheduled for this team yet.</p>}
-            <div className="space-y-4">
-                {teamActivities.map(act => {
-                    const actName = act.tags.find(t => t[0] === 'name')?.[1] || 'Unnamed Activity';
-                    const actDesc = act.tags.find(t => t[0] === 'description')?.[1] || act.content || 'No description.';
-                    const actStart = act.tags.find(t => t[0] === 'start')?.[1];
-                    const actLocation = act.tags.find(t => t[0] === 'location')?.[1];
-                    const isChallenge = act.kind === KIND_NIP101_TEAM_CHALLENGE;
-
-                    return (
-                        <div key={act.id} className="p-4 bg-gray-750 rounded-lg shadow border border-gray-700">
-                            <div className="flex justify-between items-start">
-                                <h4 className="text-lg font-semibold text-blue-300 mb-1">{actName} <span className="text-xs font-normal text-gray-400">({isChallenge ? 'Challenge' : 'Event'})</span></h4>
-                                <p className="text-xs text-gray-500">By: {getPubkeyDisplayName(act.pubkey)}</p>
-                            </div>
-                            <p className="text-sm text-gray-300 whitespace-pre-wrap mb-2">{actDesc}</p>
-                            {actStart && <p className="text-xs text-gray-400">Start: {new Date(parseInt(actStart) * 1000).toLocaleString()}</p>}
-                            {actLocation && <p className="text-xs text-gray-400">Location: {actLocation}</p>}
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
+        <TeamChallengesTab 
+           ndk={ndk as any}
+           ndkReady={ndkReady}
+           teamAIdentifier={teamAIdentifierForChat || ''}
+           teamUUID={teamUUID || ''}
+           captainPubkey={actualCaptain}
+           currentUserPubkey={currentUserPubkey}
+           isCaptain={isCurrentUserCaptain}
+        />
     );
   };
 
@@ -552,8 +467,8 @@ const TeamDetailPage: React.FC = () => {
     switch (activeTab) {
       case 'chat': 
         return renderChatTabContent();
-      case 'activities': 
-        return renderActivitiesTabContent();
+      case 'challenges': 
+        return renderChallengesTabContent();
       case 'members':
         return (
           <div>

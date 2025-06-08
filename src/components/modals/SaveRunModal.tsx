@@ -68,12 +68,15 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
     setError(null);
 
     let teamAssociation: TeamAssociationOptions | undefined = undefined; // Initialize as undefined
+    let challengeUUIDs: string[] = [];
 
     if (selectedTeamIdentifier) {
       const parts = selectedTeamIdentifier.split(':');
       if (parts.length === 2) {
         const [teamCaptainPubkey, teamUUID] = parts;
         teamAssociation = { teamCaptainPubkey, teamUUID };
+        const stored = JSON.parse(localStorage.getItem(`runstr:challengeParticipation:${teamUUID}`) || '[]');
+        if (Array.isArray(stored)) challengeUUIDs = stored;
       }
     }
     
@@ -87,7 +90,7 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
     };
 
     // createWorkoutEvent expects options.teamAssociation to be of its defined type or undefined
-    const eventTemplate = createWorkoutEvent(finalRunDataForEvent, distanceUnit, { teamAssociation });
+    const eventTemplate = createWorkoutEvent(finalRunDataForEvent, distanceUnit, { teamAssociation, challengeUUIDs });
 
     if (!eventTemplate) {
       setError('Failed to prepare workout event details.');
