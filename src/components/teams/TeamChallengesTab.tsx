@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import NDK, { NDKEvent } from '@nostr-dev-kit/ndk';
+import NDK, { NDKEvent, NDKSubscription } from '@nostr-dev-kit/ndk';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ChallengeDetails,
   prepareTeamChallengeEvent,
   subscribeToTeamChallenges,
-  NostrEvent,
 } from '../../services/nostr/NostrTeamsService';
-import { NDKEvent as NostrNDKEvent } from '@nostr-dev-kit/ndk';
+import { useNostr } from '../../hooks/useNostr';
+import { Event as NostrEvent } from 'nostr-tools';
 
 interface TeamChallengesTabProps {
   ndk: NDK;
@@ -56,6 +56,8 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
     end: '',
   });
 
+  const { connectSigner } = useNostr();
+
   // Load participation list
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem(localKey(teamUUID)) || '[]');
@@ -65,14 +67,21 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
   // Subscribe to challenges
   useEffect(() => {
     if (!ndkReady || !teamAIdentifier) return;
-    const sub = subscribeToTeamChallenges(ndk, teamAIdentifier, evt => {
-      setChallenges(prev => {
-        if (prev.find(c => c.id === evt.id)) return prev;
-        return [...prev, parseChallenge(evt)].sort((a, b) => b.start - a.start);
+    let sub: NDKSubscription | null = null;
+    try {
+      sub = subscribeToTeamChallenges(ndk, teamAIdentifier, evt => {
+        setChallenges(prev => {
+          if (prev.find(c => c.id === evt.id)) return prev;
+          return [...prev, parseChallenge(evt)].sort((a, b) => (b.start || 0) - (a.start || 0));
+        });
       });
-    });
+    } catch (e) {
+      console.error("Error subscribing to team challenges", e);
+    }
     setLoading(false);
-    return () => sub && sub.stop();
+    return () => {
+      if (sub) sub.stop();
+    };
   }, [ndkReady, teamAIdentifier, ndk]);
 
   const toggleParticipation = (uuid: string) => {
@@ -83,7 +92,18 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isCaptain || !currentUserPubkey) return;
+    if (!isCaptain) return;
+
+    let finalPubkey = currentUserPubkey;
+    if (!finalPubkey) {
+      const signerResult = await connectSigner();
+      finalPubkey = signerResult?.pubkey || null;
+      if (!finalPubkey) {
+        alert('A signer is required to create a challenge.');
+        return;
+      }
+    }
+
     const details: ChallengeDetails = {
       name: form.name,
       description: form.description,
@@ -91,7 +111,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       startTime: form.start ? Math.floor(new Date(form.start).getTime() / 1000) : undefined,
       endTime: form.end ? Math.floor(new Date(form.end).getTime() / 1000) : undefined,
     };
-    const tmpl = prepareTeamChallengeEvent(teamAIdentifier, details, currentUserPubkey);
+    const tmpl = prepareTeamChallengeEvent(teamAIdentifier, details, finalPubkey);
     if (!tmpl) return alert('Failed to build challenge event');
     try {
       const ndkEvt = new NDKEvent(ndk, tmpl as any);
@@ -115,9 +135,11 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       {!loading && challenges.map(ch => (
         <div key={ch.id} className="border border-gray-700 rounded-md p-3 mb-3">
           <h4 className="font-semibold text-gray-100 mb-1">{ch.name}</h4>
-          <p className="text-sm text-gray-300 mb-2">Goal: {ch.goalValue} {ch.goalUnit}</p>
-          {ch.start && <p className="text-xs text-gray-400">{new Date(ch.start * 1000).toLocaleDateString()} – {ch.end ? new Date(ch.end * 1000).toLocaleDateString() : '∞'}</p>}
-          <button onClick={() => toggleParticipation(ch.uuid)} className="mt-2 px-3 py-1 text-sm rounded-md border border-blue-500 text-blue-400 hover:bg-blue-600/20">
+          {ch.goalValue && (
+            <p className="text-sm text-gray-300 mb-1">Goal: {ch.goalValue} {ch.goalUnit}</p>) }
+          {ch.start && (
+            <p className="text-xs text-gray-400 mb-1">{new Date(ch.start * 1000).toLocaleDateString()} – {ch.end ? new Date(ch.end * 1000).toLocaleDateString() : '∞'}</p>) }
+          <button onClick={() => toggleParticipation(ch.uuid)} className="mt-1 px-3 py-1 text-sm rounded-md border border-blue-500 text-blue-400 hover:bg-blue-600/20">
             {participating.includes(ch.uuid) ? 'Leave Challenge' : 'Participate'}
           </button>
         </div>
@@ -140,7 +162,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div><label className="block text-sm mb-1">Goal Value</label><input type="number" value={form.goalValue} onChange={e => setForm({ ...form, goalValue: Number(e.target.value) })} className="w-full p-2 bg-gray-700 border border-gray-600 rounded" /></div>
-                    <div><label className="block text-sm mb-1">Unit</label><select value={form.goalUnit} onChange={e => setForm({ ...form, goalUnit: e.target.value as 'km'|'mi' })} className="w-full p-2 bg-gray-700 border border-gray-600 rounded"><option value="km">km</option><option value="mi">mi</option></select></div>
+                    <div><label className="block text-sm mb-1">Unit</label><select value={form.goalUnit} onChange={e => setForm({ ...form, goalUnit: e.target.value as 'km' | 'mi' })} className="w-full p-2 bg-gray-700 border border-gray-600 rounded"><option value="km">km</option><option value="mi">mi</option></select></div>
                   </div>
                   <div><label className="block text-sm mb-1">Start (optional)</label><input type="datetime-local" value={form.start} onChange={e => setForm({ ...form, start: e.target.value })} className="w-full p-2 bg-gray-700 border border-gray-600 rounded" /></div>
                   <div><label className="block text-sm mb-1">End (optional)</label><input type="datetime-local" value={form.end} onChange={e => setForm({ ...form, end: e.target.value })} className="w-full p-2 bg-gray-700 border border-gray-600 rounded" /></div>

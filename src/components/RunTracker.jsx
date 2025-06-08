@@ -13,6 +13,8 @@ import { PostRunWizardModal } from './PostRunWizardModal';
 import { useContext } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { NostrContext } from '../contexts/NostrContext';
+import { fetchRunDataFromWatch, mapWatchDataToRun } from '../services/BluetoothService';
+import { SyncConfirmationModal } from './modals/SyncConfirmationModal';
 
 export const RunTracker = () => {
   const { 
@@ -48,6 +50,9 @@ export const RunTracker = () => {
   const [isSavingWorkout, setIsSavingWorkout] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showPostRunWizard, setShowPostRunWizard] = useState(false);
+  const [syncedRun, setSyncedRun] = useState(null);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [isSyncingWatch, setIsSyncingWatch] = useState(false);
 
   // Initialize events when the component mounts
   useEffect(() => {
@@ -434,11 +439,34 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     }
   };
 
+  // NEW: Sync handler
+  const handleSyncFromWatch = async () => {
+    try {
+      setIsSyncingWatch(true);
+      const rawData = await fetchRunDataFromWatch();
+      const mappedRun = mapWatchDataToRun(rawData, distanceUnit);
+      setSyncedRun(mappedRun);
+      setShowSyncModal(true);
+    } catch (err) {
+      console.error('Failed to sync from watch:', err);
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast(err.message || 'Failed to sync from watch');
+      } else {
+        alert(err.message || 'Failed to sync from watch');
+      }
+    } finally {
+      setIsSyncingWatch(false);
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">
-      {/* Title Banner */}
-      <div className="bg-gradient-to-r from-indigo-800 to-purple-800 p-4 mb-6 text-center">
+      {/* Title Banner with Sync Button */}
+      <div className="bg-gradient-to-r from-indigo-800 to-purple-800 p-4 mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">{getActivityText('header')}</h2>
+        <button onClick={handleSyncFromWatch} className="bg-white/20 hover:bg-white/30 text-white text-sm px-3 py-1 rounded-md">
+          {isSyncingWatch ? 'Syncing...' : 'Sync Watch'}
+        </button>
       </div>
 
       {/* Stats Grid */}
@@ -679,6 +707,15 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {showPostRunWizard && recentRun && (
         <PostRunWizardModal run={recentRun} onClose={() => setShowPostRunWizard(false)} />
       )}
+      
+      {/* Sync confirmation modal */}
+      <SyncConfirmationModal
+        isOpen={showSyncModal}
+        onClose={() => { setShowSyncModal(false); setSyncedRun(null); }}
+        run={syncedRun}
+        distanceUnit={distanceUnit}
+        publicKey={publicKey}
+      />
     </div>
   );
 };
