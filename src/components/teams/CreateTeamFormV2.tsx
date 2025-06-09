@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../../hooks/useNostr';
+import { useAuth } from '../../hooks/useAuth';
+import { payLnurl } from '../../utils/lnurlPay';
 import { RefreshCw } from "lucide-react";
 import {
   TeamData,
   prepareNip101eTeamEventTemplate,
   getTeamUUID,
-  getTeamCaptain
+  getTeamCaptain,
+  prepareTeamSubscriptionReceiptEvent
 } from '../../services/nostr/NostrTeamsService';
 import { createAndPublishEvent } from '../../utils/nostr';
 
@@ -21,11 +24,8 @@ const CreateTeamFormV2: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const {
-    publicKey,
-    ndkReady,
-    connectSigner,
-  } = useNostr();
+  const { publicKey, connectSigner } = useNostr() as any;
+  const { wallet } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,6 +46,26 @@ const CreateTeamFormV2: React.FC = () => {
 
     if (!teamName.trim()) {
       setError('Team name is required.');
+      setIsLoading(false);
+      return;
+    }
+
+    // Ensure wallet connected and process captain subscription payment (10k sats)
+    if (!wallet) {
+      setError('Please connect a wallet in Settings first.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await payLnurl({
+        lightning: 'runstr@geyser.fund',
+        amount: 10000,
+        wallet,
+        comment: 'Runstr captain subscription',
+      });
+    } catch (e: any) {
+      setError(e?.message || 'Payment failed');
       setIsLoading(false);
       return;
     }
@@ -72,9 +92,15 @@ const CreateTeamFormV2: React.FC = () => {
         const newTeamUUID = getTeamUUID(result);
         const captainPk = getTeamCaptain(result);
         if (newTeamUUID && captainPk) {
+          // Publish subscription receipt event
+          const aIdentifier = `33404:${captainPk}:${newTeamUUID}`;
+          const receiptTemplate = prepareTeamSubscriptionReceiptEvent(aIdentifier, captainPk, 10000);
+          if (receiptTemplate) {
+            await createAndPublishEvent(receiptTemplate, null);
+          }
           navigate(`/teams/${captainPk}/${newTeamUUID}`);
         } else {
-          console.error("V2 Form: Failed to get UUID/captain from published event.");
+          console.error('V2 Form: Failed to get UUID/captain from published event.');
           navigate('/teams');
         }
       } else {

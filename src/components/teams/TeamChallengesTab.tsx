@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import NDK, { NDKEvent, NDKSubscription } from '@nostr-dev-kit/ndk';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  ChallengeDetails,
   prepareTeamChallengeEvent,
   subscribeToTeamChallenges,
 } from '../../services/nostr/NostrTeamsService';
+import type { ChallengeDetails } from '../../services/nostr/NostrTeamsService';
 import { useNostr } from '../../hooks/useNostr';
 import { Event as NostrEvent } from 'nostr-tools';
 
@@ -56,7 +56,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
     end: '',
   });
 
-  const { connectSigner } = useNostr();
+  const { connectSigner } = (useNostr() as any);
 
   // Load participation list
   useEffect(() => {
@@ -69,7 +69,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
     if (!ndkReady || !teamAIdentifier) return;
     let sub: NDKSubscription | null = null;
     try {
-      sub = subscribeToTeamChallenges(ndk, teamAIdentifier, evt => {
+      sub = subscribeToTeamChallenges(ndk, teamAIdentifier, (evt: NostrEvent) => {
         setChallenges(prev => {
           if (prev.find(c => c.id === evt.id)) return prev;
           return [...prev, parseChallenge(evt)].sort((a, b) => (b.start || 0) - (a.start || 0));
@@ -83,6 +83,14 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       if (sub) sub.stop();
     };
   }, [ndkReady, teamAIdentifier, ndk]);
+
+  // Auto-connect signer for captains on mount if pubkey is missing
+  useEffect(() => {
+    if (isCaptain && !currentUserPubkey) {
+      connectSigner().catch((err: any) => console.warn('Auto connectSigner failed:', err));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCaptain, currentUserPubkey]);
 
   const toggleParticipation = (uuid: string) => {
     const newSet = participating.includes(uuid) ? participating.filter(u => u !== uuid) : [...participating, uuid];

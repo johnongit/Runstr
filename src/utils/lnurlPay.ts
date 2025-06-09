@@ -39,4 +39,38 @@ export async function payLnurl({ lightning, amount, wallet, comment }: { lightni
     throw new Error('Wallet not connected');
   }
   await wallet.makePayment(invData.pr);
+}
+
+/**
+ * Fetch an invoice for a fixed amount from a lightning address/LNURL without attempting to pay it.
+ */
+export async function requestLnurlInvoice({ lightning, amount, comment }: { lightning: string; amount: number; comment?: string; }): Promise<string> {
+  let lnurlEndpoint: string;
+  if (lightning.includes('@')) {
+    const [username, domain] = lightning.split('@');
+    lnurlEndpoint = `https://${domain}/.well-known/lnurlp/${username}`;
+  } else {
+    lnurlEndpoint = lightning;
+  }
+
+  const metaResp = await fetch(lnurlEndpoint);
+  if (!metaResp.ok) throw new Error(`LNURL metadata fetch failed: ${metaResp.status}`);
+  const payData = await metaResp.json();
+  if (payData.tag !== 'payRequest' || !payData.callback) throw new Error('Invalid LNURL-pay metadata');
+
+  const msats = amount * 1000;
+  if (msats < payData.minSendable || msats > payData.maxSendable) {
+    throw new Error(`Amount out of bounds (min ${payData.minSendable/1000}, max ${payData.maxSendable/1000})`);
+  }
+
+  const cbUrl = new URL(payData.callback);
+  cbUrl.searchParams.append('amount', msats.toString());
+  if (comment && payData.commentAllowed) cbUrl.searchParams.append('comment', comment.substring(0, payData.commentAllowed));
+
+  const invResp = await fetch(cbUrl.toString());
+  if (!invResp.ok) throw new Error(`LNURL callback failed: ${invResp.status}`);
+  const invData = await invResp.json();
+  if (!invData.pr) throw new Error('Invoice missing in LNURL response');
+
+  return invData.pr as string;
 } 

@@ -27,6 +27,7 @@ import {
   prepareTeamMembershipEvent,
   fetchTeamMemberships,
   KIND_TEAM_MEMBERSHIP,
+  prepareTeamSubscriptionReceiptEvent,
 } from '../services/nostr/NostrTeamsService'; // Corrected path
 import { useNostr } from '../hooks/useNostr'; // Corrected path
 import { NDKEvent, NDKSubscription, NDKKind } from '@nostr-dev-kit/ndk';
@@ -36,6 +37,10 @@ import { payLnurl } from '../utils/lnurlPay';
 import { useAuth } from '../hooks/useAuth';
 import LocalTeamChat from '../components/teams/LocalTeamChat';
 import TeamChallengesTab from '../components/teams/TeamChallengesTab';
+import { useTeamSubscriptionStatus } from '../hooks/useTeamSubscriptionStatus';
+import SubscriptionBanner from '../components/teams/SubscriptionBanner';
+import PaymentModal from '../components/payments/PaymentModal';
+import { requestLnurlInvoice } from '../utils/lnurlPay';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -98,6 +103,20 @@ const TeamDetailPage: React.FC = () => {
   const [challengeForm, setChallengeForm] = useState<{name:string;description:string;goalValue:number;goalUnit:'km'|'mi';startTimeString?:string;endTimeString?:string}>({
     name:'',description:'',goalValue:0,goalUnit:'km',startTimeString:'',endTimeString:''});
   const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
+
+  // Payment modal state
+  const [paymentInvoice, setPaymentInvoice] = useState<string>('');
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // Determine pay amount based on whether current user is the captain (URL param heuristic)
+  const isCaptainByParam = currentUserPubkey && captainPubkey && currentUserPubkey === captainPubkey;
+  const payAmount = isCaptainByParam ? 10000 : 2000;
+  const { phase: subscriptionPhase, nextDue, renew: renewSubscription, isProcessing: isRenewProcessing } = useTeamSubscriptionStatus(
+    teamAIdentifierForChat,
+    currentUserPubkey || null,
+    payAmount,
+  );
 
   const loadTeamDetails = useCallback(async (forceRefetch = false) => {
     if (!captainPubkey || !teamUUID || !ndkReady || !ndk) return;
@@ -297,25 +316,48 @@ const TeamDetailPage: React.FC = () => {
 
   const handleJoinTeam = async () => {
       if (!ndkReady || !ndk || !currentUserPubkey || !teamAIdentifierForChat) return;
-      if (!wallet) throw new Error('Please connect a wallet in Settings first');
       try {
-        // 1. Pay the fee to RUNSTR lightning address
-        await payLnurl({
-          lightning: 'runstr@geyser.fund',
-          amount: 2000,
-          wallet,
-          comment: 'Runstr team join fee',
-        });
-        // 2. Publish membership event
-        const membershipTemplate = prepareTeamMembershipEvent(teamAIdentifierForChat, currentUserPubkey);
-        if (!membershipTemplate) throw new Error('Failed to prepare membership event');
-        await createAndPublishEvent(membershipTemplate, null);
-        alert('Successfully joined the team!');
-        const joinedMembers = await fetchTeamMemberships(ndk, teamAIdentifierForChat);
-        setExtraMembers(joinedMembers);
+        // 1. Request invoice via LNURL
+        const invoice = await requestLnurlInvoice({ lightning: 'runstr@geyser.fund', amount: 2000, comment: 'Runstr team join fee' });
+        setPaymentInvoice(invoice);
+
+        // 2. Attempt to pay automatically if wallet connected
+        let autoPaid = false;
+        if (wallet && typeof wallet.makePayment === 'function') {
+          try {
+            await wallet.makePayment(invoice);
+            autoPaid = true;
+          } catch (e) {
+            console.warn('Auto payment failed, falling back to manual', e);
+          }
+        }
+
+        if (!autoPaid) {
+          setPaymentModalOpen(true);
+          return; // The onPaid callback will continue flow
+        }
+
+        await finalizeJoinAfterPayment();
+
       } catch (err: any) {
-        alert(`Failed to join team: ${err.message || err}`);
+        alert(`Failed to initiate join process: ${err.message || err}`);
       }
+  };
+
+  const finalizeJoinAfterPayment = async () => {
+    try {
+      // Publish membership & receipt events
+      const membershipTemplate = prepareTeamMembershipEvent(teamAIdentifierForChat!, currentUserPubkey!,);
+      if (membershipTemplate) await createAndPublishEvent(membershipTemplate, null);
+      const receiptTemplate = prepareTeamSubscriptionReceiptEvent(teamAIdentifierForChat!, currentUserPubkey!, 2000);
+      if (receiptTemplate) await createAndPublishEvent(receiptTemplate, null);
+      alert('Successfully joined the team!');
+      const joinedMembers = await fetchTeamMemberships(ndk!, teamAIdentifierForChat!);
+      setExtraMembers(joinedMembers);
+      setPaymentModalOpen(false);
+    } catch (e:any) {
+      setPaymentError(e?.message || 'Error publishing membership');
+    }
   };
 
   if (isLoading && !team) {
@@ -575,6 +617,14 @@ const TeamDetailPage: React.FC = () => {
 
   return (
     <div className="p-4 max-w-3xl mx-auto text-white">
+      {/* Subscription banner */}
+      <SubscriptionBanner
+        phase={subscriptionPhase}
+        amount={payAmount}
+        nextDue={nextDue}
+        onRenew={renewSubscription}
+        isProcessing={isRenewProcessing}
+      />
       <div className="mb-6 pb-4 border-b border-gray-700">
         <h1 className="text-3xl font-bold mb-1 text-blue-300">{teamName}</h1>
         <p className="text-gray-300 mb-3 leading-relaxed">{teamDescription}</p>
@@ -590,6 +640,16 @@ const TeamDetailPage: React.FC = () => {
       <div className="mt-4">
         {renderCurrentTabContent()}
       </div>
+
+      {/* Payment Modal */}
+      <PaymentModal
+        open={paymentModalOpen}
+        invoice={paymentInvoice}
+        amount={2000}
+        onClose={() => setPaymentModalOpen(false)}
+        onPaid={finalizeJoinAfterPayment}
+        paymentError={paymentError}
+      />
 
       <div className="mt-8 pt-4 border-t border-gray-700 text-center">
         <Link to="/teams" className="text-blue-400 hover:text-blue-300 transition-colors duration-150">
