@@ -41,6 +41,7 @@ import { useTeamSubscriptionStatus } from '../hooks/useTeamSubscriptionStatus';
 import SubscriptionBanner from '../components/teams/SubscriptionBanner';
 import PaymentModal from '../components/payments/PaymentModal';
 import { requestLnurlInvoice } from '../utils/lnurlPay';
+import { DisplayName } from '../components/shared/DisplayName';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -543,7 +544,7 @@ const TeamDetailPage: React.FC = () => {
                 {combinedMembers.map((memberPubkey, index) => (
                   <li key={index} className="flex items-center justify-between text-gray-300 bg-gray-750 p-2 rounded-md font-mono text-xs">
                     <span className="truncate hover:text-clip">
-                        {getPubkeyDisplayName(memberPubkey)}
+                        <DisplayName pubkey={memberPubkey} />
                         {memberPubkey === actualCaptain && <span className="ml-2 text-xs text-yellow-400">(Captain)</span>}
                         {memberPubkey === currentUserPubkey && !isCurrentUserCaptain && <span className="ml-2 text-xs text-green-400">(You)</span>}
                     </span>

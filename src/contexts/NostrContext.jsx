@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 // Import the NDK singleton
 import { ndk, ndkReadyPromise } from '../lib/ndkSingleton'; // Consistent import without extension
 import { NDKNip07Signer, NDKPrivateKeySigner } from '@nostr-dev-kit/ndk'; // Keep NDKSigner types
+import AmberAuth from '../services/AmberAuth.js';
+import { Platform } from '../utils/react-native-shim.js';
 
 // Function to attach the appropriate signer TO THE SINGLETON NDK
 const attachSigner = async () => {
@@ -12,7 +14,7 @@ const attachSigner = async () => {
       // --- Priority 1: Check for stored private key ---
       const storedPrivKey = window.localStorage.getItem('runstr_privkey');
       if (storedPrivKey) {
-        console.log('NostrContext: Found private key in localStorage. Using NDKPrivateKeySigner.');
+        console.log('NostrContext: Found private key, using NDKPrivateKeySigner.');
         try {
           // Use the singleton ndk instance
           ndk.signer = new NDKPrivateKeySigner(storedPrivKey);
@@ -26,9 +28,33 @@ const attachSigner = async () => {
         }
       }
 
+      if (Platform.OS === 'android' && await AmberAuth.isAmberInstalled()) {
+        console.log('NostrContext: Amber is installed. Using Amber signer shim.');
+        try {
+          ndk.signer = {
+            _pubkey: null,
+            user: async function() {
+              if (!this._pubkey) this._pubkey = await AmberAuth.getPublicKey();
+              return { pubkey: this._pubkey };
+            },
+            sign: async (event) => {
+              const signedEvent = await AmberAuth.signEvent(event);
+              return signedEvent.sig;
+            }
+          };
+          const user = await ndk.signer.user();
+          console.log('NostrContext: Amber signer attached, user pubkey:', user.pubkey);
+          return user.pubkey;
+        } catch (amberError) {
+          console.error('NostrContext: Error initializing AmberSigner:', amberError);
+          ndk.signer = undefined;
+          return null;
+        }
+      }
+
       // --- Priority 2: Check for NIP-07 (window.nostr) ---
       if (window.nostr) {
-        console.log('NostrContext: No private key found. Using NIP-07 signer (window.nostr).');
+        console.log('NostrContext: Using NIP-07 signer (window.nostr).');
         const nip07signer = new NDKNip07Signer();
         // Use the singleton ndk instance
         ndk.signer = nip07signer;
@@ -139,6 +165,9 @@ export const NostrProvider = ({ children }) => {
   useEffect(() => {
     console.log('>>> NostrProvider useEffect START (using NDK Singleton) <<<');
     let isMounted = true;
+
+    // Setup Amber deep link handler once.
+    AmberAuth.setupDeepLinkHandling();
 
     const initializeNostrSystem = async () => {
       console.log('>>> NostrProvider: Awaiting ndkReadyPromise (initial connection attempt) <<<');

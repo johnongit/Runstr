@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../../hooks/useNostr';
 import { useAuth } from '../../hooks/useAuth';
-import { payLnurl } from '../../utils/lnurlPay';
+import { payLnurl, getInvoiceFromLnAddress } from '../../utils/lnurlPay';
 import { RefreshCw } from "lucide-react";
 import {
   TeamData,
@@ -58,12 +58,17 @@ const CreateTeamFormV2: React.FC = () => {
     }
 
     try {
-      await payLnurl({
-        lightning: 'runstr@geyser.fund',
-        amount: 10000,
-        wallet,
-        comment: 'Runstr captain subscription',
-      });
+      if (wallet.kind === 'nwc') {
+        const invoice = await getInvoiceFromLnAddress('runstr@geyser.fund', 10000);
+        await wallet.payInvoice(invoice);
+      } else {
+        await payLnurl({
+          lightning: 'runstr@geyser.fund',
+          amount: 10000,
+          wallet,
+          comment: 'Runstr captain subscription',
+        });
+      }
     } catch (e: any) {
       setError(e?.message || 'Payment failed');
       setIsLoading(false);
