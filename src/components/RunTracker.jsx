@@ -15,6 +15,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { NostrContext } from '../contexts/NostrContext';
 import { fetchRunDataFromWatch, mapWatchDataToRun } from '../services/BluetoothService';
 import { SyncConfirmationModal } from './modals/SyncConfirmationModal';
+import { publishRun } from '../utils/runPublisher';
 
 export const RunTracker = () => {
   const { 
@@ -35,7 +36,7 @@ export const RunTracker = () => {
   } = useRunTracker();
 
   const { getActivityText, mode } = useActivityMode();
-  const { distanceUnit, skipStartCountdown, skipEndCountdown } = useSettings();
+  const { distanceUnit, skipStartCountdown, skipEndCountdown, autoPostToNostr } = useSettings();
   const { publicKey, lightningAddress } = useContext(NostrContext);
 
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -53,6 +54,7 @@ export const RunTracker = () => {
   const [syncedRun, setSyncedRun] = useState(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [isSyncingWatch, setIsSyncingWatch] = useState(false);
+  const [autoPublishing, setAutoPublishing] = useState(false);
 
   // Initialize events when the component mounts
   useEffect(() => {
@@ -458,6 +460,23 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       setIsSyncingWatch(false);
     }
   };
+
+  useEffect(() => {
+    const attemptAutoPost = async () => {
+      if (!autoPostToNostr || !recentRun || recentRun.nostrWorkoutEventId || autoPublishing) return;
+      try {
+        setAutoPublishing(true);
+        await publishRun(recentRun, distanceUnit, {});
+        // publishRun mutates run to set nostrWorkoutEventId; update local storage copy
+        runDataService.updateRun(recentRun.id, { nostrWorkoutEventId: recentRun.nostrWorkoutEventId });
+      } catch (err) {
+        console.error('Auto-post failed', err);
+      } finally {
+        setAutoPublishing(false);
+      }
+    };
+    attemptAutoPost();
+  }, [recentRun, autoPostToNostr, distanceUnit, autoPublishing]);
 
   return (
     <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">

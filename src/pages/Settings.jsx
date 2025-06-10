@@ -19,6 +19,8 @@ const Settings = () => {
     setPrivateRelayUrl,
     blossomEndpoint,
     setBlossomEndpoint,
+    autoPostToNostr,
+    setAutoPostToNostr,
     // skipStartCountdown,
     // setSkipStartCountdown,
     // skipEndCountdown,
@@ -159,6 +161,11 @@ const Settings = () => {
     setHealthEncryptionPref(enable ? 'encrypted' : 'plaintext');
   };
 
+  const handleAutoPostToggle = (e) => {
+    const value = e.target.checked;
+    setAutoPostToNostr(value);
+  };
+
   return (
     <div className="settings-page">
       <h2>Settings</h2>
@@ -295,6 +302,19 @@ const Settings = () => {
               id="notificationsToggle"
               checked={showNotifications}
               onChange={handleNotificationsToggle}
+            />
+            <span className="toggle-slider"></span>
+          </div>
+        </div>
+
+        <div className="setting-item">
+          <label htmlFor="autoPostToggle">Auto-post Workouts to Nostr</label>
+          <div className="toggle-switch">
+            <input
+              type="checkbox"
+              id="autoPostToggle"
+              checked={autoPostToNostr}
+              onChange={handleAutoPostToggle}
             />
             <span className="toggle-slider"></span>
           </div>
