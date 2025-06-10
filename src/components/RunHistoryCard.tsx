@@ -201,13 +201,13 @@ export const RunHistoryCard: React.FC<RunHistoryCardProps> = ({
   }
   
   const handleShareToNostr = async () => {
-    if (!ndkReady || !ndk || !publicKey) {
-      setShareError('Nostr client not ready or not logged in.');
+    if (run && (run as any).nostrWorkoutEventId) {
+      setShareError('This workout has already been shared to Nostr.');
       setTimeout(() => setShareError(null), 5000);
       return;
     }
-    if (!run) {
-      setShareError('Run data is missing.');
+    if (!ndkReady || !ndk || !publicKey) {
+      setShareError('Nostr client not ready or not logged in.');
       setTimeout(() => setShareError(null), 5000);
       return;
     }
