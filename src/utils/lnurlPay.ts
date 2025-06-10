@@ -1,3 +1,6 @@
+import { NostrEvent } from 'nostr-tools';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
+
 type WalletLike = { makePayment: (invoice: string) => Promise<any> };
 
 /**
@@ -73,4 +76,27 @@ export async function requestLnurlInvoice({ lightning, amount, comment }: { ligh
   if (!invData.pr) throw new Error('Invoice missing in LNURL response');
 
   return invData.pr as string;
-} 
+}
+
+export const getInvoiceFromLnAddress = async (lnaddress: string, amount: number): Promise<string> => {
+    const parts = lnaddress.split('@');
+    const url = `https://{domain}/.well-known/lnurlp/{user}`
+      .replace('{domain}', parts[1])
+      .replace('{user}', parts[0]);
+
+    const res = await fetch(url);
+    const body = await res.json();
+    
+    if (body.status === 'ERROR') {
+        throw new Error(body.reason);
+    }
+    
+    const callbackRes = await fetch(`${body.callback}?amount=${amount * 1000}`);
+    const callbackBody = await callbackRes.json();
+    
+    if (callbackBody.status === 'ERROR') {
+        throw new Error(callbackBody.reason);
+    }
+    
+    return callbackBody.pr;
+}; 

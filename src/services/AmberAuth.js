@@ -47,7 +47,7 @@ const setupDeepLinkHandling = () => {
       }).catch(err => console.warn('RN-Linking an error occurred', err));
   }
   
-  const handleAppStateChange = (nextAppState: any) => {
+  const handleAppStateChange = (nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === 'active') {
       // App has come to the foreground
     }
