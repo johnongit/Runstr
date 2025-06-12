@@ -261,7 +261,9 @@ export async function fetchTeamActivityFeed(
   ndk: NDK,
   teamCaptainPubkey: string,
   teamUUID: string,
-  limit: number = 20
+  limit: number = 20,
+  since?: number,
+  until?: number
 ): Promise<NostrWorkoutEvent[]> {
   if (!ndk) {
     console.warn("NDK instance not provided to fetchTeamActivityFeed.");
@@ -280,6 +282,9 @@ export async function fetchTeamActivityFeed(
     '#t': [teamTagValue], // Query by t-tag value
     limit: limit,
   };
+
+  if (since) filter.since = since;
+  if (until) filter.until = until;
 
   try {
     console.log(`Fetching team activity feed for team: ${teamTagValue}`, filter);

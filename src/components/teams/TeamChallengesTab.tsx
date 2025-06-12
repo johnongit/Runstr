@@ -8,6 +8,7 @@ import {
 import type { ChallengeDetails } from '../../services/nostr/NostrTeamsService';
 import { useNostr } from '../../hooks/useNostr';
 import { Event as NostrEvent } from 'nostr-tools';
+import toast from 'react-hot-toast';
 
 interface TeamChallengesTabProps {
   ndk: NDK;
@@ -107,7 +108,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       const signerResult = await connectSigner();
       finalPubkey = signerResult?.pubkey || null;
       if (!finalPubkey) {
-        alert('A signer is required to create a challenge.');
+        toast.error('A signer is required to create a challenge.');
         return;
       }
     }
@@ -119,20 +120,27 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       startTime: form.start ? Math.floor(new Date(form.start).getTime() / 1000) : undefined,
       endTime: form.end ? Math.floor(new Date(form.end).getTime() / 1000) : undefined,
     };
+
+    const toastId = toast.loading('Publishing challenge...');
     const tmpl = prepareTeamChallengeEvent(teamAIdentifier, details, finalPubkey);
-    if (!tmpl) return alert('Failed to build challenge event');
+    if (!tmpl) {
+      toast.error('Failed to build challenge event', { id: toastId });
+      return;
+    }
     try {
       const ndkEvt = new NDKEvent(ndk, tmpl as any);
       await ndkEvt.sign();
       const res = await ndkEvt.publish();
       if (res.size > 0) {
-        alert('Challenge published');
+        toast.success('Challenge published!', { id: toastId });
         setShowModal(false);
         setForm({ name: '', description: '', goalValue: 0, goalUnit: 'km', start: '', end: '' });
-      } else alert('Publish failed');
+      } else {
+        toast.error('Publish failed. No relays accepted the event.', { id: toastId });
+      }
     } catch (err) {
       console.error(err);
-      alert('Error creating challenge');
+      toast.error('Error creating challenge.', { id: toastId });
     }
   };
 

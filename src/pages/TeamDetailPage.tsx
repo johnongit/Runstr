@@ -41,6 +41,10 @@ import SubscriptionBanner from '../components/teams/SubscriptionBanner';
 import PaymentModal from '../components/payments/PaymentModal';
 import { DisplayName } from '../components/shared/DisplayName';
 import { useTeamRoles } from '../hooks/useTeamRoles';
+import toast from 'react-hot-toast';
+import LeaderboardTab from '../components/teams/LeaderboardTab';
+import TeamStatsWidget from '../components/teams/TeamStatsWidget';
+import { useTeamActivity } from '../hooks/useTeamActivity';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -72,7 +76,7 @@ const TeamDetailPage: React.FC = () => {
   const [team, setTeam] = useState<NostrTeamEvent | null>(seededEvent);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'chat' | 'challenges' | 'members' | 'feed'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'challenges' | 'members' | 'leaderboard' | 'feed'>('chat');
 
   const [teamFeed, setTeamFeed] = useState<NostrWorkoutEvent[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState<boolean>(false);
@@ -114,6 +118,11 @@ const TeamDetailPage: React.FC = () => {
     payAmount,
   );
 
+  const [isProcessingMembership, setIsProcessingMembership] = useState<string | null>(null);
+
+  const [monthlyWorkouts, setMonthlyWorkouts] = useState<NostrWorkoutEvent[]>([]);
+  const [isLoadingMonthlyWorkouts, setIsLoadingMonthlyWorkouts] = useState(false);
+
   const loadTeamDetails = useCallback(async (forceRefetch = false) => {
     if (!captainPubkey || !teamUUID || !ndkReady || !ndk) return;
     if (!forceRefetch) setIsLoading(true);
@@ -141,36 +150,31 @@ const TeamDetailPage: React.FC = () => {
     }
   }, [captainPubkey, teamUUID, ndk, ndkReady]);
 
-  const loadTeamFeed = useCallback(async () => {
-    if (!ndk || !ndkReady || !team || !captainPubkey || !teamUUID) return;
-    setIsLoadingFeed(true);
-    try {
-      const feedEvents = await fetchTeamActivityFeed(ndk, captainPubkey, teamUUID, 25); // Fetch 25 items for feed
-      setTeamFeed(feedEvents);
-    } catch (err) {
-      console.error("Error fetching team activity feed:", err);
-      // setError("Failed to load team activity feed."); // Optional: Set a specific feed error
-    } finally {
-      setIsLoadingFeed(false);
-    }
-  }, [ndk, ndkReady, team, captainPubkey, teamUUID]); // Add team as dependency to refetch if team changes
+  // Fetch workouts for current calendar month when Leaderboard tab is active
+  useEffect(() => {
+    const fetchMonthly = async () => {
+      if (activeTab !== 'leaderboard') return;
+      if (!ndk || !ndkReady || !captainPubkey || !teamUUID) return;
+      const now = new Date();
+      const since = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000; // first day of month, in seconds
+      setIsLoadingMonthlyWorkouts(true);
+      try {
+        const events = await fetchTeamActivityFeed(ndk, captainPubkey, teamUUID, 100, since);
+        setMonthlyWorkouts(events);
+      } catch (err) {
+        console.error('Error fetching monthly workouts', err);
+      } finally {
+        setIsLoadingMonthlyWorkouts(false);
+      }
+    };
+    fetchMonthly();
+  }, [activeTab, ndk, ndkReady, captainPubkey, teamUUID]);
 
   useEffect(() => {
     if (captainPubkey && teamUUID && ndkReady && ndk) {
       loadTeamDetails();
     }
   }, [captainPubkey, teamUUID, ndkReady, ndk, loadTeamDetails]);
-
-  useEffect(() => {
-    if (activeTab === 'feed' && team) {
-      loadTeamFeed();
-    }
-    // Cleanup subscriptions when tab changes or component unmounts
-    // return () => {
-    //   if (chatSubscription) chatSubscription.stop();
-    //   if (activitiesSubscription) activitiesSubscription.stop();
-    // };
-  }, [activeTab, team, loadTeamFeed]); // Removed subscriptions from here, handle in specific effect hooks
 
   // Effect for Chat Subscription (uses teamAIdentifierForChat)
   useEffect(() => {
@@ -242,7 +246,7 @@ const TeamDetailPage: React.FC = () => {
       const publishedRelays = await eventToSign.publish();
       if (publishedRelays.size > 0) {
         setNewMemberPubkey(''); 
-        alert('Member added successfully! Team data will refresh.');
+        toast.success('Member added successfully! Team data will refresh.');
         await loadTeamDetails(true); 
       } else {
         setAddMemberError("Failed to publish team update. Check relay connections.");
@@ -255,36 +259,37 @@ const TeamDetailPage: React.FC = () => {
   };
 
   const handleRemoveMember = async (memberToRemovePk: string) => {
-    if (!ndk || !currentUserPubkey || !team ) return;
+    if (!ndk || !currentUserPubkey || !team) return;
     if (currentUserPubkey !== getTeamCaptain(team)) {
-        setError("Only the team captain can remove members.");
-        return;
+      toast.error("Only the team captain can remove members.");
+      return;
     }
     if (memberToRemovePk === currentUserPubkey) {
-        setError("Captain cannot remove themselves.");
-        return;
+      toast.error("Captain cannot remove themselves.");
+      return;
     }
-    setIsLoading(true);
-    setError(null);
+    setIsProcessingMembership(memberToRemovePk);
+    const toastId = toast.loading('Removing member...');
     try {
-        const updatedEventTemplate = removeMemberFromTeamEvent(team, memberToRemovePk);
-        if (!updatedEventTemplate) {
-            setError("Failed to prepare team update for removing member.");
-            return;
-        }
-        const eventToSign = new NDKEvent(ndk, { ...updatedEventTemplate, pubkey: currentUserPubkey });
-        await eventToSign.sign();
-        const publishedRelays = await eventToSign.publish();
-        if (publishedRelays.size > 0) {
-            alert('Member removed successfully! Team data will refresh.');
-            await loadTeamDetails(true); 
-        } else {
-            setError("Failed to publish team update for removing member.");
-        }
+      const updatedEventTemplate = removeMemberFromTeamEvent(team, memberToRemovePk);
+      if (!updatedEventTemplate) {
+        toast.error("Failed to prepare team update for removing member.", { id: toastId });
+        setIsProcessingMembership(null);
+        return;
+      }
+      const eventToSign = new NDKEvent(ndk, { ...updatedEventTemplate, pubkey: currentUserPubkey });
+      await eventToSign.sign();
+      const publishedRelays = await eventToSign.publish();
+      if (publishedRelays.size > 0) {
+        toast.success('Member removed successfully! Team data will refresh.', { id: toastId });
+        await loadTeamDetails(true);
+      } else {
+        toast.error("Failed to publish team update for removing member.", { id: toastId });
+      }
     } catch (err: any) {
-        setError(err.message || "Error removing member.");
+      toast.error(err.message || "Error removing member.", { id: toastId });
     } finally {
-        setIsLoading(false);
+      setIsProcessingMembership(null);
     }
   };
 
@@ -292,25 +297,29 @@ const TeamDetailPage: React.FC = () => {
     if (!ndk || !currentUserPubkey || !team) return;
     const teamCaptain = getTeamCaptain(team);
     if (currentUserPubkey === teamCaptain) {
-        alert("Captains cannot leave the team using this option.");
-        return;
+      toast.error("Captains cannot leave the team using this option.");
+      return;
     }
-    alert(`To leave the team, please ask the captain (${getPubkeyDisplayName(teamCaptain)}) to remove you.`);
+    toast.info(`To leave the team, please ask the captain (${getPubkeyDisplayName(teamCaptain)}) to remove you.`);
   };
 
   const handleJoinTeam = async () => {
     if (!ndkReady || !ndk || !currentUserPubkey || !teamAIdentifierForChat) return;
+    const toastId = toast.loading('Joining team...');
     try {
-      const membershipTemplate = prepareTeamMembershipEvent(teamAIdentifierForChat, currentUserPubkey);
+      const membershipTemplate = prepareTeamMembershipEvent(
+        teamAIdentifierForChat,
+        currentUserPubkey
+      );
       if (!membershipTemplate) {
-        alert('Failed to prepare membership event.');
+        toast.error('Failed to prepare membership event.', { id: toastId });
         return;
       }
       await createAndPublishEvent(membershipTemplate, null);
-      alert('Successfully joined the team!');
+      toast.success('Successfully joined the team!', { id: toastId });
       await loadTeamDetails(true);
     } catch (err: any) {
-      alert(err?.message || 'Error joining team');
+      toast.error(err?.message || 'Error joining team', { id: toastId });
     }
   };
 
@@ -349,7 +358,7 @@ const TeamDetailPage: React.FC = () => {
     return (
       <div className="mb-4 border-b border-gray-700">
         <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto pb-px" aria-label="Tabs">
-          {['chat', 'challenges', 'members', 'feed'].map((tabName) => {
+          {['chat', 'challenges', 'members', 'leaderboard'].map((tabName) => {
             let displayName = tabName;
             if (tabName === 'challenges') displayName = 'Team Challenges';
             else displayName = tabName.charAt(0).toUpperCase() + tabName.slice(1);
@@ -375,14 +384,15 @@ const TeamDetailPage: React.FC = () => {
 
   const handleSendChatMessage = async () => {
     if (!ndk || !ndkReady || !currentUserPubkey || !teamAIdentifierForChat || !newChatMessage.trim()) {
-      alert("Cannot send message: Missing NDK, user, team identifier, or message content.");
+      toast.error("Cannot send message: Missing NDK, user, team identifier, or message content.");
       return;
     }
     setIsSendingChatMessage(true);
+    const toastId = toast.loading('Sending message...');
     try {
       const chatMessageTemplate = prepareTeamChatMessage(teamAIdentifierForChat, newChatMessage, currentUserPubkey);
       if (!chatMessageTemplate) {
-        alert("Failed to prepare chat message.");
+        toast.error("Failed to prepare chat message.", { id: toastId });
         setIsSendingChatMessage(false);
         return;
       }
@@ -390,13 +400,14 @@ const TeamDetailPage: React.FC = () => {
       await ndkChatMessage.sign();
       const publishedRelays = await ndkChatMessage.publish();
       if (publishedRelays.size > 0) {
-        setNewChatMessage(''); 
+        setNewChatMessage('');
+        toast.dismiss(toastId);
       } else {
-        alert("Failed to send chat message to any relays.");
+        toast.error("Failed to send chat message to any relays.", { id: toastId });
       }
     } catch (err: any) {
       console.error("Error sending chat message:", err);
-      alert(`Error sending message: ${err.message}`);
+      toast.error(`Error sending message: ${err.message}`, { id: toastId });
     } finally {
       setIsSendingChatMessage(false);
     }
@@ -406,7 +417,7 @@ const TeamDetailPage: React.FC = () => {
   const handleCreateChallenge = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!ndk||!ndkReady||!currentUserPubkey||!teamAIdentifierForChat){
-        alert('Cannot create challenge: missing requirements');
+        toast.error('Cannot create challenge: missing requirements');
         return;
     }
     const { prepareTeamChallengeEvent } = require('../services/nostr/NostrTeamsService');
@@ -418,13 +429,14 @@ const TeamDetailPage: React.FC = () => {
         endTime:challengeForm.endTimeString?Math.floor(new Date(challengeForm.endTimeString).getTime()/1000):undefined
     };
     setIsCreatingChallenge(true);
+    const toastId = toast.loading('Creating challenge...');
     const tmpl=prepareTeamChallengeEvent(teamAIdentifierForChat,details,currentUserPubkey);
-    if(!tmpl){alert('Failed to prepare challenge');setIsCreatingChallenge(false);return;}
+    if(!tmpl){toast.error('Failed to prepare challenge', { id: toastId });setIsCreatingChallenge(false);return;}
     try{
        const ev=new NDKEvent(ndk,tmpl); await ev.sign(); const relays=await ev.publish();
-       if(relays.size>0){alert('Challenge created!'); setChallengeForm({name:'',description:'',goalValue:0,goalUnit:'km',startTimeString:'',endTimeString:''});}
-       else alert('Failed to publish challenge');
-    }catch(err:any){console.error('create challenge err',err);alert(err.message||'Error');}
+       if(relays.size>0){toast.success('Challenge created!', { id: toastId }); setChallengeForm({name:'',description:'',goalValue:0,goalUnit:'km',startTimeString:'',endTimeString:''});}
+       else toast.error('Failed to publish challenge', { id: toastId });
+    }catch(err:any){console.error('create challenge err',err);toast.error(err.message||'Error', { id: toastId });}
     finally{setIsCreatingChallenge(false);}    
   };
   
@@ -525,27 +537,16 @@ const TeamDetailPage: React.FC = () => {
             )}
           </div>
         );
-      case 'feed':
-        if (isLoadingFeed) return <div className="text-gray-400 p-4 text-center">Loading team feed...</div>;
-        if (teamFeed.length === 0 && !isLoadingFeed) return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">No activity in this team's feed yet.</div>;
+      case 'leaderboard':
+        if (isLoadingMonthlyWorkouts) {
+          return <div className="text-gray-400 p-4 text-center">Loading leaderboard…</div>;
+        }
+        const { rankedMembers, totalTeamDistance } = useTeamActivity(monthlyWorkouts);
         return (
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold mb-3 text-gray-100">Team Activity Feed</h3>
-            {teamFeed.map(workoutEvent => (
-              <div key={workoutEvent.id} className="p-4 bg-gray-750 rounded-lg shadow">
-                <p className="text-xs text-gray-400 mb-1">
-                  <strong>{getPubkeyDisplayName(workoutEvent.pubkey)}</strong> 
-                  <span className="mx-1">|</span>
-                  {new Date(workoutEvent.created_at * 1000).toLocaleDateString()} {new Date(workoutEvent.created_at * 1000).toLocaleTimeString()}
-                </p>
-                <h4 className="text-md font-semibold text-blue-300 mb-1">{getWorkoutTitle(workoutEvent)}</h4>
-                {workoutEvent.content && workoutEvent.content !== getWorkoutTitle(workoutEvent) &&
-                    <p className="text-sm text-gray-300 whitespace-pre-wrap">{workoutEvent.content}</p>
-                }
-                {/* TODO: Display more workout details from tags if needed */}
-              </div>
-            ))}
-          </div>
+          <>
+            <TeamStatsWidget totalDistance={totalTeamDistance} />
+            <LeaderboardTab workoutEvents={monthlyWorkouts} />
+          </>
         );
       default:
         return null;
