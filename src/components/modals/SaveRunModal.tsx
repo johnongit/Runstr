@@ -37,7 +37,10 @@ interface TeamAssociationOptions {
 const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSaveAndPublish, onClose }) => {
   const { ndk, publicKey, ndkReady } = useNostr();
   const [userTeams, setUserTeams] = useState<NostrTeamEvent[]>([]);
-  const [selectedTeamIdentifier, setSelectedTeamIdentifier] = useState<string>('');
+  const DEFAULT_KEY = 'runstr:defaultPostingTeamIdentifier';
+  const [selectedTeamIdentifier, setSelectedTeamIdentifier] = useState<string>(
+    typeof window !== 'undefined' ? localStorage.getItem(DEFAULT_KEY) || '' : ''
+  );
   const [isLoadingTeams, setIsLoadingTeams] = useState<boolean>(false);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [notes, setNotes] = useState(runData.notes || '');
@@ -103,6 +106,10 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
 
       if (publishedEventOutcome && publishedEventOutcome.success) {
         console.log('Workout event published via SaveRunModal:', publishedEventOutcome);
+        // Persist default posting team for future runs
+        if (selectedTeamIdentifier) {
+          localStorage.setItem('runstr:defaultPostingTeamIdentifier', selectedTeamIdentifier);
+        }
         alert('Run saved and published to Nostr!');
         onSaveAndPublish();
       } else {

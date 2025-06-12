@@ -45,6 +45,7 @@ import toast from 'react-hot-toast';
 import LeaderboardTab from '../components/teams/LeaderboardTab';
 import TeamStatsWidget from '../components/teams/TeamStatsWidget';
 import { useTeamActivity } from '../hooks/useTeamActivity';
+import { setDefaultPostingTeamIdentifier } from '../utils/settingsManager';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -318,6 +319,11 @@ const TeamDetailPage: React.FC = () => {
       await createAndPublishEvent(membershipTemplate, null);
       toast.success('Successfully joined the team!', { id: toastId });
       await loadTeamDetails(true);
+
+      // Persist default posting team for future workout tagging
+      if (captainPubkey && teamUUID) {
+        setDefaultPostingTeamIdentifier(`${captainPubkey}:${teamUUID}`);
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Error joining team', { id: toastId });
     }

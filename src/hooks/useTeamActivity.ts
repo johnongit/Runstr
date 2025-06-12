@@ -14,8 +14,15 @@ const getTagValue = (event: NostrWorkoutEvent, key: string): string | undefined 
 };
 
 const getDistance = (event: NostrWorkoutEvent): number => {
-  const distanceStr = getTagValue(event, 'distance');
-  return distanceStr ? parseFloat(distanceStr) / 1000 : 0; // Assuming meters, convert to km
+  const distanceTag = event.tags.find(t => t[0] === 'distance');
+  if (!distanceTag) return 0;
+  const raw = parseFloat(distanceTag[1]);
+  const unit = distanceTag[2] || 'km'; // default km
+  if (isNaN(raw)) return 0;
+  if (unit === 'mi') {
+    return raw * 1.60934; // convert miles to km for unified leaderboard
+  }
+  return raw; // already km
 };
 
 export const useTeamActivity = (workoutEvents: NostrWorkoutEvent[]) => {

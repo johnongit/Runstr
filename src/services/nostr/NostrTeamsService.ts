@@ -197,57 +197,62 @@ export async function fetchUserMemberTeams(
     return [];
   }
 
-  const filter: NDKFilter = {
+  // 1) Fetch *all* team events so we have latest metadata for each team
+  const teamFilter: NDKFilter = {
     kinds: [KIND_FITNESS_TEAM as NDKKind],
-    // NIP-51 based querying for a tag value containing the user's pubkey.
-    // This queries for events where a #p tag (representing a pubkey, common for members) equals userPubkey.
-    // However, NIP-101e uses `["member", "<pubkey>"]`. Standard relays might not index generic tags efficiently.
-    // A more robust but potentially slower method is to fetch all teams and filter client-side,
-    // or rely on relays that support more advanced NIP-01 generic tag queries if those become common.
-    // For now, let's try a tag query that might work on some relays for the specific "member" tag format.
-    // This is experimental for generic tags:
-    // '#t_member': [userPubkey], // This is non-standard for generic tags.
+  };
 
-    // The most reliable way is often to fetch candidate teams (e.g., all public, or by author if captain known)
-    // and then filter client-side. Or, if NIP-51 (Lists) is used for team member lists by some clients,
-    // that would be another angle. Given our strict NIP-101e approach, we'll filter client-side after a broader fetch.
-    // Let's fetch all team kinds and then filter.
-    // This could be inefficient for a large number of teams.
-    // A better approach might be to fetch teams captained by the user, and teams they've interacted with.
+  // 2) Fetch membership events authored by the user (Kind 33406)
+  const membershipFilter: NDKFilter = {
+    kinds: [KIND_TEAM_MEMBERSHIP as NDKKind],
+    authors: [userPubkey],
   };
 
   try {
-    console.log(`Fetching all teams to filter for user membership: ${userPubkey}`);
-    // Fetch ALL Kind 33404 events. This can be a lot of data.
-    // Consider narrowing this down if possible (e.g., by relays, or known team authors if your app has that context)
-    const allTeamEventsSet = await ndk.fetchEvents(filter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
-    const allTeamEvents: NostrTeamEvent[] = Array.from(allTeamEventsSet).map(e => e.rawEvent() as NostrTeamEvent);
+    const [teamSet, membershipSet] = await Promise.all([
+      ndk.fetchEvents(teamFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }),
+      ndk.fetchEvents(membershipFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }),
+    ]);
 
-    const memberTeams: NostrTeamEvent[] = [];
-    const processedTeamIds = new Set<string>(); // To keep only the latest version of each team
+    const allTeamEvents: NostrTeamEvent[] = Array.from(teamSet).map(e => e.rawEvent() as NostrTeamEvent);
+    const membershipEvents = Array.from(membershipSet);
 
-    // Sort by created_at descending to process latest versions first
+    // Build map of latest team event keyed by captain:uuid
+    const latestTeamMap = new Map<string, NostrTeamEvent>();
     allTeamEvents.sort((a, b) => b.created_at - a.created_at);
-
-    for (const teamEvent of allTeamEvents) {
-      const captain = getTeamCaptain(teamEvent);
-      const uuid = getTeamUUID(teamEvent);
-      if (!uuid) continue; 
-
-      const teamUniqueId = `${captain}:${uuid}`;
-      if (processedTeamIds.has(teamUniqueId)) {
-        continue; // Already processed a newer version of this team
-      }
-
-      const members = getTeamMembers(teamEvent);
-      if (members.includes(userPubkey)) {
-        memberTeams.push(teamEvent);
-      }
-      processedTeamIds.add(teamUniqueId);
+    for (const ev of allTeamEvents) {
+      const id = `${getTeamCaptain(ev)}:${getTeamUUID(ev)}`;
+      if (!latestTeamMap.has(id)) latestTeamMap.set(id, ev);
     }
-    
-    console.log(`Found ${memberTeams.length} teams where user ${userPubkey} is a member.`);
-    return memberTeams;
+
+    // Collect team identifiers from membership events
+    const memberTeamIds = new Set<string>();
+    for (const m of membershipEvents) {
+      const aTag = m.tags.find(t => t[0] === 'a');
+      if (!aTag) continue;
+      const parts = aTag[1].split(':'); // 33404:cpt:uuid
+      if (parts.length === 3) {
+        const captain = parts[1];
+        const uuid = parts[2];
+        memberTeamIds.add(`${captain}:${uuid}`);
+      }
+    }
+
+    // Also include teams where member tag exists directly in team event
+    for (const ev of allTeamEvents) {
+      if (getTeamMembers(ev).includes(userPubkey)) {
+        memberTeamIds.add(`${getTeamCaptain(ev)}:${getTeamUUID(ev)}`);
+      }
+    }
+
+    const result: NostrTeamEvent[] = [];
+    memberTeamIds.forEach(id => {
+      const ev = latestTeamMap.get(id);
+      if (ev) result.push(ev);
+    });
+
+    console.log(`fetchUserMemberTeams → ${result.length} teams for user ${userPubkey}`);
+    return result;
   } catch (error) {
     console.error("Error fetching user member teams:", error);
     return [];
