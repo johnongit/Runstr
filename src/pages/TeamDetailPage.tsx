@@ -33,15 +33,14 @@ import { useNostr } from '../hooks/useNostr'; // Corrected path
 import { NDKEvent, NDKSubscription, NDKKind } from '@nostr-dev-kit/ndk';
 import { Event as NostrEventBase } from 'nostr-tools';
 import { createAndPublishEvent } from '../utils/nostr';
-import { payLnurl } from '../utils/lnurlPay';
 import { useAuth } from '../hooks/useAuth';
 import LocalTeamChat from '../components/teams/LocalTeamChat';
 import TeamChallengesTab from '../components/teams/TeamChallengesTab';
 import { useTeamSubscriptionStatus } from '../hooks/useTeamSubscriptionStatus';
 import SubscriptionBanner from '../components/teams/SubscriptionBanner';
 import PaymentModal from '../components/payments/PaymentModal';
-import { requestLnurlInvoice } from '../utils/lnurlPay';
 import { DisplayName } from '../components/shared/DisplayName';
+import { useTeamRoles } from '../hooks/useTeamRoles';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -83,10 +82,6 @@ const TeamDetailPage: React.FC = () => {
   const [isAddingMember, setIsAddingMember] = useState<boolean>(false);
   const [addMemberError, setAddMemberError] = useState<string | null>(null);
 
-  const [isProcessingMembership, setIsProcessingMembership] = useState<string | null>(null); // Stores pubkey of member being processed or 'self' for leaving
-  const [membershipError, setMembershipError] = useState<string | null>(null);
-  const [extraMembers, setExtraMembers] = useState<string[]>([]); // members from membership events
-
   // State for Chat - chatGroupRef is no longer needed
   // const [chatGroupRef, setChatGroupRef] = useState<string | null>(null); // REMOVED
   const [teamAIdentifierForChat, setTeamAIdentifierForChat] = useState<string | null>(null); // Added: e.g. "33404:captain:uuid"
@@ -123,7 +118,6 @@ const TeamDetailPage: React.FC = () => {
     if (!captainPubkey || !teamUUID || !ndkReady || !ndk) return;
     if (!forceRefetch) setIsLoading(true);
     setError(null);
-    setMembershipError(null); // Clear errors on load
     try {
       const fetchedTeam = await fetchTeamById(ndk, captainPubkey, teamUUID);
       if (fetchedTeam) {
@@ -225,16 +219,6 @@ const TeamDetailPage: React.FC = () => {
       if(challengesSubscription){challengesSubscription.stop(); setChallengesSubscription(null);} }
   },[activeTab,teamAIdentifierForChat,ndk,ndkReady]);
 
-  // Fetch membership events and merge into members list
-  useEffect(() => {
-    const loadMemberships = async () => {
-      if (!ndk || !ndkReady || !teamAIdentifierForChat) return;
-      const joinedMembers = await fetchTeamMemberships(ndk, teamAIdentifierForChat);
-      setExtraMembers(joinedMembers);
-    };
-    loadMemberships();
-  }, [ndk, ndkReady, teamAIdentifierForChat]);
-
   const handleAddMember = async () => {
     if (!ndk || !currentUserPubkey || !team || !newMemberPubkey.trim()) {
       setAddMemberError("Missing NDK, captain pubkey, team data, or new member pubkey.");
@@ -273,22 +257,21 @@ const TeamDetailPage: React.FC = () => {
   const handleRemoveMember = async (memberToRemovePk: string) => {
     if (!ndk || !currentUserPubkey || !team ) return;
     if (currentUserPubkey !== getTeamCaptain(team)) {
-        setMembershipError("Only the team captain can remove members.");
+        setError("Only the team captain can remove members.");
         return;
     }
     if (memberToRemovePk === currentUserPubkey) {
-        setMembershipError("Captain cannot remove themselves.");
+        setError("Captain cannot remove themselves.");
         return;
     }
-    setIsProcessingMembership(memberToRemovePk);
-    setMembershipError(null);
-    const updatedEventTemplate = removeMemberFromTeamEvent(team, memberToRemovePk);
-    if (!updatedEventTemplate) {
-        setMembershipError("Failed to prepare team update for removing member.");
-        setIsProcessingMembership(null);
-        return;
-    }
+    setIsLoading(true);
+    setError(null);
     try {
+        const updatedEventTemplate = removeMemberFromTeamEvent(team, memberToRemovePk);
+        if (!updatedEventTemplate) {
+            setError("Failed to prepare team update for removing member.");
+            return;
+        }
         const eventToSign = new NDKEvent(ndk, { ...updatedEventTemplate, pubkey: currentUserPubkey });
         await eventToSign.sign();
         const publishedRelays = await eventToSign.publish();
@@ -296,12 +279,12 @@ const TeamDetailPage: React.FC = () => {
             alert('Member removed successfully! Team data will refresh.');
             await loadTeamDetails(true); 
         } else {
-            setMembershipError("Failed to publish team update for removing member.");
+            setError("Failed to publish team update for removing member.");
         }
     } catch (err: any) {
-        setMembershipError(err.message || "Error removing member.");
+        setError(err.message || "Error removing member.");
     } finally {
-        setIsProcessingMembership(null);
+        setIsLoading(false);
     }
   };
 
@@ -316,48 +299,18 @@ const TeamDetailPage: React.FC = () => {
   };
 
   const handleJoinTeam = async () => {
-      if (!ndkReady || !ndk || !currentUserPubkey || !teamAIdentifierForChat) return;
-      try {
-        // 1. Request invoice via LNURL
-        const invoice = await requestLnurlInvoice({ lightning: 'runstr@geyser.fund', amount: 2000, comment: 'Runstr team join fee' });
-        setPaymentInvoice(invoice);
-
-        // 2. Attempt to pay automatically if wallet connected
-        let autoPaid = false;
-        if (wallet && typeof wallet.makePayment === 'function') {
-          try {
-            await wallet.makePayment(invoice);
-            autoPaid = true;
-          } catch (e) {
-            console.warn('Auto payment failed, falling back to manual', e);
-          }
-        }
-
-        if (!autoPaid) {
-          setPaymentModalOpen(true);
-          return; // The onPaid callback will continue flow
-        }
-
-        await finalizeJoinAfterPayment();
-
-      } catch (err: any) {
-        alert(`Failed to initiate join process: ${err.message || err}`);
-      }
-  };
-
-  const finalizeJoinAfterPayment = async () => {
+    if (!ndkReady || !ndk || !currentUserPubkey || !teamAIdentifierForChat) return;
     try {
-      // Publish membership & receipt events
-      const membershipTemplate = prepareTeamMembershipEvent(teamAIdentifierForChat!, currentUserPubkey!,);
-      if (membershipTemplate) await createAndPublishEvent(membershipTemplate, null);
-      const receiptTemplate = prepareTeamSubscriptionReceiptEvent(teamAIdentifierForChat!, currentUserPubkey!, 2000);
-      if (receiptTemplate) await createAndPublishEvent(receiptTemplate, null);
+      const membershipTemplate = prepareTeamMembershipEvent(teamAIdentifierForChat, currentUserPubkey);
+      if (!membershipTemplate) {
+        alert('Failed to prepare membership event.');
+        return;
+      }
+      await createAndPublishEvent(membershipTemplate, null);
       alert('Successfully joined the team!');
-      const joinedMembers = await fetchTeamMemberships(ndk!, teamAIdentifierForChat!);
-      setExtraMembers(joinedMembers);
-      setPaymentModalOpen(false);
-    } catch (e:any) {
-      setPaymentError(e?.message || 'Error publishing membership');
+      await loadTeamDetails(true);
+    } catch (err: any) {
+      alert(err?.message || 'Error joining team');
     }
   };
 
@@ -381,15 +334,16 @@ const TeamDetailPage: React.FC = () => {
   const teamName = getTeamName(team);
   const teamDescription = getTeamDescription(team);
   const actualCaptain = getTeamCaptain(team);
-  const members = getTeamMembers(team);
+  const baseMembers = getTeamMembers(team);
   const teamIsPublic = isTeamPublic(team);
   const confirmedTeamUUID = getTeamUUID(team);
 
-  // Combine members from team event and membership events
-  const combinedMembers = Array.from(new Set([...members, ...extraMembers]));
-
-  const isCurrentUserCaptain = currentUserPubkey === actualCaptain && !!actualCaptain;
-  const isCurrentUserMember = !!currentUserPubkey && combinedMembers.includes(currentUserPubkey);
+  // Derive role information using new hook
+  const {
+    members: combinedMembers,
+    isCaptain: isCurrentUserCaptain,
+    isMember: isCurrentUserMember,
+  } = useTeamRoles(team, teamAIdentifierForChat);
 
   const renderTabs = () => {
     return (
@@ -538,7 +492,6 @@ const TeamDetailPage: React.FC = () => {
                 {addMemberError && <p className="text-red-400 text-xs mt-2">{addMemberError}</p>}
               </div>
             )}
-            {membershipError && <p className="text-red-400 text-sm my-3 p-2 bg-red-900/30 rounded-md">Error: {membershipError}</p>}
             {combinedMembers.length > 0 ? (
               <ul className="space-y-2">
                 {combinedMembers.map((memberPubkey, index) => (
@@ -551,10 +504,9 @@ const TeamDetailPage: React.FC = () => {
                     {isCurrentUserCaptain && memberPubkey !== currentUserPubkey && (
                         <button 
                             onClick={() => handleRemoveMember(memberPubkey)}
-                            disabled={isProcessingMembership === memberPubkey}
                             className="ml-3 px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
                         >
-                            {isProcessingMembership === memberPubkey ? 'Removing...' : 'Remove'}
+                            Remove
                         </button>
                     )}
                   </li>
@@ -566,10 +518,9 @@ const TeamDetailPage: React.FC = () => {
             {!isCurrentUserCaptain && isCurrentUserMember && (
                 <button 
                     onClick={handleLeaveTeam}
-                    disabled={isProcessingMembership === 'self'} 
                     className="mt-4 px-4 py-2 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded disabled:opacity-50"
                 >
-                   {isProcessingMembership === 'self' ? 'Processing...' : 'Request to Leave Team'} 
+                   Request to Leave Team 
                 </button>
             )}
           </div>
@@ -611,7 +562,7 @@ const TeamDetailPage: React.FC = () => {
             className="mt-4 w-full sm:w-auto px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition-colors"
             title={`Captain: ${actualCaptain}`}
           >
-            Join Team (2000 sats)
+            Join Team
           </button>
       );
   }
@@ -648,7 +599,7 @@ const TeamDetailPage: React.FC = () => {
         invoice={paymentInvoice}
         amount={2000}
         onClose={() => setPaymentModalOpen(false)}
-        onPaid={finalizeJoinAfterPayment}
+        onPaid={handleJoinTeam}
         paymentError={paymentError}
       />
 
