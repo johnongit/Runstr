@@ -301,14 +301,50 @@ const TeamDetailPage: React.FC = () => {
   };
 
   const handleJoinTeam = async () => {
-    if (!ndkReady || !ndk || !currentUserPubkey || !teamAIdentifierForChat) {
-      console.error('Join team failed: Missing requirements', {
-        ndkReady,
-        ndk: !!ndk,
-        currentUserPubkey: !!currentUserPubkey,
-        teamAIdentifierForChat
-      });
-      toast.error('Unable to join team: Missing connection or user information');
+    // Enhanced validation with detailed logging
+    console.log('handleJoinTeam: Starting validation...', {
+      ndkReady,
+      ndk: !!ndk,
+      currentUserPubkey: !!currentUserPubkey,
+      teamAIdentifierForChat,
+      team: !!team,
+      teamName: team ? getTeamName(team) : 'unknown'
+    });
+
+    if (!ndkReady) {
+      console.error('Join team failed: NDK not ready');
+      toast.error('Connection not ready. Please wait a moment and try again.');
+      return;
+    }
+
+    if (!ndk) {
+      console.error('Join team failed: NDK instance missing');
+      toast.error('Network connection missing. Please refresh the page.');
+      return;
+    }
+
+    if (!currentUserPubkey) {
+      console.error('Join team failed: User not authenticated');
+      toast.error('User not authenticated. Please connect your Nostr account first.');
+      return;
+    }
+
+    if (!teamAIdentifierForChat) {
+      console.error('Join team failed: Team identifier missing');
+      toast.error('Team information incomplete. Please refresh the page and try again.');
+      return;
+    }
+
+    if (!team) {
+      console.error('Join team failed: Team data missing');
+      toast.error('Team data not loaded. Please refresh the page.');
+      return;
+    }
+
+    // Additional check: Ensure user isn't already a member
+    if (isCurrentUserMember) {
+      console.log('Join team skipped: User is already a member');
+      toast.info('You are already a member of this team!');
       return;
     }
 
@@ -320,7 +356,9 @@ const TeamDetailPage: React.FC = () => {
       console.log('Starting team join process:', {
         teamAIdentifier: teamAIdentifierForChat,
         userPubkey: currentUserPubkey,
-        teamName: getTeamName(team)
+        teamName: getTeamName(team),
+        teamUUID: getTeamUUID(team),
+        captainPubkey: getTeamCaptain(team)
       });
 
       // Create membership event
@@ -332,6 +370,7 @@ const TeamDetailPage: React.FC = () => {
       if (!membershipTemplate) {
         console.error('Failed to prepare membership event template');
         toast.error('Failed to prepare membership event.', { id: toastId });
+        setIsProcessingMembership(null);
         return;
       }
 
@@ -339,6 +378,8 @@ const TeamDetailPage: React.FC = () => {
       
       // Create NDK event and sign it
       const membershipEvent = new NDKEvent(ndk, membershipTemplate);
+      
+      console.log('Signing membership event...');
       await membershipEvent.sign();
       
       console.log('Membership event signed, publishing...');
@@ -348,7 +389,8 @@ const TeamDetailPage: React.FC = () => {
       
       if (publishedRelays.size === 0) {
         console.error('Failed to publish membership event to any relays');
-        toast.error('Failed to publish membership event to any relays.', { id: toastId });
+        toast.error('Failed to publish membership event. Please check your connection and try again.', { id: toastId });
+        setIsProcessingMembership(null);
         return;
       }
 
@@ -362,22 +404,31 @@ const TeamDetailPage: React.FC = () => {
         console.log('Set default posting team:', `${captainPubkey}:${teamUUID}`);
       }
 
-      // Force refresh of team details and membership data
+      // Enhanced refresh strategy with multiple attempts
       console.log('Refreshing team details after successful join...');
+      
+      // Immediate refresh
       await loadTeamDetails(true);
 
-      // Give a moment for the membership event to propagate, then force a re-render
-      setTimeout(() => {
-        console.log('Forcing component re-render to update membership status');
-        // This will trigger useTeamRoles to re-fetch membership events
+      // Additional refresh after delay to catch eventual consistency
+      setTimeout(async () => {
+        console.log('Second refresh after 2 seconds...');
+        await loadTeamDetails(true);
         setIsProcessingMembership(null);
-        // Force a state update to trigger re-render
-        setTeam(prevTeam => ({ ...prevTeam }));
       }, 2000);
+
+      // Final refresh after longer delay
+      setTimeout(async () => {
+        console.log('Final refresh after 5 seconds...');
+        await loadTeamDetails(true);
+        // Force re-evaluation of membership status
+        setTeam(prevTeam => prevTeam ? { ...prevTeam } : null);
+      }, 5000);
 
     } catch (err: any) {
       console.error('Error joining team:', err);
-      toast.error(err?.message || 'Error joining team', { id: toastId });
+      const errorMessage = err?.message || 'Unknown error occurred while joining team';
+      toast.error(`Failed to join team: ${errorMessage}`, { id: toastId });
       setIsProcessingMembership(null);
     }
   };
@@ -415,8 +466,8 @@ const TeamDetailPage: React.FC = () => {
 
   const renderTabs = () => {
     return (
-      <div className="mb-6 border-b border-gray-700">
-        <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto pb-px" aria-label="Tabs">
+      <div className="mb-8 border-b border-gray-700">
+        <nav className="-mb-px flex space-x-6 sm:space-x-8 overflow-x-auto pb-px scrollbar-hide" aria-label="Tabs">
           {['chat', 'challenges', 'members', 'leaderboard'].map((tabName) => {
             let displayName = tabName;
             if (tabName === 'challenges') displayName = 'Team Challenges';
@@ -426,11 +477,11 @@ const TeamDetailPage: React.FC = () => {
             <button
               key={tabName}
               onClick={() => setActiveTab(tabName as any)}
-              className={`whitespace-nowrap py-3 px-2 sm:py-4 sm:px-3 border-b-2 font-medium text-sm 
+              className={`whitespace-nowrap py-4 px-3 sm:py-4 sm:px-4 border-b-2 font-medium text-sm sm:text-base min-w-0 flex-shrink-0
                 ${activeTab === tabName 
-                  ? 'border-blue-500 text-blue-400' 
-                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'}
-                capitalize transition-colors duration-150`}
+                  ? 'border-blue-500 text-blue-400 bg-blue-500/10' 
+                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500 hover:bg-gray-700/50'}
+                capitalize transition-all duration-150 rounded-t-lg`}
             >
               {displayName}
             </button>
@@ -508,57 +559,62 @@ const TeamDetailPage: React.FC = () => {
         return renderChallengesTabContent();
       case 'members':
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-100">Members ({combinedMembers.length})</h3>
             {isCurrentUserCaptain && (
-              <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
-                <h4 className="text-lg font-semibold text-gray-200 mb-3">Add New Member (Captain Only)</h4>
-                <div className="flex items-center space-x-3">
+              <div className="p-4 sm:p-6 bg-gray-800 border border-gray-700 rounded-lg">
+                <h4 className="text-lg font-semibold text-gray-200 mb-4">Add New Member (Captain Only)</h4>
+                <div className="flex flex-col sm:flex-row gap-3">
                   <input 
                     type="text"
                     value={newMemberPubkey}
                     onChange={(e) => setNewMemberPubkey(e.target.value)}
                     placeholder="Enter new member npub or hex pubkey"
-                    className="flex-grow p-3 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
+                    className="flex-grow p-3 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
                   />
                   <button 
                     onClick={handleAddMember}
                     disabled={isAddingMember || !newMemberPubkey.trim()}
-                    className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                   >
                     {isAddingMember ? 'Adding...' : 'Add Member'}
                   </button>
                 </div>
-                {addMemberError && <p className="text-red-400 text-sm mt-2">{addMemberError}</p>}
+                {addMemberError && <p className="text-red-400 text-sm mt-3">{addMemberError}</p>}
               </div>
             )}
             {combinedMembers.length > 0 ? (
-              <ul className="space-y-3">
+              <div className="space-y-3">
                 {combinedMembers.map((memberPubkey, index) => (
-                  <li key={index} className="flex items-center justify-between text-gray-300 bg-gray-800 p-3 rounded-lg">
-                    <span className="truncate">
+                  <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-gray-300 bg-gray-800 p-4 rounded-lg">
+                    <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <DisplayName pubkey={memberPubkey} />
-                        {memberPubkey === actualCaptain && <span className="ml-2 text-sm text-yellow-400 font-medium">(Captain)</span>}
-                        {memberPubkey === currentUserPubkey && !isCurrentUserCaptain && <span className="ml-2 text-sm text-green-400 font-medium">(You)</span>}
-                    </span>
+                        {memberPubkey === actualCaptain && <span className="text-xs sm:text-sm text-yellow-400 font-medium px-2 py-1 bg-yellow-400/10 rounded-full">(Captain)</span>}
+                        {memberPubkey === currentUserPubkey && !isCurrentUserCaptain && <span className="text-xs sm:text-sm text-green-400 font-medium px-2 py-1 bg-green-400/10 rounded-full">(You)</span>}
+                    </div>
                     {isCurrentUserCaptain && memberPubkey !== currentUserPubkey && (
                         <button 
                             onClick={() => handleRemoveMember(memberPubkey)}
-                            className="ml-3 px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50 transition-colors"
+                            className="px-3 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 transition-colors whitespace-nowrap"
                         >
                             Remove
                         </button>
                     )}
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </div>
             ) : (
-              <p className="text-gray-400 text-center py-8">This team has no members yet.</p>
+              <div className="text-center py-12 bg-gray-800/50 rounded-lg border border-gray-700">
+                <p className="text-gray-400 mb-2">This team has no members yet.</p>
+                {isCurrentUserCaptain && (
+                  <p className="text-sm text-gray-500">Add the first member using the form above!</p>
+                )}
+              </div>
             )}
             {!isCurrentUserCaptain && isCurrentUserMember && (
                 <button 
                     onClick={handleLeaveTeam}
-                    className="mt-4 px-4 py-2 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded disabled:opacity-50 transition-colors"
+                    className="px-6 py-3 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg disabled:opacity-50 transition-colors"
                 >
                    Request to Leave Team 
                 </button>
@@ -639,25 +695,40 @@ const TeamDetailPage: React.FC = () => {
 
   return (
     <div className="p-4 max-w-4xl mx-auto text-white">
-      {/* Team Header - Fixed spacing */}
+      {/* Team Header - Enhanced spacing and layout */}
       <div className="mb-8 pb-6 border-b border-gray-700">
-        <div className="flex justify-between items-start mb-4">
-          <h1 className="text-3xl font-bold text-blue-300">{teamName}</h1>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-blue-300 mb-2">{teamName}</h1>
+            <p className="text-gray-300 leading-relaxed text-base sm:text-lg">{teamDescription}</p>
+          </div>
           {isCurrentUserCaptain && (
             <button
               onClick={() => setShowManageTeamModal(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 sm:px-6 sm:py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap text-sm sm:text-base"
             >
               Manage Team
             </button>
           )}
         </div>
-        <p className="text-gray-300 mb-6 leading-relaxed text-lg">{teamDescription}</p>
-        <div className="text-sm text-gray-500 space-y-2">
-            <p>Captain: <span className="font-mono text-gray-400">{getPubkeyDisplayName(actualCaptain)}</span></p>
-            <p>Team ID: <span className="font-mono text-gray-400">{confirmedTeamUUID || teamUUID}</span></p>
-            <p>Visibility: <span className={teamIsPublic ? "text-green-400" : "text-red-400"}>{teamIsPublic ? 'Public' : 'Private'}</span></p>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-sm mb-6">
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-xs uppercase tracking-wide">Captain</span>
+              <DisplayName pubkey={actualCaptain} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-xs uppercase tracking-wide">Team ID</span>
+              <span className="font-mono text-gray-400 text-xs break-all">{confirmedTeamUUID || teamUUID}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-xs uppercase tracking-wide">Visibility</span>
+              <span className={`${teamIsPublic ? "text-green-400" : "text-red-400"} font-medium`}>
+                {teamIsPublic ? 'Public' : 'Private'}
+              </span>
+            </div>
         </div>
+        
         {renderJoinButton()} 
       </div>
 

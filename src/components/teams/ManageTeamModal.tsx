@@ -34,9 +34,12 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Enhanced readiness check
+  const isReady = ndkReady && publicKey;
+  
   const handleUpdateTeam = async () => {
-    if (!ndkReady || !publicKey) {
-      setError('Nostr connection not ready or user not logged in.');
+    if (!isReady) {
+      setError('Nostr connection or authentication not ready. Please wait a moment and try again.');
       return;
     }
 
@@ -158,6 +161,12 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
           </div>
         )}
 
+        {!isReady && (
+          <div className="mt-4 p-3 bg-yellow-700/60 text-yellow-200 border border-yellow-600 rounded-md text-sm">
+            <p><strong>Connecting:</strong> Waiting for Nostr connection...</p>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
           <button
             type="button"
@@ -170,14 +179,12 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
           <button
             type="button"
             onClick={handleUpdateTeam}
-            disabled={!ndkReady || isUpdating}
+            disabled={!isReady || isUpdating}
             className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
           >
             {isUpdating ? 'Updating...' : 'Update Team'}
           </button>
         </div>
-        
-        {!ndkReady && <p className="text-xs text-yellow-500 mt-2 text-right">Nostr not ready</p>}
       </div>
     </div>
   );

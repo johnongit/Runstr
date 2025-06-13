@@ -101,7 +101,10 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isCaptain) return;
+    if (!isCaptain) {
+      toast.error('Only team captains can create challenges.');
+      return;
+    }
 
     let finalPubkey = currentUserPubkey;
     if (!finalPubkey) {
@@ -145,49 +148,180 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
   };
 
   return (
-    <div className="px-2">
-      {loading && <p className="text-gray-400">Loading…</p>}
-      {!loading && challenges.length === 0 && <p className="text-gray-400">No challenges yet.</p>}
-      {!loading && challenges.map(ch => (
-        <div key={ch.id} className="border border-gray-700 rounded-md p-3 mb-3">
-          <h4 className="font-semibold text-gray-100 mb-1">{ch.name}</h4>
-          {ch.goalValue && (
-            <p className="text-sm text-gray-300 mb-1">Goal: {ch.goalValue} {ch.goalUnit}</p>) }
-          {ch.start && (
-            <p className="text-xs text-gray-400 mb-1">{new Date(ch.start * 1000).toLocaleDateString()} – {ch.end ? new Date(ch.end * 1000).toLocaleDateString() : '∞'}</p>) }
-          <button onClick={() => toggleParticipation(ch.uuid)} className="mt-1 px-3 py-1 text-sm rounded-md border border-blue-500 text-blue-400 hover:bg-blue-600/20">
-            {participating.includes(ch.uuid) ? 'Leave Challenge' : 'Participate'}
-          </button>
-        </div>
-      ))}
+    <div className="space-y-6">
+      {/* Captain Challenge Creation Section */}
       {isCaptain && (
-        <>
-          <button onClick={() => setShowModal(true)} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md">Create Challenge</button>
-          {showModal && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-              <div className="bg-gray-800 p-5 rounded-lg w-full max-w-md text-white">
-                <h3 className="text-lg font-semibold mb-3">New Challenge</h3>
-                <form onSubmit={handleCreate} className="space-y-3">
-                  <div>
-                    <label className="block text-sm mb-1">Name</label>
-                    <input name="name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="w-full p-2 bg-gray-700 border border-gray-600 rounded" />
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Description</label>
-                    <textarea name="description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required className="w-full p-2 bg-gray-700 border border-gray-600 rounded" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><label className="block text-sm mb-1">Goal Value</label><input type="number" value={form.goalValue} onChange={e => setForm({ ...form, goalValue: Number(e.target.value) })} className="w-full p-2 bg-gray-700 border border-gray-600 rounded" /></div>
-                    <div><label className="block text-sm mb-1">Unit</label><select value={form.goalUnit} onChange={e => setForm({ ...form, goalUnit: e.target.value as 'km' | 'mi' })} className="w-full p-2 bg-gray-700 border border-gray-600 rounded"><option value="km">km</option><option value="mi">mi</option></select></div>
-                  </div>
-                  <div><label className="block text-sm mb-1">Start (optional)</label><input type="datetime-local" value={form.start} onChange={e => setForm({ ...form, start: e.target.value })} className="w-full p-2 bg-gray-700 border border-gray-600 rounded" /></div>
-                  <div><label className="block text-sm mb-1">End (optional)</label><input type="datetime-local" value={form.end} onChange={e => setForm({ ...form, end: e.target.value })} className="w-full p-2 bg-gray-700 border border-gray-600 rounded" /></div>
-                  <div className="flex justify-end space-x-3 pt-2"><button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-600 rounded">Cancel</button><button type="submit" className="px-4 py-2 bg-blue-600 rounded">Create</button></div>
-                </form>
-              </div>
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-blue-300">Captain Controls</h3>
+              <p className="text-sm text-gray-400">Create challenges to motivate your team members</p>
             </div>
-          )}
-        </>
+            <button 
+              onClick={() => setShowModal(true)} 
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap"
+            >
+              + Create Challenge
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Challenges List */}
+      <div>
+        <h4 className="text-xl font-semibold text-gray-100 mb-4">
+          Team Challenges {!loading && `(${challenges.length})`}
+        </h4>
+        
+        {loading && (
+          <div className="text-center py-8">
+            <p className="text-gray-400">Loading challenges...</p>
+          </div>
+        )}
+        
+        {!loading && challenges.length === 0 && (
+          <div className="text-center py-8 bg-gray-800 rounded-lg border border-gray-700">
+            <p className="text-gray-400 mb-2">No challenges available.</p>
+            {isCaptain && (
+              <p className="text-sm text-gray-500">Create the first challenge to get your team motivated!</p>
+            )}
+          </div>
+        )}
+        
+        {!loading && challenges.length > 0 && (
+          <div className="space-y-4">
+            {challenges.map(ch => (
+              <div key={ch.id} className="border border-gray-700 rounded-lg p-4 bg-gray-800">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
+                  <h4 className="font-semibold text-gray-100 text-lg">{ch.name}</h4>
+                  {ch.goalValue && (
+                    <span className="px-3 py-1 bg-blue-600 text-white text-sm rounded-full whitespace-nowrap">
+                      Goal: {ch.goalValue} {ch.goalUnit}
+                    </span>
+                  )}
+                </div>
+                
+                {ch.description && (
+                  <p className="text-gray-300 mb-3">{ch.description}</p>
+                )}
+                
+                {ch.start && (
+                  <p className="text-sm text-gray-400 mb-4">
+                    📅 {new Date(ch.start * 1000).toLocaleDateString()} – {ch.end ? new Date(ch.end * 1000).toLocaleDateString() : 'No end date'}
+                  </p>
+                )}
+                
+                <button 
+                  onClick={() => toggleParticipation(ch.uuid)} 
+                  className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${
+                    participating.includes(ch.uuid) 
+                      ? 'bg-red-600 hover:bg-red-700 text-white' 
+                      : 'border border-blue-500 text-blue-400 hover:bg-blue-600/20'
+                  }`}
+                >
+                  {participating.includes(ch.uuid) ? '✓ Leave Challenge' : '+ Participate'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Challenge Creation Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 p-6 rounded-lg w-full max-w-lg text-white max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-semibold mb-4 text-blue-300">Create New Challenge</h3>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Challenge Name</label>
+                <input 
+                  name="name" 
+                  value={form.name} 
+                  onChange={e => setForm({ ...form, name: e.target.value })} 
+                  required 
+                  placeholder="e.g., 5K Challenge"
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Description</label>
+                <textarea 
+                  name="description" 
+                  value={form.description} 
+                  onChange={e => setForm({ ...form, description: e.target.value })} 
+                  required 
+                  rows={3}
+                  placeholder="Describe the challenge goals and rules..."
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Goal Distance</label>
+                  <input 
+                    type="number" 
+                    value={form.goalValue} 
+                    onChange={e => setForm({ ...form, goalValue: Number(e.target.value) })} 
+                    min="0"
+                    step="0.1"
+                    placeholder="5.0"
+                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Unit</label>
+                  <select 
+                    value={form.goalUnit} 
+                    onChange={e => setForm({ ...form, goalUnit: e.target.value as 'km' | 'mi' })} 
+                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="km">Kilometers</option>
+                    <option value="mi">Miles</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Start Date (Optional)</label>
+                <input 
+                  type="datetime-local" 
+                  value={form.start} 
+                  onChange={e => setForm({ ...form, start: e.target.value })} 
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">End Date (Optional)</label>
+                <input 
+                  type="datetime-local" 
+                  value={form.end} 
+                  onChange={e => setForm({ ...form, end: e.target.value })} 
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                />
+              </div>
+              
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowModal(false)} 
+                  className="px-6 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Create Challenge
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

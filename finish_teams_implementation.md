@@ -196,4 +196,220 @@ Create a fully functional teams feature for mobile users that allows:
 
 Once you provide guidance on the above questions, I can begin implementing the chosen approach. The codebase is well-structured and the fixes are straightforward - we just need to align on priorities and approach.
 
-**Recommended Starting Point:** Phase 1.1 (Remove Payment System) as it's blocking team creation for users. 
+**Recommended Starting Point:** Phase 1.1 (Remove Payment System) as it's blocking team creation for users.
+
+# Teams Implementation Final Fixes - Phase 6
+
+## Current Status Analysis (Based on Screenshots)
+
+✅ **Progress Made:**
+- Manage Team modal appears for captains 
+- Join button now shows visual error instead of being unresponsive
+- Leaderboard tab doesn't crash the app
+- Payment system successfully disabled
+
+❌ **Remaining Critical Issues:**
+
+### Issue 1: Users Unable to Join Teams
+**Screenshot Evidence:** Shows "Unable to join team: Missing connection or user information" error
+**Root Cause:** Join team functionality has connectivity/state management issues
+**Priority:** HIGH - Core functionality blocker
+
+### Issue 2: UI Layout Problems  
+**Screenshot Evidence:** Buttons appear cramped and poorly spaced on team page
+**Root Cause:** CSS spacing and responsive design issues
+**Priority:** MEDIUM - UX degradation
+
+### Issue 3: Manage Team Modal Shows "Nostr not ready"
+**Screenshot Evidence:** Modal footer shows "Nostr not ready" message
+**Root Cause:** NDK readiness detection or timing issues in ManageTeamModal
+**Priority:** MEDIUM - Functional but confusing to users
+
+### Issue 4: Missing Create Challenge Button for Captains
+**Screenshot Evidence:** No visible create challenge option for team captains
+**Root Cause:** UI component missing or not rendering for captains
+**Priority:** MEDIUM - Missing captain functionality
+
+### Issue 5: Captain Shows Hex Instead of Username
+**Screenshot Evidence:** "Captain: 30ceb64e...bdf5" instead of readable name
+**Root Cause:** Profile resolution not working for captain display
+**Priority:** LOW - Cosmetic but unprofessional
+
+---
+
+## Implementation Plan: Quick Targeted Fixes
+
+### Fix 1: Join Team Functionality (Priority: HIGH)
+
+**Problem Analysis:**
+- Error message suggests missing connection or user information
+- Likely issues with NDK readiness, user pubkey, or team membership state
+
+**Implementation Steps:**
+1. **Enhance join team error handling in TeamDetailPage.tsx**
+   - Add comprehensive logging for join team attempts
+   - Verify NDK readiness, user authentication, and team data
+   - Provide specific error messages for different failure scenarios
+
+2. **Improve team membership state management**
+   - Ensure proper refresh of team data after join attempts
+   - Add retry logic for failed join attempts
+   - Implement proper loading states during join process
+
+3. **Fix team membership detection logic**
+   - Review `useTeamRoles` hook for membership detection accuracy
+   - Ensure team member list updates properly after join events
+
+**Expected Outcome:** Users can successfully join teams with clear feedback
+
+### Fix 2: UI Layout Issues (Priority: MEDIUM)
+
+**Problem Analysis:**
+- Buttons and text elements appear cramped
+- Mobile responsive design needs improvement
+
+**Implementation Steps:**
+1. **Fix button spacing in TeamDetailPage.tsx**
+   - Add proper margins and padding between UI elements
+   - Improve responsive design for different screen sizes
+   - Ensure touch targets are appropriately sized for mobile
+
+2. **Improve header layout**
+   - Space out team info and Manage Team button properly
+   - Fix text overflow and wrapping issues
+   - Ensure consistent spacing throughout the page
+
+**Expected Outcome:** Clean, properly spaced UI that works well on mobile
+
+### Fix 3: Manage Team Modal "Nostr not ready" (Priority: MEDIUM)
+
+**Problem Analysis:**
+- Modal shows "Nostr not ready" even when other parts of app work
+- Likely timing issue with NDK readiness detection
+
+**Implementation Steps:**
+1. **Review NDK readiness logic in ManageTeamModal.tsx**
+   - Check if `useNostr` hook is returning correct readiness state
+   - Add debugging to understand when/why NDK appears not ready
+   - Consider adding a loading state while waiting for NDK
+
+2. **Improve readiness detection**
+   - Ensure modal only shows after NDK is confirmed ready
+   - Add retry mechanism if NDK becomes ready after modal opens
+   - Consider hiding the "Nostr not ready" message if it's transient
+
+**Expected Outcome:** Modal shows proper ready state and functions reliably
+
+### Fix 4: Create Challenge Button for Captains (Priority: MEDIUM)
+
+**Problem Analysis:**
+- Captain should see challenge creation options
+- TeamChallengesTab may not be showing create button for captains
+
+**Implementation Steps:**
+1. **Review TeamChallengesTab.tsx captain detection**
+   - Ensure `isCaptain` logic works correctly in challenges tab
+   - Add create challenge button that's prominently visible for captains
+   - Ensure create challenge modal/functionality is accessible
+
+2. **Add create challenge UI if missing**
+   - Add "Create Challenge" button in challenges tab for captains
+   - Ensure button is styled consistently with other UI elements
+   - Test challenge creation flow end-to-end
+
+**Expected Outcome:** Captains can easily create challenges for their teams
+
+### Fix 5: Captain Username Display (Priority: LOW)
+
+**Problem Analysis:**
+- Captain field shows hex pubkey instead of username
+- Profile resolution not working for captain display
+
+**Implementation Steps:**
+1. **Use DisplayName component for captain display**
+   - Replace direct hex display with DisplayName component
+   - Ensure profile fetching works for captain pubkey
+   - Add fallback display if username not available
+
+**Expected Outcome:** Captain shows readable username instead of hex
+
+---
+
+## Implementation Priority Order
+
+### Phase 6A: Critical Functionality (Do First)
+1. **Fix 1: Join Team Functionality** - Essential for basic team operations
+2. **Fix 3: Manage Team Modal State** - Required for captain management
+
+### Phase 6B: UX Improvements (Do Second) 
+3. **Fix 2: UI Layout Issues** - Important for professional appearance
+4. **Fix 4: Create Challenge Button** - Important for captain experience
+
+### Phase 6C: Polish (Do Third)
+5. **Fix 5: Captain Username Display** - Nice to have improvement
+
+---
+
+## Testing Plan
+
+### Test Case 1: Join Team Flow
+1. Navigate to a team you're not a member of
+2. Click "Join Team" button
+3. Verify successful join with proper UI feedback
+4. Confirm membership appears correctly in UI
+
+### Test Case 2: Captain Management
+1. As team captain, open Manage Team modal
+2. Verify no "Nostr not ready" message appears
+3. Make changes and save successfully
+4. Verify changes appear in team display
+
+### Test Case 3: Challenge Creation
+1. As team captain, navigate to challenges tab
+2. Find and click "Create Challenge" button
+3. Create a new challenge successfully
+4. Verify challenge appears in team challenges list
+
+### Test Case 4: UI Responsiveness
+1. Test team page on different screen sizes
+2. Verify all buttons are properly spaced and touchable
+3. Ensure text doesn't overflow or get cut off
+4. Check that all interactive elements work properly
+
+---
+
+## Risk Assessment
+
+**Low Risk:**
+- UI layout fixes are cosmetic and unlikely to break functionality
+- Captain username display is purely cosmetic
+
+**Medium Risk:**  
+- Join team functionality touches core membership logic
+- Challenge creation affects team activity features
+
+**Mitigation Strategy:**
+- Test each fix thoroughly before moving to the next
+- Keep changes minimal and focused
+- Maintain existing working functionality
+- Use feature flags or gradual rollout if needed
+
+---
+
+## Success Criteria
+
+### Must Have (Required for completion):
+- ✅ Users can successfully join teams without errors
+- ✅ Manage Team modal works without "Nostr not ready" messages
+- ✅ UI elements are properly spaced and mobile-friendly
+
+### Should Have (Important for good UX):
+- ✅ Captains can create challenges easily
+- ✅ Captain names display as usernames instead of hex
+
+### Nice to Have (Polish):
+- Better error messages for various failure scenarios
+- Improved loading states during team operations
+- Enhanced responsive design for various screen sizes
+
+This focused approach should resolve the remaining critical issues while maintaining the progress already made. 
