@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNostr } from '../../hooks/useNostr';
 import {
   NostrTeamEvent,
@@ -23,7 +23,7 @@ const getTeamImage = (team: NostrTeamEvent): string => {
 };
 
 const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeamUpdated }) => {
-  const { publicKey, ndkReady } = useNostr() as any;
+  const { publicKey, ndkReady, connectSigner } = useNostr() as any;
   
   // Initialize form state with current team data
   const [teamName, setTeamName] = useState(getTeamName(team) || '');
@@ -36,6 +36,19 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
 
   // Enhanced readiness check
   const isReady = ndkReady && publicKey;
+  
+  // Attempt to auto-connect signer if not ready (Amber prompt will open) on mount
+  useEffect(() => {
+    if (!publicKey) {
+      (async () => {
+        try {
+          await connectSigner();
+        } catch (err) {
+          console.warn('ManageTeamModal: Auto connectSigner failed:', err);
+        }
+      })();
+    }
+  }, [publicKey, connectSigner]);
   
   const handleUpdateTeam = async () => {
     if (!isReady) {
@@ -162,8 +175,14 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
         )}
 
         {!isReady && (
-          <div className="mt-4 p-3 bg-yellow-700/60 text-yellow-200 border border-yellow-600 rounded-md text-sm">
-            <p><strong>Connecting:</strong> Waiting for Nostr connection...</p>
+          <div className="mt-4 p-3 bg-yellow-700/60 text-yellow-200 border border-yellow-600 rounded-md text-sm space-y-2">
+            <p><strong>Signer Required</strong> – connect Amber to edit team.</p>
+            <button
+              onClick={connectSigner}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+            >
+              Connect Signer
+            </button>
           </div>
         )}
 

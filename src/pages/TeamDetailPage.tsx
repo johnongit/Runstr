@@ -324,9 +324,20 @@ const TeamDetailPage: React.FC = () => {
     }
 
     if (!currentUserPubkey) {
-      console.error('Join team failed: User not authenticated');
-      toast.error('User not authenticated. Please connect your Nostr account first.');
-      return;
+      console.log('handleJoinTeam: No pubkey yet – attempting to connect signer via Amber');
+      try {
+        const result = await connectSigner();
+        if (result && result.pubkey) {
+          currentUserPubkey = result.pubkey; // use the returned pubkey for this invocation
+        } else {
+          toast.error('Signer connection cancelled or failed.');
+          return;
+        }
+      } catch (err) {
+        console.error('handleJoinTeam: connectSigner threw', err);
+        toast.error('Unable to connect signer.');
+        return;
+      }
     }
 
     if (!teamAIdentifierForChat) {
