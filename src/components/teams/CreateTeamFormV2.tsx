@@ -50,30 +50,9 @@ const CreateTeamFormV2: React.FC = () => {
       return;
     }
 
-    // Ensure wallet connected and process captain subscription payment (10k sats)
-    if (!wallet) {
-      setError('Please connect a wallet in Settings first.');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      if (wallet.kind === 'nwc') {
-        const invoice = await getInvoiceFromLnAddress('runstr@geyser.fund', 10000);
-        await wallet.payInvoice(invoice);
-      } else {
-        await payLnurl({
-          lightning: 'runstr@geyser.fund',
-          amount: 10000,
-          wallet,
-          comment: 'Runstr captain subscription',
-        });
-      }
-    } catch (e: any) {
-      setError(e?.message || 'Payment failed');
-      setIsLoading(false);
-      return;
-    }
+    // Payment system disabled for teams feature
+    // TODO: Re-enable payment system if needed in the future
+    console.log('Team creation: Payment system disabled, proceeding without payment');
 
     const teamData: TeamData = {
       name: teamName,
@@ -97,12 +76,7 @@ const CreateTeamFormV2: React.FC = () => {
         const newTeamUUID = getTeamUUID(result);
         const captainPk = getTeamCaptain(result);
         if (newTeamUUID && captainPk) {
-          // Publish subscription receipt event
-          const aIdentifier = `33404:${captainPk}:${newTeamUUID}`;
-          const receiptTemplate = prepareTeamSubscriptionReceiptEvent(aIdentifier, captainPk, 10000);
-          if (receiptTemplate) {
-            await createAndPublishEvent(receiptTemplate, null);
-          }
+          // Subscription receipt disabled - no payment required
           navigate(`/teams/${captainPk}/${newTeamUUID}`);
         } else {
           console.error('V2 Form: Failed to get UUID/captain from published event.');

@@ -18,37 +18,54 @@ interface LeaderboardTabProps {
 }
 
 const LeaderboardTab: React.FC<LeaderboardTabProps> = ({ workoutEvents }) => {
-  const { rankedMembers } = useTeamActivity(workoutEvents);
-  const { profiles } = useProfiles(rankedMembers.map(m => m.pubkey));
+  try {
+    const { rankedMembers } = useTeamActivity(workoutEvents || []);
+    const pubkeys = rankedMembers?.map(m => m.pubkey) || [];
+    const { profiles } = useProfiles(pubkeys);
 
-  if (rankedMembers.length === 0) {
-    return <p className="text-gray-400">No activity recorded for this month's leaderboard yet.</p>;
-  }
+    if (!rankedMembers || rankedMembers.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-gray-400">No activity recorded for this month's leaderboard yet.</p>
+          <p className="text-gray-500 text-sm mt-2">Team members' workouts will appear here once they start logging runs.</p>
+        </div>
+      );
+    }
 
-  return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-12 gap-2 p-2 font-bold text-gray-400 text-sm">
-        <div className="col-span-1">#</div>
-        <div className="col-span-6">Member</div>
-        <div className="col-span-3 text-right">Distance</div>
-        <div className="col-span-2 text-right">Runs</div>
-      </div>
-      {rankedMembers.map((member, index) => {
-        const profile = profiles[member.pubkey];
-        return (
-          <div key={member.pubkey} className="grid grid-cols-12 gap-2 items-center bg-gray-800 p-2 rounded-md">
-            <div className="col-span-1 text-lg font-bold">{index + 1}</div>
-            <div className="col-span-6 flex items-center space-x-3">
-              <Avatar src={profile?.image} name={profile?.displayName || profile?.name} />
-              <DisplayName pubkey={member.pubkey} profile={profile} />
+    return (
+      <div className="space-y-3">
+        <h3 className="text-xl font-semibold text-gray-100 mb-4">Monthly Leaderboard</h3>
+        <div className="grid grid-cols-12 gap-3 p-3 font-bold text-gray-400 text-sm border-b border-gray-700">
+          <div className="col-span-1">#</div>
+          <div className="col-span-6">Member</div>
+          <div className="col-span-3 text-right">Distance</div>
+          <div className="col-span-2 text-right">Runs</div>
+        </div>
+        {rankedMembers.map((member, index) => {
+          const profile = profiles?.[member.pubkey];
+          return (
+            <div key={member.pubkey} className="grid grid-cols-12 gap-3 items-center bg-gray-800 p-3 rounded-lg hover:bg-gray-750 transition-colors">
+              <div className="col-span-1 text-lg font-bold text-blue-400">{index + 1}</div>
+              <div className="col-span-6 flex items-center space-x-3">
+                <Avatar src={profile?.image} name={profile?.displayName || profile?.name} />
+                <DisplayName pubkey={member.pubkey} />
+              </div>
+              <div className="col-span-3 text-right font-semibold text-green-400">{member.totalDistance.toFixed(2)} km</div>
+              <div className="col-span-2 text-right text-gray-300">{member.runCount}</div>
             </div>
-            <div className="col-span-3 text-right font-semibold">{member.totalDistance.toFixed(2)} km</div>
-            <div className="col-span-2 text-right">{member.runCount}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
+          );
+        })}
+      </div>
+    );
+  } catch (error) {
+    console.error('Error rendering leaderboard:', error);
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-400">Error loading leaderboard</p>
+        <p className="text-gray-500 text-sm mt-2">Please try refreshing the page</p>
+      </div>
+    );
+  }
 };
 
 export default LeaderboardTab; 
