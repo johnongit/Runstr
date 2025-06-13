@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState, useContext } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
-import { NostrProvider } from './contexts/NostrProvider';
+import { NostrProvider } from './contexts/NostrContext.jsx';
 import { AuthProvider } from './components/AuthProvider';
 import { AudioPlayerProvider } from './contexts/AudioPlayerProvider';
 import { RunTrackerProvider } from './contexts/RunTrackerContext';

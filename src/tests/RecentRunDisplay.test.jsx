@@ -41,7 +41,8 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 // NostrContext mock values
 const nostrContextMock = {
   publicKey: 'test-public-key',
-  isNostrReady: true,
+  ndkReady: true,
+  isInitialized: true,
   requestNostrPermissions: vi.fn().mockResolvedValue(true),
   defaultZapAmount: 1000,
   updateDefaultZapAmount: vi.fn()

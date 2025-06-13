@@ -64,7 +64,7 @@ const TeamDetailPage: React.FC = () => {
   const { captainPubkey, teamUUID } = useParams<TeamDetailParams>();
   const location = useLocation();
   const seededEvent = (location.state as any)?.teamEvent ?? null;
-  const { ndk, ndkReady, publicKey: currentUserPubkey } = useNostr();
+  const { ndk, ndkReady, publicKey: currentUserPubkey, canReadData, connectSigner } = useNostr();
   const { wallet } = useAuth();
   const navigate = useNavigate();
 
@@ -106,7 +106,8 @@ const TeamDetailPage: React.FC = () => {
   const [showManageTeamModal, setShowManageTeamModal] = useState<boolean>(false);
 
   const loadTeamDetails = useCallback(async (forceRefetch = false) => {
-    if (!captainPubkey || !teamUUID || !ndkReady || !ndk) return;
+    // Option A: Use canReadData for data fetching operations
+    if (!captainPubkey || !teamUUID || !canReadData || !ndk) return;
     if (!forceRefetch) setIsLoading(true);
     setError(null);
     try {
@@ -130,13 +131,14 @@ const TeamDetailPage: React.FC = () => {
     } finally {
       if (!forceRefetch) setIsLoading(false);
     }
-  }, [captainPubkey, teamUUID, ndk, ndkReady]);
+  }, [captainPubkey, teamUUID, ndk, canReadData]);
 
   // Fetch workouts for current calendar month when Leaderboard tab is active
   useEffect(() => {
     const fetchMonthly = async () => {
       if (activeTab !== 'leaderboard') return;
-      if (!ndk || !ndkReady || !captainPubkey || !teamUUID) return;
+      // Option A: Use canReadData for data fetching operations
+      if (!ndk || !canReadData || !captainPubkey || !teamUUID) return;
       const now = new Date();
       const since = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000;
       setIsLoadingMonthlyWorkouts(true);
@@ -150,13 +152,13 @@ const TeamDetailPage: React.FC = () => {
       }
     };
     fetchMonthly();
-  }, [activeTab, ndk, ndkReady, captainPubkey, teamUUID]);
+  }, [activeTab, ndk, canReadData, captainPubkey, teamUUID]);
 
   useEffect(() => {
-    if (captainPubkey && teamUUID && ndkReady && ndk) {
+    if (captainPubkey && teamUUID && canReadData && ndk) {
       loadTeamDetails();
     }
-  }, [captainPubkey, teamUUID, ndkReady, ndk, loadTeamDetails]);
+  }, [captainPubkey, teamUUID, canReadData, ndk, loadTeamDetails]);
 
   // Effect for Chat Subscription
   useEffect(() => {
@@ -448,7 +450,7 @@ const TeamDetailPage: React.FC = () => {
     return <div className="p-4 text-white text-center">Loading team details...</div>;
   }
 
-  if (!ndkReady && !isLoading && !team) {
+  if (!canReadData && !isLoading && !team) {
       return <div className="p-4 text-white text-center">Connecting to Nostr... <br/> If this persists, please check your relay connections.</div>;
   }
 

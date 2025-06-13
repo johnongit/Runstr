@@ -134,6 +134,14 @@ export const NostrContext = createContext({
   ndkError: null,
   ndk: ndk, // Provide the singleton NDK instance
   connectSigner: () => Promise.resolve({ pubkey: null, error: 'Connect signer not implemented via context directly' }), // Placeholder
+  // New properties for Option A implementation
+  canReadData: false, // True when NDK is connected (regardless of signer)
+  needsSigner: false, // True when an operation requires signer but it's not available
+  // Compatibility properties from old NostrProvider
+  defaultZapAmount: 1000,
+  updateDefaultZapAmount: () => console.warn('NostrContext not yet initialized'),
+  isAmberAvailable: false,
+  requestNostrPermissions: () => Promise.resolve(false),
 });
 
 export const NostrProvider = ({ children }) => {
@@ -142,6 +150,9 @@ export const NostrProvider = ({ children }) => {
   const [signerAvailable, setSignerAvailable] = useState(false);
   const [currentRelayCount, setCurrentRelayCount] = useState(0);
   const [ndkError, setNdkError] = useState(null);
+  // New state for Option A implementation
+  const [canReadData, setCanReadData] = useState(false);
+  const [needsSigner, setNeedsSigner] = useState(false);
   // Lightning address cached from Nostr metadata (lud16/lud06)
   const [lightningAddress, setLightningAddress] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -149,12 +160,35 @@ export const NostrProvider = ({ children }) => {
     }
     return null;
   });
+  
+  // Add missing properties for compatibility with old NostrProvider
+  const [defaultZapAmount, setDefaultZapAmount] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('defaultZapAmount');
+      return stored ? parseInt(stored, 10) : 1000; // Default to 1000 sats if not set
+    }
+    return 1000;
+  });
+  
+  // Check if Amber is available (for compatibility)
+  const [isAmberAvailable, setIsAmberAvailable] = useState(false);
+  
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      AmberAuth.isAmberInstalled().then(installed => {
+        setIsAmberAvailable(installed);
+      });
+    }
+  }, []);
 
   // Callback to update relay count and NDK readiness
   const updateNdkStatus = useCallback(() => {
     const connectedRelays = ndk.pool?.stats()?.connected ?? 0;
     setCurrentRelayCount(connectedRelays);
-    setNdkReady(connectedRelays > 0);
+    const isNdkReady = connectedRelays > 0;
+    setNdkReady(isNdkReady);
+    // Option A: canReadData is true when NDK is connected, regardless of signer
+    setCanReadData(isNdkReady);
     if (connectedRelays === 0 && !ndkError) {
       // If we were previously connected and now have 0 relays, set an error or warning
       // This avoids overwriting a more specific initialization error from ndkReadyPromise
@@ -297,6 +331,49 @@ export const NostrProvider = ({ children }) => {
     }
   }, []);
 
+  // Add missing functions for compatibility with old NostrProvider
+  const updateDefaultZapAmount = useCallback((amount) => {
+    const numAmount = parseInt(amount, 10);
+    if (!isNaN(numAmount) && numAmount > 0) {
+      setDefaultZapAmount(numAmount);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('defaultZapAmount', numAmount.toString());
+      }
+    }
+  }, []);
+
+  const requestNostrPermissions = useCallback(async () => {
+    // For Android, use Amber if available
+    if (Platform.OS === 'android' && isAmberAvailable) {
+      try {
+        const result = await AmberAuth.requestAuthentication();
+        // The actual public key will be set by the signer attachment process
+        return result;
+      } catch (error) {
+        console.error('Error requesting Amber authentication:', error);
+        return false;
+      }
+    } 
+    // For web or if Amber is not available, use window.nostr
+    else if (window.nostr) {
+      try {
+        // This will trigger the extension permission dialog
+        const pubkey = await window.nostr.getPublicKey();
+        setPublicKeyInternal(pubkey);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('permissionsGranted', 'true');
+        }
+        return true;
+      } catch (error) {
+        console.error('Error getting Nostr public key:', error);
+        return false;
+      }
+    } else {
+      console.warn('No authentication method available');
+      return false;
+    }
+  }, [isAmberAvailable]);
+
   const value = useMemo(() => ({
     publicKey,
     lightningAddress,
@@ -308,7 +385,15 @@ export const NostrProvider = ({ children }) => {
     ndkError,
     ndk, // The singleton NDK instance
     connectSigner,
-  }), [publicKey, lightningAddress, setPublicKey, ndkReady, signerAvailable, currentRelayCount, ndkError, connectSigner]);
+    // Option A: New properties for separated data/signer concerns
+    canReadData, // True when NDK is connected, regardless of signer
+    needsSigner, // True when an operation requires signer but it's not available
+    // Compatibility properties from old NostrProvider
+    defaultZapAmount,
+    updateDefaultZapAmount,
+    isAmberAvailable,
+    requestNostrPermissions,
+  }), [publicKey, lightningAddress, setPublicKey, ndkReady, signerAvailable, currentRelayCount, ndkError, connectSigner, canReadData, needsSigner, defaultZapAmount, updateDefaultZapAmount, isAmberAvailable, requestNostrPermissions]);
 
   return (
     <NostrContext.Provider value={value}>
