@@ -311,17 +311,32 @@ function convertNip96FileToTrack(file, serverUrl) {
 /**
  * Get files from traditional Blossom server (fallback method)
  */
-async function getFilesFromBlossomServer(serverUrl) {
+async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
   try {
     console.log('📋 Getting files from Blossom server (fallback):', serverUrl);
     
     // Try different possible endpoints
-    const endpoints = [
-      `${serverUrl}/list`,
-      `${serverUrl}/files`,
-      `${serverUrl}/api/list`,
-      `${serverUrl}/api/files`
-    ];
+    let endpoints = [];
+    
+    if (pubkey) {
+      console.log('🔑 Using pubkey for user-specific endpoints:', pubkey.substring(0, 8) + '...');
+      // User-specific endpoints (most likely to work for Blossom servers)
+      endpoints = [
+        `${serverUrl}/list/${pubkey}`,
+        `${serverUrl}/${pubkey}`,
+        `${serverUrl}/api/list/${pubkey}`,
+        `${serverUrl}/files/${pubkey}`
+      ];
+    } else {
+      console.log('⚠️ No pubkey provided, trying generic endpoints');
+      // Generic endpoints (fallback)
+      endpoints = [
+        `${serverUrl}/list`,
+        `${serverUrl}/files`,
+        `${serverUrl}/api/list`,
+        `${serverUrl}/api/files`
+      ];
+    }
     
     for (const endpoint of endpoints) {
       try {
@@ -438,7 +453,7 @@ function convertBlossomFileToTrack(file, serverUrl) {
 /**
  * Get tracks from Nostr relays using NIP-94 File Metadata events
  */
-async function getTracksFromNostr() {
+async function getTracksFromNostr(pubkey) {
   try {
     console.log('🔍 Searching for audio tracks via Nostr relays...');
     
@@ -515,7 +530,8 @@ async function getTracksFromNostr() {
           server: 'nostr',
           hash: tagMap.x || tagMap.ox,
           uploadedAt: new Date(event.created_at * 1000),
-          nostrEvent: event.id
+          nostrEvent: event.id,
+          pubkey: pubkey
         };
         
         tracks.push(track);
@@ -539,7 +555,7 @@ async function getTracksFromNostr() {
 /**
  * Main function to get all available tracks from all sources
  */
-export async function getAllTracks(servers = DEFAULT_SERVERS) {
+export async function getAllTracks(servers = DEFAULT_SERVERS, pubkey) {
   console.log('🎵 Starting comprehensive track search...');
   console.log('🔍 Searching servers:', servers);
   
@@ -548,7 +564,7 @@ export async function getAllTracks(servers = DEFAULT_SERVERS) {
   try {
     // First, try to get tracks from Nostr relays
     console.log('📡 Phase 1: Searching Nostr relays for NIP-94 events...');
-    const nostrTracks = await getTracksFromNostr();
+    const nostrTracks = await getTracksFromNostr(pubkey);
     allTracks.push(...nostrTracks);
     console.log(`✅ Phase 1 complete: ${nostrTracks.length} tracks from Nostr`);
     
@@ -566,7 +582,7 @@ export async function getAllTracks(servers = DEFAULT_SERVERS) {
           serverTracks = await getFilesFromNip96Server(server.url);
         } else {
           // Use traditional Blossom approach
-          serverTracks = await getFilesFromBlossomServer(server.url);
+          serverTracks = await getFilesFromBlossomServer(server.url, pubkey);
         }
         
         console.log(`✅ Server ${server.name}: ${serverTracks.length} tracks`);
@@ -604,7 +620,7 @@ export async function getAllTracks(servers = DEFAULT_SERVERS) {
 /**
  * Get tracks from a specific server
  */
-export async function getTracksFromServer(serverUrl) {
+export async function getTracksFromServer(serverUrl, pubkey) {
   console.log('🎵 Getting tracks from specific server:', serverUrl);
   
   // Find server configuration
@@ -620,7 +636,7 @@ export async function getTracksFromServer(serverUrl) {
     if (server.type === 'nip96') {
       tracks = await getFilesFromNip96Server(serverUrl);
     } else {
-      tracks = await getFilesFromBlossomServer(serverUrl);
+      tracks = await getFilesFromBlossomServer(serverUrl, pubkey);
     }
     
     // If no tracks found and we assumed blossom, try NIP-96

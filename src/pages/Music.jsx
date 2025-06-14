@@ -116,11 +116,13 @@ export function Music() {
         if (blossomEndpoint && blossomEndpoint !== '') {
           // Load tracks from specific server
           console.log('[Music] Loading tracks from specific server:', blossomEndpoint);
-          tracks = await getTracksFromServer(blossomEndpoint);
+          console.log('[Music] Using pubkey:', pubkey ? `${pubkey.substring(0, 8)}...` : 'none');
+          tracks = await getTracksFromServer(blossomEndpoint, pubkey);
         } else {
           // Load tracks from all default servers
           console.log('[Music] Loading tracks from all default servers');
-          tracks = await getAllTracks(DEFAULT_SERVERS);
+          console.log('[Music] Using pubkey:', pubkey ? `${pubkey.substring(0, 8)}...` : 'none');
+          tracks = await getAllTracks(DEFAULT_SERVERS, pubkey);
         }
         
         setBlossomTracks(tracks);
@@ -136,7 +138,7 @@ export function Music() {
     };
 
     loadBlossomTracks();
-  }, [blossomEndpoint]);
+  }, [blossomEndpoint, pubkey]);
 
   const handleSelectPlaylist = (playlistId) => {
     loadPlaylist(playlistId);
