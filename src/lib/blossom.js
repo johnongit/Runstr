@@ -63,20 +63,87 @@ const SUPPORTED_AUDIO_EXTENSIONS = [
 const NIP96_PAGE_LIMIT = 500;
 
 /**
- * Check if a file is an audio file based on MIME type and extension
+ * Create Blossom authorization header for authenticated requests (kind 24242)
+ */
+async function createBlossomAuth(action = 'list') {
+  try {
+    // Import NDK dynamically to avoid loading issues
+    const { default: NDK, NDKEvent } = await import('@nostr-dev-kit/ndk');
+    
+    // Get user's private key from localStorage
+    const storedKey = localStorage.getItem('nostr-key');
+    if (!storedKey) {
+      console.log('❌ No private key found for Blossom auth');
+      return null;
+    }
+
+    let privateKey;
+    try {
+      // Try to decode as nsec
+      const decoded = nip19.decode(storedKey);
+      if (decoded.type === 'nsec') {
+        privateKey = decoded.data;
+      } else {
+        privateKey = storedKey;
+      }
+    } catch {
+      // Assume it's already a hex private key
+      privateKey = storedKey;
+    }
+
+    // Create NDK instance
+    const ndk = new NDK();
+    
+    // Create Blossom authorization event (kind 24242)
+    const authEvent = new NDKEvent(ndk);
+    authEvent.kind = 24242;
+    authEvent.content = 'List Blobs';
+    authEvent.created_at = Math.floor(Date.now() / 1000);
+    
+    // Required tags for Blossom auth
+    authEvent.tags = [
+      ['t', action],
+      ['expiration', (Math.floor(Date.now() / 1000) + 3600).toString()]
+    ];
+
+    // Sign the event
+    await authEvent.sign(privateKey);
+    
+    // Create authorization header
+    const authHeader = `Nostr ${btoa(JSON.stringify(authEvent.rawEvent()))}`;
+    console.log('✅ Created Blossom authorization header (kind 24242)');
+    return authHeader;
+    
+  } catch (error) {
+    console.error('❌ Error creating Blossom auth:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if a file is an audio file based on MIME type and extension (liberal filtering)
  */
 function isAudioFile(mimeType, filename) {
   console.log('🎵 Checking if file is audio:', { mimeType, filename });
   
-  // Check MIME type
-  if (mimeType && SUPPORTED_AUDIO_TYPES.some(type => 
-    mimeType.toLowerCase().includes(type.toLowerCase())
-  )) {
+  // Accept any audio MIME type
+  if (mimeType && mimeType.toLowerCase().startsWith('audio/')) {
     console.log('✅ Audio detected by MIME type:', mimeType);
     return true;
   }
   
-  // Check file extension
+  // Accept application/octet-stream with audio extensions
+  if (mimeType === 'application/octet-stream' && filename) {
+    const hasAudioExt = SUPPORTED_AUDIO_EXTENSIONS.some(ext => 
+      filename.toLowerCase().endsWith(ext.toLowerCase())
+    );
+    if (hasAudioExt) {
+      console.log('✅ Audio detected: octet-stream with audio extension:', filename);
+      return true;
+    }
+  }
+  
+  // Accept by file extension only (for files without MIME type)
   if (filename && SUPPORTED_AUDIO_EXTENSIONS.some(ext => 
     filename.toLowerCase().endsWith(ext.toLowerCase())
   )) {
@@ -84,7 +151,8 @@ function isAudioFile(mimeType, filename) {
     return true;
   }
   
-  console.log('❌ Not detected as audio file');
+  // Log what we're rejecting for debugging
+  console.log('❌ Not detected as audio file:', { mimeType, filename });
   return false;
 }
 
@@ -175,6 +243,64 @@ async function createNip98Auth(url, method = 'GET', payload = null) {
     
   } catch (error) {
     console.error('❌ Error creating NIP-98 auth:', error);
+    return null;
+  }
+}
+
+/**
+ * Create Blossom authorization header for authenticated requests (kind 24242)
+ */
+async function createBlossomAuth(action = 'list') {
+  try {
+    // Import NDK dynamically to avoid loading issues
+    const { default: NDK, NDKEvent } = await import('@nostr-dev-kit/ndk');
+    
+    // Get user's private key from localStorage
+    const storedKey = localStorage.getItem('nostr-key');
+    if (!storedKey) {
+      console.log('❌ No private key found for Blossom auth');
+      return null;
+    }
+
+    let privateKey;
+    try {
+      // Try to decode as nsec
+      const decoded = nip19.decode(storedKey);
+      if (decoded.type === 'nsec') {
+        privateKey = decoded.data;
+      } else {
+        privateKey = storedKey;
+      }
+    } catch {
+      // Assume it's already a hex private key
+      privateKey = storedKey;
+    }
+
+    // Create NDK instance
+    const ndk = new NDK();
+    
+    // Create Blossom authorization event (kind 24242)
+    const authEvent = new NDKEvent(ndk);
+    authEvent.kind = 24242;
+    authEvent.content = 'List Blobs';
+    authEvent.created_at = Math.floor(Date.now() / 1000);
+    
+    // Required tags for Blossom auth
+    authEvent.tags = [
+      ['t', action],
+      ['expiration', (Math.floor(Date.now() / 1000) + 3600).toString()]
+    ];
+
+    // Sign the event
+    await authEvent.sign(privateKey);
+    
+    // Create authorization header
+    const authHeader = `Nostr ${btoa(JSON.stringify(authEvent.rawEvent()))}`;
+    console.log('✅ Created Blossom authorization header (kind 24242)');
+    return authHeader;
+    
+  } catch (error) {
+    console.error('❌ Error creating Blossom auth:', error);
     return null;
   }
 }
@@ -368,55 +494,60 @@ function convertNip96FileToTrack(file, serverUrl) {
 }
 
 /**
- * Get files from traditional Blossom server (fallback method)
+ * Get files from pure Blossom server using correct protocol
  */
 async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
   try {
-    console.log('📋 Getting files from Blossom server (fallback):', serverUrl);
+    console.log('🌸 Getting files from pure Blossom server:', serverUrl);
     
-    // Try different possible endpoints
+    if (!pubkey) {
+      console.log('⚠️ No pubkey provided for Blossom server');
+      return [];
+    }
+    
+    // Build Blossom-specific endpoints based on server patterns
     let endpoints = [];
     
-    if (pubkey) {
-      console.log('🔑 Using pubkey for user-specific endpoints:', pubkey.substring(0, 8) + '...');
-      // User-specific endpoints (most likely to work for Blossom servers)
+    // Handle blossom.band subdomain pattern
+    if (serverUrl.includes('blossom.band')) {
+      // Try both subdomain and main domain patterns
       endpoints = [
         `${serverUrl}/list/${pubkey}`,
-        `${serverUrl}/${pubkey}`,
+        `https://blossom.band/list/${pubkey}`,
+        `https://blossom.band/api/list/${pubkey}`
+      ];
+    } else {
+      // Standard Blossom server endpoints
+      endpoints = [
+        `${serverUrl}/list/${pubkey}`,
         `${serverUrl}/api/list/${pubkey}`,
         `${serverUrl}/files/${pubkey}`
       ];
-    } else {
-      console.log('⚠️ No pubkey provided, trying generic endpoints');
-      // Generic endpoints (fallback)
-      endpoints = [
-        `${serverUrl}/list`,
-        `${serverUrl}/files`,
-        `${serverUrl}/api/list`,
-        `${serverUrl}/api/files`
-      ];
     }
+    
+    console.log('🔍 Trying Blossom endpoints:', endpoints);
     
     for (const endpoint of endpoints) {
       try {
-        console.log('🔍 Trying endpoint:', endpoint);
+        console.log('🌸 Trying Blossom endpoint:', endpoint);
         
-        // Try without auth first
+        // Try without auth first (Blossom spec says auth is optional for listing)
         let headers = { 'Accept': 'application/json' };
         let response = await fetch(endpoint, { method: 'GET', headers });
-        // If unauthorized, retry with auth
+        
+        // If unauthorized, retry with Blossom auth (kind 24242)
         if (response.status === 401) {
-          const authHeader = await createNip98Auth(endpoint, 'GET');
+          console.log('🔑 Endpoint requires auth, trying Blossom auth (kind 24242)');
+          const authHeader = await createBlossomAuth('list');
           if (authHeader) {
             headers = { ...headers, 'Authorization': authHeader };
-            console.log('🔑 Retrying Blossom endpoint with auth');
             response = await fetch(endpoint, { method: 'GET', headers });
           }
         }
         
         if (response.ok) {
           const data = await response.json();
-          console.log('📋 Blossom response data:', data);
+          console.log('🌸 Blossom response data:', data);
           
           // Try to parse the response
           let files = [];
@@ -460,30 +591,39 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
 }
 
 /**
- * Convert Blossom file object to track format
+ * Convert Blossom blob descriptor to track format
  */
 function convertBlossomFileToTrack(file, serverUrl) {
   try {
-    console.log('🎵 Converting Blossom file to track:', file);
+    console.log('🌸 Converting Blossom blob descriptor to track:', file);
     
-    // Handle different possible field names
-    const filename = file.name || file.filename || file.title || file.id || 'unknown';
-    const mimeType = file.type || file.mimeType || file.mime || file.contentType;
-    const size = file.size || file.length || file.bytes;
-    const hash = file.sha256 || file.hash || file.id;
-    const url = file.url || `${serverUrl}/${hash}`;
+    // Blossom blob descriptor format:
+    // { url, sha256, size, type, uploaded }
+    const url = file.url;
+    const hash = file.sha256;
+    const mimeType = file.type;
+    const size = file.size;
+    const uploaded = file.uploaded || file.created;
+    
+    if (!url || !hash) {
+      console.log('❌ Invalid blob descriptor - missing url or sha256');
+      return null;
+    }
+    
+    // Extract filename from URL for title
+    const filename = url.split('/').pop() || hash;
     
     // Check if this is an audio file
     if (!isAudioFile(mimeType, filename)) {
-      console.log('❌ File is not an audio file');
+      console.log('❌ Blob is not an audio file');
       return null;
     }
     
     // Create track object compatible with AudioPlayerProvider
     const track = {
-      id: hash || url,
-      title: filename.replace(/\.[^/.]+$/, ''), // Remove extension
-      artist: file.artist || file.creator || 'Unknown Artist',
+      id: hash,
+      title: filename.replace(/\.[^/.]+$/, ''), // Remove extension for title
+      artist: 'Unknown Artist', // Blossom doesn't store artist info in blob descriptors
       url: url, // Keep for compatibility
       mediaUrl: url, // Required by AudioPlayerProvider
       source: 'blossom', // Required by AudioPlayerProvider to identify as Blossom track
@@ -492,14 +632,14 @@ function convertBlossomFileToTrack(file, serverUrl) {
       mimeType: mimeType,
       server: serverUrl,
       hash: hash,
-      uploadedAt: file.created_at ? new Date(file.created_at * 1000) : null
+      uploadedAt: uploaded ? new Date(uploaded * 1000) : null
     };
     
-    console.log('✅ Created track:', track);
+    console.log('✅ Created track from Blossom blob:', track);
     return track;
     
   } catch (error) {
-    console.error('❌ Error converting Blossom file to track:', error);
+    console.error('❌ Error converting Blossom blob to track:', error);
     return null;
   }
 }

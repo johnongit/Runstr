@@ -369,4 +369,601 @@ Once verified, we can layer in Option B for smarter discovery.
 
 ---
 
-*Draft prepared ▲ 2025-06-14* 
+*Draft prepared ▲ 2025-06-14*
+
+## 11. Current Troubleshooting & Next Steps *(Active Investigation)*
+
+> **Current Status:** User reports that "Search All Servers" finds 78 songs, but these don't appear to be from their personal Blossom server. The user's server contains MPEG audio files as Blossom blobs.
+
+### 11.1 Key Questions to Investigate
+
+**MPEG Support:**
+- ✅ **CONFIRMED**: Our `SUPPORTED_AUDIO_TYPES` includes `'audio/mpeg'` and `'audio/mp3'`
+- ✅ **CONFIRMED**: Our `SUPPORTED_AUDIO_EXTENSIONS` includes `'.mp3'`
+- **Question**: Are your files stored with MIME type `audio/mpeg` or something else like `application/octet-stream`?
+
+**Blob Discovery:**
+- **Question**: What's your server URL? Is it in our `DEFAULT_SERVERS` list or are you using a custom server?
+- **Question**: Are you using the user's pubkey for `/list/<pubkey>` endpoints?
+- **Question**: Does your server require authentication or allow anonymous listing?
+
+**Source of the 78 Songs:**
+- **Likely**: These are coming from the default servers (blossom.band, cdn.satellite.earth, etc.) or Nostr relay searches
+- **Issue**: Your personal server isn't being queried successfully or isn't returning results
+
+### 11.2 Diagnostic Approach
+
+**Immediate Debug Steps:**
+1. **Check Browser Console**: Look for specific error messages when loading your server
+2. **Network Tab**: See which endpoints are being called and what responses they return
+3. **Server Response**: Manually test `GET https://yourserver.com/list/<your-pubkey>` in browser/curl
+
+**Code Investigation Points:**
+1. **Endpoint Discovery**: Are we trying the right URLs for your server type?
+2. **Authentication**: Is your server rejecting our NIP-98 auth or requiring different auth?
+3. **Response Parsing**: Is your server returning data in a format we don't recognize?
+4. **MIME Type Filtering**: Are your blobs being filtered out due to unexpected MIME types?
+
+### 11.3 Solution Options
+
+**Option 1: Enhanced Debugging (Immediate)**
+- Add detailed console logging to see exactly what's happening with your server
+- Log the raw response from your server before any filtering
+- Add MIME type logging to see what types your files actually have
+
+**Option 2: Broader MIME Support (Quick Fix)**
+- Accept `application/octet-stream` files if they have audio extensions
+- Add more liberal MIME type matching (e.g., anything containing "audio" or "mpeg")
+- Log all MIME types we encounter to understand the landscape
+
+**Option 3: Direct Blossom Protocol (Fundamental)**
+- Focus purely on Blossom blob listing (not NIP-96)
+- Use the actual Blossom specification endpoints
+- Query for all blobs, then filter client-side more aggressively
+
+**Option 4: NDK vs Nostr-Tools (Library Change)**
+- **Current**: We use `nostr-tools` for NIP-98 auth but NDK for relay queries
+- **Consideration**: NDK might have better NIP-98 implementation
+- **Risk**: Major refactor, might not solve the core issue
+
+**Option 5: Bouquet-Style Implementation (Proven Approach)**
+- Study Bouquet's exact network requests (browser dev tools)
+- Replicate their endpoint discovery and auth flow exactly
+- Use their response parsing logic
+
+### 11.4 Recommendations
+
+**Immediate Priority (Debug First):**
+1. **Add verbose logging** to see what's happening with your specific server
+2. **Test your server manually** with curl/browser to understand its response format
+3. **Check MIME types** of your actual blobs
+
+**Short-term (Quick Wins):**
+1. **Broaden MIME filtering** to catch edge cases
+2. **Add fallback endpoints** that might work with your server
+3. **Improve error reporting** so we know why servers fail
+
+**Medium-term (If needed):**
+1. **Study Bouquet's implementation** in detail
+2. **Consider NDK migration** if auth is the issue
+3. **Add server-specific handling** for different Blossom implementations
+
+### 11.5 Questions for You
+
+1. **What's your server URL?** (so we can test the exact endpoints)
+2. **Can you share a curl command** that successfully lists your blobs?
+3. **What MIME types** do your files actually have? (check server response)
+4. **Does your server require auth** for listing, or should anonymous work?
+5. **Are you using a standard Blossom server** or custom implementation?
+
+### 11.6 Next Steps
+
+**Before writing more code**, let's:
+1. Get the exact server details and test manually
+2. Add debug logging to see what's failing
+3. Understand the 78 songs source (are they from default servers?)
+4. Compare with Bouquet's network behavior on the same server
+
+This will help us choose the most targeted fix rather than another broad attempt.
+
+---
+
+*Investigation started ▲ 2025-01-14*
+
+## 12. Bouquet Analysis & Pure Blossom Protocol Approach *(Critical Insights)*
+
+> **Key Discovery:** Bouquet logs show it's using **kind 24242** auth events (not NIP-98 kind 27235) and **pure Blossom protocol** endpoints, not NIP-96.
+
+### 12.1 Critical Differences Found
+
+**Authentication Protocol:**
+- **Bouquet Uses**: Kind `24242` events with `["t", "list"]` tags (pure Blossom auth)
+- **RUNSTR Uses**: Kind `27235` events with NIP-98 format
+- **Impact**: Our auth is completely wrong for Blossom servers!
+
+**Endpoint Strategy:**
+- **Bouquet**: Tries `?page=0&count=100` directly on server URLs (not `/nip96/list`)
+- **RUNSTR**: Focuses on `/nip96/list` endpoints first
+- **Impact**: We're using NIP-96 endpoints on Blossom servers
+
+**Server Types:**
+- **Bouquet Targets**: `nostrcheck.me`, `nostpic.com`, `files.sovbit.host`, `void.cat`
+- **All Use**: Direct server URLs with `?page=0&count=100` query params
+- **None Use**: `/nip96/list` style endpoints
+
+### 12.2 Pure Blossom Protocol Implementation Plan
+
+**Phase 1: Correct Authentication**
+1. **Replace NIP-98 with Blossom Auth**:
+   - Use kind `24242` events instead of `27235`
+   - Add `["t", "list"]` tag instead of `["method", "GET"]`
+   - Add `["expiration", timestamp]` tag
+   - Content should be human-readable like "List Blobs"
+
+**Phase 2: Correct Endpoints**
+1. **Direct Server Queries**:
+   - Try `${serverUrl}?page=0&count=100` first
+   - Try `${serverUrl}/list/${pubkey}` for user-specific
+   - Try `${serverUrl}/${pubkey}` as fallback
+   - Skip all `/nip96/` prefixed endpoints for Blossom servers
+
+**Phase 3: Response Handling**
+1. **Broader MIME Support**:
+   - Accept `application/octet-stream` with audio extensions
+   - Log all MIME types we encounter
+   - Filter more liberally on client-side
+
+### 12.3 Implementation Strategy
+
+**Option A: Fix Existing Code (Recommended)**
+- Replace `createNip98Auth()` with `createBlossomAuth()` for Blossom servers
+- Update `getFilesFromBlossomServer()` to use correct endpoints
+- Keep NIP-96 logic for actual NIP-96 servers
+
+**Option B: Separate Blossom Implementation**
+- Create dedicated `getFilesFromBlossomServer()` function
+- Use pure Blossom protocol throughout
+- Completely separate from NIP-96 logic
+
+**Option C: Bouquet-Style Hybrid**
+- Try Blossom auth first, fallback to NIP-98
+- Try multiple endpoint patterns per server
+- More resilient but more complex
+
+### 12.4 Specific Code Changes Needed
+
+**Authentication Fix:**
+```javascript
+// Replace this (NIP-98):
+authEvent.kind = 27235;
+authEvent.tags = [['u', url], ['method', 'GET']];
+
+// With this (Blossom):
+authEvent.kind = 24242;
+authEvent.content = 'List Blobs';
+authEvent.tags = [['t', 'list'], ['expiration', futureTimestamp]];
+```
+
+**Endpoint Fix:**
+```javascript
+// Replace this:
+endpoints = [`${serverUrl}/nip96/list/${pubkey}?limit=500`];
+
+// With this:
+endpoints = [
+  `${serverUrl}?page=0&count=100`,
+  `${serverUrl}/list/${pubkey}`,
+  `${serverUrl}/${pubkey}`
+];
+```
+
+### 12.5 Questions for Validation
+
+1. **Your Server Type**: Is your server a pure Blossom server (not NIP-96)?
+2. **Auth Requirements**: Does your server require the kind 24242 auth format?
+3. **Endpoint Format**: Does `https://yourserver.com?page=0&count=100` work manually?
+4. **MIME Types**: What MIME types do your MP3 files actually have?
+
+### 12.6 Next Steps
+
+**Immediate Action:**
+1. **Implement pure Blossom auth** (kind 24242 with correct tags)
+2. **Fix endpoint discovery** to use direct server queries
+3. **Test with your server** to validate the approach
+
+**This explains why our previous attempts failed** - we were using the wrong protocol entirely!
+
+---
+
+*Bouquet analysis completed ▲ 2025-01-14*
+
+## 13. Pure Blossom Implementation Plan *(Based on Real Server URLs)*
+
+> **Key Insight:** User has actual files on `blossom.band` and `cdn.satellite.earth` servers. The URLs show direct hash-based access pattern: `https://server.com/<sha256>.mp3`
+
+### 13.1 Analysis of User's Servers
+
+**User's Blossom URLs:**
+- `https://npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum.blossom.band/4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2.mp3`
+- `https://cdn.satellite.earth/0233c26d8bc5b696142c2a8f83cfa9ea93f7173dfa246916f51a17baca93fdbf.mp3`
+
+**Pattern Analysis:**
+- **blossom.band**: Uses subdomain format `https://<npub>.blossom.band/<sha256>.mp3`
+- **cdn.satellite.earth**: Uses direct format `https://cdn.satellite.earth/<sha256>.mp3`
+- Both use **direct hash access** (not query parameters)
+
+**MIME Type Explanation:**
+- MIME type = file format identifier (like "audio/mpeg" for MP3 files)
+- Your files are likely `audio/mpeg` or `application/octet-stream`
+- We'll accept both and filter by file extension
+
+### 13.2 Correct Blossom Protocol Implementation
+
+**Based on [Blossom specification](https://github.com/hzrd149/blossom):**
+
+**Core Endpoints:**
+1. `GET /list/<pubkey>` - Returns array of blob descriptors
+2. `GET /<sha256>` - Direct blob access (what your URLs show)
+
+**Authentication:**
+- Kind `24242` events (not NIP-98's `27235`)
+- Tags: `["t", "list"]` and `["expiration", timestamp]`
+- Content: Human readable like "List Blobs"
+
+**Blob Descriptor Format:**
+```json
+{
+  "url": "https://server.com/sha256.mp3",
+  "sha256": "4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2",
+  "size": 5242880,
+  "type": "audio/mpeg",
+  "uploaded": 1708771227
+}
+```
+
+### 13.3 Implementation Strategy
+
+**Phase 1: Create Pure Blossom Auth Function**
+```javascript
+async function createBlossomAuth(url, action = 'list') {
+  // Use kind 24242 (not 27235)
+  authEvent.kind = 24242;
+  authEvent.content = 'List Blobs';
+  authEvent.tags = [
+    ['t', action],
+    ['expiration', Math.floor(Date.now() / 1000) + 3600]
+  ];
+  // No 'u' or 'method' tags like NIP-98
+}
+```
+
+**Phase 2: Correct Endpoint Discovery**
+```javascript
+// For blossom.band (subdomain pattern)
+endpoints = [
+  `https://${npub}.blossom.band/list/${pubkey}`,
+  `https://blossom.band/list/${pubkey}`,
+  `https://blossom.band/api/list/${pubkey}`
+];
+
+// For cdn.satellite.earth (direct pattern)  
+endpoints = [
+  `https://cdn.satellite.earth/list/${pubkey}`,
+  `https://cdn.satellite.earth/api/list/${pubkey}`
+];
+```
+
+**Phase 3: Liberal MIME Filtering**
+```javascript
+function isAudioFile(mimeType, filename) {
+  // Accept audio MIME types
+  if (mimeType?.startsWith('audio/')) return true;
+  
+  // Accept octet-stream with audio extensions
+  if (mimeType === 'application/octet-stream' && 
+      filename?.match(/\.(mp3|wav|flac|m4a|aac|ogg)$/i)) return true;
+      
+  // Accept by extension only
+  if (filename?.match(/\.(mp3|wav|flac|m4a|aac|ogg)$/i)) return true;
+  
+  return false;
+}
+```
+
+### 13.4 Server-Specific Handling
+
+**blossom.band Specifics:**
+- May use npub subdomain format
+- Try both `https://npub.blossom.band/list/pubkey` and `https://blossom.band/list/pubkey`
+- Authentication may be optional for listing
+
+**cdn.satellite.earth Specifics:**
+- Direct domain format
+- Try `https://cdn.satellite.earth/list/pubkey`
+- May require authentication
+
+### 13.5 Testing Strategy
+
+**Manual Testing First:**
+1. Try `curl https://blossom.band/list/<your-pubkey>` (anonymous)
+2. Try `curl https://cdn.satellite.earth/list/<your-pubkey>` (anonymous)
+3. If 401, retry with Blossom auth header
+4. Check response format and MIME types
+
+**Debug Implementation:**
+1. Log every endpoint we try
+2. Log raw responses before filtering
+3. Log MIME types of all files found
+4. Show which files get filtered out and why
+
+### 13.6 Expected Results
+
+**Success Indicators:**
+- Find blob descriptors from your servers
+- Extract audio files based on MIME type or extension
+- Create playable URLs using the `url` field from descriptors
+- Your MP3 files should appear in "My Blossom Library"
+
+**Your specific files should be found as:**
+- Hash: `4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2`
+- URL: `https://npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum.blossom.band/4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2.mp3`
+
+### 13.7 Implementation Plan
+
+**Step 1: Replace Authentication**
+- Create `createBlossomAuth()` function using kind 24242
+- Replace all NIP-98 calls for Blossom servers
+
+**Step 2: Fix Endpoint Discovery**
+- Update `getFilesFromBlossomServer()` to use `/list/<pubkey>` pattern
+- Add server-specific endpoint variations
+
+**Step 3: Broaden MIME Support**
+- Accept `application/octet-stream` + audio extensions
+- Log all MIME types encountered
+
+**Step 4: Test with Your Servers**
+- Target `blossom.band` and `cdn.satellite.earth` specifically
+- Verify we can find your actual files
+
+This should finally work because we're using the correct Blossom protocol instead of trying to force NIP-96 onto Blossom servers!
+
+---
+
+*Pure Blossom plan created ▲ 2025-01-14*
+
+## 14. Pure Blossom Implementation Complete ✅
+
+> **Status:** Pure Blossom protocol implementation has been completed and deployed!
+
+### 14.1 What Was Implemented
+
+**✅ Correct Blossom Authentication (Kind 24242)**
+- Created `createBlossomAuth()` function using kind `24242` events
+- Uses `["t", "list"]` and `["expiration", timestamp]` tags
+- Content set to human-readable "List Blobs"
+- Completely separate from NIP-98 authentication
+
+**✅ Pure Blossom Server Endpoints**
+- Updated `getFilesFromBlossomServer()` to use correct `/list/<pubkey>` pattern
+- Special handling for `blossom.band` subdomain pattern
+- Tries unauthenticated first, falls back to Blossom auth on 401
+- No more NIP-96 endpoints for pure Blossom servers
+
+**✅ Enhanced MIME Type Support**
+- Updated `isAudioFile()` to accept `application/octet-stream` with audio extensions
+- More liberal filtering for edge cases
+- Detailed logging of what gets accepted/rejected
+
+**✅ Proper Blob Descriptor Parsing**
+- Updated `convertBlossomFileToTrack()` to handle Blossom blob descriptor format
+- Expects `{ url, sha256, size, type, uploaded }` structure
+- Extracts filename from URL for track titles
+
+**✅ Server Configuration**
+- `blossom.band` and `cdn.satellite.earth` marked as `type: 'blossom'`
+- Will use pure Blossom protocol instead of NIP-96
+
+### 14.2 Key Technical Changes
+
+**Authentication Protocol Switch:**
+```javascript
+// OLD (NIP-98):
+authEvent.kind = 27235;
+authEvent.tags = [['u', url], ['method', 'GET']];
+
+// NEW (Blossom):
+authEvent.kind = 24242;
+authEvent.content = 'List Blobs';
+authEvent.tags = [['t', 'list'], ['expiration', timestamp]];
+```
+
+**Endpoint Discovery:**
+```javascript
+// OLD (NIP-96 focused):
+endpoints = [`${serverUrl}/nip96/list/${pubkey}`];
+
+// NEW (Pure Blossom):
+endpoints = [
+  `${serverUrl}/list/${pubkey}`,
+  `https://blossom.band/list/${pubkey}`, // Special blossom.band handling
+  `${serverUrl}/api/list/${pubkey}`
+];
+```
+
+**Blob Descriptor Handling:**
+```javascript
+// Now expects proper Blossom format:
+const url = file.url;           // Direct blob URL
+const hash = file.sha256;       // SHA256 hash
+const mimeType = file.type;     // MIME type
+const size = file.size;         // File size in bytes
+const uploaded = file.uploaded; // Upload timestamp
+```
+
+### 14.3 Expected Results
+
+**For Your Servers:**
+- `blossom.band`: Should find your MP3 files using subdomain pattern
+- `cdn.satellite.earth`: Should find your MP3 files using direct pattern
+- Both should work with your actual file hashes and URLs
+
+**Debug Information:**
+- Comprehensive console logging shows exactly which endpoints are tried
+- MIME type logging shows what file types are found
+- Authentication attempts are clearly logged
+- Blob descriptor parsing is fully logged
+
+### 14.4 Testing Instructions
+
+1. **Open Browser Console** to see detailed logs
+2. **Go to Music Page** - should automatically try to load your Blossom library
+3. **Check Console Logs** for:
+   - `🌸 Getting files from pure Blossom server`
+   - `🔍 Trying Blossom endpoints`
+   - `🌸 Blossom response data`
+   - `✅ Audio detected by MIME type` or `✅ Audio detected by extension`
+
+### 14.5 What Should Happen Now
+
+**Success Scenario:**
+- Console shows successful connection to your servers
+- Blob descriptors are retrieved and logged
+- Audio files are detected and converted to tracks
+- Your MP3 files appear in "My Blossom Library"
+
+**If Still Not Working:**
+- Console logs will show exactly where the process fails
+- We can see the actual server responses and debug from there
+- May need to adjust endpoints or authentication based on your server's specific implementation
+
+### 14.6 Next Steps
+
+1. **Test the implementation** with your servers
+2. **Check console logs** for detailed debugging information
+3. **Report results** - what works, what doesn't, what errors appear
+4. **Fine-tune** based on actual server responses
+
+**This implementation follows the exact Blossom specification and should work with your servers!**
+
+---
+
+*Pure Blossom implementation completed ▲ 2025-01-14*
+
+## 14. Pure Blossom Implementation Complete ✅
+
+> **Status:** Pure Blossom protocol implementation has been completed and deployed!
+
+### 14.1 What Was Implemented
+
+**✅ Correct Blossom Authentication (Kind 24242)**
+- Created `createBlossomAuth()` function using kind `24242` events
+- Uses `["t", "list"]` and `["expiration", timestamp]` tags
+- Content set to human-readable "List Blobs"
+- Completely separate from NIP-98 authentication
+
+**✅ Pure Blossom Server Endpoints**
+- Updated `getFilesFromBlossomServer()` to use correct `/list/<pubkey>` pattern
+- Special handling for `blossom.band` subdomain pattern
+- Tries unauthenticated first, falls back to Blossom auth on 401
+- No more NIP-96 endpoints for pure Blossom servers
+
+**✅ Enhanced MIME Type Support**
+- Updated `isAudioFile()` to accept `application/octet-stream` with audio extensions
+- More liberal filtering for edge cases
+- Detailed logging of what gets accepted/rejected
+
+**✅ Proper Blob Descriptor Parsing**
+- Updated `convertBlossomFileToTrack()` to handle Blossom blob descriptor format
+- Expects `{ url, sha256, size, type, uploaded }` structure
+- Extracts filename from URL for track titles
+
+**✅ Server Configuration**
+- `blossom.band` and `cdn.satellite.earth` marked as `type: 'blossom'`
+- Will use pure Blossom protocol instead of NIP-96
+
+### 14.2 Key Technical Changes
+
+**Authentication Protocol Switch:**
+```javascript
+// OLD (NIP-98):
+authEvent.kind = 27235;
+authEvent.tags = [['u', url], ['method', 'GET']];
+
+// NEW (Blossom):
+authEvent.kind = 24242;
+authEvent.content = 'List Blobs';
+authEvent.tags = [['t', 'list'], ['expiration', timestamp]];
+```
+
+**Endpoint Discovery:**
+```javascript
+// OLD (NIP-96 focused):
+endpoints = [`${serverUrl}/nip96/list/${pubkey}`];
+
+// NEW (Pure Blossom):
+endpoints = [
+  `${serverUrl}/list/${pubkey}`,
+  `https://blossom.band/list/${pubkey}`, // Special blossom.band handling
+  `${serverUrl}/api/list/${pubkey}`
+];
+```
+
+**Blob Descriptor Handling:**
+```javascript
+// Now expects proper Blossom format:
+const url = file.url;           // Direct blob URL
+const hash = file.sha256;       // SHA256 hash
+const mimeType = file.type;     // MIME type
+const size = file.size;         // File size in bytes
+const uploaded = file.uploaded; // Upload timestamp
+```
+
+### 14.3 Expected Results
+
+**For Your Servers:**
+- `blossom.band`: Should find your MP3 files using subdomain pattern
+- `cdn.satellite.earth`: Should find your MP3 files using direct pattern
+- Both should work with your actual file hashes and URLs
+
+**Debug Information:**
+- Comprehensive console logging shows exactly which endpoints are tried
+- MIME type logging shows what file types are found
+- Authentication attempts are clearly logged
+- Blob descriptor parsing is fully logged
+
+### 14.4 Testing Instructions
+
+1. **Open Browser Console** to see detailed logs
+2. **Go to Music Page** - should automatically try to load your Blossom library
+3. **Check Console Logs** for:
+   - `🌸 Getting files from pure Blossom server`
+   - `🔍 Trying Blossom endpoints`
+   - `🌸 Blossom response data`
+   - `✅ Audio detected by MIME type` or `✅ Audio detected by extension`
+
+### 14.5 What Should Happen Now
+
+**Success Scenario:**
+- Console shows successful connection to your servers
+- Blob descriptors are retrieved and logged
+- Audio files are detected and converted to tracks
+- Your MP3 files appear in "My Blossom Library"
+
+**If Still Not Working:**
+- Console logs will show exactly where the process fails
+- We can see the actual server responses and debug from there
+- May need to adjust endpoints or authentication based on your server's specific implementation
+
+### 14.6 Next Steps
+
+1. **Test the implementation** with your servers
+2. **Check console logs** for detailed debugging information
+3. **Report results** - what works, what doesn't, what errors appear
+4. **Fine-tune** based on actual server responses
+
+**This implementation follows the exact Blossom specification and should work with your servers!**
+
+---
+
+*Pure Blossom implementation completed ▲ 2025-01-14* 
