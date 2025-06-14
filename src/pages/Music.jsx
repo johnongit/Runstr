@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchLibraryPlaylists,
-  fetchLikedPlaylist,
   fetchTop40,
   fetchTrendingHipHop,
   fetchTrendingRock
@@ -21,7 +20,6 @@ export function Music() {
   const [trendingHipHopPlaylist, setTrendingHipHopPlaylist] = useState();
 
   const [libraryPlaylists, setLibraryPlaylists] = useState();
-  const [likedPlaylist, setLikedPlaylist] = useState();
 
   useEffect(() => {
     window.nostr
@@ -90,17 +88,8 @@ export function Music() {
         .catch((err) => {
           console.error('error fetching library playlists', err);
         });
-
-      fetchLikedPlaylist()
-        .then((playlist) => {
-          setLikedPlaylist(playlist);
-        })
-        .catch((err) => {
-          console.error('error fetching liked playlists', err);
-        });
     } else {
       setLibraryPlaylists();
-      setLikedPlaylist();
     }
   }, [pubkey]);
 
@@ -118,11 +107,10 @@ export function Music() {
 
   const userPlaylists = useMemo(() => {
     const playlists = [];
-    if (likedPlaylist) playlists.push(likedPlaylist);
     if (libraryPlaylists) playlists.push(...libraryPlaylists);
 
     return playlists;
-  }, [libraryPlaylists, likedPlaylist]);
+  }, [libraryPlaylists]);
 
   return (
     <div className="container text-center py-12">

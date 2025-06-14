@@ -13,8 +13,6 @@ import { PostRunWizardModal } from './PostRunWizardModal';
 import { useContext } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { NostrContext } from '../contexts/NostrContext';
-import { fetchRunDataFromWatch, mapWatchDataToRun } from '../services/BluetoothService';
-import { SyncConfirmationModal } from './modals/SyncConfirmationModal';
 import { publishRun } from '../utils/runPublisher';
 
 export const RunTracker = () => {
@@ -51,9 +49,6 @@ export const RunTracker = () => {
   const [isSavingWorkout, setIsSavingWorkout] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showPostRunWizard, setShowPostRunWizard] = useState(false);
-  const [syncedRun, setSyncedRun] = useState(null);
-  const [showSyncModal, setShowSyncModal] = useState(false);
-  const [isSyncingWatch, setIsSyncingWatch] = useState(false);
   const [autoPublishing, setAutoPublishing] = useState(false);
 
   // Initialize events when the component mounts
@@ -441,26 +436,6 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     }
   };
 
-  // NEW: Sync handler
-  const handleSyncFromWatch = async () => {
-    try {
-      setIsSyncingWatch(true);
-      const rawData = await fetchRunDataFromWatch();
-      const mappedRun = mapWatchDataToRun(rawData, distanceUnit);
-      setSyncedRun(mappedRun);
-      setShowSyncModal(true);
-    } catch (err) {
-      console.error('Failed to sync from watch:', err);
-      if (window.Android && window.Android.showToast) {
-        window.Android.showToast(err.message || 'Failed to sync from watch');
-      } else {
-        alert(err.message || 'Failed to sync from watch');
-      }
-    } finally {
-      setIsSyncingWatch(false);
-    }
-  };
-
   useEffect(() => {
     const attemptAutoPost = async () => {
       if (!autoPostToNostr || !recentRun || recentRun.nostrWorkoutEventId || autoPublishing) return;
@@ -480,12 +455,9 @@ ${additionalContent ? `\n${additionalContent}` : ''}
 
   return (
     <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">
-      {/* Title Banner with Sync Button */}
+      {/* Title Banner */}
       <div className="bg-gradient-to-r from-indigo-800 to-purple-800 p-4 mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">{getActivityText('header')}</h2>
-        <button onClick={handleSyncFromWatch} className="bg-white/20 hover:bg-white/30 text-white text-sm px-3 py-1 rounded-md">
-          {isSyncingWatch ? 'Syncing...' : 'Sync Watch'}
-        </button>
       </div>
 
       {/* Stats Grid */}
@@ -554,7 +526,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
           <div className="flex items-center mb-2">
             <div className="w-6 h-6 rounded-full bg-[#8B5CF6]/20 flex items-center justify-center mr-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
             <span className="text-sm font-medium text-gray-300">Split Times</span>
@@ -726,15 +698,6 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {showPostRunWizard && recentRun && (
         <PostRunWizardModal run={recentRun} onClose={() => setShowPostRunWizard(false)} />
       )}
-      
-      {/* Sync confirmation modal */}
-      <SyncConfirmationModal
-        isOpen={showSyncModal}
-        onClose={() => { setShowSyncModal(false); setSyncedRun(null); }}
-        run={syncedRun}
-        distanceUnit={distanceUnit}
-        publicKey={publicKey}
-      />
     </div>
   );
 };

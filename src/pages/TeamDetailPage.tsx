@@ -725,14 +725,10 @@ const TeamDetailPage: React.FC = () => {
           )}
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-sm mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm mb-6">
             <div className="flex flex-col">
               <span className="text-gray-500 text-xs uppercase tracking-wide">Captain</span>
               <DisplayName pubkey={actualCaptain} />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500 text-xs uppercase tracking-wide">Team ID</span>
-              <span className="font-mono text-gray-400 text-xs break-all">{confirmedTeamUUID || teamUUID}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-gray-500 text-xs uppercase tracking-wide">Visibility</span>

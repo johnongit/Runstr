@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { saveLeaderboardParticipation, getLeaderboardParticipation } from '../utils/leaderboardUtils';
 import { getRewardsSettings, saveRewardsSettings } from '../utils/rewardsSettings';
 import { Link } from 'react-router-dom';
+import { NostrContext } from '../contexts/NostrContext';
+import { fetchRunDataFromWatch, mapWatchDataToRun } from '../services/BluetoothService';
+import { SyncConfirmationModal } from '../components/modals/SyncConfirmationModal';
 
 const Settings = () => {
   const { 
@@ -26,6 +29,7 @@ const Settings = () => {
     // skipEndCountdown,
     // setSkipEndCountdown
   } = useSettings();
+  const { publicKey } = useContext(NostrContext);
   
   const [showPaceInMinutes, setShowPaceInMinutes] = useState(true);
   const [autoSaveRuns, setAutoSaveRuns] = useState(true);
@@ -34,6 +38,9 @@ const Settings = () => {
   const [leaderboardParticipation, setLeaderboardParticipation] = useState(true);
   const [autoClaimRewards, setAutoClaimRewards] = useState(false);
   const [rewardsEnabled, setRewardsEnabled] = useState(true);
+  const [isSyncingWatch, setIsSyncingWatch] = useState(false);
+  const [syncedRun, setSyncedRun] = useState(null);
+  const [showSyncModal, setShowSyncModal] = useState(false);
   
   // Load settings from localStorage
   useEffect(() => {
@@ -140,6 +147,25 @@ const Settings = () => {
       autoClaimRewards: value,
       showNotifications
     });
+  };
+
+  const handleSyncFromWatch = async () => {
+    try {
+      setIsSyncingWatch(true);
+      const rawData = await fetchRunDataFromWatch();
+      const mappedRun = mapWatchDataToRun(rawData, distanceUnit);
+      setSyncedRun(mappedRun);
+      setShowSyncModal(true);
+    } catch (err) {
+      console.error('Failed to sync from watch:', err);
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast(err.message || 'Failed to sync from watch');
+      } else {
+        alert(err.message || 'Failed to sync from watch');
+      }
+    } finally {
+      setIsSyncingWatch(false);
+    }
   };
 
   const handleCalorieIntensityChange = (preference) => {
@@ -400,6 +426,24 @@ const Settings = () => {
         <p>Runstr App Version 1.1.0</p>
         <p>A Bitcoin-powered running app</p>
       </div>
+
+      <div className="settings-section">
+        <h3>Integrations</h3>
+        <div className="setting-item">
+          <label>Bangle.js</label>
+          <button onClick={handleSyncFromWatch} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            {isSyncingWatch ? 'Syncing...' : 'Sync Watch'}
+          </button>
+        </div>
+      </div>
+
+      <SyncConfirmationModal
+        isOpen={showSyncModal}
+        onClose={() => { setShowSyncModal(false); setSyncedRun(null); }}
+        run={syncedRun}
+        distanceUnit={distanceUnit}
+        publicKey={publicKey}
+      />
     </div>
   );
 };
