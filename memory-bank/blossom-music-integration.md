@@ -308,4 +308,65 @@ Users can now:
 - Multiple server support
 - Advanced UI/UX improvements
 
-**The basic Blossom music integration is now fully functional and ready for user testing!** 
+**The basic Blossom music integration is now fully functional and ready for user testing!**
+
+## 10. Retrieval Issues & Proposed Solutions *(Draft – Needs Validation)*
+
+> ❗ **Context:**  RUNSTR's Phase 1 integration works for some servers (e.g. `blossom.band`) but _fails to show any tracks_ on several user-hosted Blossom instances.  The Bouquet and Blossom-Drive projects do succeed against the same servers, so we need to understand the gap and decide on a minimal, reliable fix.
+
+### 10.1 Quick Diagnosis
+
+| Area | RUNSTR (current) | Bouquet / Blossom-Drive | Potential Impact |
+|------|------------------|-------------------------|------------------|
+| **Discovery Endpoint** | Tries multiple hard-coded patterns:<br>`/list/<pubkey>`, `/nip96/list/<pubkey>`, etc. | Primarily uses **`/nip96/list/<pubkey>`** (Bouquet) or **`GET /list?pubkey=` query style** (Blossom-Drive). | If our first attempt fails and fallback logic has a bug, we may exit early and report zero tracks. |
+| **Auth Strategy** | Generates NIP-98 header once per request. | Same, _but_ retries with **Anonymous GET** if the server advertises `AllowUnauthenticated=true`. | Some self-hosted servers are configured as public; they will _reject_ signed requests that include headers they don't expect. |
+| **MIME Filter** | Accepts only exact `audio/*` or file-extension whitelist. | Accepts **any blob** first, then filters **client-side** by `type` _and_ `kind 1063` metadata. | RUNSTR might be discarding valid audio that uses uncommon MIME (e.g. `application/octet-stream`). |
+| **Pagination Handling** | Assumes single-page JSON array. | Iterates through `cursor` pagination until empty. | Large libraries may return only the first 100 rows. |
+| **Error Handling** | `try/catch` on each endpoint; logs error, then returns `[]` immediately. | Logs error **but continues** trying other endpoints. | A thrown 404 on `/list/<pubkey>` may stop our loop prematurely. |
+
+### 10.2 Hypotheses & Tests
+
+1. **Unexpected 404 short-circuit**  – Verify that `getFilesFromBlossomServer()` still attempts the _next_ endpoint after a non-200.  Use a mock server to confirm.
+2. **Signed vs Anonymous GET** – Attempt the same `GET /list/<pubkey>` _without_ the `Authorization:` header; compare responses.
+3. **MIME Edge Cases** – Fetch raw list, count blobs that are `application/octet-stream` but have `.mp3`/`.wav` filename.
+4. **Pagination** – Check for `?cursor=` or `?page=` parameters in Bouquet's network chatter when listing >100 files.
+
+### 10.3 Solution Paths (Pick one or blend)
+
+**Option A – Borrow Bouquet's Flow (Lowest Risk)**
+1. Call `/nip96/list/<pubkey>?limit=500` first, unauthenticated.
+2. If `401`, retry with NIP-98.
+3. Iterate `while (resp.cursor)` to accumulate all blobs.
+4. Post-filter blobs client-side by:
+   * `kind === 1063` **OR** `mime?.startsWith('audio/')` **OR** filename regex `\.(mp3|flac|wav|m4a)$`.
+
+**Option B – Capability Discovery (Future-Proof)**
+1. Fetch server root `GET /.well-known/blossom.json` (proposed in spec–draft).
+2. Parse advertised endpoints & auth modes.
+3. Dynamically build the list of candidate URLs, then proceed as in Option A.
+
+**Option C – Hybrid Blossom/NIP-96 Index**
+1. For each user-configured server save both **type = 'blossom'** and **type = 'nip96'**.
+2. In parallel, query both endpoint families; merge results.
+3. De-duplicate by `sha256`.
+
+### 10.4 Recommendation
+
+Start with **Option A** to unblock users quickly.  It aligns with Bouquet's proven approach, adds minimal code, and improves resilience:
+
+* Keeps logic in `src/lib/blossom.js` self-contained.
+* Requires ~30 lines of additional code and no schema changes.
+* Gets us pagination and broader MIME support "for free."
+
+Once verified, we can layer in Option B for smarter discovery.
+
+### 10.5 Follow-Up Questions
+
+1. Which exact server URLs are users reporting failures on?
+2. Do those servers require auth for listing blobs?
+3. What is the average library size (to prioritise pagination work)?
+4. Should we expose an "Unauthenticated Requests" toggle in Settings for edge cases?
+
+---
+
+*Draft prepared ▲ 2025-06-14* 

@@ -59,6 +59,9 @@ const SUPPORTED_AUDIO_EXTENSIONS = [
   '.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.mp4'
 ];
 
+// Number of items to request per page when using the /nip96/list endpoint
+const NIP96_PAGE_LIMIT = 500;
+
 /**
  * Check if a file is an audio file based on MIME type and extension
  */
@@ -176,65 +179,121 @@ async function createNip98Auth(url, method = 'GET', payload = null) {
   }
 }
 
-/**
- * Get files from NIP-96 server using the listing endpoint
- */
-async function getFilesFromNip96Server(serverUrl) {
+// SECOND_EDIT
+// Enhanced NIP-96 fetch supporting /nip96/list, pagination, and auth fallback
+async function getFilesFromNip96Server(serverUrl, pubkey = null) {
   try {
     console.log('📋 Getting files from NIP-96 server:', serverUrl);
-    
-    // Get server configuration
-    const config = await getNip96Config(serverUrl);
-    const apiUrl = config.api_url || serverUrl;
-    
-    // Create listing endpoint URL
-    const listingUrl = `${apiUrl}?page=0&count=100`;
-    console.log('📋 Listing URL:', listingUrl);
-    
-    // Create authorization header
-    const authHeader = await createNip98Auth(listingUrl, 'GET');
-    if (!authHeader) {
-      console.log('❌ Could not create auth header for NIP-96 listing');
-      return [];
+
+    // ---- Bouquet-style /nip96/list endpoint (unauth first, auth fallback) ----
+    const candidateBases = [];
+    if (pubkey) {
+      candidateBases.push(`${serverUrl}/nip96/list/${pubkey}?limit=${NIP96_PAGE_LIMIT}`);
     }
-    
-    // Make authenticated request to listing endpoint
-    const response = await fetch(listingUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': authHeader,
-        'Accept': 'application/json'
+    candidateBases.push(`${serverUrl}/nip96/list?limit=${NIP96_PAGE_LIMIT}`);
+
+    // Helper to extract files from different response shapes
+    const extractFiles = (data) => {
+      if (Array.isArray(data)) return data;
+      if (data.files && Array.isArray(data.files)) return data.files;
+      if (data.data && Array.isArray(data.data)) return data.data;
+      return [];
+    };
+
+    for (const base of candidateBases) {
+      try {
+        let cursor = null;
+        let useAuth = false;
+        const collected = [];
+
+        while (true) {
+          const pageUrl = cursor ? `${base}&cursor=${encodeURIComponent(cursor)}` : base;
+          const headers = { 'Accept': 'application/json' };
+          if (useAuth) {
+            const authHeader = await createNip98Auth(pageUrl, 'GET');
+            if (authHeader) headers['Authorization'] = authHeader;
+          }
+
+          let resp = await fetch(pageUrl, { method: 'GET', headers });
+
+          // Retry with auth if first attempt unauthenticated and server demands it
+          if (resp.status === 401 && !useAuth) {
+            useAuth = true;
+            console.log('🔑 NIP-96 endpoint requires auth – retrying');
+            continue; // loop will retry same URL with auth
+          }
+
+          if (!resp.ok) {
+            console.log('❌ NIP-96 fetch failed:', resp.status, pageUrl);
+            break;
+          }
+
+          const data = await resp.json();
+          const files = extractFiles(data);
+          for (const f of files) {
+            const t = convertNip96FileToTrack(f, serverUrl);
+            if (t) collected.push(t);
+          }
+
+          cursor = data.cursor || data.next_cursor || null;
+          if (!cursor) break;
+        }
+
+        if (collected.length) {
+          console.log(`✅ Found ${collected.length} tracks via ${base}`);
+          return collected;
+        }
+
+      } catch (err) {
+        console.log('⚠️ Candidate endpoint failed:', base, err.message);
+        continue;
       }
-    });
-    
-    console.log('📋 NIP-96 listing response status:', response.status);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log('❌ NIP-96 listing failed:', response.status, errorText);
-      return [];
     }
-    
-    const data = await response.json();
-    console.log('📋 NIP-96 listing response:', data);
-    
-    if (!data.files || !Array.isArray(data.files)) {
-      console.log('❌ Invalid NIP-96 response format');
-      return [];
-    }
-    
-    // Convert NIP-96 files to track format
-    const tracks = [];
-    for (const file of data.files) {
-      const track = convertNip96FileToTrack(file, serverUrl);
-      if (track) {
-        tracks.push(track);
+
+    // ---- Fallback to legacy ?page=0&count style (existing logic) ----
+    console.log('ℹ️ Falling back to legacy NIP-96 listing');
+    // (Existing logic below remains unchanged)
+    try {
+      console.log('📋 Getting files from NIP-96 server:', serverUrl);
+      
+      // Get server configuration
+      const config = await getNip96Config(serverUrl);
+      const apiUrl = config.api_url || serverUrl;
+      
+      // Create listing endpoint URL
+      const listingUrl = `${apiUrl}?page=0&count=${NIP96_PAGE_LIMIT}`;
+      console.log('📋 Legacy listing URL:', listingUrl);
+
+      // Try without auth
+      let headers = { 'Accept': 'application/json' };
+      let resp = await fetch(listingUrl, { method: 'GET', headers });
+
+      // Retry with auth if required
+      if (resp.status === 401) {
+        const authHeader = await createNip98Auth(listingUrl, 'GET');
+        if (authHeader) {
+          headers = { ...headers, 'Authorization': authHeader };
+          console.log('🔑 Legacy endpoint requires auth – retrying');
+          resp = await fetch(listingUrl, { method: 'GET', headers });
+        }
       }
+
+      if (!resp.ok) {
+        console.log('❌ Legacy NIP-96 listing failed:', resp.status);
+        return [];
+      }
+
+      const legacyData = await resp.json();
+      const legacyFiles = Array.isArray(legacyData) ? legacyData : (legacyData.files || legacyData.data || []);
+      const legacyTracks = legacyFiles.map(f => convertNip96FileToTrack(f, serverUrl)).filter(Boolean);
+      if (legacyTracks.length) {
+        console.log(`✅ Found ${legacyTracks.length} tracks via legacy endpoint`);
+      }
+      return legacyTracks;
+    } catch (error) {
+      console.error('❌ Error getting files from NIP-96 server:', error);
+      return [];
     }
-    
-    console.log(`✅ Found ${tracks.length} audio tracks from NIP-96 server`);
-    return tracks;
-    
   } catch (error) {
     console.error('❌ Error getting files from NIP-96 server:', error);
     return [];
@@ -342,23 +401,18 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
       try {
         console.log('🔍 Trying endpoint:', endpoint);
         
-        // Create authorization header
-        const authHeader = await createNip98Auth(endpoint, 'GET');
-        
-        const headers = {
-          'Accept': 'application/json'
-        };
-        
-        if (authHeader) {
-          headers['Authorization'] = authHeader;
+        // Try without auth first
+        let headers = { 'Accept': 'application/json' };
+        let response = await fetch(endpoint, { method: 'GET', headers });
+        // If unauthorized, retry with auth
+        if (response.status === 401) {
+          const authHeader = await createNip98Auth(endpoint, 'GET');
+          if (authHeader) {
+            headers = { ...headers, 'Authorization': authHeader };
+            console.log('🔑 Retrying Blossom endpoint with auth');
+            response = await fetch(endpoint, { method: 'GET', headers });
+          }
         }
-        
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers
-        });
-        
-        console.log('📋 Blossom response status:', response.status);
         
         if (response.ok) {
           const data = await response.json();
@@ -579,7 +633,7 @@ export async function getAllTracks(servers = DEFAULT_SERVERS, pubkey) {
         
         if (server.type === 'nip96') {
           // Use NIP-96 listing endpoint
-          serverTracks = await getFilesFromNip96Server(server.url);
+          serverTracks = await getFilesFromNip96Server(server.url, pubkey);
         } else {
           // Use traditional Blossom approach
           serverTracks = await getFilesFromBlossomServer(server.url, pubkey);
@@ -634,15 +688,15 @@ export async function getTracksFromServer(serverUrl, pubkey) {
     let tracks = [];
     
     if (server.type === 'nip96') {
-      tracks = await getFilesFromNip96Server(serverUrl);
+      tracks = await getFilesFromNip96Server(server.url, pubkey);
     } else {
-      tracks = await getFilesFromBlossomServer(serverUrl, pubkey);
+      tracks = await getFilesFromBlossomServer(server.url, pubkey);
     }
     
     // If no tracks found and we assumed blossom, try NIP-96
     if (tracks.length === 0 && server.type === 'blossom') {
       console.log('🔄 No tracks found with Blossom approach, trying NIP-96...');
-      tracks = await getFilesFromNip96Server(serverUrl);
+      tracks = await getFilesFromNip96Server(server.url, pubkey);
     }
     
     console.log(`✅ Found ${tracks.length} tracks from ${serverUrl}`);
