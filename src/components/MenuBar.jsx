@@ -397,7 +397,7 @@ export const MenuBar = () => {
                     type="text"
                     value={blossomEndpoint}
                     onChange={e => setBlossomEndpoint(e.target.value)}
-                    placeholder="https://blossom.band"
+                    placeholder="https://cdn.satellite.earth"
                     className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>

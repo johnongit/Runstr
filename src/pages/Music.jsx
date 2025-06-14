@@ -127,15 +127,14 @@ export function Music() {
           
           console.log('[Music] Signing NIP-98 event template:', eventTemplate);
           
-          // Ensure the event template has the correct kind for NIP-98 HTTP Auth
+          // Don't modify the event template - nip98.getToken creates the correct structure
+          // Just ensure pubkey is set if missing
           const nip98EventTemplate = {
             ...eventTemplate,
-            kind: 27235, // NIP-98 HTTP Auth kind
-            pubkey: publicKey, // Ensure pubkey is set
-            created_at: eventTemplate.created_at || Math.floor(Date.now() / 1000)
+            pubkey: eventTemplate.pubkey || publicKey,
           };
           
-          console.log('[Music] Creating NIP-98 event with kind 27235:', nip98EventTemplate);
+          console.log('[Music] Using NIP-98 event template as-is:', nip98EventTemplate);
           
           // Create a proper NDK event and sign it
           const ndkEvent = new NDKEvent(ndk, nip98EventTemplate);

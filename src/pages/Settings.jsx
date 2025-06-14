@@ -333,7 +333,7 @@ const Settings = () => {
                     type="text"
                     value={blossomEndpoint}
                     onChange={e => setBlossomEndpoint(e.target.value)}
-                    placeholder="https://blossom.example.com/upload"
+                    placeholder="https://cdn.satellite.earth"
                     style={{ width: '100%' }}
                   />
                 </>
@@ -474,7 +474,7 @@ const Settings = () => {
             type="text"
             value={blossomEndpoint}
             onChange={e => setBlossomEndpoint(e.target.value)}
-            placeholder="https://blossom.band"
+            placeholder="https://cdn.satellite.earth"
             style={{ width: '100%', marginBottom: '0.5rem' }}
           />
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>

@@ -191,16 +191,32 @@ export async function testConnection(serverUrl) {
   try {
     const baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
     
-    // Try to fetch the root endpoint or a known Blossom endpoint
-    // Most Blossom servers should respond to HEAD requests on the root
+    console.log(`[Blossom] Testing connection to: ${baseUrl}`);
+    
+    // First, try to get server info to see if it's actually a Blossom server
+    const serverInfo = await getServerInfo(baseUrl);
+    if (serverInfo) {
+      console.log(`[Blossom] Server info:`, serverInfo);
+      // If we got JSON response from info endpoints, it's likely a proper Blossom server
+      return true;
+    }
+    
+    // Fallback: Try a basic HEAD request to see if server is reachable
     const response = await fetch(baseUrl, {
       method: 'HEAD',
       timeout: 5000 // 5 second timeout
     });
     
+    console.log(`[Blossom] Basic connectivity test - Status: ${response.status}`);
+    
     // If we get any response (even 404), the server is reachable
-    // Blossom servers might return various status codes for the root
-    return response.status < 500; // Accept anything that's not a server error
+    // But warn that we couldn't verify it's a Blossom server
+    if (response.status < 500) {
+      console.warn(`[Blossom] Server is reachable but couldn't verify it's a Blossom server`);
+      return true; // Still return true for basic connectivity
+    }
+    
+    return false;
     
   } catch (error) {
     console.error('[Blossom] Connection test failed:', error);
