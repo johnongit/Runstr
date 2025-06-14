@@ -10,7 +10,7 @@ import { MusicPlayer } from '../components/MusicPlayer';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useSettings } from '../contexts/SettingsContext';
 import { NostrContext } from '../contexts/NostrContext';
-import { listTracks } from '../lib/blossom';
+import { getAllTracks, getTracksFromServer, DEFAULT_SERVERS } from '../lib/blossom';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 
 export function Music() {
@@ -104,55 +104,30 @@ export function Music() {
     }
   }, [pubkey]);
 
-  // Load Blossom tracks when server URL and pubkey are available
+  // Load Blossom tracks when server URL is available
   useEffect(() => {
     const loadBlossomTracks = async () => {
-      if (!blossomEndpoint || !publicKey || !ndk?.signer) {
-        setBlossomTracks([]);
-        setBlossomError(null);
-        return;
-      }
-
       setBlossomLoading(true);
       setBlossomError(null);
 
       try {
-        console.log('[Music] Loading Blossom tracks from:', blossomEndpoint);
+        let tracks = [];
         
-        // Create a sign function that works with our NDK signer
-        const signEvent = async (eventTemplate) => {
-          if (!ndk.signer || typeof ndk.signer.sign !== 'function') {
-            throw new Error('No signer available');
-          }
-          
-          console.log('[Music] Signing NIP-98 event template:', eventTemplate);
-          
-          // Don't modify the event template - nip98.getToken creates the correct structure
-          // Just ensure pubkey is set if missing
-          const nip98EventTemplate = {
-            ...eventTemplate,
-            pubkey: eventTemplate.pubkey || publicKey,
-          };
-          
-          console.log('[Music] Using NIP-98 event template as-is:', nip98EventTemplate);
-          
-          // Create a proper NDK event and sign it
-          const ndkEvent = new NDKEvent(ndk, nip98EventTemplate);
-          await ndkEvent.sign();
-          
-          const signedEvent = ndkEvent.rawEvent();
-          console.log('[Music] Signed NIP-98 event:', signedEvent);
-          
-          // Return the raw event object that NIP-98 expects
-          return signedEvent;
-        };
-
-        const tracks = await listTracks(blossomEndpoint, publicKey, signEvent);
+        if (blossomEndpoint && blossomEndpoint !== '') {
+          // Load tracks from specific server
+          console.log('[Music] Loading tracks from specific server:', blossomEndpoint);
+          tracks = await getTracksFromServer(blossomEndpoint);
+        } else {
+          // Load tracks from all default servers
+          console.log('[Music] Loading tracks from all default servers');
+          tracks = await getAllTracks(DEFAULT_SERVERS);
+        }
+        
         setBlossomTracks(tracks);
-        console.log(`[Music] Loaded ${tracks.length} Blossom tracks`);
+        console.log(`[Music] Loaded ${tracks.length} total tracks`);
         
       } catch (error) {
-        console.error('[Music] Error loading Blossom tracks:', error);
+        console.error('[Music] Error loading tracks:', error);
         setBlossomError(error.message);
         setBlossomTracks([]);
       } finally {
@@ -161,7 +136,7 @@ export function Music() {
     };
 
     loadBlossomTracks();
-  }, [blossomEndpoint, publicKey, ndk?.signer]);
+  }, [blossomEndpoint]);
 
   const handleSelectPlaylist = (playlistId) => {
     loadPlaylist(playlistId);
@@ -196,12 +171,16 @@ export function Music() {
 
   // Create a virtual playlist object for Blossom library
   const blossomPlaylistDisplay = useMemo(() => {
-    if (!blossomEndpoint || blossomTracks.length === 0) return [];
+    if (blossomTracks.length === 0) return [];
+    
+    const description = blossomEndpoint && blossomEndpoint !== '' 
+      ? `${blossomTracks.length} tracks from ${blossomEndpoint}`
+      : `${blossomTracks.length} tracks from Blossom servers`;
     
     return [{
       id: 'blossom',
-      title: 'My Blossom Library',
-      description: `${blossomTracks.length} tracks from your Blossom server`,
+      title: 'Blossom Music Library',
+      description: description,
       tracks: blossomTracks
     }];
   }, [blossomEndpoint, blossomTracks]);
@@ -219,33 +198,37 @@ export function Music() {
         />
         
         {/* Blossom Library Section */}
-        {blossomEndpoint && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4 text-left">My Blossom Library</h2>
-            {blossomLoading && (
-              <div className="text-gray-400 text-left mb-4">
-                Loading tracks from your Blossom server...
-              </div>
-            )}
-            {blossomError && (
-              <div className="text-red-400 text-left mb-4">
-                Error loading Blossom tracks: {blossomError}
-              </div>
-            )}
-            {!blossomLoading && !blossomError && blossomTracks.length === 0 && (
-              <div className="text-gray-400 text-left mb-4">
-                No audio files found on your Blossom server.
-              </div>
-            )}
-            {blossomPlaylistDisplay.length > 0 && (
-              <PlaylistSection
-                title=""
-                playlists={blossomPlaylistDisplay}
-                handlePlaylistClick={handleSelectBlossomLibrary}
-              />
-            )}
-          </div>
-        )}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-left">Blossom Music Library</h2>
+          {blossomLoading && (
+            <div className="text-gray-400 text-left mb-4">
+              {blossomEndpoint && blossomEndpoint !== '' 
+                ? `Loading tracks from ${blossomEndpoint}...`
+                : 'Searching for audio tracks across Blossom servers...'
+              }
+            </div>
+          )}
+          {blossomError && (
+            <div className="text-red-400 text-left mb-4">
+              Error loading tracks: {blossomError}
+            </div>
+          )}
+          {!blossomLoading && !blossomError && blossomTracks.length === 0 && (
+            <div className="text-gray-400 text-left mb-4">
+              {blossomEndpoint && blossomEndpoint !== '' 
+                ? `No audio files found on ${blossomEndpoint}.`
+                : 'No audio files found on Blossom servers. Try uploading some audio files to your Blossom server or check the console for detailed logs.'
+              }
+            </div>
+          )}
+          {blossomPlaylistDisplay.length > 0 && (
+            <PlaylistSection
+              title=""
+              playlists={blossomPlaylistDisplay}
+              handlePlaylistClick={handleSelectBlossomLibrary}
+            />
+          )}
+        </div>
         
         <PlaylistSection
           title="Library"

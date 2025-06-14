@@ -4,7 +4,7 @@ import { FloatingMusicPlayer } from './FloatingMusicPlayer';
 import { useActivityMode, ACTIVITY_TYPES } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import rewardsPayoutService from '../services/rewardsPayoutService';
-import { testConnection } from '../lib/blossom';
+import { testConnection, DEFAULT_SERVERS } from '../lib/blossom';
 
 export const MenuBar = () => {
   const location = useLocation();
@@ -402,9 +402,12 @@ export const MenuBar = () => {
                     onChange={e => setBlossomEndpoint(e.target.value)}
                     className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
                   >
-                    <option value="https://cdn.satellite.earth">cdn.satellite.earth (Recommended)</option>
-                    <option value="https://blossom.band">blossom.band</option>
-                    <option value="https://blossom.primal.net">blossom.primal.net</option>
+                    <option value="">Search All Servers</option>
+                    {DEFAULT_SERVERS.map(server => (
+                      <option key={server.url} value={server.url}>
+                        {server.name} {server.type === 'nip96' ? '(NIP-96)' : '(Blossom)'}
+                      </option>
+                    ))}
                     <option value="custom">Custom Server...</option>
                   </select>
                 </div>
@@ -440,7 +443,7 @@ export const MenuBar = () => {
                   )}
                 </div>
                 <p className="text-xs text-gray-500">
-                  Choose a Blossom server to access your music library. cdn.satellite.earth is recommended for most users.
+                  Choose a specific server or leave blank to search all servers. NIP-96 servers support authenticated file listing, while Blossom servers use direct file access.
                 </p>
               </div>
             </div>

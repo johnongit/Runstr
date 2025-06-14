@@ -1,35 +1,447 @@
-import { nip98 } from 'nostr-tools';
+// Blossom Music Integration for RUNSTR
+// Implements NIP-96 HTTP File Storage Integration
 
-/**
- * Blossom API utility for music integration
- * Handles communication with Blossom servers for music playback
- */
+import { nip19 } from 'nostr-tools';
 
-// Supported audio file types for filtering
+// Default Blossom servers with their capabilities
+const DEFAULT_SERVERS = [
+  {
+    url: 'https://cdn.satellite.earth',
+    name: 'Satellite Earth (Recommended)',
+    type: 'blossom'
+  },
+  {
+    url: 'https://blossom.band',
+    name: 'Blossom Band',
+    type: 'blossom'
+  },
+  {
+    url: 'https://blossom.primal.net',
+    name: 'Primal Blossom',
+    type: 'blossom'
+  },
+  {
+    url: 'https://nostr.build',
+    name: 'Nostr Build',
+    type: 'nip96'
+  },
+  {
+    url: 'https://nostrcheck.me',
+    name: 'Nostr Check',
+    type: 'nip96'
+  },
+  {
+    url: 'https://nostpic.com',
+    name: 'Nostpic',
+    type: 'nip96'
+  },
+  {
+    url: 'https://files.sovbit.host',
+    name: 'Sovbit Files',
+    type: 'nip96'
+  },
+  {
+    url: 'https://void.cat',
+    name: 'Void Cat',
+    type: 'nip96'
+  }
+];
+
+// Supported audio MIME types
 const SUPPORTED_AUDIO_TYPES = [
   'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/flac', 
-  'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/mp4'
+  'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/mp4',
+  'audio/x-wav', 'audio/x-flac', 'audio/x-m4a'
+];
+
+// Supported audio file extensions
+const SUPPORTED_AUDIO_EXTENSIONS = [
+  '.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.mp4'
 ];
 
 /**
- * Get audio tracks from Nostr relays using NIP-94 File Metadata events
- * @param {string} serverUrl - Base URL of the Blossom server (used for filtering)
- * @param {string} pubkey - User's public key
- * @param {Function} signEvent - Function to sign Nostr events (from Nostr context)
- * @returns {Promise<Array>} - Array of track objects
+ * Check if a file is an audio file based on MIME type and extension
  */
-export async function listTracks(serverUrl, pubkey, signEvent) {
-  if (!serverUrl || !pubkey) {
-    throw new Error('Missing required parameters: serverUrl or pubkey');
+function isAudioFile(mimeType, filename) {
+  console.log('🎵 Checking if file is audio:', { mimeType, filename });
+  
+  // Check MIME type
+  if (mimeType && SUPPORTED_AUDIO_TYPES.some(type => 
+    mimeType.toLowerCase().includes(type.toLowerCase())
+  )) {
+    console.log('✅ Audio detected by MIME type:', mimeType);
+    return true;
   }
   
-  console.log(`[Blossom] Fetching audio tracks from Nostr relays for server: ${serverUrl}`);
+  // Check file extension
+  if (filename && SUPPORTED_AUDIO_EXTENSIONS.some(ext => 
+    filename.toLowerCase().endsWith(ext.toLowerCase())
+  )) {
+    console.log('✅ Audio detected by extension:', filename);
+    return true;
+  }
   
+  console.log('❌ Not detected as audio file');
+  return false;
+}
+
+/**
+ * Get NIP-96 server configuration
+ */
+async function getNip96Config(serverUrl) {
   try {
-    // Import NDK dynamically to avoid issues
+    console.log('🔧 Getting NIP-96 config for:', serverUrl);
+    const configUrl = `${serverUrl}/.well-known/nostr/nip96.json`;
+    const response = await fetch(configUrl);
+    
+    if (!response.ok) {
+      console.log('❌ NIP-96 config not found, using default API URL');
+      return { api_url: serverUrl };
+    }
+    
+    const config = await response.json();
+    console.log('✅ NIP-96 config loaded:', config);
+    return config;
+  } catch (error) {
+    console.log('❌ Error loading NIP-96 config:', error);
+    return { api_url: serverUrl };
+  }
+}
+
+/**
+ * Create NIP-98 authorization header for authenticated requests
+ */
+async function createNip98Auth(url, method = 'GET', payload = null) {
+  try {
+    // Import NDK dynamically to avoid loading issues
+    const { default: NDK, NDKEvent } = await import('@nostr-dev-kit/ndk');
+    
+    // Get user's private key from localStorage
+    const storedKey = localStorage.getItem('nostr-key');
+    if (!storedKey) {
+      console.log('❌ No private key found for NIP-98 auth');
+      return null;
+    }
+
+    let privateKey;
+    try {
+      // Try to decode as nsec
+      const decoded = nip19.decode(storedKey);
+      if (decoded.type === 'nsec') {
+        privateKey = decoded.data;
+      } else {
+        privateKey = storedKey;
+      }
+    } catch {
+      // Assume it's already a hex private key
+      privateKey = storedKey;
+    }
+
+    // Create NDK instance
+    const ndk = new NDK();
+    
+    // Create NIP-98 HTTP Auth event (kind 27235)
+    const authEvent = new NDKEvent(ndk);
+    authEvent.kind = 27235;
+    authEvent.content = '';
+    authEvent.created_at = Math.floor(Date.now() / 1000);
+    
+    // Required tags for NIP-98
+    authEvent.tags = [
+      ['u', url],
+      ['method', method.toUpperCase()]
+    ];
+    
+    // Add payload hash if provided
+    if (payload) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(payload);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      authEvent.tags.push(['payload', hashHex]);
+    }
+
+    // Sign the event
+    await authEvent.sign(privateKey);
+    
+    // Create authorization header
+    const authHeader = `Nostr ${btoa(JSON.stringify(authEvent.rawEvent()))}`;
+    console.log('✅ Created NIP-98 authorization header');
+    return authHeader;
+    
+  } catch (error) {
+    console.error('❌ Error creating NIP-98 auth:', error);
+    return null;
+  }
+}
+
+/**
+ * Get files from NIP-96 server using the listing endpoint
+ */
+async function getFilesFromNip96Server(serverUrl) {
+  try {
+    console.log('📋 Getting files from NIP-96 server:', serverUrl);
+    
+    // Get server configuration
+    const config = await getNip96Config(serverUrl);
+    const apiUrl = config.api_url || serverUrl;
+    
+    // Create listing endpoint URL
+    const listingUrl = `${apiUrl}?page=0&count=100`;
+    console.log('📋 Listing URL:', listingUrl);
+    
+    // Create authorization header
+    const authHeader = await createNip98Auth(listingUrl, 'GET');
+    if (!authHeader) {
+      console.log('❌ Could not create auth header for NIP-96 listing');
+      return [];
+    }
+    
+    // Make authenticated request to listing endpoint
+    const response = await fetch(listingUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader,
+        'Accept': 'application/json'
+      }
+    });
+    
+    console.log('📋 NIP-96 listing response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('❌ NIP-96 listing failed:', response.status, errorText);
+      return [];
+    }
+    
+    const data = await response.json();
+    console.log('📋 NIP-96 listing response:', data);
+    
+    if (!data.files || !Array.isArray(data.files)) {
+      console.log('❌ Invalid NIP-96 response format');
+      return [];
+    }
+    
+    // Convert NIP-96 files to track format
+    const tracks = [];
+    for (const file of data.files) {
+      const track = convertNip96FileToTrack(file, serverUrl);
+      if (track) {
+        tracks.push(track);
+      }
+    }
+    
+    console.log(`✅ Found ${tracks.length} audio tracks from NIP-96 server`);
+    return tracks;
+    
+  } catch (error) {
+    console.error('❌ Error getting files from NIP-96 server:', error);
+    return [];
+  }
+}
+
+/**
+ * Convert NIP-96 file object to track format
+ */
+function convertNip96FileToTrack(file, serverUrl) {
+  try {
+    console.log('🎵 Converting NIP-96 file to track:', file);
+    
+    if (!file.tags || !Array.isArray(file.tags)) {
+      console.log('❌ Invalid file format - no tags array');
+      return null;
+    }
+    
+    // Parse tags into a map for easier access
+    const tagMap = {};
+    file.tags.forEach(tag => {
+      if (Array.isArray(tag) && tag.length >= 2) {
+        tagMap[tag[0]] = tag[1];
+      }
+    });
+    
+    console.log('🏷️ Parsed tags:', tagMap);
+    
+    // Get essential fields
+    const url = tagMap.url;
+    const mimeType = tagMap.m;
+    const originalHash = tagMap.ox;
+    const size = tagMap.size;
+    
+    if (!url) {
+      console.log('❌ No URL found in file tags');
+      return null;
+    }
+    
+    // Extract filename from URL
+    const filename = url.split('/').pop() || 'unknown';
+    
+    // Check if this is an audio file
+    if (!isAudioFile(mimeType, filename)) {
+      console.log('❌ File is not an audio file');
+      return null;
+    }
+    
+    // Create track object
+    const track = {
+      id: originalHash || url,
+      title: tagMap.title || tagMap.alt || file.content || filename.replace(/\.[^/.]+$/, ''),
+      artist: tagMap.creator || tagMap.artist || 'Unknown Artist',
+      url: url,
+      duration: null, // Will be determined when audio loads
+      size: size ? parseInt(size) : null,
+      mimeType: mimeType,
+      server: serverUrl,
+      hash: originalHash,
+      uploadedAt: file.created_at ? new Date(file.created_at * 1000) : null
+    };
+    
+    console.log('✅ Created track:', track);
+    return track;
+    
+  } catch (error) {
+    console.error('❌ Error converting NIP-96 file to track:', error);
+    return null;
+  }
+}
+
+/**
+ * Get files from traditional Blossom server (fallback method)
+ */
+async function getFilesFromBlossomServer(serverUrl) {
+  try {
+    console.log('📋 Getting files from Blossom server (fallback):', serverUrl);
+    
+    // Try different possible endpoints
+    const endpoints = [
+      `${serverUrl}/list`,
+      `${serverUrl}/files`,
+      `${serverUrl}/api/list`,
+      `${serverUrl}/api/files`
+    ];
+    
+    for (const endpoint of endpoints) {
+      try {
+        console.log('🔍 Trying endpoint:', endpoint);
+        
+        // Create authorization header
+        const authHeader = await createNip98Auth(endpoint, 'GET');
+        
+        const headers = {
+          'Accept': 'application/json'
+        };
+        
+        if (authHeader) {
+          headers['Authorization'] = authHeader;
+        }
+        
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers
+        });
+        
+        console.log('📋 Blossom response status:', response.status);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📋 Blossom response data:', data);
+          
+          // Try to parse the response
+          let files = [];
+          if (Array.isArray(data)) {
+            files = data;
+          } else if (data.files && Array.isArray(data.files)) {
+            files = data.files;
+          } else if (data.data && Array.isArray(data.data)) {
+            files = data.data;
+          }
+          
+          if (files.length > 0) {
+            console.log(`✅ Found ${files.length} files from Blossom server`);
+            
+            // Convert to tracks
+            const tracks = [];
+            for (const file of files) {
+              const track = convertBlossomFileToTrack(file, serverUrl);
+              if (track) {
+                tracks.push(track);
+              }
+            }
+            
+            return tracks;
+          }
+        }
+        
+      } catch (endpointError) {
+        console.log('❌ Endpoint failed:', endpoint, endpointError.message);
+        continue;
+      }
+    }
+    
+    console.log('❌ No working endpoints found for Blossom server');
+    return [];
+    
+  } catch (error) {
+    console.error('❌ Error getting files from Blossom server:', error);
+    return [];
+  }
+}
+
+/**
+ * Convert Blossom file object to track format
+ */
+function convertBlossomFileToTrack(file, serverUrl) {
+  try {
+    console.log('🎵 Converting Blossom file to track:', file);
+    
+    // Handle different possible field names
+    const filename = file.name || file.filename || file.title || file.id || 'unknown';
+    const mimeType = file.type || file.mimeType || file.mime || file.contentType;
+    const size = file.size || file.length || file.bytes;
+    const hash = file.sha256 || file.hash || file.id;
+    const url = file.url || `${serverUrl}/${hash}`;
+    
+    // Check if this is an audio file
+    if (!isAudioFile(mimeType, filename)) {
+      console.log('❌ File is not an audio file');
+      return null;
+    }
+    
+    // Create track object
+    const track = {
+      id: hash || url,
+      title: filename.replace(/\.[^/.]+$/, ''), // Remove extension
+      artist: file.artist || file.creator || 'Unknown Artist',
+      url: url,
+      duration: null, // Will be determined when audio loads
+      size: size ? parseInt(size) : null,
+      mimeType: mimeType,
+      server: serverUrl,
+      hash: hash,
+      uploadedAt: file.created_at ? new Date(file.created_at * 1000) : null
+    };
+    
+    console.log('✅ Created track:', track);
+    return track;
+    
+  } catch (error) {
+    console.error('❌ Error converting Blossom file to track:', error);
+    return null;
+  }
+}
+
+/**
+ * Get tracks from Nostr relays using NIP-94 File Metadata events
+ */
+async function getTracksFromNostr() {
+  try {
+    console.log('🔍 Searching for audio tracks via Nostr relays...');
+    
+    // Import NDK dynamically
     const { default: NDK } = await import('@nostr-dev-kit/ndk');
     
-    // Create NDK instance with some popular relays
+    // Create NDK instance with popular relays
     const ndk = new NDK({
       explicitRelayUrls: [
         'wss://relay.damus.io',
@@ -41,237 +453,183 @@ export async function listTracks(serverUrl, pubkey, signEvent) {
     });
     
     await ndk.connect();
-    console.log('[Blossom] Connected to Nostr relays');
+    console.log('✅ Connected to Nostr relays');
     
-    // Query for audio track events (kind 31337) from the user
+    // Search for NIP-94 File Metadata events (kind 1063) and kind 31337
     const filter = {
-      kinds: [31337], // Audio track events
-      authors: [pubkey],
+      kinds: [1063, 31337],
       limit: 100
     };
     
-    console.log('[Blossom] Querying for audio track events:', filter);
+    console.log('🔍 Querying for file metadata events...');
     const events = await ndk.fetchEvents(filter);
-    console.log(`[Blossom] Found ${events.size} audio track events`);
+    console.log(`📋 Found ${events.size} file metadata events`);
     
     const tracks = [];
-    const baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
     
     for (const event of events) {
       try {
-        const track = parseAudioTrackEvent(event.rawEvent(), baseUrl);
-        if (track) {
-          tracks.push(track);
+        console.log('📄 Processing event:', event.id);
+        
+        // Parse tags
+        const tagMap = {};
+        event.tags.forEach(tag => {
+          if (Array.isArray(tag) && tag.length >= 2) {
+            tagMap[tag[0]] = tag[1];
+          }
+        });
+        
+        console.log('🏷️ Event tags:', tagMap);
+        
+        // Look for audio-related tags
+        const url = tagMap.url;
+        const mimeType = tagMap.m;
+        const title = tagMap.title || tagMap.subject || event.content;
+        const creator = tagMap.creator || tagMap.artist;
+        
+        if (!url) {
+          console.log('❌ No URL in event');
+          continue;
         }
-      } catch (error) {
-        console.warn('[Blossom] Error parsing audio track event:', error);
+        
+        // Check if this is an audio file
+        if (!isAudioFile(mimeType, url)) {
+          console.log('❌ Event is not for an audio file');
+          continue;
+        }
+        
+        const track = {
+          id: event.id,
+          title: title || 'Unknown Title',
+          artist: creator || 'Unknown Artist',
+          url: url,
+          duration: null,
+          size: tagMap.size ? parseInt(tagMap.size) : null,
+          mimeType: mimeType,
+          server: 'nostr',
+          hash: tagMap.x || tagMap.ox,
+          uploadedAt: new Date(event.created_at * 1000),
+          nostrEvent: event.id
+        };
+        
+        tracks.push(track);
+        console.log('✅ Added track from Nostr:', track.title);
+        
+      } catch (eventError) {
+        console.error('❌ Error processing event:', eventError);
+        continue;
       }
     }
     
-    console.log(`[Blossom] Successfully parsed ${tracks.length} audio tracks`);
+    console.log(`✅ Found ${tracks.length} audio tracks from Nostr`);
     return tracks;
     
   } catch (error) {
-    console.error('[Blossom] Error fetching tracks from Nostr:', error);
-    throw new Error(`Failed to fetch tracks from Nostr relays: ${error.message}`);
+    console.error('❌ Error getting tracks from Nostr:', error);
+    return [];
   }
 }
 
 /**
- * Parse a NIP-94 audio track event into a track object
- * @param {Object} event - Raw Nostr event
- * @param {string} serverUrl - Base URL to filter by
- * @returns {Object|null} - Track object or null if not valid
+ * Main function to get all available tracks from all sources
  */
-function parseAudioTrackEvent(event, serverUrl) {
-  if (!event || event.kind !== 31337) {
-    return null;
-  }
+export async function getAllTracks(servers = DEFAULT_SERVERS) {
+  console.log('🎵 Starting comprehensive track search...');
+  console.log('🔍 Searching servers:', servers);
   
-  console.log('[Blossom] Parsing audio track event:', event.id);
+  const allTracks = [];
   
-  // Extract metadata from tags
-  const tags = event.tags || [];
-  let mediaUrl = null;
-  let mimeType = null;
-  let title = null;
-  let artist = null;
-  let duration = null;
-  
-  // Parse tags according to NIP-94 and Bouquet example
-  for (const tag of tags) {
-    const [tagName, ...values] = tag;
+  try {
+    // First, try to get tracks from Nostr relays
+    console.log('📡 Phase 1: Searching Nostr relays for NIP-94 events...');
+    const nostrTracks = await getTracksFromNostr();
+    allTracks.push(...nostrTracks);
+    console.log(`✅ Phase 1 complete: ${nostrTracks.length} tracks from Nostr`);
     
-    switch (tagName) {
-      case 'title':
-        title = values[0];
-        break;
-      case 'creator':
-        if (!artist) artist = values[0]; // Use first creator as artist
-        break;
-      case 'imeta':
-        // Parse imeta tag: ["imeta", "url https://example.com/file.mp3", "m audio/mpeg"]
-        for (let i = 1; i < values.length; i++) {
-          const value = values[i];
-          if (value.startsWith('url ')) {
-            const url = value.substring(4);
-            if (url.includes(serverUrl) || serverUrl.includes('satellite.earth')) {
-              mediaUrl = url;
-            }
-          } else if (value.startsWith('m ')) {
-            mimeType = value.substring(2);
-          }
+    // Then, query each server directly
+    console.log('🌐 Phase 2: Querying servers directly...');
+    
+    for (const server of servers) {
+      try {
+        console.log(`🔍 Querying server: ${server.name} (${server.url})`);
+        
+        let serverTracks = [];
+        
+        if (server.type === 'nip96') {
+          // Use NIP-96 listing endpoint
+          serverTracks = await getFilesFromNip96Server(server.url);
+        } else {
+          // Use traditional Blossom approach
+          serverTracks = await getFilesFromBlossomServer(server.url);
         }
-        break;
-      case 'media':
-        // Direct media URL
-        const url = values[0];
-        if (url && (url.includes(serverUrl) || serverUrl.includes('satellite.earth'))) {
-          mediaUrl = url;
-        }
-        break;
-      case 'm':
-        // MIME type
-        mimeType = values[0];
-        break;
-      case 'duration':
-        duration = parseInt(values[0]);
-        break;
+        
+        console.log(`✅ Server ${server.name}: ${serverTracks.length} tracks`);
+        allTracks.push(...serverTracks);
+        
+      } catch (serverError) {
+        console.error(`❌ Error querying server ${server.name}:`, serverError);
+        continue;
+      }
     }
+    
+    console.log(`🎵 Search complete: ${allTracks.length} total tracks found`);
+    
+    // Remove duplicates based on hash or URL
+    const uniqueTracks = [];
+    const seen = new Set();
+    
+    for (const track of allTracks) {
+      const key = track.hash || track.url;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueTracks.push(track);
+      }
+    }
+    
+    console.log(`✅ Final result: ${uniqueTracks.length} unique tracks`);
+    return uniqueTracks;
+    
+  } catch (error) {
+    console.error('❌ Error in getAllTracks:', error);
+    return allTracks; // Return whatever we managed to get
   }
+}
+
+/**
+ * Get tracks from a specific server
+ */
+export async function getTracksFromServer(serverUrl) {
+  console.log('🎵 Getting tracks from specific server:', serverUrl);
   
-  // Filter by supported audio types
-  if (!mimeType || !SUPPORTED_AUDIO_TYPES.includes(mimeType)) {
-    console.log(`[Blossom] Skipping track with unsupported MIME type: ${mimeType}`);
-    return null;
-  }
-  
-  // Must have a media URL
-  if (!mediaUrl) {
-    console.log('[Blossom] Skipping track without media URL');
-    return null;
-  }
-  
-  // Create track object compatible with existing audio player
-  const track = {
-    id: event.id,
-    title: title || 'Unknown Title',
-    artist: artist || 'Unknown Artist',
-    mediaUrl: mediaUrl,
-    source: 'blossom',
-    duration: duration,
-    mimeType: mimeType,
-    // Additional metadata
-    pubkey: event.pubkey,
-    created_at: event.created_at,
-    content: event.content || ''
+  // Find server configuration
+  const server = DEFAULT_SERVERS.find(s => s.url === serverUrl) || {
+    url: serverUrl,
+    name: 'Custom Server',
+    type: 'blossom' // Default to blossom, will try NIP-96 if that fails
   };
   
-  console.log('[Blossom] Successfully parsed track:', track.title, 'by', track.artist);
-  return track;
-}
-
-/**
- * Test connection to a Blossom server (simplified for NIP-94 approach)
- * @param {string} serverUrl - Base URL of the Blossom server
- * @returns {Promise<boolean>} - True if server appears to be reachable
- */
-export async function testConnection(serverUrl) {
-  if (!serverUrl) {
-    return false;
-  }
-  
   try {
-    const baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
-    console.log(`[Blossom] Testing connection to: ${baseUrl}`);
+    let tracks = [];
     
-    // For NIP-94 approach, we just test if the server is reachable
-    // The actual audio tracks come from Nostr relays, not the Blossom server directly
-    const response = await fetch(baseUrl, {
-      method: 'HEAD',
-      headers: {
-        'User-Agent': 'RUNSTR-Music-Player/1.0'
-      }
-    });
+    if (server.type === 'nip96') {
+      tracks = await getFilesFromNip96Server(serverUrl);
+    } else {
+      tracks = await getFilesFromBlossomServer(serverUrl);
+    }
     
-    const isReachable = response.status < 500; // Accept any non-server-error response
-    console.log(`[Blossom] Connection test result: ${isReachable ? 'SUCCESS' : 'FAILED'} (${response.status})`);
+    // If no tracks found and we assumed blossom, try NIP-96
+    if (tracks.length === 0 && server.type === 'blossom') {
+      console.log('🔄 No tracks found with Blossom approach, trying NIP-96...');
+      tracks = await getFilesFromNip96Server(serverUrl);
+    }
     
-    return isReachable;
+    console.log(`✅ Found ${tracks.length} tracks from ${serverUrl}`);
+    return tracks;
     
   } catch (error) {
-    console.error('[Blossom] Connection test failed:', error);
-    return false;
+    console.error('❌ Error getting tracks from server:', error);
+    return [];
   }
 }
 
-/**
- * Get server info (placeholder for future use)
- * @param {string} serverUrl - Base URL of the server
- * @returns {Promise<Object|null>} - Server info or null
- */
-export async function getServerInfo(serverUrl) {
-  try {
-    const response = await fetch(`${serverUrl}/.well-known/nostr.json`);
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (error) {
-    console.log('[Blossom] No server info available');
-  }
-  return null;
-}
-
-/**
- * Debug function to test different authentication methods for Satellite CDN
- * @param {string} serverUrl - Base URL of the Blossom server
- * @param {string} pubkey - User's public key
- * @returns {Promise<Object>} - Debug information about different auth attempts
- */
-export async function debugSatelliteAuth(serverUrl, pubkey) {
-  const baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
-  const results = {};
-  
-  // Test different endpoints and auth methods
-  const testCases = [
-    { url: `${baseUrl}/list/${pubkey}`, auth: false, name: 'Standard endpoint, no auth' },
-    { url: `${baseUrl}/${pubkey}`, auth: false, name: 'Direct pubkey endpoint, no auth' },
-    { url: `${baseUrl}/api/list/${pubkey}`, auth: false, name: 'API endpoint, no auth' },
-    { url: `${baseUrl}/files/${pubkey}`, auth: false, name: 'Files endpoint, no auth' },
-  ];
-  
-  for (const testCase of testCases) {
-    try {
-      console.log(`[Debug] Testing: ${testCase.name} - ${testCase.url}`);
-      
-      const response = await fetch(testCase.url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'RUNSTR-Music-Player/1.0'
-        }
-      });
-      
-      const responseText = await response.text();
-      
-      results[testCase.name] = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        body: responseText.substring(0, 500), // First 500 chars
-        success: response.ok
-      };
-      
-      console.log(`[Debug] ${testCase.name}: ${response.status} ${response.statusText}`);
-      
-    } catch (error) {
-      results[testCase.name] = {
-        error: error.message,
-        success: false
-      };
-      console.error(`[Debug] ${testCase.name} failed:`, error.message);
-    }
-  }
-  
-  return results;
-} 
+export { DEFAULT_SERVERS };
