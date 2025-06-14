@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useContext } from 'react';
 import {
   fetchLibraryPlaylists,
   fetchTop40,
@@ -8,10 +8,15 @@ import {
 import { PlaylistSection } from '../components/PlaylistSection';
 import { MusicPlayer } from '../components/MusicPlayer';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { useSettings } from '../contexts/SettingsContext';
+import { NostrContext } from '../contexts/NostrContext';
+import { listTracks } from '../lib/blossom';
 
 export function Music() {
   const hasMounted = useRef(false);
   const { loadPlaylist, currentTrack } = useAudioPlayer();
+  const { blossomEndpoint } = useSettings();
+  const { publicKey, ndk } = useContext(NostrContext);
 
   const [pubkey, setPubkey] = useState(null);
 
@@ -20,6 +25,11 @@ export function Music() {
   const [trendingHipHopPlaylist, setTrendingHipHopPlaylist] = useState();
 
   const [libraryPlaylists, setLibraryPlaylists] = useState();
+  
+  // Blossom-related state
+  const [blossomTracks, setBlossomTracks] = useState([]);
+  const [blossomLoading, setBlossomLoading] = useState(false);
+  const [blossomError, setBlossomError] = useState(null);
 
   useEffect(() => {
     window.nostr
@@ -93,8 +103,59 @@ export function Music() {
     }
   }, [pubkey]);
 
+  // Load Blossom tracks when server URL and pubkey are available
+  useEffect(() => {
+    const loadBlossomTracks = async () => {
+      if (!blossomEndpoint || !publicKey || !ndk?.signer) {
+        setBlossomTracks([]);
+        setBlossomError(null);
+        return;
+      }
+
+      setBlossomLoading(true);
+      setBlossomError(null);
+
+      try {
+        console.log('[Music] Loading Blossom tracks from:', blossomEndpoint);
+        
+        // Create a sign function that works with our NDK signer
+        const signEvent = async (event) => {
+          if (ndk.signer && typeof ndk.signer.sign === 'function') {
+            return await ndk.signer.sign(event);
+          }
+          throw new Error('No signer available');
+        };
+
+        const tracks = await listTracks(blossomEndpoint, publicKey, signEvent);
+        setBlossomTracks(tracks);
+        console.log(`[Music] Loaded ${tracks.length} Blossom tracks`);
+        
+      } catch (error) {
+        console.error('[Music] Error loading Blossom tracks:', error);
+        setBlossomError(error.message);
+        setBlossomTracks([]);
+      } finally {
+        setBlossomLoading(false);
+      }
+    };
+
+    loadBlossomTracks();
+  }, [blossomEndpoint, publicKey, ndk?.signer]);
+
   const handleSelectPlaylist = (playlistId) => {
     loadPlaylist(playlistId);
+  };
+
+  const handleSelectBlossomLibrary = () => {
+    // Create a virtual playlist for Blossom tracks
+    const blossomPlaylist = {
+      id: 'blossom',
+      title: 'My Blossom Library',
+      tracks: blossomTracks
+    };
+    
+    // Load the Blossom playlist using the new signature
+    loadPlaylist('blossom', blossomPlaylist);
   };
 
   const trendingPlaylists = useMemo(
@@ -112,6 +173,18 @@ export function Music() {
     return playlists;
   }, [libraryPlaylists]);
 
+  // Create a virtual playlist object for Blossom library
+  const blossomPlaylistDisplay = useMemo(() => {
+    if (!blossomEndpoint || blossomTracks.length === 0) return [];
+    
+    return [{
+      id: 'blossom',
+      title: 'My Blossom Library',
+      description: `${blossomTracks.length} tracks from your Blossom server`,
+      tracks: blossomTracks
+    }];
+  }, [blossomEndpoint, blossomTracks]);
+
   return (
     <div className="container text-center py-12">
       <h1 className="text-2xl font-bold mb-4">WAVLAKE</h1>
@@ -123,6 +196,36 @@ export function Music() {
           playlists={trendingPlaylists}
           handlePlaylistClick={handleSelectPlaylist}
         />
+        
+        {/* Blossom Library Section */}
+        {blossomEndpoint && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 text-left">My Blossom Library</h2>
+            {blossomLoading && (
+              <div className="text-gray-400 text-left mb-4">
+                Loading tracks from your Blossom server...
+              </div>
+            )}
+            {blossomError && (
+              <div className="text-red-400 text-left mb-4">
+                Error loading Blossom tracks: {blossomError}
+              </div>
+            )}
+            {!blossomLoading && !blossomError && blossomTracks.length === 0 && (
+              <div className="text-gray-400 text-left mb-4">
+                No audio files found on your Blossom server.
+              </div>
+            )}
+            {blossomPlaylistDisplay.length > 0 && (
+              <PlaylistSection
+                title=""
+                playlists={blossomPlaylistDisplay}
+                handlePlaylistClick={handleSelectBlossomLibrary}
+              />
+            )}
+          </div>
+        )}
+        
         <PlaylistSection
           title="Library"
           playlists={userPlaylists}

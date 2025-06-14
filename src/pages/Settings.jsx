@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { NostrContext } from '../contexts/NostrContext';
 import { fetchRunDataFromWatch, mapWatchDataToRun } from '../services/BluetoothService';
 import { SyncConfirmationModal } from '../components/modals/SyncConfirmationModal';
+import { testConnection } from '../lib/blossom';
 
 const Settings = () => {
   const { 
@@ -41,6 +42,10 @@ const Settings = () => {
   const [isSyncingWatch, setIsSyncingWatch] = useState(false);
   const [syncedRun, setSyncedRun] = useState(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
+  
+  // Blossom connection test state
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState(null);
   
   // Load settings from localStorage
   useEffect(() => {
@@ -190,6 +195,40 @@ const Settings = () => {
   const handleAutoPostToggle = (e) => {
     const value = e.target.checked;
     setAutoPostToNostr(value);
+  };
+
+  const handleTestBlossomConnection = async () => {
+    if (!blossomEndpoint) {
+      setConnectionStatus({ success: false, message: 'Please enter a Blossom server URL first' });
+      return;
+    }
+
+    setIsTestingConnection(true);
+    setConnectionStatus(null);
+
+    try {
+      const isConnected = await testConnection(blossomEndpoint);
+      if (isConnected) {
+        setConnectionStatus({ 
+          success: true, 
+          message: 'Successfully connected to Blossom server!' 
+        });
+      } else {
+        setConnectionStatus({ 
+          success: false, 
+          message: 'Could not connect to Blossom server. Please check the URL.' 
+        });
+      }
+    } catch (error) {
+      setConnectionStatus({ 
+        success: false, 
+        message: `Connection failed: ${error.message}` 
+      });
+    } finally {
+      setIsTestingConnection(false);
+      // Clear status after 5 seconds
+      setTimeout(() => setConnectionStatus(null), 5000);
+    }
   };
 
   return (
@@ -425,6 +464,37 @@ const Settings = () => {
         <h3>About</h3>
         <p>Runstr App Version 1.1.0</p>
         <p>A Bitcoin-powered running app</p>
+      </div>
+
+      <div className="settings-section">
+        <h3>Music Server</h3>
+        <div className="setting-item">
+          <label>Blossom Music Server URL</label>
+          <input
+            type="text"
+            value={blossomEndpoint}
+            onChange={e => setBlossomEndpoint(e.target.value)}
+            placeholder="https://blossom.band"
+            style={{ width: '100%', marginBottom: '0.5rem' }}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <button 
+              onClick={handleTestBlossomConnection}
+              disabled={isTestingConnection || !blossomEndpoint}
+              className="bg-blue-500 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold py-1 px-3 rounded text-sm"
+            >
+              {isTestingConnection ? 'Testing...' : 'Test Connection'}
+            </button>
+            {connectionStatus && (
+              <span className={connectionStatus.success ? 'text-green-400' : 'text-red-400'}>
+                {connectionStatus.message}
+              </span>
+            )}
+          </div>
+          <p className="setting-description">
+            Connect to your personal Blossom server to access your music library. Leave empty to disable music server integration.
+          </p>
+        </div>
       </div>
 
       <div className="settings-section">
