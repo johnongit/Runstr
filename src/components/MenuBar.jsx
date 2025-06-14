@@ -27,6 +27,7 @@ export const MenuBar = () => {
   // Blossom connection test state
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(null);
+  const [customBlossomUrl, setCustomBlossomUrl] = useState('');
 
   // Load manualLnAddress when settings modal becomes visible or component mounts
   useEffect(() => {
@@ -123,7 +124,10 @@ export const MenuBar = () => {
   };
 
   const handleTestBlossomConnection = async () => {
-    if (!blossomEndpoint) {
+    // Determine the actual URL to test
+    const urlToTest = blossomEndpoint === 'custom' ? customBlossomUrl : blossomEndpoint;
+    
+    if (!urlToTest) {
       setConnectionStatus({ success: false, message: 'Please enter a Blossom server URL first' });
       return;
     }
@@ -132,7 +136,7 @@ export const MenuBar = () => {
     setConnectionStatus(null);
 
     try {
-      const isConnected = await testConnection(blossomEndpoint);
+      const isConnected = await testConnection(urlToTest);
       if (isConnected) {
         setConnectionStatus({ 
           success: true, 
@@ -389,22 +393,42 @@ export const MenuBar = () => {
               <h4 className="text-lg font-semibold mb-3">Music Server</h4>
               <div className="space-y-3">
                 <div>
-                  <label htmlFor="blossomEndpointInput" className="block text-sm font-medium text-gray-300 mb-1">
-                    Blossom Music Server URL
+                  <label htmlFor="blossomEndpointSelect" className="block text-sm font-medium text-gray-300 mb-1">
+                    Blossom Music Server
                   </label>
-                  <input
-                    id="blossomEndpointInput"
-                    type="text"
+                  <select
+                    id="blossomEndpointSelect"
                     value={blossomEndpoint}
                     onChange={e => setBlossomEndpoint(e.target.value)}
-                    placeholder="https://cdn.satellite.earth"
                     className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
+                  >
+                    <option value="https://cdn.satellite.earth">cdn.satellite.earth (Recommended)</option>
+                    <option value="https://blossom.band">blossom.band</option>
+                    <option value="https://blossom.primal.net">blossom.primal.net</option>
+                    <option value="custom">Custom Server...</option>
+                  </select>
                 </div>
+                
+                {blossomEndpoint === 'custom' && (
+                  <div>
+                    <label htmlFor="customBlossomInput" className="block text-sm font-medium text-gray-300 mb-1">
+                      Custom Server URL
+                    </label>
+                    <input
+                      id="customBlossomInput"
+                      type="text"
+                      value={customBlossomUrl}
+                      onChange={e => setCustomBlossomUrl(e.target.value)}
+                      placeholder="https://your-blossom-server.com"
+                      className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                )}
+                
                 <div className="flex items-center space-x-2">
                   <button 
                     onClick={handleTestBlossomConnection}
-                    disabled={isTestingConnection || !blossomEndpoint}
+                    disabled={isTestingConnection || (!blossomEndpoint || blossomEndpoint === 'custom' && !customBlossomUrl)}
                     className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white text-sm rounded-md transition-colors"
                   >
                     {isTestingConnection ? 'Testing...' : 'Test Connection'}
@@ -416,7 +440,7 @@ export const MenuBar = () => {
                   )}
                 </div>
                 <p className="text-xs text-gray-500">
-                  Connect to your personal Blossom server to access your music library. Go to the Music tab to see your tracks.
+                  Choose a Blossom server to access your music library. cdn.satellite.earth is recommended for most users.
                 </p>
               </div>
             </div>
