@@ -632,4 +632,108 @@ export async function getTracksFromServer(serverUrl) {
   }
 }
 
+/**
+ * Test connection to a Blossom or NIP-96 server
+ */
+export async function testConnection(serverUrl) {
+  try {
+    console.log('🔧 Testing connection to:', serverUrl);
+    
+    // Find server configuration
+    const server = DEFAULT_SERVERS.find(s => s.url === serverUrl) || {
+      url: serverUrl,
+      name: 'Custom Server',
+      type: 'blossom' // Default to blossom, will try NIP-96 if that fails
+    };
+    
+    // Try basic connectivity first
+    try {
+      const response = await fetch(serverUrl, {
+        method: 'HEAD',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        console.log('✅ Basic connectivity test passed');
+        return true;
+      }
+    } catch (basicError) {
+      console.log('⚠️ Basic connectivity test failed, trying specific endpoints');
+    }
+    
+    // Try server-specific endpoints
+    if (server.type === 'nip96') {
+      // Test NIP-96 configuration endpoint
+      try {
+        const configUrl = `${serverUrl}/.well-known/nostr/nip96.json`;
+        const configResponse = await fetch(configUrl);
+        
+        if (configResponse.ok) {
+          console.log('✅ NIP-96 configuration endpoint accessible');
+          return true;
+        }
+      } catch (configError) {
+        console.log('❌ NIP-96 config endpoint failed');
+      }
+      
+      // Try NIP-96 API endpoint
+      try {
+        const config = await getNip96Config(serverUrl);
+        const apiUrl = config.api_url || serverUrl;
+        const testResponse = await fetch(`${apiUrl}?page=0&count=1`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        // Even if it returns 401 (unauthorized), it means the endpoint exists
+        if (testResponse.status === 401 || testResponse.ok) {
+          console.log('✅ NIP-96 API endpoint accessible');
+          return true;
+        }
+      } catch (apiError) {
+        console.log('❌ NIP-96 API endpoint failed');
+      }
+    } else {
+      // Test Blossom endpoints
+      const endpoints = [
+        `${serverUrl}/list`,
+        `${serverUrl}/files`,
+        `${serverUrl}/api/list`,
+        `${serverUrl}/api/files`
+      ];
+      
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          // Even if it returns 401 (unauthorized), it means the endpoint exists
+          if (response.status === 401 || response.ok) {
+            console.log(`✅ Blossom endpoint accessible: ${endpoint}`);
+            return true;
+          }
+        } catch (endpointError) {
+          console.log(`❌ Endpoint failed: ${endpoint}`);
+          continue;
+        }
+      }
+    }
+    
+    console.log('❌ All connection tests failed');
+    return false;
+    
+  } catch (error) {
+    console.error('❌ Error testing connection:', error);
+    return false;
+  }
+}
+
 export { DEFAULT_SERVERS };
