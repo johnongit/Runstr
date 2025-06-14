@@ -4,6 +4,7 @@ import { FloatingMusicPlayer } from './FloatingMusicPlayer';
 import { useActivityMode, ACTIVITY_TYPES } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import rewardsPayoutService from '../services/rewardsPayoutService';
+import { testConnection } from '../lib/blossom';
 
 export const MenuBar = () => {
   const location = useLocation();
@@ -14,6 +15,7 @@ export const MenuBar = () => {
     healthEncryptionPref, setHealthEncryptionPref,
     publishMode, setPublishMode,
     privateRelayUrl, setPrivateRelayUrl,
+    blossomEndpoint, setBlossomEndpoint,
     skipStartCountdown, setSkipStartCountdown,
     usePedometer, setUsePedometer,
   } = useSettings();
@@ -21,6 +23,10 @@ export const MenuBar = () => {
   // State for the fallback lightning address in the modal
   const [manualLnAddress, setManualLnAddress] = useState('');
   const [lnAddressStatusMessage, setLnAddressStatusMessage] = useState('');
+  
+  // Blossom connection test state
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState(null);
 
   // Load manualLnAddress when settings modal becomes visible or component mounts
   useEffect(() => {
@@ -114,6 +120,40 @@ export const MenuBar = () => {
       setLnAddressStatusMessage('Please enter a valid Lightning Address (e.g., user@domain.com)');
     }
     setTimeout(() => setLnAddressStatusMessage(''), 3000);
+  };
+
+  const handleTestBlossomConnection = async () => {
+    if (!blossomEndpoint) {
+      setConnectionStatus({ success: false, message: 'Please enter a Blossom server URL first' });
+      return;
+    }
+
+    setIsTestingConnection(true);
+    setConnectionStatus(null);
+
+    try {
+      const isConnected = await testConnection(blossomEndpoint);
+      if (isConnected) {
+        setConnectionStatus({ 
+          success: true, 
+          message: 'Successfully connected to Blossom server!' 
+        });
+      } else {
+        setConnectionStatus({ 
+          success: false, 
+          message: 'Could not connect to Blossom server. Please check the URL.' 
+        });
+      }
+    } catch (error) {
+      setConnectionStatus({ 
+        success: false, 
+        message: `Connection failed: ${error.message}` 
+      });
+    } finally {
+      setIsTestingConnection(false);
+      // Clear status after 5 seconds
+      setTimeout(() => setConnectionStatus(null), 5000);
+    }
   };
 
   return (
@@ -341,6 +381,43 @@ export const MenuBar = () => {
                   />
                 </div>
                 {/* End Pedometer Checkbox */}
+              </div>
+            </div>
+            
+            {/* Blossom Music Server Section */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold mb-3">Music Server</h4>
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="blossomEndpointInput" className="block text-sm font-medium text-gray-300 mb-1">
+                    Blossom Music Server URL
+                  </label>
+                  <input
+                    id="blossomEndpointInput"
+                    type="text"
+                    value={blossomEndpoint}
+                    onChange={e => setBlossomEndpoint(e.target.value)}
+                    placeholder="https://blossom.band"
+                    className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button 
+                    onClick={handleTestBlossomConnection}
+                    disabled={isTestingConnection || !blossomEndpoint}
+                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white text-sm rounded-md transition-colors"
+                  >
+                    {isTestingConnection ? 'Testing...' : 'Test Connection'}
+                  </button>
+                  {connectionStatus && (
+                    <span className={`text-sm ${connectionStatus.success ? 'text-green-400' : 'text-red-400'}`}>
+                      {connectionStatus.message}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Connect to your personal Blossom server to access your music library. Go to the Music tab to see your tracks.
+                </p>
               </div>
             </div>
             

@@ -64,7 +64,8 @@ const TeamDetailPage: React.FC = () => {
   const { captainPubkey, teamUUID } = useParams<TeamDetailParams>();
   const location = useLocation();
   const seededEvent = (location.state as any)?.teamEvent ?? null;
-  const { ndk, ndkReady, publicKey: currentUserPubkey, canReadData, connectSigner } = useNostr();
+  const { ndk, ndkReady, publicKey, canReadData, connectSigner } = useNostr();
+  let currentUserPubkey = publicKey;
   const { wallet } = useAuth();
   const navigate = useNavigate();
 
