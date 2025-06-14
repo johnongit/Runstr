@@ -125,12 +125,27 @@ export function Music() {
             throw new Error('No signer available');
           }
           
+          console.log('[Music] Signing NIP-98 event template:', eventTemplate);
+          
+          // Ensure the event template has the correct kind for NIP-98 HTTP Auth
+          const nip98EventTemplate = {
+            ...eventTemplate,
+            kind: 27235, // NIP-98 HTTP Auth kind
+            pubkey: publicKey, // Ensure pubkey is set
+            created_at: eventTemplate.created_at || Math.floor(Date.now() / 1000)
+          };
+          
+          console.log('[Music] Creating NIP-98 event with kind 27235:', nip98EventTemplate);
+          
           // Create a proper NDK event and sign it
-          const ndkEvent = new NDKEvent(ndk, eventTemplate);
+          const ndkEvent = new NDKEvent(ndk, nip98EventTemplate);
           await ndkEvent.sign();
           
+          const signedEvent = ndkEvent.rawEvent();
+          console.log('[Music] Signed NIP-98 event:', signedEvent);
+          
           // Return the raw event object that NIP-98 expects
-          return ndkEvent.rawEvent();
+          return signedEvent;
         };
 
         const tracks = await listTracks(blossomEndpoint, publicKey, signEvent);
