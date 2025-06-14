@@ -450,13 +450,19 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
     // Build Blossom-specific endpoints based on server patterns
     let endpoints = [];
     
-    // Handle blossom.band subdomain pattern
+    // Handle blossom.band subdomain pattern - CRITICAL FIX!
     if (serverUrl.includes('blossom.band')) {
-      // Try both subdomain and main domain patterns
+      // blossom.band uses user-specific subdomains: https://<npub>.blossom.band
+      const npub = nip19.npubEncode(pubkey);
+      console.log('🌸 User pubkey (hex):', pubkey);
+      console.log('🌸 User npub:', npub);
+      console.log('🌸 Expected subdomain:', `https://${npub}.blossom.band`);
+      
       endpoints = [
-        `${serverUrl}/list/${pubkey}`,
-        `https://blossom.band/list/${pubkey}`,
-        `https://blossom.band/api/list/${pubkey}`
+        `https://${npub}.blossom.band/list/${pubkey}`, // Correct subdomain pattern
+        `${serverUrl}/list/${pubkey}`, // Fallback to provided URL
+        `https://blossom.band/list/${pubkey}`, // Fallback to main domain
+        `https://blossom.band/api/list/${pubkey}` // API endpoint fallback
       ];
     } else {
       // Standard Blossom server endpoints
@@ -473,12 +479,25 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
       try {
         console.log('🌸 Trying Blossom endpoint:', endpoint);
         
-        // Try without auth first (Blossom spec says auth is optional for listing)
+        // For blossom.band, always use authentication (it's required)
         let headers = { 'Accept': 'application/json' };
+        let useAuth = serverUrl.includes('blossom.band');
+        
+        if (useAuth) {
+          console.log('🔑 blossom.band requires auth - using Blossom auth (kind 24242)');
+          const authHeader = await createBlossomAuth('list');
+          if (authHeader) {
+            headers = { ...headers, 'Authorization': authHeader };
+          } else {
+            console.log('❌ Failed to create auth header for blossom.band');
+            continue;
+          }
+        }
+        
         let response = await fetch(endpoint, { method: 'GET', headers });
         
-        // If unauthorized, retry with Blossom auth (kind 24242)
-        if (response.status === 401) {
+        // If unauthorized and we haven't tried auth yet, retry with Blossom auth
+        if (response.status === 401 && !useAuth) {
           console.log('🔑 Endpoint requires auth, trying Blossom auth (kind 24242)');
           const authHeader = await createBlossomAuth('list');
           if (authHeader) {

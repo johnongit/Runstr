@@ -850,120 +850,274 @@ const uploaded = file.uploaded; // Upload timestamp
 
 *Pure Blossom implementation completed ▲ 2025-01-14*
 
-## 14. Pure Blossom Implementation Complete ✅
+## 15. Blossom.band Server Analysis & Solutions *(Critical Discovery)*
 
-> **Status:** Pure Blossom protocol implementation has been completed and deployed!
+> **Key Discovery:** User provided blossom.band server documentation revealing authentication requirements and subdomain structure that explains why files aren't being found.
 
-### 14.1 What Was Implemented
+### 15.1 Critical Server Information from blossom.band
 
-**✅ Correct Blossom Authentication (Kind 24242)**
-- Created `createBlossomAuth()` function using kind `24242` events
-- Uses `["t", "list"]` and `["expiration", timestamp]` tags
-- Content set to human-readable "List Blobs"
-- Completely separate from NIP-98 authentication
+**Authentication Requirements:**
+- `GET /list/<pubkey>` **requires authentication** (not optional as we assumed)
+- Uses "Signed nostr event" authentication
+- Every user gets their own subdomain: `https://<npub>.blossom.band`
 
-**✅ Pure Blossom Server Endpoints**
-- Updated `getFilesFromBlossomServer()` to use correct `/list/<pubkey>` pattern
-- Special handling for `blossom.band` subdomain pattern
-- Tries unauthenticated first, falls back to Blossom auth on 401
-- No more NIP-96 endpoints for pure Blossom servers
+**Supported Endpoints:**
+- ✅ `GET /<sha256>` (optional auth)
+- ✅ `GET /list/<pubkey>` (**authentication required**)
+- ✅ `PUT /upload` (authentication required)
+- ✅ `DELETE /<sha256>` (authentication required)
 
-**✅ Enhanced MIME Type Support**
-- Updated `isAudioFile()` to accept `application/octet-stream` with audio extensions
-- More liberal filtering for edge cases
-- Detailed logging of what gets accepted/rejected
+**Media Support:**
+- ✅ Audio files: `.wav`, `.mp3`, `.flac` explicitly supported
+- ✅ 100 MiB per upload limit (sufficient for most audio)
+- ✅ No limit on total uploads or retention
 
-**✅ Proper Blob Descriptor Parsing**
-- Updated `convertBlossomFileToTrack()` to handle Blossom blob descriptor format
-- Expects `{ url, sha256, size, type, uploaded }` structure
-- Extracts filename from URL for track titles
+### 15.2 Why Our Implementation Is Failing
 
-**✅ Server Configuration**
-- `blossom.band` and `cdn.satellite.earth` marked as `type: 'blossom'`
-- Will use pure Blossom protocol instead of NIP-96
+**Problem 1: Authentication Assumption**
+- **Our Code**: Tries unauthenticated first, then falls back to auth
+- **blossom.band Reality**: `/list/<pubkey>` **requires authentication**
+- **Impact**: Our unauthenticated attempts always fail, but we may not be handling the auth fallback correctly
 
-### 14.2 Key Technical Changes
+**Problem 2: Subdomain Structure**
+- **User's URL Pattern**: `https://npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum.blossom.band/`
+- **Our Endpoints**: We try `https://blossom.band/list/<pubkey>` 
+- **Correct Endpoint**: Should be `https://<npub>.blossom.band/list/<pubkey>`
 
-**Authentication Protocol Switch:**
+**Problem 3: Authentication Protocol**
+- **blossom.band**: Uses "Signed nostr event" (likely kind 24242 Blossom auth)
+- **Our Implementation**: Uses kind 24242 but may have wrong format
+- **Need to Verify**: Exact event structure and header format
+
+### 15.3 Immediate Solutions to Test
+
+**Solution 1: Fix Subdomain Endpoint Discovery**
 ```javascript
-// OLD (NIP-98):
-authEvent.kind = 27235;
-authEvent.tags = [['u', url], ['method', 'GET']];
-
-// NEW (Blossom):
-authEvent.kind = 24242;
-authEvent.content = 'List Blobs';
-authEvent.tags = [['t', 'list'], ['expiration', timestamp]];
-```
-
-**Endpoint Discovery:**
-```javascript
-// OLD (NIP-96 focused):
-endpoints = [`${serverUrl}/nip96/list/${pubkey}`];
-
-// NEW (Pure Blossom):
+// Current (wrong):
 endpoints = [
   `${serverUrl}/list/${pubkey}`,
-  `https://blossom.band/list/${pubkey}`, // Special blossom.band handling
-  `${serverUrl}/api/list/${pubkey}`
+  `https://blossom.band/list/${pubkey}`
+];
+
+// Should be:
+const npub = nip19.npubEncode(pubkey);
+endpoints = [
+  `https://${npub}.blossom.band/list/${pubkey}`,
+  `${serverUrl}/list/${pubkey}` // fallback
 ];
 ```
 
-**Blob Descriptor Handling:**
+**Solution 2: Always Use Authentication for blossom.band**
 ```javascript
-// Now expects proper Blossom format:
-const url = file.url;           // Direct blob URL
-const hash = file.sha256;       // SHA256 hash
-const mimeType = file.type;     // MIME type
-const size = file.size;         // File size in bytes
-const uploaded = file.uploaded; // Upload timestamp
+// For blossom.band, skip unauthenticated attempt
+if (serverUrl.includes('blossom.band')) {
+  // Always use Blossom auth (kind 24242) for blossom.band
+  const authHeader = await createBlossomAuth('list');
+  headers = { 'Accept': 'application/json', 'Authorization': authHeader };
+}
 ```
 
-### 14.3 Expected Results
+**Solution 3: Enhanced Debug Logging**
+```javascript
+console.log('🌸 User pubkey (hex):', pubkey);
+console.log('🌸 User npub:', nip19.npubEncode(pubkey));
+console.log('🌸 Expected subdomain:', `https://${nip19.npubEncode(pubkey)}.blossom.band`);
+console.log('🌸 Trying endpoint:', endpoint);
+console.log('🌸 Auth header present:', !!authHeader);
+```
 
-**For Your Servers:**
-- `blossom.band`: Should find your MP3 files using subdomain pattern
-- `cdn.satellite.earth`: Should find your MP3 files using direct pattern
-- Both should work with your actual file hashes and URLs
+### 15.4 Brainstorming: Complete blossom.band Integration
 
-**Debug Information:**
-- Comprehensive console logging shows exactly which endpoints are tried
-- MIME type logging shows what file types are found
-- Authentication attempts are clearly logged
-- Blob descriptor parsing is fully logged
+**Approach A: Subdomain-First Strategy**
+1. **Always use subdomain format** for blossom.band
+2. **Always authenticate** (don't try unauthenticated)
+3. **Use user's npub** to construct the correct subdomain
+4. **Verify Blossom auth format** matches blossom.band expectations
 
-### 14.4 Testing Instructions
+**Approach B: Multi-Endpoint Fallback**
+1. **Try subdomain first**: `https://<npub>.blossom.band/list/<pubkey>`
+2. **Fallback to main domain**: `https://blossom.band/list/<pubkey>`
+3. **Try API subdomain**: `https://api.blossom.band/list/<pubkey>`
+4. **All with authentication** since it's required
 
-1. **Open Browser Console** to see detailed logs
-2. **Go to Music Page** - should automatically try to load your Blossom library
-3. **Check Console Logs** for:
-   - `🌸 Getting files from pure Blossom server`
-   - `🔍 Trying Blossom endpoints`
-   - `🌸 Blossom response data`
-   - `✅ Audio detected by MIME type` or `✅ Audio detected by extension`
+**Approach C: Server-Specific Configuration**
+```javascript
+const BLOSSOM_BAND_CONFIG = {
+  requiresAuth: true,
+  useSubdomain: true,
+  authType: 'blossom', // kind 24242
+  endpoints: [
+    'https://{npub}.blossom.band/list/{pubkey}',
+    'https://blossom.band/list/{pubkey}'
+  ]
+};
+```
 
-### 14.5 What Should Happen Now
+### 15.5 Questions to Investigate
 
-**Success Scenario:**
-- Console shows successful connection to your servers
-- Blob descriptors are retrieved and logged
-- Audio files are detected and converted to tracks
-- Your MP3 files appear in "My Blossom Library"
+**Authentication Format:**
+1. **What exact event structure** does blossom.band expect for kind 24242?
+2. **What header format**: `Authorization: Nostr <base64>` or different?
+3. **What tags are required**: `["t", "list"]`, `["expiration", timestamp]`?
 
-**If Still Not Working:**
-- Console logs will show exactly where the process fails
-- We can see the actual server responses and debug from there
-- May need to adjust endpoints or authentication based on your server's specific implementation
+**Endpoint Discovery:**
+1. **Does the subdomain pattern work** for `/list/<pubkey>`?
+2. **Are there other API endpoints** we should try?
+3. **Does blossom.band support pagination** or return all blobs at once?
 
-### 14.6 Next Steps
+**Response Format:**
+1. **What does the blob descriptor look like** from blossom.band?
+2. **Are MIME types set correctly** for MP3 files?
+3. **Does the response include the full URL** or just the hash?
 
-1. **Test the implementation** with your servers
-2. **Check console logs** for detailed debugging information
-3. **Report results** - what works, what doesn't, what errors appear
-4. **Fine-tune** based on actual server responses
+### 15.6 Implementation Plan
 
-**This implementation follows the exact Blossom specification and should work with your servers!**
+**Phase 1: Fix Subdomain Discovery**
+- Update `getFilesFromBlossomServer()` to use npub subdomain for blossom.band
+- Always authenticate for blossom.band (skip unauthenticated attempt)
+- Add comprehensive logging for debugging
+
+**Phase 2: Verify Authentication**
+- Test our kind 24242 events against blossom.band requirements
+- Verify header format and event structure
+- Add fallback authentication methods if needed
+
+**Phase 3: Test with Real Data**
+- Use your actual npub and known file hashes
+- Verify endpoint responses and blob descriptors
+- Confirm audio file detection and track conversion
+
+### 15.7 Immediate Action Items
+
+1. **Update endpoint discovery** to use `https://<npub>.blossom.band/list/<pubkey>`
+2. **Always authenticate** for blossom.band servers
+3. **Add detailed logging** to see exactly what's happening
+4. **Test manually** with curl to verify the correct endpoint and auth
+
+**This explains why we're not finding your files - we're not using the correct subdomain structure that blossom.band requires!**
 
 ---
 
-*Pure Blossom implementation completed ▲ 2025-01-14* 
+*blossom.band analysis completed ▲ 2025-01-14*
+- **Impact**: Our unauthenticated attempts always fail, but we may not be handling the auth fallback correctly
+
+**Problem 2: Subdomain Structure**
+- **User's URL Pattern**: `https://npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum.blossom.band/`
+- **Our Endpoints**: We try `https://blossom.band/list/<pubkey>` 
+- **Correct Endpoint**: Should be `https://<npub>.blossom.band/list/<pubkey>`
+
+**Problem 3: Authentication Protocol**
+- **blossom.band**: Uses "Signed nostr event" (likely kind 24242 Blossom auth)
+- **Our Implementation**: Uses kind 24242 but may have wrong format
+- **Need to Verify**: Exact event structure and header format
+
+### 15.3 Immediate Solutions to Test
+
+**Solution 1: Fix Subdomain Endpoint Discovery**
+```javascript
+// Current (wrong):
+endpoints = [
+  `${serverUrl}/list/${pubkey}`,
+  `https://blossom.band/list/${pubkey}`
+];
+
+// Should be:
+const npub = nip19.npubEncode(pubkey);
+endpoints = [
+  `https://${npub}.blossom.band/list/${pubkey}`,
+  `${serverUrl}/list/${pubkey}` // fallback
+];
+```
+
+**Solution 2: Always Use Authentication for blossom.band**
+```javascript
+// For blossom.band, skip unauthenticated attempt
+if (serverUrl.includes('blossom.band')) {
+  // Always use Blossom auth (kind 24242) for blossom.band
+  const authHeader = await createBlossomAuth('list');
+  headers = { 'Accept': 'application/json', 'Authorization': authHeader };
+}
+```
+
+**Solution 3: Enhanced Debug Logging**
+```javascript
+console.log('🌸 User pubkey (hex):', pubkey);
+console.log('🌸 User npub:', nip19.npubEncode(pubkey));
+console.log('🌸 Expected subdomain:', `https://${nip19.npubEncode(pubkey)}.blossom.band`);
+console.log('🌸 Trying endpoint:', endpoint);
+console.log('🌸 Auth header present:', !!authHeader);
+```
+
+### 15.4 Brainstorming: Complete blossom.band Integration
+
+**Approach A: Subdomain-First Strategy**
+1. **Always use subdomain format** for blossom.band
+2. **Always authenticate** (don't try unauthenticated)
+3. **Use user's npub** to construct the correct subdomain
+4. **Verify Blossom auth format** matches blossom.band expectations
+
+**Approach B: Multi-Endpoint Fallback**
+1. **Try subdomain first**: `https://<npub>.blossom.band/list/<pubkey>`
+2. **Fallback to main domain**: `https://blossom.band/list/<pubkey>`
+3. **Try API subdomain**: `https://api.blossom.band/list/<pubkey>`
+4. **All with authentication** since it's required
+
+**Approach C: Server-Specific Configuration**
+```javascript
+const BLOSSOM_BAND_CONFIG = {
+  requiresAuth: true,
+  useSubdomain: true,
+  authType: 'blossom', // kind 24242
+  endpoints: [
+    'https://{npub}.blossom.band/list/{pubkey}',
+    'https://blossom.band/list/{pubkey}'
+  ]
+};
+```
+
+### 15.5 Questions to Investigate
+
+**Authentication Format:**
+1. **What exact event structure** does blossom.band expect for kind 24242?
+2. **What header format**: `Authorization: Nostr <base64>` or different?
+3. **What tags are required**: `["t", "list"]`, `["expiration", timestamp]`?
+
+**Endpoint Discovery:**
+1. **Does the subdomain pattern work** for `/list/<pubkey>`?
+2. **Are there other API endpoints** we should try?
+3. **Does blossom.band support pagination** or return all blobs at once?
+
+**Response Format:**
+1. **What does the blob descriptor look like** from blossom.band?
+2. **Are MIME types set correctly** for MP3 files?
+3. **Does the response include the full URL** or just the hash?
+
+### 15.6 Implementation Plan
+
+**Phase 1: Fix Subdomain Discovery**
+- Update `getFilesFromBlossomServer()` to use npub subdomain for blossom.band
+- Always authenticate for blossom.band servers
+- Add comprehensive logging for debugging
+
+**Phase 2: Verify Authentication**
+- Test our kind 24242 events against blossom.band requirements
+- Verify header format and event structure
+- Add fallback authentication methods if needed
+
+**Phase 3: Test with Real Data**
+- Use your actual npub and known file hashes
+- Verify endpoint responses and blob descriptors
+- Confirm audio file detection and track conversion
+
+### 15.7 Immediate Action Items
+
+1. **Update endpoint discovery** to use `https://<npub>.blossom.band/list/<pubkey>`
+2. **Always authenticate** for blossom.band servers
+3. **Add detailed logging** to see exactly what's happening
+4. **Test manually** with curl to verify the correct endpoint and auth
+
+**This explains why we're not finding your files - we're not using the correct subdomain structure that blossom.band requires!**
+
+---
+
+*blossom.band analysis completed ▲ 2025-01-14* 
