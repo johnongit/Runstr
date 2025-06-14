@@ -247,64 +247,6 @@ async function createNip98Auth(url, method = 'GET', payload = null) {
   }
 }
 
-/**
- * Create Blossom authorization header for authenticated requests (kind 24242)
- */
-async function createBlossomAuth(action = 'list') {
-  try {
-    // Import NDK dynamically to avoid loading issues
-    const { default: NDK, NDKEvent } = await import('@nostr-dev-kit/ndk');
-    
-    // Get user's private key from localStorage
-    const storedKey = localStorage.getItem('nostr-key');
-    if (!storedKey) {
-      console.log('❌ No private key found for Blossom auth');
-      return null;
-    }
-
-    let privateKey;
-    try {
-      // Try to decode as nsec
-      const decoded = nip19.decode(storedKey);
-      if (decoded.type === 'nsec') {
-        privateKey = decoded.data;
-      } else {
-        privateKey = storedKey;
-      }
-    } catch {
-      // Assume it's already a hex private key
-      privateKey = storedKey;
-    }
-
-    // Create NDK instance
-    const ndk = new NDK();
-    
-    // Create Blossom authorization event (kind 24242)
-    const authEvent = new NDKEvent(ndk);
-    authEvent.kind = 24242;
-    authEvent.content = 'List Blobs';
-    authEvent.created_at = Math.floor(Date.now() / 1000);
-    
-    // Required tags for Blossom auth
-    authEvent.tags = [
-      ['t', action],
-      ['expiration', (Math.floor(Date.now() / 1000) + 3600).toString()]
-    ];
-
-    // Sign the event
-    await authEvent.sign(privateKey);
-    
-    // Create authorization header
-    const authHeader = `Nostr ${btoa(JSON.stringify(authEvent.rawEvent()))}`;
-    console.log('✅ Created Blossom authorization header (kind 24242)');
-    return authHeader;
-    
-  } catch (error) {
-    console.error('❌ Error creating Blossom auth:', error);
-    return null;
-  }
-}
-
 // SECOND_EDIT
 // Enhanced NIP-96 fetch supporting /nip96/list, pagination, and auth fallback
 async function getFilesFromNip96Server(serverUrl, pubkey = null) {
