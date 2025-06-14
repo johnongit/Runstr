@@ -283,12 +283,14 @@ function convertNip96FileToTrack(file, serverUrl) {
       return null;
     }
     
-    // Create track object
+    // Create track object compatible with AudioPlayerProvider
     const track = {
       id: originalHash || url,
       title: tagMap.title || tagMap.alt || file.content || filename.replace(/\.[^/.]+$/, ''),
       artist: tagMap.creator || tagMap.artist || 'Unknown Artist',
-      url: url,
+      url: url, // Keep for compatibility
+      mediaUrl: url, // Required by AudioPlayerProvider
+      source: 'blossom', // Required by AudioPlayerProvider to identify as Blossom track
       duration: null, // Will be determined when audio loads
       size: size ? parseInt(size) : null,
       mimeType: mimeType,
@@ -408,12 +410,14 @@ function convertBlossomFileToTrack(file, serverUrl) {
       return null;
     }
     
-    // Create track object
+    // Create track object compatible with AudioPlayerProvider
     const track = {
       id: hash || url,
       title: filename.replace(/\.[^/.]+$/, ''), // Remove extension
       artist: file.artist || file.creator || 'Unknown Artist',
-      url: url,
+      url: url, // Keep for compatibility
+      mediaUrl: url, // Required by AudioPlayerProvider
+      source: 'blossom', // Required by AudioPlayerProvider to identify as Blossom track
       duration: null, // Will be determined when audio loads
       size: size ? parseInt(size) : null,
       mimeType: mimeType,
@@ -502,7 +506,9 @@ async function getTracksFromNostr() {
           id: event.id,
           title: title || 'Unknown Title',
           artist: creator || 'Unknown Artist',
-          url: url,
+          url: url, // Keep for compatibility
+          mediaUrl: url, // Required by AudioPlayerProvider
+          source: 'blossom', // Required by AudioPlayerProvider to identify as Blossom track
           duration: null,
           size: tagMap.size ? parseInt(tagMap.size) : null,
           mimeType: mimeType,
