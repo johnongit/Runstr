@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import teamsDataService from '../../services/TeamsDataService';
 import { getUserPublicKey } from '../../utils/nostrClient';
+import { DisplayName } from '../shared/DisplayName';
 
 interface LocalTeamChatProps {
   teamId: string;
@@ -74,7 +75,7 @@ export const LocalTeamChat: React.FC<LocalTeamChatProps> = ({ teamId, userPubkey
         {messages.length === 0 && <p style={{ color:'#aaa', textAlign:'center' }}>No messages yet.</p>}
         {messages.map(msg => (
           <div key={msg.id} style={{ marginBottom:'6px' }}>
-            <strong style={{ fontSize:'0.8rem' }}>{msg.userId.substring(0,8)}…</strong>{' '}
+            <strong style={{ fontSize:'0.8rem' }}><DisplayName pubkey={msg.userId} /></strong>{' '}
             <span style={{ fontSize:'0.7rem', color:'#888' }}>{formatTs(msg.timestamp)}</span>
             <p style={{ margin:'2px 0', wordBreak:'break-word', whiteSpace:'pre-wrap' }}>{msg.content}</p>
           </div>

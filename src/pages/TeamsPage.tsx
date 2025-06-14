@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useNip101TeamsFeed } from '../hooks/useNip101TeamsFeed';
 import { getTeamName, getTeamDescription, getTeamCaptain, getTeamUUID } from '../services/nostr/NostrTeamsService';
+import { DisplayName } from '../components/shared/DisplayName';
 
 const TeamsPage: React.FC = () => {
   const { teams, isLoading, error: fetchError, refetchTeams } = useNip101TeamsFeed();
@@ -63,7 +64,7 @@ const TeamsPage: React.FC = () => {
                     {team.description.substring(0, 150)}{team.description.length > 150 ? '...' : ''}
                   </p>
                   <div className="text-xs text-gray-500">
-                    <p>Captain: <span className="font-mono text-gray-400">{team.captainPubkey.substring(0,10)}...{team.captainPubkey.substring(team.captainPubkey.length - 5)}</span></p>
+                    <p>Captain: <DisplayName pubkey={team.captainPubkey} /></p>
                   </div>
                 </li>
               );

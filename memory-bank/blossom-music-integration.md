@@ -23,11 +23,16 @@ This phase focuses on the primary read-only functionality: finding and playing m
 1.  **Blossom API Utility (`src/lib/blossom.js`):**
     *   Create a new utility file for handling communication with Blossom servers.
     *   **`listTracks(serverUrl, pubkey)` function:**
-        *   This function will call the `GET <serverUrl>/list/<pubkey>` endpoint. The user's `pubkey` can be retrieved from `window.nostr.getPublicKey()`.
-        *   It needs to handle optional **NIP-98 authentication**, similar to how `fetchLikedPlaylist` in `src/utils/wavlake.js` works. We can reuse that pattern.
-        *   The function must **filter the results**. A Blossom server can store any file type. We'll need to inspect the returned data for each blob (likely checking a `type` or `mime_type` field, or falling back to file extension) and only include audio files (e.g., `audio/mpeg`, `audio/wav`, `video/mp4`).
+        *   This function will call the `GET <serverUrl>/list/<pubkey>` endpoint. The user's `pubkey` can be retrieved from the existing Nostr context/provider in the app.
+        *   It needs to handle **required NIP-98 authentication** (based on blossom.band documentation showing authentication is required for `/list/<pubkey>`), similar to how `fetchLikedPlaylist` in `src/utils/wavlake.js` works. We can reuse that pattern.
+        *   The function must **filter the results**. A Blossom server can store any file type. We'll need to inspect the returned data for each blob (likely checking a `type` or `mime_type` field, or falling back to file extension) and only include audio files (e.g., `audio/mpeg`, `audio/wav`, `audio/mp4`, `audio/flac`).
 
-2.  **Audio Player Integration (`src/contexts/AudioPlayerProvider.jsx`):**
+2.  **Settings Storage (`src/contexts/SettingsProvider.jsx` or similar):**
+    *   Add a new setting for `blossomServerUrl` that persists to local storage.
+    *   Include validation to ensure the URL is properly formatted.
+    *   Provide methods to get/set the Blossom server URL that other components can use.
+
+3.  **Audio Player Integration (`src/contexts/AudioPlayerProvider.jsx`):**
     *   The existing `loadPlaylist` function will be updated to recognize a new, special-purpose playlist ID, for instance, `"blossom"`.
     *   When `loadPlaylist("blossom")` is called, the provider will use the new `blossom.js` utility to fetch the list of tracks.
     *   It will then map the Blossom blob data into the track format the player expects: `{ id, title, mediaUrl }`.
@@ -73,8 +78,138 @@ The mirroring feature, as specified in BUD-04, seems challenging to implement in
 
 ---
 
-## 4. Open Questions & Next Steps
+## 4. Key Technical Insights from Research
 
-1.  **What is the exact structure of the data returned by the `GET /list/<pubkey>` endpoint?** This is the most important question. We need to know if it includes mime types for filtering and titles for display.
-2.  **How do we handle blobs without metadata?** We need a fallback strategy for displaying tracks if a title isn't available.
-3.  **Are most Blossom servers private?** We should assume authentication might be needed and build `nip98` support from the start. 
+Based on the [blossom.band documentation](https://blossom.band), we now know:
+
+1.  **Authentication is Required:** The `GET /list/<pubkey>` endpoint requires authentication via signed Nostr events (NIP-98). This is consistent across Blossom servers.
+2.  **Supported Audio Formats:** Common audio formats are supported including `.wav`, `.mp3`, `.flac`, and `.mp4` (for audio/video).
+3.  **File Size Limits:** Free tier has 100 MiB per upload limit, which should be sufficient for most audio files.
+4.  **Metadata Support:** Servers support Nostr File Metadata Tags (NIP-94/BUD-08), which should provide proper titles and metadata for audio files.
+
+## 5. Updated Implementation Considerations
+
+### Mobile App Context
+- **No `window.nostr`:** We'll use the existing Nostr context/provider that the app already has for signing events.
+- **Persistent Storage:** The Blossom server URL must be saved to local storage so users don't need to re-enter it every time.
+- **Network Efficiency:** Since this is a mobile app, we should implement proper loading states and error handling for network requests.
+
+### Settings Integration
+The settings page should include:
+- Input field for Blossom server URL with validation
+- Test connection button to verify the server is reachable
+- Clear indication of connection status
+- Option to clear/reset the server URL
+
+## 6. Open Questions & Next Steps
+
+1.  **What is the exact structure of the data returned by the `GET /list/<pubkey>` endpoint?** We need to test this with a real server to understand the blob descriptor format.
+2.  **How are NIP-94 metadata tags structured?** This will determine how we extract titles and other metadata for display.
+3.  **Should we support multiple Blossom servers?** For now, single server support seems sufficient, but this could be expanded later.
+
+---
+
+## 7. Phased Implementation Plan
+
+Based on the existing codebase architecture, here are the implementation options:
+
+### **Option A: Minimal Integration (Recommended Start)**
+*Focus: Get basic playback working with minimal changes*
+
+**Phase 1A: Settings Foundation (1-2 hours)**
+- Extend `src/contexts/SettingsContext.jsx` to add `blossomServerUrl` (already has `blossomEndpoint` - we can reuse this!)
+- Add UI in `src/pages/Settings.jsx` for Blossom server URL input
+- Add basic URL validation and connection testing
+
+**Phase 1B: Blossom API Utility (2-3 hours)**
+- Create `src/lib/blossom.js` with `listTracks()` function
+- Implement NIP-98 authentication using existing Nostr context
+- Add audio file filtering logic
+- Handle blob descriptor to track mapping
+
+**Phase 1C: Music Page Integration (2-3 hours)**
+- Modify `src/pages/Music.jsx` to show "My Blossom Library" section
+- Create new `PlaylistSection` for Blossom tracks
+- Integrate with existing `loadPlaylist()` in `AudioPlayerProvider`
+
+**Phase 1D: Player Integration (1-2 hours)**
+- Extend `src/contexts/AudioPlayerProvider.jsx` to handle "blossom" playlist ID
+- Map Blossom tracks to existing track format
+- Test playback with direct Blossom URLs
+
+**Total Estimated Time: 6-10 hours**
+
+### **Option B: Full Integration (More Comprehensive)**
+*Focus: Complete feature with advanced functionality*
+
+**Phase 2A: Enhanced Settings (2-3 hours)**
+- Add connection status indicators
+- Implement server capability detection
+- Add multiple server support (future-proofing)
+- Enhanced error handling and user feedback
+
+**Phase 2B: Advanced Blossom Features (3-4 hours)**
+- Implement NIP-94 metadata parsing for better track titles
+- Add caching for track lists
+- Implement background sync for track updates
+- Add track artwork support if available
+
+**Phase 2C: UI/UX Polish (2-3 hours)**
+- Custom Blossom library UI components
+- Loading states and error handling
+- Search/filter functionality within Blossom library
+- Integration with existing music player themes
+
+**Phase 2D: Performance Optimization (1-2 hours)**
+- Implement lazy loading for large libraries
+- Add request debouncing
+- Optimize for mobile performance
+
+**Total Estimated Time: 8-12 hours**
+
+### **Option C: Research & Prototype (Conservative Approach)**
+*Focus: Validate assumptions before full implementation*
+
+**Phase 3A: API Research (1-2 hours)**
+- Test actual Blossom server responses
+- Document blob descriptor format
+- Validate NIP-94 metadata availability
+- Test authentication requirements
+
+**Phase 3B: Minimal Prototype (2-3 hours)**
+- Create standalone test component
+- Implement basic server communication
+- Test audio playback with direct URLs
+- Validate technical approach
+
+**Phase 3C: Integration Planning (1 hour)**
+- Document integration points
+- Plan data flow architecture
+- Identify potential issues
+- Create detailed implementation roadmap
+
+**Total Estimated Time: 4-6 hours**
+
+---
+
+## 8. Recommended Approach
+
+**I recommend starting with Option A (Minimal Integration)** for these reasons:
+
+1. **Leverages Existing Architecture:** The app already has `blossomEndpoint` in settings and a robust audio player system
+2. **Low Risk:** Minimal changes to existing code reduce the chance of breaking current functionality
+3. **Quick Validation:** We can test the core concept quickly and get user feedback
+4. **Iterative:** Easy to enhance with Option B features once basic functionality is proven
+
+### Implementation Order:
+1. **Start with Phase 1A** - extend existing settings (safest, builds on existing patterns)
+2. **Move to Phase 1B** - create the Blossom utility (core functionality)
+3. **Then Phase 1C** - integrate with Music page (user-facing feature)
+4. **Finally Phase 1D** - connect to audio player (complete the feature)
+
+### Key Decision Points:
+- **Use existing `blossomEndpoint` setting or create new `blossomServerUrl`?** (Recommend reuse existing)
+- **Extend current `AudioPlayerProvider` or create separate Blossom player?** (Recommend extend existing)
+- **Show Blossom tracks in main music feed or separate section?** (Recommend separate section initially)
+
+Would you like me to proceed with implementing Phase 1A, or would you prefer to discuss any of these options further? 
