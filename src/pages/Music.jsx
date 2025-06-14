@@ -11,6 +11,7 @@ import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useSettings } from '../contexts/SettingsContext';
 import { NostrContext } from '../contexts/NostrContext';
 import { listTracks } from '../lib/blossom';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 
 export function Music() {
   const hasMounted = useRef(false);
@@ -119,11 +120,17 @@ export function Music() {
         console.log('[Music] Loading Blossom tracks from:', blossomEndpoint);
         
         // Create a sign function that works with our NDK signer
-        const signEvent = async (event) => {
-          if (ndk.signer && typeof ndk.signer.sign === 'function') {
-            return await ndk.signer.sign(event);
+        const signEvent = async (eventTemplate) => {
+          if (!ndk.signer || typeof ndk.signer.sign !== 'function') {
+            throw new Error('No signer available');
           }
-          throw new Error('No signer available');
+          
+          // Create a proper NDK event and sign it
+          const ndkEvent = new NDKEvent(ndk, eventTemplate);
+          await ndkEvent.sign();
+          
+          // Return the raw event object that NIP-98 expects
+          return ndkEvent.rawEvent();
         };
 
         const tracks = await listTracks(blossomEndpoint, publicKey, signEvent);
