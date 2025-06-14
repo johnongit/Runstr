@@ -8,7 +8,6 @@ import { TeamsProvider } from './contexts/TeamsContext';
 import { ActivityModeProvider } from './contexts/ActivityModeContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { WalletProvider } from './contexts/WalletContext';
-import { ThemeProvider } from './contexts/ThemeContext';
 import { MenuBar } from './components/MenuBar';
 import { initializeEvents } from './services/EventService';
 import './App.css';
@@ -170,34 +169,32 @@ const App = () => {
   }
   
   return (
-    <ThemeProvider>
-      <Router>
-        <NostrProvider>
-          <AuthProvider>
-            <AudioPlayerProvider>
-              <SettingsProvider>
-                <ActivityModeProvider>
-                  <RunTrackerProvider>
-                    <TeamsProvider>
-                      <WalletProvider>
-                        <div className="relative w-full h-full bg-background text-primary">
-                          <MenuBar />
-                          <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
-                            <Suspense fallback={<EnhancedLoadingFallback />}>
-                              <AppRoutes />
-                            </Suspense>
-                          </main>
-                        </div>
-                      </WalletProvider>
-                    </TeamsProvider>
-                  </RunTrackerProvider>
-                </ActivityModeProvider>
-              </SettingsProvider>
-            </AudioPlayerProvider>
-          </AuthProvider>
-        </NostrProvider>
-      </Router>
-    </ThemeProvider>
+    <Router>
+      <NostrProvider>
+        <AuthProvider>
+          <AudioPlayerProvider>
+            <SettingsProvider>
+              <ActivityModeProvider>
+                <RunTrackerProvider>
+                  <TeamsProvider>
+                    <WalletProvider>
+                      <div className="relative w-full h-full bg-[#111827] text-white">
+                        <MenuBar />
+                        <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
+                          <Suspense fallback={<EnhancedLoadingFallback />}>
+                            <AppRoutes />
+                          </Suspense>
+                        </main>
+                      </div>
+                    </WalletProvider>
+                  </TeamsProvider>
+                </RunTrackerProvider>
+              </ActivityModeProvider>
+            </SettingsProvider>
+          </AudioPlayerProvider>
+        </AuthProvider>
+      </NostrProvider>
+    </Router>
   );
 };
 

@@ -1,208 +1,52 @@
 :root {
-  /* ==============================================
-     NEW DESIGN SYSTEM VARIABLES 
-     ============================================== */
+  /* Color variables */
+  --primary-color: #3a86ff;
+  --secondary-color: #ff006e;
+  --success-color: #28a745;
+  --danger-color: #dc3545;
+  --warning-color: #ffc107;
+  --info-color: #17a2b8;
   
-  /* Core Colors - Light Mode (defaults) */
-  --color-background: #ffffff;
-  --color-surface: #f8f9fa;
-  --color-surface-elevated: #ffffff;
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #6c757d;
-  --color-text-tertiary: #adb5bd;
+  /* Bitcoin colors */
+  --bitcoin-orange: #f7931a;
+  --bitcoin-orange-light: rgba(247, 147, 26, 0.1);
   
-  /* Interactive Colors - Light Mode */
-  --color-interactive: #1a1a1a;
-  --color-interactive-hover: #333333;
-  --color-interactive-active: #0f0f0f;
-  --color-interactive-disabled: #e5e5e5;
-  
-  /* Border Colors - Light Mode */
-  --color-border: rgba(26, 26, 26, 0.1);
-  --color-border-hover: rgba(26, 26, 26, 0.2);
-  --color-border-active: rgba(26, 26, 26, 0.3);
-  
-  /* Accent Colors (Functional Only) */
-  --color-accent: #f7931a;
-  --color-accent-subtle: rgba(247, 147, 26, 0.1);
-  --color-accent-hover: #e8870f;
-  
-  /* System Colors */
-  --color-success: #22c55e;
-  --color-success-subtle: rgba(34, 197, 94, 0.1);
-  --color-error: #ef4444;
-  --color-error-subtle: rgba(239, 68, 68, 0.1);
-  --color-warning: #f59e0b;
-  --color-warning-subtle: rgba(245, 158, 11, 0.1);
-  --color-info: #3b82f6;
-  --color-info-subtle: rgba(59, 130, 246, 0.1);
-  
-  /* Typography */
-  --font-family-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  
-  /* Font Sizes */
-  --font-size-xs: 0.75rem;     /* 12px */
-  --font-size-sm: 0.875rem;    /* 14px */
-  --font-size-base: 1rem;      /* 16px */
-  --font-size-lg: 1.125rem;    /* 18px */
-  --font-size-xl: 1.25rem;     /* 20px */
-  --font-size-2xl: 1.5rem;     /* 24px */
-  --font-size-3xl: 1.875rem;   /* 30px */
-  --font-size-4xl: 2.25rem;    /* 36px */
-  
-  /* Line Heights */
-  --line-height-tight: 1.25;
-  --line-height-normal: 1.5;
-  --line-height-relaxed: 1.75;
-  
-  /* Font Weights */
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  
-  /* Spacing System (4px grid) */
-  --space-0: 0;
-  --space-1: 0.25rem;   /* 4px */
-  --space-2: 0.5rem;    /* 8px */
-  --space-3: 0.75rem;   /* 12px */
-  --space-4: 1rem;      /* 16px */
-  --space-5: 1.25rem;   /* 20px */
-  --space-6: 1.5rem;    /* 24px */
-  --space-8: 2rem;      /* 32px */
-  --space-10: 2.5rem;   /* 40px */
-  --space-12: 3rem;     /* 48px */
-  --space-16: 4rem;     /* 64px */
-  
-  /* Border Radius */
-  --radius-none: 0;
-  --radius-sm: 0.25rem;   /* 4px */
-  --radius-md: 0.5rem;    /* 8px */
-  --radius-lg: 0.75rem;   /* 12px */
-  --radius-xl: 1rem;      /* 16px */
-  --radius-2xl: 1.5rem;   /* 24px */
-  --radius-full: 9999px;
-  
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  
-  /* Animation Timing */
-  --timing-fast: 150ms;
-  --timing-normal: 250ms;
-  --timing-slow: 350ms;
-  
-  /* Animation Easing */
-  --easing-linear: cubic-bezier(0, 0, 1, 1);
-  --easing-ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --easing-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-  
-  /* ==============================================
-     BACKWARDS COMPATIBILITY VARIABLES
-     (Preserving existing variables that may be referenced)
-     ============================================== */
-  
-  /* Legacy color variables - mapped to new system */
-  --primary-color: var(--color-interactive);
-  --secondary-color: var(--color-text-secondary);
-  --success-color: var(--color-success);
-  --danger-color: var(--color-error);
-  --warning-color: var(--color-warning);
-  --info-color: var(--color-info);
-  
-  /* Bitcoin colors - using new accent system */
-  --bitcoin-orange: var(--color-accent);
-  --bitcoin-orange-light: var(--color-accent-subtle);
-  
-  /* Background colors - mapped to new system */
-  --bg-dark: var(--color-surface);
-  --bg-darker: var(--color-background);
-  --bg-light: var(--color-surface-elevated);
+  /* Background colors */
+  --bg-dark: #121212;
+  --bg-darker: #0a0a0a;
+  --bg-light: #1e1e1e;
   --bg-highlight: rgba(255, 255, 255, 0.05);
   
-  /* Text colors - mapped to new system */
-  --text-primary: var(--color-text-primary);
-  --text-secondary: var(--color-text-secondary);
-  --text-muted: var(--color-text-tertiary);
+  /* Text colors */
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.5);
   
-  /* Border colors - mapped to new system */
-  --border-color: var(--color-border);
-  --border-color-active: var(--color-border-active);
+  /* Border colors */
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-color-active: rgba(255, 255, 255, 0.3);
   
-  /* Legacy animation durations */
-  --animation-speed-fast: var(--timing-fast);
-  --animation-speed-normal: var(--timing-normal);
-  --animation-speed-slow: var(--timing-slow);
+  /* Animation durations */
+  --animation-speed-fast: 0.2s;
+  --animation-speed-normal: 0.3s;
+  --animation-speed-slow: 0.5s;
   
-  /* Legacy spacing */
-  --spacing-xs: var(--space-1);
-  --spacing-sm: var(--space-2);
-  --spacing-md: var(--space-4);
-  --spacing-lg: var(--space-6);
-  --spacing-xl: var(--space-8);
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
   
-  /* Legacy border radius */
-  --border-radius-sm: var(--radius-sm);
-  --border-radius-md: var(--radius-md);
-  --border-radius-lg: var(--radius-lg);
-  --border-radius-xl: var(--radius-xl);
-  --border-radius-pill: var(--radius-full);
+  /* Border radius */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-pill: 9999px;
   
-  /* Legacy shadows - using new shadow system */
+  /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
-}
-
-/* ==============================================
-   DARK MODE OVERRIDES
-   ============================================== */
-
-[data-theme="dark"] {
-  /* Core Colors - Dark Mode */
-  --color-background: #000000;
-  --color-surface: #0f0f0f;
-  --color-surface-elevated: #1a1a1a;
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #b0b0b0;
-  --color-text-tertiary: #707070;
-  
-  /* Interactive Colors - Dark Mode */
-  --color-interactive: #ffffff;
-  --color-interactive-hover: #e5e5e5;
-  --color-interactive-active: #f0f0f0;
-  --color-interactive-disabled: #404040;
-  
-  /* Border Colors - Dark Mode */
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-border-hover: rgba(255, 255, 255, 0.2);
-  --color-border-active: rgba(255, 255, 255, 0.3);
-  
-  /* Accent Colors remain the same in dark mode */
-  --color-accent-hover: #ff9f1c;
-  
-  /* System Colors - adjusted for dark mode */
-  --color-success-subtle: rgba(34, 197, 94, 0.15);
-  --color-error-subtle: rgba(239, 68, 68, 0.15);
-  --color-warning-subtle: rgba(245, 158, 11, 0.15);
-  --color-info-subtle: rgba(59, 130, 246, 0.15);
-  
-  /* Shadows - adjusted for dark mode */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
-  
-  /* Legacy background colors for dark mode */
-  --bg-dark: #0f0f0f;
-  --bg-darker: #000000;
-  --bg-light: #1a1a1a;
-  --bg-highlight: rgba(255, 255, 255, 0.08);
-  
-  /* Legacy text colors for dark mode */
-  --text-primary: rgba(255, 255, 255, 0.95);
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --text-muted: rgba(255, 255, 255, 0.5);
 } 
