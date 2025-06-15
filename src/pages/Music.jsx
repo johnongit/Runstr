@@ -10,7 +10,7 @@ import { MusicPlayer } from '../components/MusicPlayer';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useSettings } from '../contexts/SettingsContext';
 import { NostrContext } from '../contexts/NostrContext';
-import { getAllTracks, getTracksFromServer, DEFAULT_SERVERS } from '../lib/blossom';
+import { getAllTracks, getTracksFromServer, DEFAULT_SERVERS, setDebugCallback } from '../lib/blossom';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 
 export function Music() {
@@ -31,6 +31,25 @@ export function Music() {
   const [blossomTracks, setBlossomTracks] = useState([]);
   const [blossomLoading, setBlossomLoading] = useState(false);
   const [blossomError, setBlossomError] = useState(null);
+  
+  // Debug logging state - TEMPORARY FOR DEBUGGING
+  const [debugLogs, setDebugLogs] = useState([]);
+  const [showDebugLogs, setShowDebugLogs] = useState(true);
+  
+  const addDebugLog = (message, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugLogs(prev => [...prev, { timestamp, message, type }]);
+  };
+  
+  const clearDebugLogs = () => {
+    setDebugLogs([]);
+  };
+  
+  // Set up debug callback for blossom.js
+  useEffect(() => {
+    setDebugCallback(addDebugLog);
+    return () => setDebugCallback(null);
+  }, []);
 
   useEffect(() => {
     window.nostr
@@ -107,30 +126,57 @@ export function Music() {
   // Load Blossom tracks when server URL is available
   useEffect(() => {
     const loadBlossomTracks = async () => {
+      if (!pubkey) {
+        addDebugLog('❌ No pubkey available - user may not be logged in', 'error');
+        return;
+      }
+      
       setBlossomLoading(true);
       setBlossomError(null);
+      clearDebugLogs();
+      
+      addDebugLog(`🔑 Using pubkey: ${pubkey.substring(0, 8)}...${pubkey.substring(-8)}`, 'info');
+      addDebugLog(`🌐 Blossom endpoint setting: ${blossomEndpoint || 'Search All Servers'}`, 'info');
+      
+      // Check if user has private key for authentication
+      const hasPrivateKey = localStorage.getItem('nostr-key') || localStorage.getItem('runstr_privkey');
+      addDebugLog(`🔐 Private key available: ${hasPrivateKey ? 'Yes' : 'No (authentication will fail!)'}`, hasPrivateKey ? 'success' : 'error');
+      
+      if (!hasPrivateKey) {
+        addDebugLog('⚠️ No private key found - Blossom servers require authentication', 'error');
+        addDebugLog('💡 Try logging in with a Nostr extension or private key', 'info');
+      }
 
       try {
         let tracks = [];
         
         if (blossomEndpoint && blossomEndpoint !== '') {
           // Load tracks from specific server
-          console.log('[Music] Loading tracks from specific server:', blossomEndpoint);
-          console.log('[Music] Using pubkey:', pubkey ? `${pubkey.substring(0, 8)}...` : 'none');
+          addDebugLog(`🎯 Loading tracks from specific server: ${blossomEndpoint}`, 'info');
           tracks = await getTracksFromServer(blossomEndpoint, pubkey);
+          addDebugLog(`📊 Server returned ${tracks.length} tracks`, tracks.length > 0 ? 'success' : 'warning');
         } else {
           // Load tracks from all default servers
-          console.log('[Music] Loading tracks from all default servers');
-          console.log('[Music] Using pubkey:', pubkey ? `${pubkey.substring(0, 8)}...` : 'none');
+          addDebugLog('🌍 Loading tracks from all default servers', 'info');
           tracks = await getAllTracks(DEFAULT_SERVERS, pubkey);
+          addDebugLog(`📊 All servers returned ${tracks.length} total tracks`, tracks.length > 0 ? 'success' : 'warning');
         }
         
         setBlossomTracks(tracks);
-        console.log(`[Music] Loaded ${tracks.length} total tracks`);
+        addDebugLog(`✅ Final result: ${tracks.length} tracks loaded into UI`, 'success');
+        
+        // Log some sample tracks for debugging
+        if (tracks.length > 0) {
+          tracks.slice(0, 3).forEach((track, i) => {
+            addDebugLog(`🎵 Sample track ${i + 1}: "${track.title}" from ${track.server}`, 'info');
+          });
+        }
         
       } catch (error) {
         console.error('[Music] Error loading tracks:', error);
-        setBlossomError(error.message);
+        const errorMsg = `Error loading tracks: ${error.message}`;
+        setBlossomError(errorMsg);
+        addDebugLog(`❌ ${errorMsg}`, 'error');
         setBlossomTracks([]);
       } finally {
         setBlossomLoading(false);
@@ -188,9 +234,63 @@ export function Music() {
   }, [blossomEndpoint, blossomTracks]);
 
   return (
-    <div className="container text-center py-12">
-      <h1 className="text-2xl font-bold mb-4">WAVLAKE</h1>
-      <div className="bg-[#1a1a1a] rounded-lg p-4 sm:p-8 w-full mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800 text-white">
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-4xl font-bold mb-8 text-center">Music</h1>
+        
+        {/* DEBUG PANEL - TEMPORARY FOR DEBUGGING */}
+        {showDebugLogs && (
+          <div className="mb-6 bg-gray-800 rounded-lg p-4 border border-gray-600">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-semibold text-yellow-400">🔧 Debug Logs (Temporary)</h3>
+              <div className="space-x-2">
+                <button 
+                  onClick={clearDebugLogs}
+                  className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm"
+                >
+                  Clear
+                </button>
+                <button 
+                  onClick={() => setShowDebugLogs(false)}
+                  className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm"
+                >
+                  Hide
+                </button>
+              </div>
+            </div>
+            <div className="max-h-64 overflow-y-auto bg-gray-900 rounded p-3 font-mono text-sm">
+              {debugLogs.length === 0 ? (
+                <div className="text-gray-400">No logs yet...</div>
+              ) : (
+                debugLogs.map((log, index) => (
+                  <div 
+                    key={index} 
+                    className={`mb-1 ${
+                      log.type === 'error' ? 'text-red-400' : 
+                      log.type === 'success' ? 'text-green-400' : 
+                      log.type === 'warning' ? 'text-yellow-400' : 
+                      'text-gray-300'
+                    }`}
+                  >
+                    <span className="text-gray-500">[{log.timestamp}]</span> {log.message}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+        
+        {!showDebugLogs && (
+          <div className="mb-4">
+            <button 
+              onClick={() => setShowDebugLogs(true)}
+              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 rounded text-sm"
+            >
+              🔧 Show Debug Logs
+            </button>
+          </div>
+        )}
+
         {currentTrack && <MusicPlayer />}
 
         <PlaylistSection

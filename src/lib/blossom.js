@@ -3,6 +3,20 @@
 
 import { nip19 } from 'nostr-tools';
 
+// Debug callback for UI logging - TEMPORARY FOR DEBUGGING
+let debugCallback = null;
+
+export function setDebugCallback(callback) {
+  debugCallback = callback;
+}
+
+function debugLog(message, type = 'info') {
+  console.log(message);
+  if (debugCallback) {
+    debugCallback(message, type);
+  }
+}
+
 // Default Blossom servers with their capabilities
 const DEFAULT_SERVERS = [
   {
@@ -73,7 +87,7 @@ async function createBlossomAuth(action = 'list') {
     // Get user's private key from localStorage
     const storedKey = localStorage.getItem('nostr-key');
     if (!storedKey) {
-      console.log('❌ No private key found for Blossom auth');
+      debugLog('❌ No private key found for Blossom auth', 'error');
       return null;
     }
 
@@ -111,11 +125,12 @@ async function createBlossomAuth(action = 'list') {
     
     // Create authorization header
     const authHeader = `Nostr ${btoa(JSON.stringify(authEvent.rawEvent()))}`;
-    console.log('✅ Created Blossom authorization header (kind 24242)');
+    debugLog('✅ Created Blossom authorization header (kind 24242)', 'success');
+    debugLog(`🔑 Auth event: ${JSON.stringify(authEvent.rawEvent())}`, 'info');
     return authHeader;
     
   } catch (error) {
-    console.error('❌ Error creating Blossom auth:', error);
+    debugLog(`❌ Error creating Blossom auth: ${error.message}`, 'error');
     return null;
   }
 }
@@ -124,11 +139,11 @@ async function createBlossomAuth(action = 'list') {
  * Check if a file is an audio file based on MIME type and extension (liberal filtering)
  */
 function isAudioFile(mimeType, filename) {
-  console.log('🎵 Checking if file is audio:', { mimeType, filename });
+  debugLog(`🎵 Checking if file is audio - MIME: ${mimeType}, filename: ${filename}`, 'info');
   
   // Accept any audio MIME type
   if (mimeType && mimeType.toLowerCase().startsWith('audio/')) {
-    console.log('✅ Audio detected by MIME type:', mimeType);
+    debugLog(`✅ Audio detected by MIME type: ${mimeType}`, 'success');
     return true;
   }
   
@@ -138,7 +153,7 @@ function isAudioFile(mimeType, filename) {
       filename.toLowerCase().endsWith(ext.toLowerCase())
     );
     if (hasAudioExt) {
-      console.log('✅ Audio detected: octet-stream with audio extension:', filename);
+      debugLog(`✅ Audio detected: octet-stream with audio extension: ${filename}`, 'success');
       return true;
     }
   }
@@ -147,12 +162,12 @@ function isAudioFile(mimeType, filename) {
   if (filename && SUPPORTED_AUDIO_EXTENSIONS.some(ext => 
     filename.toLowerCase().endsWith(ext.toLowerCase())
   )) {
-    console.log('✅ Audio detected by extension:', filename);
+    debugLog(`✅ Audio detected by extension: ${filename}`, 'success');
     return true;
   }
   
   // Log what we're rejecting for debugging
-  console.log('❌ Not detected as audio file:', { mimeType, filename });
+  debugLog(`❌ Not detected as audio file - MIME: ${mimeType}, filename: ${filename}`, 'warning');
   return false;
 }
 
@@ -440,10 +455,10 @@ function convertNip96FileToTrack(file, serverUrl) {
  */
 async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
   try {
-    console.log('🌸 Getting files from pure Blossom server:', serverUrl);
+    debugLog(`🌸 Getting files from pure Blossom server: ${serverUrl}`, 'info');
     
     if (!pubkey) {
-      console.log('⚠️ No pubkey provided for Blossom server');
+      debugLog('⚠️ No pubkey provided for Blossom server', 'warning');
       return [];
     }
     
@@ -454,9 +469,9 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
     if (serverUrl.includes('blossom.band')) {
       // blossom.band uses user-specific subdomains: https://<npub>.blossom.band
       const npub = nip19.npubEncode(pubkey);
-      console.log('🌸 User pubkey (hex):', pubkey);
-      console.log('🌸 User npub:', npub);
-      console.log('🌸 Expected subdomain:', `https://${npub}.blossom.band`);
+      debugLog(`🌸 User pubkey (hex): ${pubkey}`, 'info');
+      debugLog(`🌸 User npub: ${npub}`, 'info');
+      debugLog(`🌸 Expected subdomain: https://${npub}.blossom.band`, 'info');
       
       endpoints = [
         `https://${npub}.blossom.band/list/${pubkey}`, // Correct subdomain pattern
@@ -473,23 +488,24 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
       ];
     }
     
-    console.log('🔍 Trying Blossom endpoints:', endpoints);
+    debugLog(`🔍 Trying Blossom endpoints: ${endpoints.join(', ')}`, 'info');
     
     for (const endpoint of endpoints) {
       try {
-        console.log('🌸 Trying Blossom endpoint:', endpoint);
+        debugLog(`🌸 Trying Blossom endpoint: ${endpoint}`, 'info');
         
         // For blossom.band, always use authentication (it's required)
         let headers = { 'Accept': 'application/json' };
         let useAuth = serverUrl.includes('blossom.band');
         
         if (useAuth) {
-          console.log('🔑 blossom.band requires auth - using Blossom auth (kind 24242)');
+          debugLog('🔑 blossom.band requires auth - using Blossom auth (kind 24242)', 'info');
           const authHeader = await createBlossomAuth('list');
           if (authHeader) {
             headers = { ...headers, 'Authorization': authHeader };
+            debugLog('✅ Blossom auth header created successfully', 'success');
           } else {
-            console.log('❌ Failed to create auth header for blossom.band');
+            debugLog('❌ Failed to create auth header for blossom.band', 'error');
             continue;
           }
         }
@@ -498,17 +514,23 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
         
         // If unauthorized and we haven't tried auth yet, retry with Blossom auth
         if (response.status === 401 && !useAuth) {
-          console.log('🔑 Endpoint requires auth, trying Blossom auth (kind 24242)');
+          debugLog('🔑 Endpoint requires auth, trying Blossom auth (kind 24242)', 'info');
           const authHeader = await createBlossomAuth('list');
           if (authHeader) {
             headers = { ...headers, 'Authorization': authHeader };
             response = await fetch(endpoint, { method: 'GET', headers });
+            debugLog('🔄 Retried with authentication', 'info');
           }
         }
         
+        debugLog(`🌸 Response status: ${response.status}`, response.ok ? 'success' : 'warning');
+        debugLog(`🌸 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'info');
+        
         if (response.ok) {
           const data = await response.json();
-          console.log('🌸 Blossom response data:', data);
+          debugLog(`🌸 Blossom response data: ${JSON.stringify(data)}`, 'info');
+          debugLog(`🌸 Response type: ${typeof data}`, 'info');
+          debugLog(`🌸 Is array: ${Array.isArray(data)}`, 'info');
           
           // Try to parse the response
           let files = [];
@@ -521,7 +543,7 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
           }
           
           if (files.length > 0) {
-            console.log(`✅ Found ${files.length} files from Blossom server`);
+            debugLog(`✅ Found ${files.length} files from Blossom server`, 'success');
             
             // Convert to tracks
             const tracks = [];
@@ -532,21 +554,29 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
               }
             }
             
+            debugLog(`🎵 Converted ${tracks.length} files to audio tracks`, tracks.length > 0 ? 'success' : 'warning');
             return tracks;
+          } else {
+            debugLog('⚠️ Server returned empty file list', 'warning');
           }
+        } else {
+          // Log error response for debugging
+          const errorText = await response.text().catch(() => 'Could not read error response');
+          debugLog(`❌ Non-OK response: ${response.status} ${response.statusText}`, 'error');
+          debugLog(`❌ Error response body: ${errorText}`, 'error');
         }
         
       } catch (endpointError) {
-        console.log('❌ Endpoint failed:', endpoint, endpointError.message);
+        debugLog(`❌ Endpoint failed: ${endpoint} - ${endpointError.message}`, 'error');
         continue;
       }
     }
     
-    console.log('❌ No working endpoints found for Blossom server');
+    debugLog('❌ No working endpoints found for Blossom server', 'error');
     return [];
     
   } catch (error) {
-    console.error('❌ Error getting files from Blossom server:', error);
+    debugLog(`❌ Error getting files from Blossom server: ${error.message}`, 'error');
     return [];
   }
 }
@@ -556,7 +586,7 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
  */
 function convertBlossomFileToTrack(file, serverUrl) {
   try {
-    console.log('🌸 Converting Blossom blob descriptor to track:', file);
+    debugLog(`🌸 Converting Blossom blob descriptor to track: ${JSON.stringify(file)}`, 'info');
     
     // Blossom blob descriptor format:
     // { url, sha256, size, type, uploaded }
@@ -567,7 +597,7 @@ function convertBlossomFileToTrack(file, serverUrl) {
     const uploaded = file.uploaded || file.created;
     
     if (!url || !hash) {
-      console.log('❌ Invalid blob descriptor - missing url or sha256');
+      debugLog('❌ Invalid blob descriptor - missing url or sha256', 'error');
       return null;
     }
     
@@ -576,7 +606,7 @@ function convertBlossomFileToTrack(file, serverUrl) {
     
     // Check if this is an audio file
     if (!isAudioFile(mimeType, filename)) {
-      console.log('❌ Blob is not an audio file');
+      debugLog(`❌ Blob is not an audio file - MIME: ${mimeType}, filename: ${filename}`, 'warning');
       return null;
     }
     
@@ -596,11 +626,11 @@ function convertBlossomFileToTrack(file, serverUrl) {
       uploadedAt: uploaded ? new Date(uploaded * 1000) : null
     };
     
-    console.log('✅ Created track from Blossom blob:', track);
+    debugLog(`✅ Created track from Blossom blob: "${track.title}"`, 'success');
     return track;
     
   } catch (error) {
-    console.error('❌ Error converting Blossom blob to track:', error);
+    debugLog(`❌ Error converting Blossom blob to track: ${error.message}`, 'error');
     return null;
   }
 }
@@ -711,24 +741,24 @@ async function getTracksFromNostr(pubkey) {
  * Main function to get all available tracks from all sources
  */
 export async function getAllTracks(servers = DEFAULT_SERVERS, pubkey) {
-  console.log('🎵 Starting comprehensive track search...');
-  console.log('🔍 Searching servers:', servers);
+  debugLog('🎵 Starting comprehensive track search...', 'info');
+  debugLog(`🔍 Searching ${servers.length} servers: ${servers.map(s => s.name).join(', ')}`, 'info');
   
   const allTracks = [];
   
   try {
     // First, try to get tracks from Nostr relays
-    console.log('📡 Phase 1: Searching Nostr relays for NIP-94 events...');
+    debugLog('📡 Phase 1: Searching Nostr relays for NIP-94 events...', 'info');
     const nostrTracks = await getTracksFromNostr(pubkey);
     allTracks.push(...nostrTracks);
-    console.log(`✅ Phase 1 complete: ${nostrTracks.length} tracks from Nostr`);
+    debugLog(`✅ Phase 1 complete: ${nostrTracks.length} tracks from Nostr`, nostrTracks.length > 0 ? 'success' : 'warning');
     
     // Then, query each server directly
-    console.log('🌐 Phase 2: Querying servers directly...');
+    debugLog('🌐 Phase 2: Querying servers directly...', 'info');
     
     for (const server of servers) {
       try {
-        console.log(`🔍 Querying server: ${server.name} (${server.url})`);
+        debugLog(`🔍 Querying server: ${server.name} (${server.url}) - Type: ${server.type}`, 'info');
         
         let serverTracks = [];
         
@@ -740,16 +770,16 @@ export async function getAllTracks(servers = DEFAULT_SERVERS, pubkey) {
           serverTracks = await getFilesFromBlossomServer(server.url, pubkey);
         }
         
-        console.log(`✅ Server ${server.name}: ${serverTracks.length} tracks`);
+        debugLog(`✅ Server ${server.name}: ${serverTracks.length} tracks`, serverTracks.length > 0 ? 'success' : 'warning');
         allTracks.push(...serverTracks);
         
       } catch (serverError) {
-        console.error(`❌ Error querying server ${server.name}:`, serverError);
+        debugLog(`❌ Error querying server ${server.name}: ${serverError.message}`, 'error');
         continue;
       }
     }
     
-    console.log(`🎵 Search complete: ${allTracks.length} total tracks found`);
+    debugLog(`🎵 Search complete: ${allTracks.length} total tracks found`, 'info');
     
     // Remove duplicates based on hash or URL
     const uniqueTracks = [];
@@ -763,11 +793,11 @@ export async function getAllTracks(servers = DEFAULT_SERVERS, pubkey) {
       }
     }
     
-    console.log(`✅ Final result: ${uniqueTracks.length} unique tracks`);
+    debugLog(`✅ Final result: ${uniqueTracks.length} unique tracks after deduplication`, 'success');
     return uniqueTracks;
     
   } catch (error) {
-    console.error('❌ Error in getAllTracks:', error);
+    debugLog(`❌ Error in getAllTracks: ${error.message}`, 'error');
     return allTracks; // Return whatever we managed to get
   }
 }
@@ -776,7 +806,7 @@ export async function getAllTracks(servers = DEFAULT_SERVERS, pubkey) {
  * Get tracks from a specific server
  */
 export async function getTracksFromServer(serverUrl, pubkey) {
-  console.log('🎵 Getting tracks from specific server:', serverUrl);
+  debugLog(`🎵 Getting tracks from specific server: ${serverUrl}`, 'info');
   
   // Find server configuration
   const server = DEFAULT_SERVERS.find(s => s.url === serverUrl) || {
@@ -785,26 +815,30 @@ export async function getTracksFromServer(serverUrl, pubkey) {
     type: 'blossom' // Default to blossom, will try NIP-96 if that fails
   };
   
+  debugLog(`🔧 Server config: ${server.name} (${server.type})`, 'info');
+  
   try {
     let tracks = [];
     
     if (server.type === 'nip96') {
+      debugLog('📋 Using NIP-96 protocol', 'info');
       tracks = await getFilesFromNip96Server(server.url, pubkey);
     } else {
+      debugLog('🌸 Using Blossom protocol', 'info');
       tracks = await getFilesFromBlossomServer(server.url, pubkey);
     }
     
     // If no tracks found and we assumed blossom, try NIP-96
     if (tracks.length === 0 && server.type === 'blossom') {
-      console.log('🔄 No tracks found with Blossom approach, trying NIP-96...');
+      debugLog('🔄 No tracks found with Blossom approach, trying NIP-96...', 'warning');
       tracks = await getFilesFromNip96Server(server.url, pubkey);
     }
     
-    console.log(`✅ Found ${tracks.length} tracks from ${serverUrl}`);
+    debugLog(`✅ Found ${tracks.length} tracks from ${serverUrl}`, tracks.length > 0 ? 'success' : 'warning');
     return tracks;
     
   } catch (error) {
-    console.error('❌ Error getting tracks from server:', error);
+    debugLog(`❌ Error getting tracks from server: ${error.message}`, 'error');
     return [];
   }
 }
