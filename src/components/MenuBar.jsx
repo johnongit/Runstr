@@ -18,6 +18,7 @@ export const MenuBar = () => {
     blossomEndpoint, setBlossomEndpoint,
     skipStartCountdown, setSkipStartCountdown,
     usePedometer, setUsePedometer,
+    useLocalStats, setUseLocalStats
   } = useSettings();
 
   // State for the fallback lightning address in the modal
@@ -52,7 +53,7 @@ export const MenuBar = () => {
     },
     { 
       name: 'STATS', 
-      path: '/history', 
+      path: useLocalStats ? '/history' : '/nostr-stats', 
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -232,6 +233,25 @@ export const MenuBar = () => {
                 </div>
                 <p className="text-xs text-gray-500">
                   Start the run immediately when you tap "Start Run".
+                </p>
+              </div>
+            </div>
+            
+            {/* Stats Settings Section - NEW */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold mb-3">Stats Settings</h4>
+              <div className="bg-[#111827] p-3 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-400 mr-3">Use Local Stats</span>
+                  <input 
+                    type="checkbox"
+                    className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
+                    checked={useLocalStats}
+                    onChange={() => setUseLocalStats(!useLocalStats)}
+                  />
+                </div>
+                <p className="text-xs text-gray-500">
+                  When enabled, the Stats tab shows local run history instead of Nostr workout stats.
                 </p>
               </div>
             </div>
@@ -483,16 +503,6 @@ export const MenuBar = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
                 <span>Wallet</span>
-              </Link>
-              <Link 
-                to="/about" 
-                className="flex items-center p-3 bg-[#111827] rounded-lg text-white"
-                onClick={toggleSettings}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>About Runstr</span>
               </Link>
             </div>
           </div>

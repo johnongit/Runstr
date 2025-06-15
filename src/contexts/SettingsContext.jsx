@@ -43,6 +43,8 @@ export const useSettings = () => {
       setUsePedometer: () => console.warn('Settings not initialized'),
       autoPostToNostr: false,
       setAutoPostToNostr: () => console.warn('Settings not initialized'),
+      useLocalStats: false,
+      setUseLocalStats: () => console.warn('Settings not initialized'),
     };
     PUBLISHABLE_METRICS.forEach(metric => {
       const keyName = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
@@ -79,6 +81,7 @@ export const SettingsProvider = ({ children }) => {
   const [skipStartCountdown, setSkipStartCountdown] = useState(() => initBooleanState('skipStartCountdown', false));
   const [usePedometer, setUsePedometer] = useState(() => initBooleanState('usePedometer', true));
   const [autoPostToNostr, setAutoPostToNostr] = useState(() => initBooleanState('autoPostToNostr', false));
+  const [useLocalStats, setUseLocalStats] = useState(() => initBooleanState('useLocalStats', false));
 
   const initialMetricPrefs = useMemo(() => PUBLISHABLE_METRICS.reduce((acc, metric) => {
     const key = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
@@ -103,6 +106,7 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => localStorage.setItem('skipStartCountdown', skipStartCountdown.toString()), [skipStartCountdown]);
   useEffect(() => localStorage.setItem('usePedometer', usePedometer.toString()), [usePedometer]);
   useEffect(() => localStorage.setItem('autoPostToNostr', autoPostToNostr.toString()), [autoPostToNostr]);
+  useEffect(() => localStorage.setItem('useLocalStats', useLocalStats.toString()), [useLocalStats]);
 
   useEffect(() => {
     try {
@@ -162,6 +166,8 @@ export const SettingsProvider = ({ children }) => {
     setUsePedometer,
     autoPostToNostr,
     setAutoPostToNostr,
+    useLocalStats,
+    setUseLocalStats,
     ...metricPublishPrefs,
     ...dynamicMetricSetters
   }), [
@@ -174,6 +180,7 @@ export const SettingsProvider = ({ children }) => {
     skipStartCountdown, setSkipStartCountdown,
     usePedometer, setUsePedometer,
     autoPostToNostr, setAutoPostToNostr,
+    useLocalStats, setUseLocalStats,
     metricPublishPrefs,
     dynamicMetricSetters
   ]);

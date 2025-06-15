@@ -175,13 +175,44 @@ export function Music() {
   const blossomPlaylistDisplay = useMemo(() => {
     if (blossomTracks.length === 0) return [];
     
+    // Helper function to get playlist name from server URL
+    const getPlaylistNameFromServer = (serverUrl) => {
+      if (!serverUrl || serverUrl === '') {
+        return 'Blossom Music Library';
+      }
+      
+      // Find the server in DEFAULT_SERVERS
+      const server = DEFAULT_SERVERS.find(s => s.url === serverUrl);
+      if (server) {
+        // Convert server names to playlist format
+        if (server.url.includes('satellite.earth')) {
+          return 'Satellite.Earth Playlist';
+        } else if (server.url.includes('blossom.band')) {
+          return 'Blossom.Band Playlist';
+        } else if (server.url.includes('primal')) {
+          return 'Primal.Band Playlist';
+        } else {
+          return `${server.name} Playlist`;
+        }
+      }
+      
+      // For custom servers, try to extract domain name
+      try {
+        const domain = new URL(serverUrl).hostname;
+        return `${domain} Playlist`;
+      } catch {
+        return 'Blossom Music Library';
+      }
+    };
+    
+    const playlistTitle = getPlaylistNameFromServer(blossomEndpoint);
     const description = blossomEndpoint && blossomEndpoint !== '' 
       ? `${blossomTracks.length} tracks from ${blossomEndpoint}`
       : `${blossomTracks.length} tracks from Blossom servers`;
     
     return [{
       id: 'blossom',
-      title: 'Blossom Music Library',
+      title: playlistTitle,
       description: description,
       tracks: blossomTracks
     }];
@@ -204,7 +235,9 @@ export function Music() {
         
         {/* Blossom Library Section */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-left">Blossom Music Library</h2>
+          <h2 className="text-xl font-semibold mb-4 text-left">
+            {blossomTracks.length > 0 && blossomPlaylistDisplay[0] ? blossomPlaylistDisplay[0].title : 'Blossom Music Library'}
+          </h2>
           {blossomLoading && (
             <div className="text-gray-400 text-left mb-4">
               {blossomEndpoint && blossomEndpoint !== '' 

@@ -25,21 +25,21 @@ Comprehensive UI improvements focusing on consistency, functionality, and user e
 ### 5. Stats Header Text Update ✅ COMPLETE
 - [x] **Change Header**: "Your Nostr Stats" → "Nostr Workout Stats"
 
+### 8. Blossom Image Placeholders ✅ COMPLETE
+- [x] **Replace Broken Images**: Use pink flower placeholders instead of broken album art
+- [x] **Implementation Choice**: One big bouquet image selected (Option B)
+
 ## Medium Complexity Tasks (30-60 mins each)
 
-### 6. Default Stats Navigation to Nostr
-- [ ] **Route Logic Update**: Make "Stats" navigation default to NostrStatsPage
-- [ ] **Settings Integration**: Add toggle for "Use Local Stats" in settings  
-- [ ] **Conditional Routing**: When toggle enabled, route to RunHistory instead
+### 6. Default Stats Navigation to Nostr ✅ COMPLETE
+- [x] **Route Logic Update**: Make "Stats" navigation default to NostrStatsPage
+- [x] **Settings Integration**: Add toggle for "Use Local Stats" in settings  
+- [x] **Conditional Routing**: When toggle enabled, route to RunHistory instead
 
-### 7. Dynamic Blossom Playlist Naming
-- [ ] **Server Detection**: Identify which Blossom server is being used
-- [ ] **Dynamic Labels**: Show "Blossom.Band Playlist", "Satellite.Earth Playlist", "Primal.Band Playlist"
-- [ ] **Remove Duplicate Text**: Fix "Blossom Music Library" appearing twice
-
-### 8. Blossom Image Placeholders
-- [ ] **Replace Broken Images**: Use pink flower placeholders instead of broken album art
-- [ ] **Implementation Choice**: Individual flowers OR one big bouquet image?
+### 7. Dynamic Blossom Playlist Naming ✅ COMPLETE
+- [x] **Server Detection**: Identify which Blossom server is being used
+- [x] **Dynamic Labels**: Show "Blossom.Band Playlist", "Satellite.Earth Playlist", "Primal.Band Playlist"
+- [x] **Remove Duplicate Text**: Fix "Blossom Music Library" appearing twice
 
 ## Complex Tasks (1-2+ hours each)
 
