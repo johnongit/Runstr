@@ -44,7 +44,6 @@ const Goals = safeLazy(() => import('./pages/Goals'), 'Goals');
 const Events = safeLazy(() => import('./pages/Events'), 'Events');
 const EventDetail = safeLazy(() => import('./pages/EventDetail'), 'EventDetail');
 const Profile = safeLazy(() => import('./pages/Profile'), 'Profile');
-const About = safeLazy(() => import('./pages/About'), 'About');
 const NostrStatsPage = safeLazy(() => import('./pages/NostrStatsPage'), 'NostrStatsPage');
 const TeamsPage = safeLazy(() => import('./pages/TeamsPage'), 'TeamsPage');
 const CreateTeamFormV2 = safeLazy(() => import('./components/teams/CreateTeamFormV2'), 'CreateTeamFormV2');
