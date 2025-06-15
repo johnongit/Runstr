@@ -41,7 +41,7 @@ const NostrStatsPage = () => {
 
   return (
     <div className="p-4 space-y-6">
-      <h2 className="text-xl font-semibold">Your Nostr Stats</h2>
+      <h2 className="text-xl font-semibold">Nostr Workout Stats</h2>
       {stats ? (
         <div className="grid grid-cols-2 gap-4 bg-gray-800 p-4 rounded-lg text-sm">
           <Stat label="Runs" value={stats.totalRuns} />

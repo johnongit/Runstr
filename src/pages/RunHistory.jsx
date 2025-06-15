@@ -433,13 +433,6 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             Nostr Workout Record
           </Link>
         </div>
-        <button 
-          className="profile-btn" 
-          onClick={() => navigate('/profile')}
-          title="Update your profile for accurate calorie calculations"
-        >
-          Update Profile
-        </button>
         <div className="stats-grid">
           <div className="stat-card">
             <h3>Total Distance</h3>

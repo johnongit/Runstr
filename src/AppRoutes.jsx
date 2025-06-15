@@ -88,7 +88,6 @@ const AppRoutes = () => {
         <Route path="/goals" element={<Goals />} />
         <Route path="/events" element={<Events />} />
         <Route path="/event/:eventId" element={<EventDetail />} />
-        <Route path="/about" element={<About />} />
         
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/new" element={<CreateTeamFormV2 />} />

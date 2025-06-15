@@ -10,16 +10,8 @@ const TeamsPage: React.FC = () => {
   return (
     <div className="p-4 max-w-3xl mx-auto text-white">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Nostr Teams (NIP-101e)</h1>
+        <h1 className="text-3xl font-bold">Teams</h1>
         <div className="flex items-center">
-          <button 
-            onClick={refetchTeams} 
-            disabled={isLoading}
-            className="mr-4 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out disabled:opacity-50"
-            title="Refresh Teams List"
-          >
-            {isLoading ? 'Refreshing...' : 'Refresh'}
-          </button>
           <Link
             to="/teams/new"
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out"
