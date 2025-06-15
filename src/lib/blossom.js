@@ -2,7 +2,7 @@
 // Implements NIP-96 HTTP File Storage Integration
 
 import { nip19 } from 'nostr-tools';
-import AmberAuth from '../services/AmberAuth.js';
+import { ndk } from '../lib/ndkSingleton.js';
 import { getUserPublicKey } from '../utils/nostrClient.js';
 
 // Debug callback for UI logging - TEMPORARY FOR DEBUGGING
@@ -79,60 +79,82 @@ const SUPPORTED_AUDIO_EXTENSIONS = [
 const NIP96_PAGE_LIMIT = 500;
 
 /**
- * Create Blossom authorization header for authenticated requests (kind 24242)
- * Uses Amber for signing on mobile
+ * Create Blossom authentication header (kind 24242)
+ * Uses the same authentication pattern as the rest of the app
+ * @param {string} action - The action being performed (e.g., 'list', 'upload')
+ * @returns {Promise<string|null>} Authorization header value or null if failed
  */
 async function createBlossomAuth(action = 'list') {
   try {
-    debugLog('🔑 Creating Blossom auth using Amber...', 'info');
-    
-    // Check if Amber is available (mobile only)
-    const isAmberAvailable = await AmberAuth.isAmberInstalled();
-    debugLog(`🔍 Amber available: ${isAmberAvailable}`, 'info');
-    
-    if (!isAmberAvailable) {
-      debugLog('❌ Amber not available - cannot create Blossom auth', 'error');
-      return null;
-    }
+    const now = Math.floor(Date.now() / 1000);
 
-    // Get user's public key
-    const userPubkey = await getUserPublicKey();
-    if (!userPubkey) {
-      debugLog('❌ No user pubkey available for Blossom auth', 'error');
-      return null;
-    }
-    
-    debugLog(`🔑 Using pubkey for auth: ${userPubkey}`, 'info');
-
-    // Create Blossom authorization event (kind 24242)
-    const authEvent = {
+    // Helper to build an unsigned auth event
+    const buildEvent = (pubkey) => ({
       kind: 24242,
       content: 'List Blobs',
-      created_at: Math.floor(Date.now() / 1000),
-      pubkey: userPubkey,
+      created_at: now,
+      pubkey,
       tags: [
         ['t', action],
-        ['expiration', (Math.floor(Date.now() / 1000) + 3600).toString()]
+        ['expiration', (now + 3600).toString()]
       ]
-    };
+    });
 
-    debugLog(`🔑 Auth event to sign: ${JSON.stringify(authEvent)}`, 'info');
-
-    // Sign the event using Amber
-    const signedEvent = await AmberAuth.signEvent(authEvent);
-    if (!signedEvent || !signedEvent.sig) {
-      debugLog('❌ Amber signing failed or returned invalid event', 'error');
-      return null;
+    // -------------------- 1. Try NDK Signer (preferred - already set up by NostrContext) --------------------
+    try {
+      if (ndk && ndk.signer) {
+        debugLog('🔑 Using NDK signer for Blossom auth', 'info');
+        const user = await ndk.signer.user();
+        if (user && user.pubkey) {
+          const unsigned = buildEvent(user.pubkey);
+          debugLog(`🔑 Auth event to sign: ${JSON.stringify(unsigned)}`, 'info');
+          
+          // Sign using NDK signer (which handles Amber, private keys, etc.)
+          const signature = await ndk.signer.sign(unsigned);
+          const signed = { ...unsigned, sig: signature };
+          
+          debugLog('✅ NDK signer signed event successfully', 'success');
+          const authHeader = `Nostr ${btoa(JSON.stringify(signed))}`;
+          debugLog(`🔑 Auth header created: ${authHeader.substring(0, 50)}...`, 'info');
+          return authHeader;
+        }
+      }
+    } catch (ndkErr) {
+      debugLog(`⚠️ NDK signer failed: ${ndkErr.message}`, 'warning');
     }
-    
-    debugLog('✅ Amber signed event successfully', 'success');
-    debugLog(`🔑 Signed event: ${JSON.stringify(signedEvent)}`, 'info');
-    
-    // Create authorization header
-    const authHeader = `Nostr ${btoa(JSON.stringify(signedEvent))}`;
-    debugLog('✅ Blossom auth header created successfully', 'success');
-    return authHeader;
-    
+
+    // -------------------- 2. Fallback to getUserPublicKey + window.nostr --------------------
+    try {
+      const pubkey = await getUserPublicKey();
+      if (pubkey && window?.nostr?.signEvent) {
+        debugLog('🔑 Using window.nostr for Blossom auth', 'info');
+        const unsigned = buildEvent(pubkey);
+        const signed = await window.nostr.signEvent(unsigned);
+        
+        debugLog('✅ window.nostr signed event successfully', 'success');
+        const authHeader = `Nostr ${btoa(JSON.stringify(signed))}`;
+        return authHeader;
+      }
+    } catch (nostrErr) {
+      debugLog(`⚠️ window.nostr sign failed: ${nostrErr.message}`, 'warning');
+    }
+
+    // -------------------- 3. Final fallback to localStorage private key --------------------
+    try {
+      const storedKey = localStorage.getItem('runstr_privkey') || localStorage.getItem('nostr-key');
+      if (storedKey) {
+        debugLog('🔑 Using stored private key for Blossom auth', 'info');
+        // This would require importing nostr-tools signing functions
+        // For now, we'll skip this to avoid adding dependencies
+        debugLog('⚠️ Private key signing not implemented in Blossom integration', 'warning');
+      }
+    } catch (keyErr) {
+      debugLog(`⚠️ Private key sign failed: ${keyErr.message}`, 'warning');
+    }
+
+    debugLog('❌ No signing method available for Blossom auth', 'error');
+    return null;
+
   } catch (error) {
     debugLog(`❌ Error creating Blossom auth: ${error.message}`, 'error');
     return null;

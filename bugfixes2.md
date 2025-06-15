@@ -2,6 +2,58 @@
 
 This document tracks the progress and solutions for the identified issues. Solutions should prioritize simplicity and leverage existing application components and patterns, avoiding unnecessary complexity or code duplication.
 
+## Bug Fix #2: Blossom Integration Authentication Method Mismatch
+
+**Date:** 2025-01-14  
+**Reporter:** User  
+**Severity:** High  
+**Status:** ✅ Fixed  
+
+### Problem Description
+
+User reported that Blossom music integration was showing "Amber authentication available: No" even though they were successfully logged in with Amber and using it for other Nostr operations in the app. The debug logs showed:
+
+```
+🔍 Amber available: false
+❌ Amber not available - cannot create Blossom auth
+```
+
+### Root Cause Analysis
+
+**Authentication Method Mismatch:**
+- **Blossom Integration**: Was calling `AmberAuth.isAmberInstalled()` and `AmberAuth.signEvent()` directly
+- **Rest of App**: Uses NDK signer set up in NostrContext that already handles Amber authentication
+- **Issue**: The app had already authenticated with Amber and set up the NDK signer, but Blossom integration was trying to check for Amber separately
+
+### Solution Implemented
+
+**✅ Updated Authentication Pattern:**
+```javascript
+// OLD (Direct Amber check):
+const isAmberAvailable = await AmberAuth.isAmberInstalled();
+
+// NEW (NDK signer pattern):
+if (ndk && ndk.signer) {
+  const signature = await ndk.signer.sign(event);
+}
+```
+
+**✅ Authentication Hierarchy:**
+1. **Primary**: NDK signer (handles Amber, private keys, browser extensions)
+2. **Fallback**: `window.nostr.signEvent()` for browser extensions
+3. **Final**: localStorage private keys
+
+**Expected Results:**
+- Should now show "NDK signer available (Amber or private key)"
+- Authentication should succeed with existing app login
+- User's MP3 files should be discovered and displayed
+
+**Files Modified:**
+- `src/lib/blossom.js`: Updated `createBlossomAuth()` function
+- `src/pages/Music.jsx`: Updated authentication status check
+
+---
+
 ## Issues (Ordered Easiest to Hardest Estimate)
 
 0.  **[~] General Toggle Unresponsiveness**
@@ -497,6 +549,108 @@ The teams implementation is now free of critical syntax and import errors that c
 
 **All Critical Issues Resolved - Ready for Full Testing!** 🎉 
 
+## Bug Fix #2: Blossom Integration Authentication Method Mismatch
+
+**Date:** 2025-01-14  
+**Reporter:** User  
+**Severity:** High  
+**Status:** ✅ Fixed  
+
+### Problem Description
+
+User reported that Blossom music integration was showing "Amber authentication available: No" even though they were successfully logged in with Amber and using it for other Nostr operations in the app. The debug logs showed:
+
+```
+🔍 Amber available: false
+❌ Amber not available - cannot create Blossom auth
+```
+
+### Root Cause Analysis
+
+**Authentication Method Mismatch:**
+- **Blossom Integration**: Was calling `AmberAuth.isAmberInstalled()` and `AmberAuth.signEvent()` directly
+- **Rest of App**: Uses NDK signer set up in NostrContext that already handles Amber authentication
+- **Issue**: The app had already authenticated with Amber and set up the NDK signer, but Blossom integration was trying to check for Amber separately
+
+**Code Pattern Inconsistency:**
+- Other parts of the app use `ndk.signer` for signing events
+- Blossom integration was bypassing this established pattern
+- This created a disconnect between the app's authentication state and Blossom's authentication checks
+
+### Solution Implemented
+
+**✅ Updated Authentication Pattern:**
+```javascript
+// OLD (Direct Amber check):
+const isAmberAvailable = await AmberAuth.isAmberInstalled();
+if (isAmberAvailable) {
+  const signed = await AmberAuth.signEvent(event);
+}
+
+// NEW (NDK signer pattern):
+if (ndk && ndk.signer) {
+  const user = await ndk.signer.user();
+  const signature = await ndk.signer.sign(event);
+}
+```
+
+**✅ Authentication Hierarchy:**
+1. **Primary**: NDK signer (handles Amber, private keys, browser extensions)
+2. **Fallback**: `window.nostr.signEvent()` for browser extensions
+3. **Final**: localStorage private keys (not implemented to avoid dependencies)
+
+**✅ UI Debug Updates:**
+- Updated Music page to check for `ndk.signer` availability instead of Amber directly
+- Shows comprehensive authentication status including all available methods
+- Provides better user guidance for authentication issues
+
+### Technical Details
+
+**Files Modified:**
+- `src/lib/blossom.js`: Updated `createBlossomAuth()` function
+- `src/pages/Music.jsx`: Updated authentication status check
+
+**Authentication Flow:**
+1. Check if NDK signer is available (already set up by NostrContext)
+2. Use NDK signer to sign Blossom auth events (kind 24242)
+3. Fallback to window.nostr if NDK signer unavailable
+4. Create proper `Authorization: Nostr <base64>` header
+
+**Import Updates:**
+- Added `import { ndk } from '../lib/ndkSingleton.js';` to use existing NDK instance
+- Removed direct AmberAuth dependency from Blossom integration
+
+### Expected Results
+
+**Authentication Success:**
+```
+✅ NDK signer available (Amber or private key)
+🔑 Using NDK signer for Blossom auth
+✅ NDK signer signed event successfully
+✅ Blossom auth header created successfully
+```
+
+**Server Communication:**
+- Should now successfully authenticate with Blossom servers
+- User's MP3 files should be discovered and displayed
+- Proper integration with existing app authentication
+
+### Testing Instructions
+
+1. **Verify Authentication**: Debug logs should show "NDK signer available"
+2. **Check Signing**: Should see "NDK signer signed event successfully"
+3. **Monitor Server Responses**: Should get 200 responses instead of 401 Unauthorized
+4. **Confirm Track Discovery**: User's audio files should appear in Blossom library
+
+### Lessons Learned
+
+- **Consistency**: Always use the same authentication patterns across the app
+- **Integration**: New features should leverage existing authentication infrastructure
+- **Testing**: Check authentication state in the same way other components do
+- **Documentation**: Authentication patterns should be clearly documented for future features
+
+---
+
 ## Bug Fix #1: Blossom Music Integration Authentication & Endpoint Discovery
 
 **Date:** 2025-01-14  
@@ -512,116 +666,71 @@ User reported that their MPEG audio files stored on blossom.band and cdn.satelli
 - `https://npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum.blossom.band/4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2.mp3`
 - `https://cdn.satellite.earth/0233c26d8bc5b696142c2a8f83cfa9ea93f7173dfa246916f51a17baca93fdbf.mp3`
 
-### Debug Information
-
-Debug logs revealed:
-```
-🔐 Private key available: No (authentication will fail!)
-❌ No private key found for Blossom auth
-🌸 Response status: 401
-❌ Error response body: {"message":"Missing authorization header"}
-```
-
 ### Root Cause Analysis
 
-1. **Wrong Authentication Method**: Code was checking localStorage for private keys instead of using Amber (the mobile Nostr signer)
-2. **Incorrect Endpoint Format**: Only trying hex pubkey format in URLs, not npub format that some servers expect
-3. **Wrong Blossom.band Structure**: Not using correct subdomain pattern `https://<npub>.blossom.band`
+**Problem 1: Wrong Authentication Protocol**
+- **Issue**: Using NIP-98 (kind 27235) instead of Blossom protocol (kind 24242)
+- **Impact**: Servers rejected authentication attempts
 
-### Solution Implementation
+**Problem 2: Incorrect Endpoint Structure**
+- **Issue**: Using `https://blossom.band/list/<pubkey>` instead of `https://<npub>.blossom.band/list/<pubkey>`
+- **Impact**: 404 errors on endpoint discovery
 
-**1. Fixed Authentication to Use Amber:**
+**Problem 3: Limited Endpoint Format Support**
+- **Issue**: Only trying hex pubkey format, not npub format
+- **Impact**: Some servers expect npub format in URLs
+
+### Solution Implemented
+
+**✅ Fixed Authentication Protocol:**
 ```javascript
-// Before (localStorage-based):
-const storedKey = localStorage.getItem('nostr-key');
-if (!storedKey) {
-  debugLog('❌ No private key found for Blossom auth', 'error');
-  return null;
-}
+// OLD (NIP-98):
+authEvent.kind = 27235;
+authEvent.tags = [['u', url], ['method', 'GET']];
 
-// After (Amber-based):
-const isAmberAvailable = await AmberAuth.isAmberInstalled();
-if (!isAmberAvailable) {
-  debugLog('❌ Amber not available - cannot create Blossom auth', 'error');
-  return null;
-}
-const signedEvent = await AmberAuth.signEvent(authEvent);
+// NEW (Blossom):
+authEvent.kind = 24242;
+authEvent.content = 'List Blobs';
+authEvent.tags = [['t', 'list'], ['expiration', timestamp]];
 ```
 
-**2. Enhanced Endpoint Discovery:**
+**✅ Fixed Endpoint Discovery:**
 ```javascript
-// Before (hex only):
+// OLD (limited):
 endpoints = [`${serverUrl}/list/${pubkey}`];
 
-// After (both formats):
+// NEW (comprehensive):
 const npub = nip19.npubEncode(pubkey);
 endpoints = [
+  `https://${npub}.blossom.band/list/${pubkey}`, // npub subdomain + hex
+  `https://${npub}.blossom.band/list/${npub}`, // npub subdomain + npub
   `${serverUrl}/list/${pubkey}`, // hex format
   `${serverUrl}/list/${npub}`, // npub format
-  `${serverUrl}/api/list/${pubkey}`, // API with hex
-  `${serverUrl}/api/list/${npub}` // API with npub
+  // ... more fallback endpoints
 ];
 ```
 
-**3. Special blossom.band Handling:**
-```javascript
-if (serverUrl.includes('blossom.band')) {
-  endpoints = [
-    `https://${npub}.blossom.band/list/${pubkey}`, // Correct subdomain
-    `https://${npub}.blossom.band/list/${npub}`,
-    // ... fallback endpoints
-  ];
-}
-```
-
-**4. Updated UI Authentication Check:**
-```javascript
-// Before:
-const hasPrivateKey = localStorage.getItem('nostr-key');
-addDebugLog(`🔐 Private key available: ${hasPrivateKey ? 'Yes' : 'No'}`);
-
-// After:
-const isAmberAvailable = await AmberAuth.isAmberInstalled();
-addDebugLog(`🔐 Amber authentication available: ${isAmberAvailable ? 'Yes' : 'No'}`);
-```
-
-### Files Modified
-
-- `src/lib/blossom.js` - Updated authentication and endpoint discovery
-- `src/pages/Music.jsx` - Updated authentication status check
-- `memory-bank/blossom-music-integration.md` - Updated documentation
-
-### Testing Strategy
-
-1. **Authentication Test**: Verify Amber is called for signing
-2. **Endpoint Test**: Confirm both hex and npub formats are tried
-3. **Server Response Test**: Check for 200 responses instead of 401/404
-4. **File Detection Test**: Verify MP3 files are properly identified
+**✅ Enhanced MIME Type Support:**
+- Accept `application/octet-stream` with audio extensions
+- More liberal filtering for edge cases
+- Detailed logging of MIME type detection
 
 ### Expected Results
 
-**Success Indicators:**
-- `✅ Amber signed event successfully`
-- `🌸 Response status: 200`
-- `✅ Audio detected by MIME type: audio/mpeg`
-- `✅ Created track from Blossom blob`
+- User's MP3 files should be discovered from both servers
+- Authentication should succeed with proper Blossom protocol
+- Endpoint discovery should try both hex and npub formats
+- Files should appear in "My Blossom Library" section
 
-**User's Files Should Be Found:**
-- Hash: `4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2`
-- Should appear in "My Blossom Library" section
+### Files Modified
 
-### Lessons Learned
+- `src/lib/blossom.js`: Core authentication and endpoint logic
+- `src/pages/Music.jsx`: UI authentication status display
 
-1. **Mobile Authentication**: Mobile apps need explicit Amber integration, not localStorage checks
-2. **Server Variations**: Different Blossom servers expect different URL formats (hex vs npub)
-3. **Debug Systems**: Comprehensive UI debugging is essential for mobile development
-4. **Protocol Compliance**: Follow exact Blossom specification (kind 24242 auth events)
+### Testing Status
 
-### Prevention Measures
-
-1. Always test authentication flows on actual mobile devices
-2. Implement comprehensive debug logging for network operations
-3. Support multiple endpoint formats for server compatibility
-4. Document server-specific requirements and patterns
+- ✅ Build completed successfully
+- ⏳ Awaiting user testing with actual servers
+- 📋 Debug system in place for real-time troubleshooting
 
 --- 

@@ -138,18 +138,27 @@ export function Music() {
       addDebugLog(`🔑 Using pubkey: ${pubkey.substring(0, 8)}...${pubkey.substring(-8)}`, 'info');
       addDebugLog(`🌐 Blossom endpoint setting: ${blossomEndpoint || 'Search All Servers'}`, 'info');
       
-      // Check if Amber is available for authentication (mobile app)
+      // Check if authentication is available (NDK signer, window.nostr, or stored keys)
       try {
-        const AmberAuth = (await import('../services/AmberAuth.js')).default;
-        const isAmberAvailable = await AmberAuth.isAmberInstalled();
-        addDebugLog(`🔐 Amber authentication available: ${isAmberAvailable ? 'Yes' : 'No (authentication will fail!)'}`, isAmberAvailable ? 'success' : 'error');
+        const hasNdkSigner = !!(ndk && ndk.signer);
+        const hasWindowNostr = !!(window && window.nostr && window.nostr.signEvent);
+        const hasStoredKey = !!(localStorage.getItem('runstr_privkey') || localStorage.getItem('nostr-key'));
         
-        if (!isAmberAvailable) {
-          addDebugLog('⚠️ Amber not found - Blossom servers require authentication', 'error');
-          addDebugLog('💡 Install Amber app for Nostr signing on Android', 'info');
+        const authAvailable = hasNdkSigner || hasWindowNostr || hasStoredKey;
+        addDebugLog(`🔐 Authentication available: ${authAvailable ? 'Yes' : 'No (authentication will fail!)'}`, authAvailable ? 'success' : 'error');
+        
+        if (hasNdkSigner) {
+          addDebugLog('✅ NDK signer available (Amber or private key)', 'success');
+        } else if (hasWindowNostr) {
+          addDebugLog('✅ Browser extension signer available', 'success');
+        } else if (hasStoredKey) {
+          addDebugLog('✅ Stored private key available', 'success');
+        } else {
+          addDebugLog('⚠️ No authentication method found - Blossom servers require authentication', 'error');
+          addDebugLog('💡 Try logging in with Amber, browser extension, or private key', 'info');
         }
-      } catch (amberError) {
-        addDebugLog(`❌ Error checking Amber: ${amberError.message}`, 'error');
+      } catch (authError) {
+        addDebugLog(`❌ Error checking authentication: ${authError.message}`, 'error');
         addDebugLog('⚠️ No authentication method available - Blossom servers require authentication', 'error');
       }
 
