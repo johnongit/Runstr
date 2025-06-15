@@ -60,7 +60,7 @@
 
 .team-tabs .tab-button.active { /* Increased specificity */
   color: #ffffff !important; /* Ensure text is white, overriding other rules */
-  background-color: rgba(58, 134, 255, 0.8); /* Semi-transparent blue background */
+  background: linear-gradient(to right, rgba(79, 70, 229, 0.8), rgba(124, 58, 237, 0.8)); /* Purple gradient background */
   border-radius: 6px 6px 0 0; /* Rounded top corners */
   font-weight: 600; /* Make text slightly bolder when active */
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
@@ -73,16 +73,17 @@
   left: 0;
   width: 100%;
   height: 3px; /* Thicker indicator for better visibility on mobile */
-  background-color: #3a86ff;
+  background: linear-gradient(to right, #4f46e5, #7c3aed);
   display: none; /* Hide the underline since we're using background color */
 }
 
 .tab-content {
-  background-color: #242424;
+  background: linear-gradient(to bottom right, #1f2937, #374151);
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   padding: 16px;
   color: #fff;
+  border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 /* Team items - Mobile optimized */
@@ -96,20 +97,20 @@
   display: flex;
   padding: 16px;
   border-radius: 8px;
-  background-color: #333;
-  border: 1px solid #444;
+  background: linear-gradient(to bottom right, #374151, #4b5563);
+  border: 1px solid rgba(139, 92, 246, 0.3);
   cursor: pointer;
   transition: all 0.2s ease;
   min-height: 80px; /* Minimum height for better tapping */
 }
 
 .team-item:active {
-  background-color: #444; /* Android active state */
+  background: linear-gradient(to bottom right, #4b5563, #6b7280);
   transform: scale(0.98);
 }
 
 .team-item.has-new-messages {
-  border-left: 4px solid #3a86ff;
+  border-left: 4px solid #8b5cf6;
 }
 
 .team-avatar {
@@ -154,7 +155,7 @@
 }
 
 .new-badge {
-  background-color: #3a86ff;
+  background: linear-gradient(to right, #4f46e5, #7c3aed);
   color: white;
   font-size: 11px;
   padding: 2px 6px;
@@ -209,7 +210,7 @@
 .search-container button,
 .cta-buttons button,
 .invite-button {
-  background-color: #3a86ff;
+  background: linear-gradient(to right, #4f46e5, #7c3aed);
   color: white;
   border: none;
   padding: 12px 16px; /* Larger tap targets */
@@ -218,12 +219,14 @@
   font-weight: 600;
   font-size: 16px;
   min-width: 80px; /* Minimum width for tapping */
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .search-container button:active,
 .cta-buttons button:active,
 .invite-button:active {
-  background-color: #2a75e8;
+  background: linear-gradient(to right, #3730a3, #6b21a8);
   transform: scale(0.98);
 }
 
@@ -342,7 +345,7 @@
 /* Form buttons - Android optimized */
 .primary-button, 
 .create-team-button {
-  background-color: #3a86ff;
+  background: linear-gradient(to right, #4f46e5, #7c3aed);
   color: white;
   font-weight: 600;
   padding: 14px 20px; /* Taller buttons for Android */
@@ -350,22 +353,23 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 16px;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
   display: block;
   margin: 20px auto;
   min-width: 200px;
   -webkit-tap-highlight-color: transparent; /* Remove tap highlight on Android */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .primary-button:active,
 .create-team-button:active {
-  background-color: #2a75e8;
+  background: linear-gradient(to right, #3730a3, #6b21a8);
   transform: scale(0.98);
 }
 
 .primary-button:disabled,
 .create-team-button:disabled {
-  background-color: #666;
+  background: rgba(107, 114, 128, 0.5);
   cursor: not-allowed;
   transform: none;
 }
@@ -437,13 +441,15 @@
 
 .message.my-message {
   margin-left: auto;
-  background-color: #3a86ff22;
+  background: linear-gradient(to right, rgba(79, 70, 229, 0.2), rgba(124, 58, 237, 0.2));
   border-radius: 18px 18px 0 18px;
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .message:not(.my-message) {
-  background-color: #333;
+  background: linear-gradient(to bottom right, #374151, #4b5563);
   border-radius: 18px 18px 18px 0;
+  border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .message-header {
@@ -488,18 +494,18 @@
 .message-input-container button {
   margin-left: 10px;
   padding: 0 20px;
-  background-color: #3a86ff;
+  background: linear-gradient(to right, #4f46e5, #7c3aed);
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   min-width: 80px;
   min-height: 50px;
+  transition: all 0.2s ease;
 }
 
-.message-input-container button:disabled {
-  background-color: #666;
-  cursor: not-allowed;
+.message-input-container button:active {
+  background: linear-gradient(to right, #3730a3, #6b21a8);
 }
 
 /* Message options - Optimized for touch */
@@ -664,17 +670,21 @@
 }
 
 .retry-button, .diagnose-button {
-  background-color: #646cff;
+  background: linear-gradient(to right, #4f46e5, #7c3aed);
   color: white;
   border: none;
+  padding: 10px 20px;
   border-radius: 4px;
-  padding: 8px 15px;
   cursor: pointer;
-  font-size: 14px;
+  margin: 0 5px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.diagnose-button {
-  background-color: #444;
+.retry-button:active,
+.diagnose-button:active {
+  background: linear-gradient(to right, #3730a3, #6b21a8);
+  transform: scale(0.98);
 }
 
 .diagnostic-info {
@@ -773,87 +783,31 @@
 }
 
 .load-more-button {
-  background-color: #4176ff;
+  background: linear-gradient(to right, #4f46e5, #7c3aed);
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  padding: 12px 24px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .load-more-button:hover {
-  background-color: #3060db;
+  background: linear-gradient(to right, #3730a3, #6b21a8);
+  transform: translateY(-1px);
+}
+
+.load-more-button:active {
+  transform: scale(0.98);
 }
 
 .load-more-button:disabled {
-  background-color: #a0b1d9;
+  background: rgba(107, 114, 128, 0.5);
   cursor: not-allowed;
-}
-
-/* Message spacing and padding improvements */
-.message {
-  margin-bottom: 15px;
-  max-width: 85%; /* Wider on mobile */
-  padding: 1px; /* Prevent margin collapse */
-}
-
-.message.my-message {
-  margin-left: auto;
-  background-color: #3a86ff22;
-  border-radius: 18px 18px 0 18px;
-}
-
-.message:not(.my-message) {
-  background-color: #333;
-  border-radius: 18px 18px 18px 0;
-}
-
-.message-header {
-  font-size: 12px;
-  color: #888;
-  margin-bottom: 4px;
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 10px 0 10px;
-}
-
-.message-content {
-  padding: 10px 15px;
-  border-radius: inherit;
-  word-break: break-word;
-}
-
-/* Fix button alignment and spacing in action groups */
-.run-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  margin-top: 15px;
-  flex-wrap: wrap;
-  padding: 0 5px;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.action-button,
-.share-btn,
-.delete-btn {
-  padding: 8px 12px;
-  font-size: 14px;
-  border-radius: 6px;
-  min-width: auto;
-  max-width: 100%;
-  flex: 0 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  transform: none;
 }
 
 /* Text truncation with proper ellipsis */

@@ -14,7 +14,7 @@ const TeamsPage: React.FC = () => {
         <div className="flex items-center">
           <Link
             to="/teams/new"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out"
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-2 px-4 rounded-md transition-all duration-150 ease-in-out shadow-lg"
           >
             Create New Team
           </Link>
@@ -26,14 +26,14 @@ const TeamsPage: React.FC = () => {
           <div className="p-4 text-white text-center">Loading NIP-101e teams...</div>
         )}
         {!isLoading && fetchError && (
-          <div className="text-center text-red-400 py-10 bg-gray-800 rounded-lg p-4">
+          <div className="text-center text-red-400 py-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg p-4 border border-red-500/20">
             <p className="text-lg">Error Loading Teams</p>
             <p className="text-sm mt-2">{fetchError}</p>
             <p className="text-sm mt-2">Please check your connection or try refreshing. You can still create a new team.</p>
           </div>
         )}
         {!isLoading && !fetchError && teams.length === 0 && (
-          <div className="text-center text-gray-400 py-10 bg-gray-800 rounded-lg p-4">
+          <div className="text-center text-slate-400 py-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg p-4 border border-purple-500/20">
             <p className="text-lg">No public NIP-101e teams found.</p>
             <p>Why not be the first to create one?</p>
           </div>
@@ -42,20 +42,20 @@ const TeamsPage: React.FC = () => {
           <ul className="space-y-4">
             {teams.map((team) => {
               return (
-                <li key={team.id || `${team.captainPubkey}-${team.teamUUID}`} className="bg-gray-800 shadow-lg rounded-lg p-5 hover:bg-gray-700 transition-colors duration-150">
+                <li key={team.id || `${team.captainPubkey}-${team.teamUUID}`} className="bg-gradient-to-br from-slate-800 to-slate-900 shadow-lg rounded-lg p-5 hover:from-slate-700 hover:to-slate-800 transition-all duration-150 border border-purple-500/20">
                   <Link 
                     to={`/teams/${team.captainPubkey}/${team.teamUUID}`}
                     state={{ teamEvent: team.originalEvent }}
                     className="block"
                   >
-                    <h2 className="text-xl font-semibold text-blue-400 hover:text-blue-300 mb-2">
+                    <h2 className="text-xl font-semibold text-purple-400 hover:text-purple-300 mb-2 transition-colors">
                       {team.name}
                     </h2>
                   </Link>
-                  <p className="text-gray-300 mb-3 text-sm">
+                  <p className="text-slate-300 mb-3 text-sm">
                     {team.description.substring(0, 150)}{team.description.length > 150 ? '...' : ''}
                   </p>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-slate-500">
                     <p>Captain: <DisplayName pubkey={team.captainPubkey} /></p>
                   </div>
                 </li>
