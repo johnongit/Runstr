@@ -5,13 +5,28 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Zap, Clock, MapPin, Calendar, TrendingUp, Timer } from "lucide-react";
+import { Zap, Clock, MapPin, Calendar, TrendingUp, Timer, Users, Trophy } from "lucide-react";
 
 interface WorkoutMetric {
   label: string;
   value: string;
   unit: string;
   icon: React.ReactNode;
+}
+
+interface TeamInfo {
+  aTag: string;
+  captain: string;
+  uuid: string;
+  relayHint: string;
+  teamName: string;
+  identifier: string;
+}
+
+interface ChallengeInfo {
+  uuid: string;
+  name: string;
+  challengeValue: string;
 }
 
 interface WorkoutCardProps {
@@ -27,6 +42,8 @@ interface WorkoutCardProps {
     timestamp: string;
     location?: string;
     date?: string;
+    teams?: TeamInfo[];
+    challenges?: ChallengeInfo[];
   };
   metrics?: WorkoutMetric[];
   engagement?: {
@@ -58,6 +75,8 @@ export function WorkoutCard({
     onZap?.();
   };
 
+  const hasTeamsOrChallenges = (workout.teams && workout.teams.length > 0) || (workout.challenges && workout.challenges.length > 0);
+
   return (
     <Card className={cn(
       "w-full max-w-2xl mx-auto overflow-hidden",
@@ -88,6 +107,36 @@ export function WorkoutCard({
       <CardContent className="p-4">
         <h2 className="text-base font-semibold mb-2 text-white">{workout.title}</h2>
         <p className="text-sm text-slate-300 mb-4">{workout.content}</p>
+
+        {/* Team and Challenge Badges */}
+        {hasTeamsOrChallenges && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {workout.teams?.map((team, index) => (
+              <Badge 
+                key={`team-${index}`}
+                variant="outline" 
+                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30 text-green-300"
+              >
+                <Users className="h-3 w-3" />
+                <span className="text-xs font-medium">
+                  {team.teamName || `Team ${team.uuid.slice(0, 8)}`}
+                </span>
+              </Badge>
+            ))}
+            {workout.challenges?.map((challenge, index) => (
+              <Badge 
+                key={`challenge-${index}`}
+                variant="outline" 
+                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border-orange-500/30 text-orange-300"
+              >
+                <Trophy className="h-3 w-3" />
+                <span className="text-xs font-medium">
+                  {challenge.name}
+                </span>
+              </Badge>
+            ))}
+          </div>
+        )}
 
         {/* Workout details */}
         <div className="flex flex-wrap gap-2 mb-4">
@@ -173,13 +222,13 @@ export default function WorkoutCardDemo() {
       avatar: "https://i.pravatar.cc/150?u=alexrunner",
       timeAgo: "2h ago",
     },
-    workout: {
-      title: "Morning Trail Run",
-      content: "Great morning run through the forest trails. Felt strong on the hills and enjoyed the sunrise. Perfect weather conditions today!",
-      timestamp: "07:30 AM",
-      location: "Forest Park",
-      date: "Today"
-    },
+          workout: {
+        title: "Morning Trail Run",
+        content: "Great morning run through the forest trails. Felt strong on the hills and enjoyed the sunrise. Perfect weather conditions today!",
+        timestamp: "07:30 AM",
+        location: "Forest Park",
+        date: "Today"
+      },
     metrics: [
       {
         label: "Distance",

@@ -5,6 +5,7 @@ import { AuthProvider } from './components/AuthProvider';
 import { AudioPlayerProvider } from './contexts/AudioPlayerProvider';
 import { RunTrackerProvider } from './contexts/RunTrackerContext';
 import { TeamsProvider } from './contexts/TeamsContext';
+import { TeamChallengeProvider } from './contexts/TeamChallengeContext';
 import { ActivityModeProvider } from './contexts/ActivityModeContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { WalletProvider } from './contexts/WalletContext';
@@ -177,7 +178,8 @@ const App = () => {
               <ActivityModeProvider>
                 <RunTrackerProvider>
                   <TeamsProvider>
-                    <WalletProvider>
+                    <TeamChallengeProvider>
+                      <WalletProvider>
                       <div className="relative w-full h-full bg-[#111827] text-white">
                         <MenuBar />
                         <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
@@ -186,7 +188,8 @@ const App = () => {
                           </Suspense>
                         </main>
                       </div>
-                    </WalletProvider>
+                      </WalletProvider>
+                    </TeamChallengeProvider>
                   </TeamsProvider>
                 </RunTrackerProvider>
               </ActivityModeProvider>
