@@ -236,7 +236,7 @@ export function Music() {
         {/* Blossom Library Section */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4 text-left">
-            {blossomTracks.length > 0 && blossomPlaylistDisplay[0] ? blossomPlaylistDisplay[0].title : 'Blossom Music Library'}
+            Blossom Library
           </h2>
           {blossomLoading && (
             <div className="text-gray-400 text-left mb-4">

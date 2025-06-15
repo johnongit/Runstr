@@ -1,9 +1,9 @@
-# RUNSTR UI Improvements & Cleanup
+# RUNSTR UI Improvements & Cleanup - Phase 2
 
 ## Overview
 Comprehensive UI improvements focusing on consistency, functionality, and user experience across all pages.
 
-## Quick Wins (Easiest Tasks - 15-30 mins each)
+## ✅ PHASE 1 COMPLETE - Previous Quick Wins (8/8)
 
 ### 1. Remove About Us Page ✅ COMPLETE
 - [x] **Remove from Settings Modal**: Delete About Us option from settings → wallet section
@@ -25,12 +25,6 @@ Comprehensive UI improvements focusing on consistency, functionality, and user e
 ### 5. Stats Header Text Update ✅ COMPLETE
 - [x] **Change Header**: "Your Nostr Stats" → "Nostr Workout Stats"
 
-### 8. Blossom Image Placeholders ✅ COMPLETE
-- [x] **Replace Broken Images**: Use pink flower placeholders instead of broken album art
-- [x] **Implementation Choice**: One big bouquet image selected (Option B)
-
-## Medium Complexity Tasks (30-60 mins each)
-
 ### 6. Default Stats Navigation to Nostr ✅ COMPLETE
 - [x] **Route Logic Update**: Make "Stats" navigation default to NostrStatsPage
 - [x] **Settings Integration**: Add toggle for "Use Local Stats" in settings  
@@ -41,29 +35,96 @@ Comprehensive UI improvements focusing on consistency, functionality, and user e
 - [x] **Dynamic Labels**: Show "Blossom.Band Playlist", "Satellite.Earth Playlist", "Primal.Band Playlist"
 - [x] **Remove Duplicate Text**: Fix "Blossom Music Library" appearing twice
 
-## Complex Tasks (1-2+ hours each)
+### 8. Blossom Image Placeholders ✅ COMPLETE
+- [x] **Replace Broken Images**: Use pink flower placeholders instead of broken album art
+- [x] **Implementation Choice**: One big bouquet image selected (Option B)
 
-### 9. Team Challenge Management
-- [ ] **Add Delete Functionality**: Allow team captains to delete challenges
-- [ ] **Add Edit Functionality**: Allow challenge modification after creation
-- [ ] **UI Integration**: Add management buttons to team challenges section
+---
 
-### 10. Global Color Scheme Standardization
-- [ ] **Assess Current Architecture**: Check if global theming exists
-- [ ] **Implement Standard Palette**: Black primary, White text, Purple accents
-- [ ] **Apply Consistently**: Teams, Music, Stats, Feed, Dashboard pages
+## 🟢 PHASE 2 - NEW QUICK WINS (15-30 mins each) ✅ COMPLETE
 
-**Current Inconsistencies:**
-- Teams: Blue theme
-- Music: Purple theme  
-- Stats: Black theme
-- Feed: White theme
-- Dashboard: Mixed colors
+### 9. Fix Blossom Music Labeling ✅ COMPLETE
+- [x] **Fix Header Display**: Top shows "Blossom Library", bottom shows server-specific name
+- [x] **Current Issue**: "Blossom.Band Playlist" appears twice  
+- [x] **Target**: "Blossom Library" + "Blossom.Band Playlist" beneath
 
-**Target Scheme:**
-- Primary: Black
-- Text: White
-- Accents: Purple
+### 10. Remove 1301 Card 3-Dot Menu ✅ COMPLETE
+- [x] **Hide Non-Functional Menu**: Remove 3-dot menu from workout record cards
+- [x] **Clean UI**: Remove dead UI element that serves no purpose
+
+### 11. Update Blossom Server Dropdown ✅ COMPLETE
+- [x] **Curate Server List**: Change to verified working servers only
+- [x] **New Options**: Blossom.Band, Blossom.Primal, CDN.Satellite.Earth, Custom
+- [x] **Remove**: Non-working or unclear server options
+
+---
+
+## 🟡 PHASE 3 - MEDIUM TASKS (30-60 mins each)  
+
+### 12. Music Player Purple/Black Theme
+- [ ] **Update Control Colors**: Purple/black instead of blue/white
+- [ ] **Apply To**: Main player controls and mini player
+- [ ] **Consistency**: Match dashboard color scheme
+
+### 13. Add Team/Challenge to 1301 Cards
+- [ ] **Conditional Display**: Show team/challenge only if user is member
+- [ ] **Card Sections**: Add "Team: RUNSTR", "Challenge: Morning 5k" sections
+- [ ] **Member Check**: Hide if user not part of team/challenge
+
+### 14. 1301 Cards Dark Theme Redesign
+- [ ] **Theme Update**: Dark cards with light text (readable)
+- [ ] **Purple/Black**: Apply consistent color scheme
+- [ ] **Remove Time**: Hide time of day from cards
+
+---
+
+## 🟠 PHASE 4 - MODERATE TASKS (1-2 hours each)
+
+### 15. Teams/Feed Purple Theme Overhaul
+- [ ] **Consistent Colors**: Purple/black with fading gradients
+- [ ] **Replace Blue**: Convert blue buttons/text to purple theme
+- [ ] **Apply To**: Teams pages, Feed tab, Team detail pages
+
+### 16. Enhanced Mini Music Player
+- [ ] **Visual Improvements**: Enhanced styling and controls
+- [ ] **Theme Consistency**: Black/purple color scheme
+- [ ] **UX Polish**: Better visual hierarchy and interactions
+
+### 17. Fix Blossom Server Endpoints
+- [ ] **Test Endpoints**: Verify cdn.satellite.earth and blossom.primal.net
+- [ ] **Debug Issues**: Investigate why satellite/primal stopped working
+- [ ] **Endpoint Correction**: Use correct URLs from GitHub analysis
+
+---
+
+## 🔴 PHASE 5 - COMPLEX TASKS (2-4+ hours each)
+
+### 18. Team Creation Payment System
+- [ ] **5k Creation Fee**: Implement initial team creation payment
+- [ ] **30-Day Reminder**: Alert system for monthly 5k payment
+- [ ] **NWC Integration**: Check wallet setup, trigger zaps to RUNSTR
+- [ ] **Payment Flow**: Modal → Pay button → 5k zap → Allow team creation
+- [ ] **Graceful Failure**: No action if payment fails
+
+---
+
+## Current Implementation Status
+- **Completed**: 11 tasks (Phase 1: 8 tasks + Phase 2: 3 tasks)
+- **Ready for**: Phase 3 Medium Tasks (Tasks 12-14)
+- **Next Up**: Music player theming and 1301 card improvements
+
+## Architecture Notes
+
+### Endpoint Analysis (GitHub Research)
+- **Primal**: `https://blossom.primal.net/` ✅ Working
+- **Satellite**: `https://cdn.satellite.earth/` (CDN focus, should work)
+- **Blossom.Band**: `https://blossom.band/` ✅ Working
+
+### Payment System Design
+- **Creation**: 5k sats one-time
+- **Maintenance**: 5k sats every 30 days (reminder modal)
+- **Destination**: Same as wallet donations
+- **Failure**: Graceful degradation (no penalties)
 
 ## Architecture Decisions Needed
 

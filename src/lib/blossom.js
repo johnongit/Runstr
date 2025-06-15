@@ -22,44 +22,19 @@ function debugLog(message, type = 'info') {
 // Default Blossom servers with their capabilities
 const DEFAULT_SERVERS = [
   {
-    url: 'https://cdn.satellite.earth',
-    name: 'Satellite Earth (Recommended)',
-    type: 'blossom'
-  },
-  {
     url: 'https://blossom.band',
-    name: 'Blossom Band',
+    name: 'Blossom.Band',
     type: 'blossom'
   },
   {
     url: 'https://blossom.primal.net',
-    name: 'Primal Blossom',
+    name: 'Blossom.Primal',
     type: 'blossom'
   },
   {
-    url: 'https://nostr.build',
-    name: 'Nostr Build',
-    type: 'nip96'
-  },
-  {
-    url: 'https://nostrcheck.me',
-    name: 'Nostr Check',
-    type: 'nip96'
-  },
-  {
-    url: 'https://nostpic.com',
-    name: 'Nostpic',
-    type: 'nip96'
-  },
-  {
-    url: 'https://files.sovbit.host',
-    name: 'Sovbit Files',
-    type: 'nip96'
-  },
-  {
-    url: 'https://void.cat',
-    name: 'Void Cat',
-    type: 'nip96'
+    url: 'https://cdn.satellite.earth',
+    name: 'CDN.Satellite.Earth',
+    type: 'blossom'
   }
 ];
 

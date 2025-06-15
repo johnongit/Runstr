@@ -5,7 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Zap, Clock, MapPin, Calendar, TrendingUp, Timer, MoreHorizontal } from "lucide-react";
+import { Zap, Clock, MapPin, Calendar, TrendingUp, Timer } from "lucide-react";
 
 interface WorkoutMetric {
   label: string;
@@ -36,7 +36,6 @@ interface WorkoutCardProps {
   onZap?: () => void;
   onComment?: () => void;
   onShare?: () => void;
-  onMore?: () => void;
   className?: string;
 }
 
@@ -48,7 +47,6 @@ export function WorkoutCard({
   onZap,
   onComment,
   onShare,
-  onMore,
   className
 }: WorkoutCardProps) {
   const [isZapped, setIsZapped] = useState(engagement?.isZapped ?? false);
@@ -83,14 +81,6 @@ export function WorkoutCard({
               </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onMore}
-            className="h-8 w-8 rounded-full"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
         </div>
       </CardHeader>
 
@@ -219,10 +209,6 @@ export default function WorkoutCardDemo() {
     console.log("Zapped workout");
   };
 
-  const handleMore = () => {
-    console.log("More options");
-  };
-
   return (
     <div className="p-4 max-w-2xl mx-auto">
       <WorkoutCard
@@ -231,7 +217,6 @@ export default function WorkoutCardDemo() {
         metrics={workoutData.metrics}
         engagement={workoutData.engagement}
         onZap={handleZap}
-        onMore={handleMore}
       />
     </div>
   );
