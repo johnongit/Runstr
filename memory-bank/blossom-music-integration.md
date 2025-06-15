@@ -1310,158 +1310,152 @@ console.log('🌸 Response body:', await response.text());
 
 *UI debugging system completed ▲ 2025-01-14*
 
-## 17. Comprehensive UI Debug System Implementation ✅
+## 18. Authentication & Endpoint Discovery Bug Fixes ✅
 
-> **Status:** Complete UI debugging system implemented to diagnose Blossom integration issues in real-time.
+> **Status:** Fixed critical authentication and endpoint discovery issues based on user debug logs.
 
-### 17.1 What Was Implemented
+### 18.1 Issues Identified from Debug Logs
 
-**✅ UI Debug Panel:**
-- Real-time debug logs displayed directly in the Music page
-- Color-coded messages (error=red, success=green, warning=yellow, info=gray)
-- Collapsible panel with clear/hide controls
-- Scrollable log area with timestamps
-- No need to check browser console
+**Problem 1: Wrong Authentication Method**
+- Debug showed: `🔐 Private key available: No (authentication will fail!)`
+- **Root Cause**: Code was checking localStorage for private keys instead of using Amber
+- **Impact**: Mobile app couldn't authenticate with Blossom servers
 
-**✅ Comprehensive Logging:**
-- **Authentication flow**: Private key detection, auth event creation, header format
-- **Endpoint discovery**: Which URLs are being tried for each server
-- **Server responses**: Status codes, headers, response bodies
-- **MIME type detection**: What file types are found and why they're accepted/rejected
-- **Track conversion**: How blob descriptors become playable tracks
-- **Error details**: Specific error messages and failure points
+**Problem 2: Limited Endpoint Formats**
+- Debug showed: Multiple 404 errors on `/list/<hex-pubkey>` endpoints
+- **Root Cause**: Only trying hex pubkey format, not npub format
+- **Impact**: Some servers expect npub format in URLs
 
-**✅ Debug Callback System:**
-- `setDebugCallback()` function connects blossom.js to UI
-- `debugLog()` function sends messages to both console and UI
-- Automatic cleanup when component unmounts
+### 18.2 Fixes Implemented
 
-### 17.2 Key Debug Information Displayed
+**✅ Authentication Fix: Amber Integration**
+```javascript
+// OLD (localStorage-based):
+const storedKey = localStorage.getItem('nostr-key');
+if (!storedKey) {
+  debugLog('❌ No private key found for Blossom auth', 'error');
+  return null;
+}
 
-**User Authentication Status:**
-```
-🔑 Using pubkey: 1234abcd...5678efgh
-🔐 Private key available: Yes/No (authentication will fail!)
-⚠️ No private key found - Blossom servers require authentication
-```
-
-**Server Discovery Process:**
-```
-🔍 Searching 8 servers: Satellite Earth, Blossom Band, Primal Blossom...
-🔧 Server config: Blossom Band (blossom)
-🌸 Expected subdomain: https://npub1abc...xyz.blossom.band
-🔍 Trying Blossom endpoints: https://npub1abc...xyz.blossom.band/list/1234...
+// NEW (Amber-based):
+const isAmberAvailable = await AmberAuth.isAmberInstalled();
+if (!isAmberAvailable) {
+  debugLog('❌ Amber not available - cannot create Blossom auth', 'error');
+  return null;
+}
+const signedEvent = await AmberAuth.signEvent(authEvent);
 ```
 
-**Authentication Flow:**
+**✅ Endpoint Discovery Fix: Both Hex and Npub Formats**
+```javascript
+// OLD (hex only):
+endpoints = [
+  `${serverUrl}/list/${pubkey}`, // hex format only
+  `${serverUrl}/api/list/${pubkey}`
+];
+
+// NEW (both formats):
+const npub = nip19.npubEncode(pubkey);
+endpoints = [
+  `${serverUrl}/list/${pubkey}`, // hex format
+  `${serverUrl}/list/${npub}`, // npub format
+  `${serverUrl}/api/list/${pubkey}`, // API with hex
+  `${serverUrl}/api/list/${npub}`, // API with npub
+];
 ```
-🔑 blossom.band requires auth - using Blossom auth (kind 24242)
+
+**✅ Enhanced blossom.band Support**
+```javascript
+// Special handling for blossom.band subdomain pattern
+if (serverUrl.includes('blossom.band')) {
+  endpoints = [
+    `https://${npub}.blossom.band/list/${pubkey}`, // npub subdomain + hex
+    `https://${npub}.blossom.band/list/${npub}`, // npub subdomain + npub
+    `${serverUrl}/list/${pubkey}`, // fallback with hex
+    `${serverUrl}/list/${npub}`, // fallback with npub
+    // ... more fallback endpoints
+  ];
+}
+```
+
+**✅ UI Authentication Check Update**
+```javascript
+// OLD (localStorage check):
+const hasPrivateKey = localStorage.getItem('nostr-key');
+addDebugLog(`🔐 Private key available: ${hasPrivateKey ? 'Yes' : 'No'}`, ...);
+
+// NEW (Amber check):
+const isAmberAvailable = await AmberAuth.isAmberInstalled();
+addDebugLog(`🔐 Amber authentication available: ${isAmberAvailable ? 'Yes' : 'No'}`, ...);
+```
+
+### 18.3 Technical Details
+
+**Amber Authentication Flow:**
+1. Check if Amber is installed on Android device
+2. Get user's public key from existing Nostr context
+3. Create kind 24242 Blossom auth event
+4. Send event to Amber for signing via deep link
+5. Receive signed event back from Amber
+6. Create `Authorization: Nostr <base64>` header
+
+**Endpoint Discovery Strategy:**
+1. Generate both hex and npub versions of user's pubkey
+2. Try multiple endpoint patterns for each server
+3. For blossom.band: Try subdomain pattern first
+4. For other servers: Try standard patterns
+5. Always authenticate for blossom.band (required)
+6. Fallback to auth for other servers on 401
+
+### 18.4 Expected Results
+
+**Authentication Success:**
+```
+🔍 Amber available: true
+🔑 Using pubkey for auth: 30ceb64e...
+🔑 Auth event to sign: {"kind":24242,...}
+✅ Amber signed event successfully
 ✅ Blossom auth header created successfully
-🔑 Auth event: {"kind":24242,"content":"List Blobs",...}
 ```
 
-**Server Responses:**
+**Endpoint Discovery Success:**
 ```
+🌸 User npub: npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum
+🔍 Trying Blossom endpoints: https://npub1xr8...blossom.band/list/30ceb64e..., ...
 🌸 Response status: 200
-🌸 Response headers: {"content-type":"application/json",...}
-🌸 Blossom response data: [{"url":"https://...","sha256":"..."}]
-```
-
-**File Processing:**
-```
-🎵 Checking if file is audio - MIME: audio/mpeg, filename: song.mp3
-✅ Audio detected by MIME type: audio/mpeg
-✅ Created track from Blossom blob: "My Song"
-```
-
-### 17.3 Problem Diagnosis Capabilities
-
-**Authentication Issues:**
-- Shows if private key is missing
-- Displays auth event structure
-- Shows server auth requirements
-
-**Endpoint Problems:**
-- Lists all URLs being tried
-- Shows which endpoints fail and why
-- Displays server response codes and errors
-
-**MIME Type Issues:**
-- Shows exact MIME types returned by servers
-- Explains why files are accepted/rejected
-- Logs supported audio formats
-
-**Data Format Problems:**
-- Shows raw server responses
-- Displays blob descriptor structure
-- Shows track conversion process
-
-### 17.4 Usage Instructions
-
-**For Users:**
-1. Go to Music page
-2. Debug panel appears automatically at top
-3. Watch logs in real-time as servers are queried
-4. Use Clear button to reset logs
-5. Use Hide button to minimize panel
-
-**For Developers:**
-1. All `console.log` calls replaced with `debugLog()`
-2. Messages appear in both console and UI
-3. Easy to add new debug points anywhere
-4. Automatic cleanup prevents memory leaks
-
-### 17.5 Expected Debugging Outcomes
-
-**Success Case:**
-```
 ✅ Found 5 files from Blossom server
-🎵 Converted 3 files to audio tracks
-✅ Final result: 3 tracks loaded into UI
 ```
 
-**Authentication Failure:**
-```
-❌ No private key found for Blossom auth
-❌ Non-OK response: 401 Unauthorized
-❌ Error response body: Authentication required
-```
+**Your Specific Files Should Be Found:**
+- Server: `cdn.satellite.earth` and `blossom.band`
+- Hash: `4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2`
+- MIME: `audio/mpeg` or `application/octet-stream`
+- Should appear in "My Blossom Library"
 
-**Wrong Endpoints:**
-```
-❌ Endpoint failed: https://blossom.band/list/abc123 - 404 Not Found
-🔄 No tracks found with Blossom approach, trying NIP-96...
-```
+### 18.5 Debug Information to Watch For
 
-**MIME Type Issues:**
-```
-❌ Not detected as audio file - MIME: image/jpeg, filename: photo.jpg
-⚠️ Server returned empty file list
-```
+**Success Indicators:**
+- `✅ Amber signed event successfully`
+- `🌸 Response status: 200`
+- `✅ Audio detected by MIME type: audio/mpeg`
+- `✅ Created track from Blossom blob`
 
-### 17.6 Temporary Nature
+**Failure Indicators:**
+- `❌ Amber not available`
+- `❌ Non-OK response: 401 Unauthorized`
+- `❌ Not detected as audio file`
+- `❌ No working endpoints found`
 
-**Easy Removal:**
-- All debug code is clearly marked as "TEMPORARY FOR DEBUGGING"
-- Debug panel can be hidden with one click
-- `setDebugCallback(null)` disables all UI logging
-- Simple to remove once issues are resolved
+### 18.6 Next Steps
 
-**Performance Impact:**
-- Minimal overhead (just string concatenation)
-- No impact on production builds
-- Debug logs don't affect core functionality
+1. **Test with Amber installed** - Ensure Amber app is available
+2. **Check debug logs** - Look for authentication success messages
+3. **Verify endpoint attempts** - Should see both hex and npub formats being tried
+4. **Monitor server responses** - Should see 200 responses instead of 401/404
+5. **Confirm track detection** - Your MP3 files should be found and converted
 
-### 17.7 Next Steps
-
-1. **Test the implementation** - Debug panel should show detailed logs
-2. **Identify specific failures** - Look for red error messages
-3. **Check authentication** - Verify private key is available
-4. **Examine server responses** - See what servers actually return
-5. **Debug MIME types** - Understand why files aren't detected as audio
-
-**This comprehensive debugging system should finally reveal exactly why your MP3 files aren't being found!**
+**These fixes address the core authentication and endpoint discovery issues that were preventing your MP3 files from being found!**
 
 ---
 
-*UI debugging system completed ▲ 2025-01-14* 
+*Authentication & endpoint fixes completed ▲ 2025-01-14* 

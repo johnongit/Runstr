@@ -138,13 +138,19 @@ export function Music() {
       addDebugLog(`🔑 Using pubkey: ${pubkey.substring(0, 8)}...${pubkey.substring(-8)}`, 'info');
       addDebugLog(`🌐 Blossom endpoint setting: ${blossomEndpoint || 'Search All Servers'}`, 'info');
       
-      // Check if user has private key for authentication
-      const hasPrivateKey = localStorage.getItem('nostr-key') || localStorage.getItem('runstr_privkey');
-      addDebugLog(`🔐 Private key available: ${hasPrivateKey ? 'Yes' : 'No (authentication will fail!)'}`, hasPrivateKey ? 'success' : 'error');
-      
-      if (!hasPrivateKey) {
-        addDebugLog('⚠️ No private key found - Blossom servers require authentication', 'error');
-        addDebugLog('💡 Try logging in with a Nostr extension or private key', 'info');
+      // Check if Amber is available for authentication (mobile app)
+      try {
+        const AmberAuth = (await import('../services/AmberAuth.js')).default;
+        const isAmberAvailable = await AmberAuth.isAmberInstalled();
+        addDebugLog(`🔐 Amber authentication available: ${isAmberAvailable ? 'Yes' : 'No (authentication will fail!)'}`, isAmberAvailable ? 'success' : 'error');
+        
+        if (!isAmberAvailable) {
+          addDebugLog('⚠️ Amber not found - Blossom servers require authentication', 'error');
+          addDebugLog('💡 Install Amber app for Nostr signing on Android', 'info');
+        }
+      } catch (amberError) {
+        addDebugLog(`❌ Error checking Amber: ${amberError.message}`, 'error');
+        addDebugLog('⚠️ No authentication method available - Blossom servers require authentication', 'error');
       }
 
       try {

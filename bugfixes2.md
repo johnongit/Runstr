@@ -496,3 +496,132 @@ The teams implementation is now free of critical syntax and import errors that c
 3. Confirm captain controls are visible and accessible
 
 **All Critical Issues Resolved - Ready for Full Testing!** 🎉 
+
+## Bug Fix #1: Blossom Music Integration Authentication & Endpoint Discovery
+
+**Date:** 2025-01-14  
+**Reporter:** User  
+**Severity:** High  
+**Status:** ✅ Fixed  
+
+### Problem Description
+
+User reported that their MPEG audio files stored on blossom.band and cdn.satellite.earth servers weren't appearing in RUNSTR app's music library. The app showed "no audio files found" for user's servers but found 67-78 tracks from other public servers when searching "all servers."
+
+**User's Server Examples:**
+- `https://npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum.blossom.band/4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2.mp3`
+- `https://cdn.satellite.earth/0233c26d8bc5b696142c2a8f83cfa9ea93f7173dfa246916f51a17baca93fdbf.mp3`
+
+### Debug Information
+
+Debug logs revealed:
+```
+🔐 Private key available: No (authentication will fail!)
+❌ No private key found for Blossom auth
+🌸 Response status: 401
+❌ Error response body: {"message":"Missing authorization header"}
+```
+
+### Root Cause Analysis
+
+1. **Wrong Authentication Method**: Code was checking localStorage for private keys instead of using Amber (the mobile Nostr signer)
+2. **Incorrect Endpoint Format**: Only trying hex pubkey format in URLs, not npub format that some servers expect
+3. **Wrong Blossom.band Structure**: Not using correct subdomain pattern `https://<npub>.blossom.band`
+
+### Solution Implementation
+
+**1. Fixed Authentication to Use Amber:**
+```javascript
+// Before (localStorage-based):
+const storedKey = localStorage.getItem('nostr-key');
+if (!storedKey) {
+  debugLog('❌ No private key found for Blossom auth', 'error');
+  return null;
+}
+
+// After (Amber-based):
+const isAmberAvailable = await AmberAuth.isAmberInstalled();
+if (!isAmberAvailable) {
+  debugLog('❌ Amber not available - cannot create Blossom auth', 'error');
+  return null;
+}
+const signedEvent = await AmberAuth.signEvent(authEvent);
+```
+
+**2. Enhanced Endpoint Discovery:**
+```javascript
+// Before (hex only):
+endpoints = [`${serverUrl}/list/${pubkey}`];
+
+// After (both formats):
+const npub = nip19.npubEncode(pubkey);
+endpoints = [
+  `${serverUrl}/list/${pubkey}`, // hex format
+  `${serverUrl}/list/${npub}`, // npub format
+  `${serverUrl}/api/list/${pubkey}`, // API with hex
+  `${serverUrl}/api/list/${npub}` // API with npub
+];
+```
+
+**3. Special blossom.band Handling:**
+```javascript
+if (serverUrl.includes('blossom.band')) {
+  endpoints = [
+    `https://${npub}.blossom.band/list/${pubkey}`, // Correct subdomain
+    `https://${npub}.blossom.band/list/${npub}`,
+    // ... fallback endpoints
+  ];
+}
+```
+
+**4. Updated UI Authentication Check:**
+```javascript
+// Before:
+const hasPrivateKey = localStorage.getItem('nostr-key');
+addDebugLog(`🔐 Private key available: ${hasPrivateKey ? 'Yes' : 'No'}`);
+
+// After:
+const isAmberAvailable = await AmberAuth.isAmberInstalled();
+addDebugLog(`🔐 Amber authentication available: ${isAmberAvailable ? 'Yes' : 'No'}`);
+```
+
+### Files Modified
+
+- `src/lib/blossom.js` - Updated authentication and endpoint discovery
+- `src/pages/Music.jsx` - Updated authentication status check
+- `memory-bank/blossom-music-integration.md` - Updated documentation
+
+### Testing Strategy
+
+1. **Authentication Test**: Verify Amber is called for signing
+2. **Endpoint Test**: Confirm both hex and npub formats are tried
+3. **Server Response Test**: Check for 200 responses instead of 401/404
+4. **File Detection Test**: Verify MP3 files are properly identified
+
+### Expected Results
+
+**Success Indicators:**
+- `✅ Amber signed event successfully`
+- `🌸 Response status: 200`
+- `✅ Audio detected by MIME type: audio/mpeg`
+- `✅ Created track from Blossom blob`
+
+**User's Files Should Be Found:**
+- Hash: `4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2`
+- Should appear in "My Blossom Library" section
+
+### Lessons Learned
+
+1. **Mobile Authentication**: Mobile apps need explicit Amber integration, not localStorage checks
+2. **Server Variations**: Different Blossom servers expect different URL formats (hex vs npub)
+3. **Debug Systems**: Comprehensive UI debugging is essential for mobile development
+4. **Protocol Compliance**: Follow exact Blossom specification (kind 24242 auth events)
+
+### Prevention Measures
+
+1. Always test authentication flows on actual mobile devices
+2. Implement comprehensive debug logging for network operations
+3. Support multiple endpoint formats for server compatibility
+4. Document server-specific requirements and patterns
+
+--- 

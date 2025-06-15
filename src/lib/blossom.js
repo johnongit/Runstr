@@ -2,6 +2,8 @@
 // Implements NIP-96 HTTP File Storage Integration
 
 import { nip19 } from 'nostr-tools';
+import AmberAuth from '../services/AmberAuth.js';
+import { getUserPublicKey } from '../utils/nostrClient.js';
 
 // Debug callback for UI logging - TEMPORARY FOR DEBUGGING
 let debugCallback = null;
@@ -78,55 +80,57 @@ const NIP96_PAGE_LIMIT = 500;
 
 /**
  * Create Blossom authorization header for authenticated requests (kind 24242)
+ * Uses Amber for signing on mobile
  */
 async function createBlossomAuth(action = 'list') {
   try {
-    // Import NDK dynamically to avoid loading issues
-    const { default: NDK, NDKEvent } = await import('@nostr-dev-kit/ndk');
+    debugLog('🔑 Creating Blossom auth using Amber...', 'info');
     
-    // Get user's private key from localStorage
-    const storedKey = localStorage.getItem('nostr-key');
-    if (!storedKey) {
-      debugLog('❌ No private key found for Blossom auth', 'error');
+    // Check if Amber is available (mobile only)
+    const isAmberAvailable = await AmberAuth.isAmberInstalled();
+    debugLog(`🔍 Amber available: ${isAmberAvailable}`, 'info');
+    
+    if (!isAmberAvailable) {
+      debugLog('❌ Amber not available - cannot create Blossom auth', 'error');
       return null;
     }
 
-    let privateKey;
-    try {
-      // Try to decode as nsec
-      const decoded = nip19.decode(storedKey);
-      if (decoded.type === 'nsec') {
-        privateKey = decoded.data;
-      } else {
-        privateKey = storedKey;
-      }
-    } catch {
-      // Assume it's already a hex private key
-      privateKey = storedKey;
+    // Get user's public key
+    const userPubkey = await getUserPublicKey();
+    if (!userPubkey) {
+      debugLog('❌ No user pubkey available for Blossom auth', 'error');
+      return null;
     }
-
-    // Create NDK instance
-    const ndk = new NDK();
     
+    debugLog(`🔑 Using pubkey for auth: ${userPubkey}`, 'info');
+
     // Create Blossom authorization event (kind 24242)
-    const authEvent = new NDKEvent(ndk);
-    authEvent.kind = 24242;
-    authEvent.content = 'List Blobs';
-    authEvent.created_at = Math.floor(Date.now() / 1000);
-    
-    // Required tags for Blossom auth
-    authEvent.tags = [
-      ['t', action],
-      ['expiration', (Math.floor(Date.now() / 1000) + 3600).toString()]
-    ];
+    const authEvent = {
+      kind: 24242,
+      content: 'List Blobs',
+      created_at: Math.floor(Date.now() / 1000),
+      pubkey: userPubkey,
+      tags: [
+        ['t', action],
+        ['expiration', (Math.floor(Date.now() / 1000) + 3600).toString()]
+      ]
+    };
 
-    // Sign the event
-    await authEvent.sign(privateKey);
+    debugLog(`🔑 Auth event to sign: ${JSON.stringify(authEvent)}`, 'info');
+
+    // Sign the event using Amber
+    const signedEvent = await AmberAuth.signEvent(authEvent);
+    if (!signedEvent || !signedEvent.sig) {
+      debugLog('❌ Amber signing failed or returned invalid event', 'error');
+      return null;
+    }
+    
+    debugLog('✅ Amber signed event successfully', 'success');
+    debugLog(`🔑 Signed event: ${JSON.stringify(signedEvent)}`, 'info');
     
     // Create authorization header
-    const authHeader = `Nostr ${btoa(JSON.stringify(authEvent.rawEvent()))}`;
-    debugLog('✅ Created Blossom authorization header (kind 24242)', 'success');
-    debugLog(`🔑 Auth event: ${JSON.stringify(authEvent.rawEvent())}`, 'info');
+    const authHeader = `Nostr ${btoa(JSON.stringify(signedEvent))}`;
+    debugLog('✅ Blossom auth header created successfully', 'success');
     return authHeader;
     
   } catch (error) {
@@ -464,27 +468,35 @@ async function getFilesFromBlossomServer(serverUrl, pubkey = null) {
     
     // Build Blossom-specific endpoints based on server patterns
     let endpoints = [];
+    const npub = nip19.npubEncode(pubkey);
+    
+    debugLog(`🌸 User pubkey (hex): ${pubkey}`, 'info');
+    debugLog(`🌸 User npub: ${npub}`, 'info');
     
     // Handle blossom.band subdomain pattern - CRITICAL FIX!
     if (serverUrl.includes('blossom.band')) {
-      // blossom.band uses user-specific subdomains: https://<npub>.blossom.band
-      const npub = nip19.npubEncode(pubkey);
-      debugLog(`🌸 User pubkey (hex): ${pubkey}`, 'info');
-      debugLog(`🌸 User npub: ${npub}`, 'info');
       debugLog(`🌸 Expected subdomain: https://${npub}.blossom.band`, 'info');
       
       endpoints = [
-        `https://${npub}.blossom.band/list/${pubkey}`, // Correct subdomain pattern
-        `${serverUrl}/list/${pubkey}`, // Fallback to provided URL
-        `https://blossom.band/list/${pubkey}`, // Fallback to main domain
-        `https://blossom.band/api/list/${pubkey}` // API endpoint fallback
+        // Try subdomain with both hex and npub formats
+        `https://${npub}.blossom.band/list/${pubkey}`, // npub subdomain + hex pubkey
+        `https://${npub}.blossom.band/list/${npub}`, // npub subdomain + npub pubkey
+        `${serverUrl}/list/${pubkey}`, // Fallback to provided URL with hex
+        `${serverUrl}/list/${npub}`, // Fallback to provided URL with npub
+        `https://blossom.band/list/${pubkey}`, // Main domain with hex
+        `https://blossom.band/list/${npub}`, // Main domain with npub
+        `https://blossom.band/api/list/${pubkey}`, // API endpoint with hex
+        `https://blossom.band/api/list/${npub}` // API endpoint with npub
       ];
     } else {
-      // Standard Blossom server endpoints
+      // Standard Blossom server endpoints - try both hex and npub formats
       endpoints = [
-        `${serverUrl}/list/${pubkey}`,
-        `${serverUrl}/api/list/${pubkey}`,
-        `${serverUrl}/files/${pubkey}`
+        `${serverUrl}/list/${pubkey}`, // hex format
+        `${serverUrl}/list/${npub}`, // npub format
+        `${serverUrl}/api/list/${pubkey}`, // API with hex
+        `${serverUrl}/api/list/${npub}`, // API with npub
+        `${serverUrl}/files/${pubkey}`, // files with hex
+        `${serverUrl}/files/${npub}` // files with npub
       ];
     }
     
