@@ -18,7 +18,8 @@ export const MenuBar = () => {
     blossomEndpoint, setBlossomEndpoint,
     skipStartCountdown, setSkipStartCountdown,
     usePedometer, setUsePedometer,
-    useLocalStats, setUseLocalStats
+    useLocalStats, setUseLocalStats,
+    autoPostToNostr, setAutoPostToNostr
   } = useSettings();
 
   // State for the fallback lightning address in the modal
@@ -195,19 +196,19 @@ export const MenuBar = () => {
               <h4 className="text-lg font-semibold mb-3">Activity Types</h4>
               <div className="grid grid-cols-3 gap-2">
                 <button 
-                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.RUN ? 'bg-indigo-600' : 'bg-[#111827]'} text-white text-center`}
+                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.RUN ? 'bg-purple-600' : 'bg-[#111827]'} text-white text-center`}
                   onClick={() => handleActivityModeChange(ACTIVITY_TYPES.RUN)}
                 >
                   Run
                 </button>
                 <button 
-                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.WALK ? 'bg-indigo-600' : 'bg-[#111827]'} text-white text-center`}
+                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.WALK ? 'bg-purple-600' : 'bg-[#111827]'} text-white text-center`}
                   onClick={() => handleActivityModeChange(ACTIVITY_TYPES.WALK)}
                 >
                   Walk
                 </button>
                 <button 
-                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.CYCLE ? 'bg-indigo-600' : 'bg-[#111827]'} text-white text-center`}
+                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.CYCLE ? 'bg-purple-600' : 'bg-[#111827]'} text-white text-center`}
                   onClick={() => handleActivityModeChange(ACTIVITY_TYPES.CYCLE)}
                 >
                   Cycle
@@ -226,7 +227,7 @@ export const MenuBar = () => {
                   <span className="text-sm text-gray-400 mr-3">Skip Start Countdown</span>
                   <input 
                     type="checkbox"
-                    className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
+                    className="form-checkbox h-5 w-5 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 rounded"
                     checked={skipStartCountdown}
                     onChange={() => setSkipStartCountdown(!skipStartCountdown)}
                   />
@@ -245,7 +246,7 @@ export const MenuBar = () => {
                   <span className="text-sm text-gray-400 mr-3">Use Local Stats</span>
                   <input 
                     type="checkbox"
-                    className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
+                    className="form-checkbox h-5 w-5 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 rounded"
                     checked={useLocalStats}
                     onChange={() => setUseLocalStats(!useLocalStats)}
                   />
@@ -262,13 +263,13 @@ export const MenuBar = () => {
               <div className="flex justify-center mb-2">
                 <div className="flex rounded-full bg-[#111827] p-1">
                   <button 
-                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'km' ? 'bg-indigo-600 text-white' : 'text-gray-400'}`}
+                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'km' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}
                     onClick={() => distanceUnit !== 'km' && toggleDistanceUnit()}
                   >
                     Kilometers
                   </button>
                   <button 
-                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'mi' ? 'bg-indigo-600 text-white' : 'text-gray-400'}`}
+                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'mi' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}
                     onClick={() => distanceUnit !== 'mi' && toggleDistanceUnit()}
                   >
                     Miles
@@ -287,7 +288,7 @@ export const MenuBar = () => {
                 <span className="text-sm text-gray-400 mr-3">Encrypt Health Data (NIP-44)</span>
                 <input
                   type="checkbox"
-                  className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
+                  className="form-checkbox h-5 w-5 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 rounded"
                   checked={healthEncryptionPref === 'encrypted'}
                   onChange={() => {
                     const currentPrefIsEncrypted = healthEncryptionPref === 'encrypted';
@@ -311,7 +312,7 @@ export const MenuBar = () => {
                 <div className="flex rounded-md bg-[#111827] p-1 space-x-1">
                   <button
                     className={`flex-1 px-3 py-2 text-xs rounded-md ${
-                      publishMode === 'public' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'
+                      publishMode === 'public' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:bg-gray-700'
                     }`}
                     onClick={() => setPublishMode('public')}
                   >
@@ -319,7 +320,7 @@ export const MenuBar = () => {
                   </button>
                   <button
                     className={`flex-1 px-3 py-2 text-xs rounded-md ${
-                      publishMode === 'private' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'
+                      publishMode === 'private' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:bg-gray-700'
                     }`}
                     onClick={() => setPublishMode('private')}
                   >
@@ -327,7 +328,7 @@ export const MenuBar = () => {
                   </button>
                   <button
                     className={`flex-1 px-3 py-2 text-xs rounded-md ${
-                      publishMode === 'mixed' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'
+                      publishMode === 'mixed' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:bg-gray-700'
                     }`}
                     onClick={() => setPublishMode('mixed')}
                   >
@@ -345,7 +346,7 @@ export const MenuBar = () => {
                       value={privateRelayUrl}
                       onChange={e => setPrivateRelayUrl(e.target.value)}
                       placeholder="wss://your-private-relay.com"
-                      className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-purple-500 focus:border-purple-500"
                     />
                   </div>
                 )}
@@ -399,7 +400,7 @@ export const MenuBar = () => {
                   <span className="text-sm text-gray-400 mr-3">Use Device Step Counter</span>
                   <input
                     type="checkbox"
-                    className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
+                    className="form-checkbox h-5 w-5 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 rounded"
                     checked={usePedometer}
                     onChange={() => setUsePedometer(!usePedometer)}
                   />
@@ -420,7 +421,7 @@ export const MenuBar = () => {
                     id="blossomEndpointSelect"
                     value={blossomEndpoint}
                     onChange={e => setBlossomEndpoint(e.target.value)}
-                    className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-purple-500 focus:border-purple-500"
                   >
                     <option value="">Search All Servers</option>
                     {DEFAULT_SERVERS.map(server => (
@@ -452,7 +453,7 @@ export const MenuBar = () => {
                   <button 
                     onClick={handleTestBlossomConnection}
                     disabled={isTestingConnection || (!blossomEndpoint || blossomEndpoint === 'custom' && !customBlossomUrl)}
-                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white text-sm rounded-md transition-colors"
+                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white text-sm rounded-md transition-colors"
                   >
                     {isTestingConnection ? 'Testing...' : 'Test Connection'}
                   </button>
@@ -478,11 +479,11 @@ export const MenuBar = () => {
                   placeholder="yourname@example.com"
                   value={manualLnAddress}
                   onChange={(e) => setManualLnAddress(e.target.value)}
-                  className="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:ring-purple-500 focus:border-purple-500"
                 />
                 <button 
                   onClick={handleSaveLnAddress} 
-                  className="mt-2 w-full px-4 py-2 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                  className="mt-2 w-full px-4 py-2 rounded-md text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white transition-colors"
                 >
                   Save Address
                 </button>
@@ -517,7 +518,7 @@ export const MenuBar = () => {
               <li key={item.name} className="flex-1">
                 <Link 
                   to={item.path} 
-                  className={`flex flex-col items-center justify-center px-1 py-1 rounded-md h-full ${location.pathname === item.path ? 'text-indigo-400' : 'text-gray-400'}`}
+                  className={`flex flex-col items-center justify-center px-1 py-1 rounded-md h-full ${location.pathname === item.path ? 'text-purple-400' : 'text-gray-400'}`}
                 >
                   {item.icon}
                   <span className="text-xs font-medium tracking-wider text-center whitespace-nowrap">{item.name}</span>

@@ -100,7 +100,7 @@ const EventDetail = ({ userPublicKey = null }) => {
             event.status === 'active' 
               ? 'bg-green-500 text-white' 
               : event.status === 'upcoming' 
-                ? 'bg-blue-500 text-white'
+                ? 'bg-purple-500 text-white'
                 : 'bg-gray-500 text-white'
           }`}>
             {event.status.toUpperCase()}

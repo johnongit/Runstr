@@ -48,6 +48,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
   const [loading, setLoading] = useState(true);
   const [participating, setParticipating] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingChallenge, setEditingChallenge] = useState<ReturnType<typeof parseChallenge> | null>(null);
   const [form, setForm] = useState<{ name: string; description: string; goalValue: number; goalUnit: 'km' | 'mi'; start: string; end: string }>({
     name: '',
     description: '',
@@ -124,8 +125,8 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       endTime: form.end ? Math.floor(new Date(form.end).getTime() / 1000) : undefined,
     };
 
-    const toastId = toast.loading('Publishing challenge...');
-    const tmpl = prepareTeamChallengeEvent(teamAIdentifier, details, finalPubkey);
+    const toastId = toast.loading(editingChallenge ? 'Updating challenge...' : 'Publishing challenge...');
+    const tmpl = prepareTeamChallengeEvent(teamAIdentifier, details, finalPubkey, editingChallenge?.uuid);
     if (!tmpl) {
       toast.error('Failed to build challenge event', { id: toastId });
       return;
@@ -135,16 +136,89 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       await ndkEvt.sign();
       const res = await ndkEvt.publish();
       if (res.size > 0) {
-        toast.success('Challenge published!', { id: toastId });
-        setShowModal(false);
-        setForm({ name: '', description: '', goalValue: 0, goalUnit: 'km', start: '', end: '' });
+        toast.success(editingChallenge ? 'Challenge updated!' : 'Challenge published!', { id: toastId });
+        handleCloseModal();
       } else {
         toast.error('Publish failed. No relays accepted the event.', { id: toastId });
       }
     } catch (err) {
       console.error(err);
-      toast.error('Error creating challenge.', { id: toastId });
+      toast.error(editingChallenge ? 'Error updating challenge.' : 'Error creating challenge.', { id: toastId });
     }
+  };
+
+  const handleEditChallenge = (challenge: ReturnType<typeof parseChallenge>) => {
+    setEditingChallenge(challenge);
+    setForm({
+      name: challenge.name,
+      description: challenge.description,
+      goalValue: Number(challenge.goalValue) || 0,
+      goalUnit: (challenge.goalUnit as 'km' | 'mi') || 'km',
+      start: challenge.start ? new Date(challenge.start * 1000).toISOString().slice(0, 16) : '',
+      end: challenge.end ? new Date(challenge.end * 1000).toISOString().slice(0, 16) : '',
+    });
+    setShowModal(true);
+  };
+
+  const handleDeleteChallenge = async (challenge: ReturnType<typeof parseChallenge>) => {
+    if (!isCaptain) {
+      toast.error('Only team captains can delete challenges.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete "${challenge.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    let finalPubkey = currentUserPubkey;
+    if (!finalPubkey) {
+      const signerResult = await connectSigner();
+      finalPubkey = signerResult?.pubkey || null;
+      if (!finalPubkey) {
+        toast.error('A signer is required to delete a challenge.');
+        return;
+      }
+    }
+
+    const toastId = toast.loading('Deleting challenge...');
+    try {
+      // Create a deletion event (kind 5) to mark the challenge as deleted
+      const deletionEvent = {
+        kind: 5,
+        content: `Challenge "${challenge.name}" has been deleted`,
+        tags: [
+          ['e', challenge.id], // Reference to the challenge event
+          ['k', '33405'] // Kind of event being deleted (team challenge)
+        ],
+        created_at: Math.floor(Date.now() / 1000)
+      };
+
+      const ndkEvt = new NDKEvent(ndk, deletionEvent as any);
+      await ndkEvt.sign();
+      const res = await ndkEvt.publish();
+      if (res.size > 0) {
+        toast.success('Challenge deleted!', { id: toastId });
+        // Remove from local state
+        setChallenges(prev => prev.filter(c => c.id !== challenge.id));
+        // Remove from participation if user was participating
+        if (participating.includes(challenge.uuid)) {
+          const newParticipating = participating.filter(u => u !== challenge.uuid);
+          setParticipating(newParticipating);
+          localStorage.setItem(localKey(teamUUID), JSON.stringify(newParticipating));
+        }
+      } else {
+        toast.error('Delete failed. No relays accepted the event.', { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Error deleting challenge.', { id: toastId });
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingChallenge(null);
+    setForm({ name: '', description: '', goalValue: 0, goalUnit: 'km', start: '', end: '' });
   };
 
   return (
@@ -154,12 +228,12 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-blue-300">Captain Controls</h3>
+              <h3 className="text-lg font-semibold text-purple-300">Captain Controls</h3>
               <p className="text-sm text-gray-400">Create challenges to motivate your team members</p>
             </div>
             <button 
               onClick={() => setShowModal(true)} 
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap"
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap"
             >
               + Create Challenge
             </button>
@@ -170,7 +244,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       {/* Challenges List */}
       <div>
         <h4 className="text-xl font-semibold text-gray-100 mb-4">
-          Team Challenges {!loading && `(${challenges.length})`}
+          Challenges {!loading && `(${challenges.length})`}
         </h4>
         
         {loading && (
@@ -195,7 +269,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
                   <h4 className="font-semibold text-gray-100 text-lg">{ch.name}</h4>
                   {ch.goalValue && (
-                    <span className="px-3 py-1 bg-blue-600 text-white text-sm rounded-full whitespace-nowrap">
+                    <span className="px-3 py-1 bg-purple-600 text-white text-sm rounded-full whitespace-nowrap">
                       Goal: {ch.goalValue} {ch.goalUnit}
                     </span>
                   )}
@@ -211,16 +285,36 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                   </p>
                 )}
                 
-                <button 
-                  onClick={() => toggleParticipation(ch.uuid)} 
-                  className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${
-                    participating.includes(ch.uuid) 
-                      ? 'bg-red-600 hover:bg-red-700 text-white' 
-                      : 'border border-blue-500 text-blue-400 hover:bg-blue-600/20'
-                  }`}
-                >
-                  {participating.includes(ch.uuid) ? '✓ Leave Challenge' : '+ Participate'}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button 
+                    onClick={() => toggleParticipation(ch.uuid)} 
+                    className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${
+                      participating.includes(ch.uuid) 
+                        ? 'bg-red-600 hover:bg-red-700 text-white' 
+                        : 'border border-purple-500 text-purple-400 hover:bg-purple-600/20'
+                    }`}
+                  >
+                    {participating.includes(ch.uuid) ? '✓ Leave Challenge' : '+ Participate'}
+                  </button>
+                  
+                  {/* Captain Controls */}
+                  {isCaptain && (
+                    <>
+                      <button 
+                        onClick={() => handleEditChallenge(ch)}
+                        className="px-4 py-2 text-sm rounded-lg font-medium border border-yellow-500 text-yellow-400 hover:bg-yellow-600/20 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteChallenge(ch)}
+                        className="px-4 py-2 text-sm rounded-lg font-medium border border-red-500 text-red-400 hover:bg-red-600/20 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -231,7 +325,9 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       {showModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 p-6 rounded-lg w-full max-w-lg text-white max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4 text-blue-300">Create New Challenge</h3>
+            <h3 className="text-xl font-semibold mb-4 text-purple-300">
+              {editingChallenge ? 'Edit Challenge' : 'Create New Challenge'}
+            </h3>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Challenge Name</label>
@@ -241,7 +337,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                   onChange={e => setForm({ ...form, name: e.target.value })} 
                   required 
                   placeholder="e.g., 5K Challenge"
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
                 />
               </div>
               
@@ -254,7 +350,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                   required 
                   rows={3}
                   placeholder="Describe the challenge goals and rules..."
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
                 />
               </div>
               
@@ -268,7 +364,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                     min="0"
                     step="0.1"
                     placeholder="5.0"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
                   />
                 </div>
                 <div>
@@ -276,7 +372,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                   <select 
                     value={form.goalUnit} 
                     onChange={e => setForm({ ...form, goalUnit: e.target.value as 'km' | 'mi' })} 
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500"
                   >
                     <option value="km">Kilometers</option>
                     <option value="mi">Miles</option>
@@ -290,7 +386,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                   type="datetime-local" 
                   value={form.start} 
                   onChange={e => setForm({ ...form, start: e.target.value })} 
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
                 />
               </div>
               
@@ -300,23 +396,23 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                   type="datetime-local" 
                   value={form.end} 
                   onChange={e => setForm({ ...form, end: e.target.value })} 
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
                 />
               </div>
               
               <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                 <button 
                   type="button" 
-                  onClick={() => setShowModal(false)} 
+                  onClick={handleCloseModal} 
                   className="px-6 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
                 >
-                  Create Challenge
+                  {editingChallenge ? 'Update Challenge' : 'Create Challenge'}
                 </button>
               </div>
             </form>

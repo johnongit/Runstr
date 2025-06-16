@@ -152,7 +152,7 @@ export function WorkoutCard({
               <span className="text-xs">{workout.location}</span>
             </Badge>
           )}
-          <Badge variant="outline" className="flex items-center gap-1 px-2 py-1">
+          <Badge variant="outline" className="flex items-center gap-1 px-2 py-1 border-purple-500/30 bg-purple-500/10 text-purple-300">
             <Clock className="h-3 w-3" />
             <span className="text-xs">{workout.timestamp}</span>
           </Badge>

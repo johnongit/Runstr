@@ -481,7 +481,7 @@ const Settings = () => {
             <button 
               onClick={handleTestBlossomConnection}
               disabled={isTestingConnection || !blossomEndpoint}
-              className="bg-blue-500 hover:bg-blue-700 disabled:bg-gray-500 text-white font-bold py-1 px-3 rounded text-sm"
+              className="bg-purple-500 hover:bg-purple-700 disabled:bg-gray-500 text-white font-bold py-1 px-3 rounded text-sm"
             >
               {isTestingConnection ? 'Testing...' : 'Test Connection'}
             </button>
@@ -501,7 +501,7 @@ const Settings = () => {
         <h3>Integrations</h3>
         <div className="setting-item">
           <label>Bangle.js</label>
-          <button onClick={handleSyncFromWatch} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          <button onClick={handleSyncFromWatch} className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
             {isSyncingWatch ? 'Syncing...' : 'Sync Watch'}
           </button>
         </div>

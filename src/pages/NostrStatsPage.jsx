@@ -15,6 +15,11 @@ const formatDuration = (secs = 0) => {
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
 };
 
+const formatPersonalBest = (pb) => {
+  if (!pb) return 'N/A';
+  return formatDuration(pb.time);
+};
+
 const renderAssociations = (event) => {
   const parts = [];
   const teamTag = event.tags?.find(t => t[0] === 'team');
@@ -41,18 +46,39 @@ const NostrStatsPage = () => {
 
   return (
     <div className="p-4 space-y-6">
-      <h2 className="text-xl font-semibold">Nostr Workout Stats</h2>
+      <h2 className="text-xl font-semibold text-purple-300">Nostr Workout Stats</h2>
       {stats ? (
-        <div className="grid grid-cols-2 gap-4 bg-gray-800 p-4 rounded-lg text-sm">
-          <Stat label="Runs" value={stats.totalRuns} />
-          <Stat label="Distance" value={`${stats.totalDistanceKm.toFixed(2)} km`} />
-          <Stat label="Duration" value={formatDuration(stats.totalDurationSeconds)} />
-          <Stat label="Elev Gain" value={`${stats.elevationGain.toFixed(0)} m`} />
+        <div className="space-y-4">
+          {/* Overall Stats */}
+          <div className="grid grid-cols-2 gap-4 bg-gray-800 p-4 rounded-lg text-sm">
+            <Stat label="Runs" value={stats.totalRuns} />
+            <Stat label="Distance" value={`${stats.totalDistanceKm.toFixed(2)} km`} />
+            <Stat label="Duration" value={formatDuration(stats.totalDurationSeconds)} />
+            <Stat label="Elev Gain" value={`${stats.elevationGain.toFixed(0)} m`} />
+          </div>
+
+          {/* Personal Bests */}
+          <div className="bg-gray-800 p-4 rounded-lg">
+            <h3 className="text-sm font-semibold text-purple-300 mb-3">Personal Bests</h3>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <Stat label="1K Best" value={formatPersonalBest(stats.personalBests['1k'])} />
+              <Stat label="5K Best" value={formatPersonalBest(stats.personalBests['5k'])} />
+              <Stat label="10K Best" value={formatPersonalBest(stats.personalBests['10k'])} />
+            </div>
+          </div>
+
+          {/* Streak */}
+          <div className="bg-gray-800 p-4 rounded-lg">
+            <h3 className="text-sm font-semibold text-purple-300 mb-3">Activity Streak</h3>
+            <div className="text-sm">
+              <Stat label="Longest Streak" value={`${stats.longestStreak} days`} />
+            </div>
+          </div>
         </div>
       ) : <p>No workouts on Nostr yet.</p>}
 
-      <h3 className="text-lg font-semibold mt-6">Recent Workouts</h3>
-      <button onClick={reload} className="text-xs text-blue-400 mb-2">Reload</button>
+      <h3 className="text-lg font-semibold mt-6 text-purple-300">Recent Workouts</h3>
+      <button onClick={reload} className="text-xs text-purple-400 mb-2">Reload</button>
       <ul className="space-y-3">
         {workoutEvents.map(ev => (
           <li key={ev.id} className="bg-gray-900 border border-gray-700 p-3 rounded-md text-sm text-gray-200">

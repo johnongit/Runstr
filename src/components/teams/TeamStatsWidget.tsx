@@ -10,7 +10,7 @@ const TeamStatsWidget: React.FC<TeamStatsWidgetProps> = ({ totalDistance }) => {
       <h3 className="text-lg font-semibold text-white mb-2">This Month's Team Stats</h3>
       <div className="text-center">
         <p className="text-gray-400 text-sm">Total Distance</p>
-        <p className="text-3xl font-bold text-blue-400">
+        <p className="text-3xl font-bold text-purple-400">
           {totalDistance.toFixed(2)} <span className="text-xl">km</span>
         </p>
       </div>

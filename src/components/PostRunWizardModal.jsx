@@ -1,42 +1,33 @@
 import { useState, useContext } from 'react';
 import PropTypes from 'prop-types';
-import runDataService from '../services/RunDataService';
 import { publishRun } from '../utils/runPublisher';
 import { NostrContext } from '../contexts/NostrContext';
-import { useSettings, PUBLISHABLE_METRICS } from '../contexts/SettingsContext';
-
-const intensities = [
-  { value: 'easy', label: 'Easy' },
-  { value: 'moderate', label: 'Moderate' },
-  { value: 'hard', label: 'Hard' }
-];
+import { useSettings } from '../contexts/SettingsContext';
 
 export const PostRunWizardModal = ({ run, onClose }) => {
-  const [step, setStep] = useState(1);
-  const [selectedIntensity, setSelectedIntensity] = useState(run.intensity || 'moderate');
   const [publishing, setPublishing] = useState(false);
   const [publishResults, setPublishResults] = useState(null);
 
   const { lightningAddress, publicKey } = useContext(NostrContext);
   const settings = useSettings();
 
-  // helper save intensity into run record once selected
-  const persistIntensity = (value) => {
-    if (!run) return;
-    run.intensity = value;
-    runDataService.updateRun(run.id, { intensity: value });
-  };
-
-  const handleNext = () => {
-    persistIntensity(selectedIntensity);
-    setStep(2);
-  };
-
   const handlePublish = async () => {
     setPublishing(true);
     try {
       const unit = localStorage.getItem('distanceUnit') || 'km';
-      const results = await publishRun(run, unit, settings);
+      // Only publish the main workout record (NIP101e), no extras
+      const results = await publishRun(run, unit, { 
+        ...settings,
+        // Override all NIP101h options to false, only publish main workout
+        publishIntensity: false,
+        publishCalories: false,
+        publishDurationMetric: false,
+        publishDistanceMetric: false,
+        publishPaceMetric: false,
+        publishElevationMetric: false,
+        publishSteps: false,
+        publishSplits: false
+      });
       setPublishResults(results);
 
       const allSuccess = results && results.every(r => r.success);
@@ -64,95 +55,60 @@ export const PostRunWizardModal = ({ run, onClose }) => {
     }
   };
 
-  const renderStep1 = () => (
-    <div>
-      <h3 className="text-lg font-semibold mb-4">Workout Finished!</h3>
-      <p className="mb-3">How hard was this workout?</p>
-      <div className="flex flex-col gap-2 mb-6">
-        {intensities.map((opt) => (
-          <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="intensity"
-              value={opt.value}
-              checked={selectedIntensity === opt.value}
-              onChange={() => setSelectedIntensity(opt.value)}
-            />
-            <span>{opt.label}</span>
-          </label>
-        ))}
-      </div>
-      <div className="flex justify-end gap-2">
-        <button className="button-secondary" onClick={onClose}>Skip</button>
-        <button className="button-primary" onClick={handleNext}>Next</button>
-      </div>
-    </div>
-  );
-
-  const renderStep2 = () => {
-    const allSuccess = publishResults && publishResults.every(r => r.success);
-    return (
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Save to Nostr</h3>
-        <p className="mb-3">The following data will be (or was) published:</p>
-        <div className="space-y-2 mb-6">
-          <div className="flex items-center justify-between py-1">
-            <span className="text-sm text-gray-300">Workout Record (Summary)</span>
-            <input 
-              type="checkbox" 
-              className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded opacity-50"
-              checked 
-              readOnly 
-              disabled 
-            />
-          </div>
-          {PUBLISHABLE_METRICS.map(metric => {
-            const settingKey = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
-            const setSettingKey = `setPublish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
-            const isChecked = settings[settingKey];
-            const setter = settings[setSettingKey];
-
-            return (
-              <div key={metric.key} className="flex items-center justify-between py-1">
-                <span className="text-sm text-gray-300">{metric.label}</span>
-                <input
-                  type="checkbox"
-                  className="form-checkbox h-5 w-5 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500 rounded"
-                  id={`publish-${metric.key}-checkbox`}
-                  checked={isChecked}
-                  onChange={() => setter(!isChecked)}
-                  disabled={publishing || !!publishResults}
-                />
-              </div>
-            );
-          })}
-        </div>
-        
-        {publishResults && (
-          <div className="mb-4 text-sm">
-            {allSuccess ? (
-              <span className="text-green-400">Successfully published selected events!</span>
-            ) : (
-              <span className="text-red-400">Some selected events may have failed. See console.</span>
-            )}
-          </div>
-        )}
-        <div className="flex justify-end gap-2">
-          <button className="button-secondary" onClick={onClose} disabled={publishing && !publishResults}>Close</button>
-          {!publishResults && (
-            <button className="button-primary" onClick={handlePublish} disabled={publishing}>
-              {publishing ? 'Publishing…' : 'Publish Selected'}
-            </button>
-          )}
-        </div>
-      </div>
-    );
+  // Helper function to format time
+  const formatTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const allSuccess = publishResults && publishResults.every(r => r.success);
 
   return (
     <div className="modal-overlay">
       <div className="modal-content post-run-wizard w-full max-w-md">
-        {step === 1 ? renderStep1() : renderStep2()}
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-purple-300">Save Workout to Nostr</h3>
+          <p className="mb-4 text-gray-300">
+            Your workout summary will be published to Nostr as a workout record.
+          </p>
+          
+          <div className="mb-4 p-3 bg-gray-700 rounded-md text-sm">
+            <p><strong>Distance:</strong> {run.distance ? `${(run.distance / 1000).toFixed(2)} km` : 'N/A'}</p>
+            <p><strong>Duration:</strong> {run.duration ? formatTime(run.duration) : 'N/A'}</p>
+            <p><strong>Activity:</strong> {run.activityType || 'Run'}</p>
+          </div>
+          
+          {publishResults && (
+            <div className="mb-4 text-sm">
+              {allSuccess ? (
+                <span className="text-green-400">✅ Successfully published workout record!</span>
+              ) : (
+                <span className="text-red-400">❌ Failed to publish workout record. Check console for details.</span>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3">
+            <button 
+              className="px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 transition-colors" 
+              onClick={onClose} 
+              disabled={publishing && !publishResults}
+            >
+              {publishResults ? 'Close' : 'Cancel'}
+            </button>
+            {!publishResults && (
+              <button 
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                onClick={handlePublish} 
+                disabled={publishing}
+              >
+                {publishing ? 'Publishing...' : 'Publish Workout'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -45,7 +45,7 @@ const LeaderboardTab: React.FC<LeaderboardTabProps> = ({ workoutEvents }) => {
           const profile = profiles?.[member.pubkey];
           return (
             <div key={member.pubkey} className="grid grid-cols-12 gap-3 items-center bg-gray-800 p-3 rounded-lg hover:bg-gray-750 transition-colors">
-              <div className="col-span-1 text-lg font-bold text-blue-400">{index + 1}</div>
+              <div className="col-span-1 text-lg font-bold text-purple-400">{index + 1}</div>
               <div className="col-span-6 flex items-center space-x-3">
                 <Avatar src={profile?.image} name={profile?.displayName || profile?.name} />
                 <DisplayName pubkey={member.pubkey} />

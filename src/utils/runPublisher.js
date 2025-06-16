@@ -16,6 +16,8 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}) => {
 
   // 🏷️ Determine default posting team (A2 strategy – simple hashtag tag)
   let teamAssociation = undefined;
+  let challengeUUIDs = [];
+  
   try {
     const { getDefaultPostingTeamIdentifier } = await import('./settingsManager.ts');
     const defaultTeamId = getDefaultPostingTeamIdentifier ? getDefaultPostingTeamIdentifier() : null;
@@ -24,6 +26,17 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}) => {
       if (parts.length === 2) {
         const [teamCaptainPubkey, teamUUID] = parts;
         teamAssociation = { teamCaptainPubkey, teamUUID };
+        
+        // 🏆 Get challenge participation for this team
+        try {
+          const challengeKey = `runstr:challengeParticipation:${teamUUID}`;
+          const stored = JSON.parse(localStorage.getItem(challengeKey) || '[]');
+          if (Array.isArray(stored)) {
+            challengeUUIDs = stored;
+          }
+        } catch (challengeErr) {
+          console.warn('runPublisher: could not retrieve challenge participation', challengeErr);
+        }
       }
     }
   } catch (err) {
@@ -32,8 +45,8 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}) => {
 
   // 1️⃣ Publish workout summary if not already published earlier (ALWAYS PUBLISHED)
   if (!run.nostrWorkoutEventId) {
-    // Pass settings to createWorkoutEvent if it needs to conditionally add tags like steps
-    const summaryTemplate = createWorkoutEvent(run, distanceUnit, { teamAssociation }); // Adds A2 team tag if available
+    // Pass team association and challenge UUIDs to createWorkoutEvent
+    const summaryTemplate = createWorkoutEvent(run, distanceUnit, { teamAssociation, challengeUUIDs });
     try {
       const summaryResult = await createAndPublishEvent(summaryTemplate, null, { relays: relayList });
       results.push({ kind: 1301, success: true, result: summaryResult });

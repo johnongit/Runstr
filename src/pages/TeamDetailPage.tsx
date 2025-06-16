@@ -484,7 +484,7 @@ const TeamDetailPage: React.FC = () => {
         <nav className="-mb-px flex space-x-6 sm:space-x-8 overflow-x-auto pb-px scrollbar-hide" aria-label="Tabs">
           {['chat', 'challenges', 'members', 'leaderboard'].map((tabName) => {
             let displayName = tabName;
-            if (tabName === 'challenges') displayName = 'Team Challenges';
+            if (tabName === 'challenges') displayName = 'Challenges';
             else displayName = tabName.charAt(0).toUpperCase() + tabName.slice(1);
 
             return (
@@ -493,7 +493,7 @@ const TeamDetailPage: React.FC = () => {
               onClick={() => setActiveTab(tabName as any)}
               className={`whitespace-nowrap py-4 px-3 sm:py-4 sm:px-4 border-b-2 font-medium text-sm sm:text-base min-w-0 flex-shrink-0
                 ${activeTab === tabName 
-                  ? 'border-blue-500 text-blue-400 bg-blue-500/10' 
+                  ? 'border-purple-500 text-purple-400 bg-purple-500/10' 
                   : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500 hover:bg-gray-700/50'}
                 capitalize transition-all duration-150 rounded-t-lg`}
             >
@@ -584,12 +584,12 @@ const TeamDetailPage: React.FC = () => {
                     value={newMemberPubkey}
                     onChange={(e) => setNewMemberPubkey(e.target.value)}
                     placeholder="Enter new member npub or hex pubkey"
-                    className="flex-grow p-3 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
+                    className="flex-grow p-3 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-purple-500 focus:border-purple-500"
                   />
                   <button 
                     onClick={handleAddMember}
                     disabled={isAddingMember || !newMemberPubkey.trim()}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                   >
                     {isAddingMember ? 'Adding...' : 'Add Member'}
                   </button>
@@ -604,7 +604,7 @@ const TeamDetailPage: React.FC = () => {
                     <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <DisplayName pubkey={memberPubkey} />
                         {memberPubkey === actualCaptain && <span className="text-xs sm:text-sm text-yellow-400 font-medium px-2 py-1 bg-yellow-400/10 rounded-full">(Captain)</span>}
-                        {memberPubkey === currentUserPubkey && !isCurrentUserCaptain && <span className="text-xs sm:text-sm text-green-400 font-medium px-2 py-1 bg-green-400/10 rounded-full">(You)</span>}
+                        {memberPubkey === currentUserPubkey && !isCurrentUserCaptain && <span className="text-xs sm:text-sm text-purple-400 font-medium px-2 py-1 bg-purple-400/10 rounded-full">(You)</span>}
                     </div>
                     {isCurrentUserCaptain && memberPubkey !== currentUserPubkey && (
                         <button 
@@ -698,7 +698,7 @@ const TeamDetailPage: React.FC = () => {
             className={`mt-4 w-full sm:w-auto px-6 py-3 font-semibold rounded-lg transition-colors ${
               isJoining 
                 ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-                : 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-purple-600 hover:bg-purple-700 text-white'
             }`}
             title={`Join ${getTeamName(team)} (Captain: ${getPubkeyDisplayName(actualCaptain)})`}
           >
@@ -713,13 +713,13 @@ const TeamDetailPage: React.FC = () => {
       <div className="mb-8 pb-6 border-b border-gray-700">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
           <div className="flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-blue-300 mb-2">{teamName}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-purple-300 mb-2">{teamName}</h1>
             <p className="text-gray-300 leading-relaxed text-base sm:text-lg">{teamDescription}</p>
           </div>
           {isCurrentUserCaptain && (
             <button
               onClick={() => setShowManageTeamModal(true)}
-              className="px-4 py-2 sm:px-6 sm:py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap text-sm sm:text-base"
+              className="px-4 py-2 sm:px-6 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap text-sm sm:text-base"
             >
               Manage Team
             </button>
@@ -733,7 +733,7 @@ const TeamDetailPage: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <span className="text-gray-500 text-xs uppercase tracking-wide">Visibility</span>
-              <span className={`${teamIsPublic ? "text-green-400" : "text-red-400"} font-medium`}>
+              <span className={`${teamIsPublic ? "text-purple-400" : "text-red-400"} font-medium`}>
                 {teamIsPublic ? 'Public' : 'Private'}
               </span>
             </div>
@@ -748,7 +748,7 @@ const TeamDetailPage: React.FC = () => {
       </div>
 
       <div className="mt-12 pt-6 border-t border-gray-700 text-center">
-        <Link to="/teams" className="text-blue-400 hover:text-blue-300 transition-colors duration-150 text-lg">
+        <Link to="/teams" className="text-purple-400 hover:text-purple-300 transition-colors duration-150 text-lg">
           &larr; Back to Teams List
         </Link>
       </div>

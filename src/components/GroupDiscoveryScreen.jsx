@@ -360,7 +360,7 @@ const GroupDiscoveryScreen = () => {
       <div className="min-h-screen bg-gray-900 p-4">
         <h1 className="text-2xl font-bold text-white mb-2">Teams</h1>
         <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
         </div>
       </div>
     );
@@ -394,7 +394,7 @@ const GroupDiscoveryScreen = () => {
                   setJoinSuccessGroup(null);
                   handleGroupPress(joinSuccessGroup);
                 }}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
               >
                 Go to Group
               </button>
@@ -427,7 +427,7 @@ const GroupDiscoveryScreen = () => {
             <p className="text-gray-300 mb-6">This feature is coming soon. Stay tuned for updates!</p>
             <button 
               onClick={() => setShowComingSoonModal(false)}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
             >
               Close
             </button>
@@ -449,7 +449,7 @@ const GroupDiscoveryScreen = () => {
           return (
             <div key={index} className="bg-gray-800 rounded-lg p-4 mb-4 border border-gray-700">
               <div className="flex items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                 <span className="ml-2 text-gray-400">Loading group data...</span>
               </div>
             </div>
@@ -521,7 +521,7 @@ const GroupDiscoveryScreen = () => {
           <div className="flex justify-center">
             <button 
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md"
+              className="px-4 py-2 bg-purple-600 text-white rounded-md"
             >
               Refresh
             </button>

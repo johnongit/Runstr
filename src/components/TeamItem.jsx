@@ -24,7 +24,7 @@ export const TeamItem = ({ team }) => {
             className="w-12 h-12 rounded-full mr-4 object-cover" 
           />
         ) : (
-          <div className="w-12 h-12 rounded-full mr-4 bg-blue-900/50 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full mr-4 bg-purple-900/50 flex items-center justify-center">
             <span className="text-lg font-bold">{team.name.charAt(0)}</span>
           </div>
         )}
