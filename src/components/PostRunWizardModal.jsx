@@ -80,15 +80,13 @@ export const PostRunWizardModal = ({ run, onClose }) => {
             <p><strong>Activity:</strong> {run.activityType || 'Run'}</p>
           </div>
           
-          {publishResults && (
-            <div className="mb-4 text-sm">
-              {allSuccess ? (
-                <span className="text-green-400">✅ Successfully published workout record!</span>
-              ) : (
-                <span className="text-red-400">❌ Failed to publish workout record. Check console for details.</span>
-              )}
-            </div>
-          )}
+          <div className="status-section mt-3">
+            {publishing && <span className="text-text-secondary">🔄 Publishing workout record...</span>}
+            {allSuccess && <span className="text-text-primary">✅ Workout record published successfully!</span>}
+            {!allSuccess && (
+              <span className="text-text-primary">❌ Failed to publish workout record. Check console for details.</span>
+            )}
+          </div>
 
           <div className="flex justify-end gap-3">
             <button 

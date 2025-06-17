@@ -140,7 +140,7 @@ const RunClub = () => {
   return (
     <div className="run-club-container">
       <div className="feed-header-static">
-        <h2>RUNSTR FEED</h2>
+        {/* Removed RUNSTR FEED title as requested */}
       </div>
 
       {loading ? (

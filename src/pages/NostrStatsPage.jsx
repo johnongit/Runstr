@@ -47,7 +47,6 @@ const NostrStatsPage = () => {
 
   return (
     <div className="p-4 space-y-6 bg-bg-primary min-h-screen">
-      <h2 className="page-title">Nostr Workout Stats</h2>
       {stats ? (
         <div className="space-y-4">
           {/* Overall Stats */}

@@ -594,7 +594,7 @@ const TeamDetailPage: React.FC = () => {
                     {isAddingMember ? 'Adding...' : 'Add Member'}
                   </button>
                 </div>
-                {addMemberError && <p className="text-red-400 text-sm mt-3">{addMemberError}</p>}
+                {addMemberError && <p className="text-text-primary text-sm mt-3">{addMemberError}</p>}
               </div>
             )}
             {combinedMembers.length > 0 ? (

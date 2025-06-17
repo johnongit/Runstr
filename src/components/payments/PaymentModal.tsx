@@ -44,15 +44,15 @@ const PaymentModal: React.FC<Props> = ({ open, invoice, amount, onClose, onPaid,
 
           <div className="grid grid-cols-3 gap-2 mt-2">
             {deepLinks.map(dl => (
-              <a key={dl.name} href={dl.url} target="_blank" rel="noreferrer" className="text-center text-xs bg-blue-600 hover:bg-blue-500 py-1 rounded-md">
+              <a key={dl.name} href={dl.url} target="_blank" rel="noreferrer" className="text-center text-xs bg-text-primary text-bg-primary hover:bg-text-secondary py-1 rounded-md">
                 {dl.name}
               </a>
             ))}
           </div>
 
-          {paymentError && <p className="text-red-400 text-xs text-center mt-2">{paymentError}</p>}
+          {paymentError && <p className="text-text-primary text-xs text-center mt-2">{paymentError}</p>}
 
-          <button onClick={onPaid} className="w-full bg-green-600 hover:bg-green-500 mt-4 py-2 rounded-md">I have paid</button>
+          <button onClick={onPaid} className="w-full bg-text-primary text-bg-primary hover:bg-text-secondary mt-4 py-2 rounded-md">I have paid</button>
         </div>
       </div>
     </Dialog>

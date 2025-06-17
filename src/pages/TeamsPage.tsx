@@ -10,7 +10,7 @@ const TeamsPage: React.FC = () => {
   return (
     <div className="p-4 max-w-3xl mx-auto text-text-primary bg-bg-primary min-h-screen">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary">Teams</h1>
+        <div></div>
         <div className="flex items-center">
           <Link
             to="/teams/new"

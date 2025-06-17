@@ -64,7 +64,7 @@ export const RunClub = () => {
   return (
     <div className="run-club-container">
       <div className="feed-header-static">
-        <h2>RUNSTR FEED</h2>
+        {/* Removed page title as requested */}
       </div>
 
       {loading && posts.length === 0 ? (
