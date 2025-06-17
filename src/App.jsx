@@ -180,14 +180,14 @@ const App = () => {
                   <TeamsProvider>
                     <TeamChallengeProvider>
                       <WalletProvider>
-                        <div className="absolute inset-0 w-full h-full bg-bg-primary text-text-primary overflow-y-auto">
-                          <MenuBar />
-                          <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
-                            <Suspense fallback={<EnhancedLoadingFallback />}>
-                              <AppRoutes />
-                            </Suspense>
-                          </main>
-                        </div>
+                                              <div className="relative w-full min-h-screen bg-bg-primary text-text-primary">
+                        <MenuBar />
+                        <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
+                          <Suspense fallback={<EnhancedLoadingFallback />}>
+                            <AppRoutes />
+                          </Suspense>
+                        </main>
+                      </div>
                       </WalletProvider>
                     </TeamChallengeProvider>
                   </TeamsProvider>
