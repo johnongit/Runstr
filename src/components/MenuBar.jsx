@@ -170,7 +170,7 @@ export const MenuBar = () => {
         <div className="min-w-[120px]">
           <FloatingMusicPlayer />
         </div>
-        <button className="text-gray-400" onClick={toggleSettings}>
+        <button className="text-text-secondary hover:text-text-primary transition-colors duration-normal" onClick={toggleSettings}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -184,7 +184,7 @@ export const MenuBar = () => {
           <div className="bg-bg-secondary rounded-t-xl sm:rounded-xl w-full max-w-md p-6 shadow-lg max-h-[90vh] overflow-y-auto border border-border-secondary">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">Settings</h3>
-              <button onClick={toggleSettings} className="text-gray-400">
+              <button onClick={toggleSettings} className="text-text-secondary hover:text-text-primary transition-colors duration-normal">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -214,7 +214,7 @@ export const MenuBar = () => {
                   Cycle
                 </button>
               </div>
-              <p className="text-sm text-gray-400 mt-2">
+              <p className="text-sm text-text-secondary mt-2">
                 Currently tracking: {getActivityText()}
               </p>
             </div>
@@ -358,17 +358,17 @@ export const MenuBar = () => {
               <h4 className="text-lg font-semibold mb-3">Bitcoin Rewards</h4>
               {/*
               <div className="space-y-2">
-                <label htmlFor="lnAddressInput" className="text-sm text-gray-400">Lightning Address (to receive streak rewards)</label>
+                <label htmlFor="lnAddressInput" className="text-sm text-text-secondary">Lightning Address (to receive streak rewards)</label>
                 <div className="flex">
                   <input
                     id="lnAddressInput"
                     type="text"
                     defaultValue={localStorage.getItem('lightningAddress') || ''}
                     placeholder="you@getalby.com"
-                    className="flex-1 bg-[#111827] p-2 rounded-l-lg text-white text-sm"
+                    className="flex-1 bg-bg-tertiary p-2 rounded-l-lg text-text-primary text-sm"
                   />
                   <button
-                    className="bg-indigo-600 px-4 rounded-r-lg text-white text-sm"
+                    className="bg-secondary px-4 rounded-r-lg text-text-primary text-sm"
                     onClick={() => {
                       const val = document.getElementById('lnAddressInput').value.trim();
                       if (val && val.includes('@')) {
@@ -381,10 +381,10 @@ export const MenuBar = () => {
                     }}
                   >Save</button>
                 </div>
-                <p className="text-xs text-gray-500">If you also connect an NWC wallet, the app will pay that first and fall back to this address if needed.</p>
+                <p className="text-xs text-text-muted">If you also connect an NWC wallet, the app will pay that first and fall back to this address if needed.</p>
               </div>
               */}
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-text-secondary">
                 Runstr now automatically sends Bitcoin rewards directly to your connected Nostr account (via Zaps).
                 You no longer need to configure a separate Lightning Address here. Ensure your Nostr profile has a Lightning Address set up to receive rewards.
               </p>
@@ -396,11 +396,11 @@ export const MenuBar = () => {
               <h4 className="text-lg font-semibold mb-3">Step Counting (Walking)</h4>
               <div className="space-y-3">
                 {/* NEW Pedometer Button - Replaced with Checkbox */}
-                <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg mb-3">
-                  <span className="text-sm text-gray-400 mr-3">Use Device Step Counter</span>
+                <div className="flex items-center justify-between bg-bg-tertiary p-3 rounded-lg mb-3 border border-border-secondary">
+                  <span className="text-sm text-text-secondary mr-3">Use Device Step Counter</span>
                   <input
                     type="checkbox"
-                    className="form-checkbox h-5 w-5 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 rounded"
+                    className="form-checkbox h-5 w-5 text-primary bg-bg-tertiary border-border-secondary focus:ring-primary rounded"
                     checked={usePedometer}
                     onChange={() => setUsePedometer(!usePedometer)}
                   />
@@ -414,14 +414,14 @@ export const MenuBar = () => {
               <h4 className="text-lg font-semibold mb-3">Music Server</h4>
               <div className="space-y-3">
                 <div>
-                  <label htmlFor="blossomEndpointSelect" className="block text-sm font-medium text-gray-300 mb-1">
+                  <label htmlFor="blossomEndpointSelect" className="block text-sm font-medium text-text-secondary mb-1">
                     Blossom Music Server
                   </label>
                   <select
                     id="blossomEndpointSelect"
                     value={blossomEndpoint}
                     onChange={e => setBlossomEndpoint(e.target.value)}
-                    className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-purple-500 focus:border-purple-500"
+                    className="w-full bg-bg-primary p-2 rounded-md text-text-primary text-sm border border-border-secondary focus:ring-primary focus:border-border-focus outline-none"
                   >
                     <option value="">Search All Servers</option>
                     {DEFAULT_SERVERS.map(server => (
@@ -435,7 +435,7 @@ export const MenuBar = () => {
                 
                 {blossomEndpoint === 'custom' && (
                   <div>
-                    <label htmlFor="customBlossomInput" className="block text-sm font-medium text-gray-300 mb-1">
+                    <label htmlFor="customBlossomInput" className="block text-sm font-medium text-text-secondary mb-1">
                       Custom Server URL
                     </label>
                     <input
@@ -444,7 +444,7 @@ export const MenuBar = () => {
                       value={customBlossomUrl}
                       onChange={e => setCustomBlossomUrl(e.target.value)}
                       placeholder="https://your-blossom-server.com"
-                      className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full bg-bg-primary p-2 rounded-md text-text-primary text-sm border border-border-secondary focus:ring-primary focus:border-border-focus outline-none"
                     />
                   </div>
                 )}
@@ -453,42 +453,42 @@ export const MenuBar = () => {
                   <button 
                     onClick={handleTestBlossomConnection}
                     disabled={isTestingConnection || (!blossomEndpoint || blossomEndpoint === 'custom' && !customBlossomUrl)}
-                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white text-sm rounded-md transition-colors"
+                    className="px-3 py-1 bg-primary hover:bg-primary-hover disabled:bg-text-muted text-text-primary text-sm rounded-md transition-colors duration-normal"
                   >
                     {isTestingConnection ? 'Testing...' : 'Test Connection'}
                   </button>
                   {connectionStatus && (
-                    <span className={`text-sm ${connectionStatus.success ? 'text-green-400' : 'text-red-400'}`}>
+                    <span className={`text-sm ${connectionStatus.success ? 'text-success' : 'text-error'}`}>
                       {connectionStatus.message}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-text-muted">
                   Choose a specific server or leave blank to search all servers. NIP-96 servers support authenticated file listing, while Blossom servers use direct file access.
                 </p>
               </div>
             </div>
             
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-2 text-gray-200">Rewards</h4>
-              <div className="setting-item bg-gray-800 p-3 rounded-md">
-                <label htmlFor="manualLnAddressInput" className="block text-sm font-medium text-gray-300 mb-1">Fallback Lightning Address</label>
+              <h4 className="text-lg font-semibold mb-2 text-text-primary">Rewards</h4>
+              <div className="setting-item bg-bg-tertiary p-3 rounded-md border border-border-secondary">
+                <label htmlFor="manualLnAddressInput" className="block text-sm font-medium text-text-secondary mb-1">Fallback Lightning Address</label>
                 <input
                   type="email"
                   id="manualLnAddressInput"
                   placeholder="yourname@example.com"
                   value={manualLnAddress}
                   onChange={(e) => setManualLnAddress(e.target.value)}
-                  className="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:ring-purple-500 focus:border-purple-500"
+                  className="w-full p-2 rounded-md bg-bg-primary text-text-primary border border-border-secondary focus:ring-primary focus:border-border-focus outline-none"
                 />
                 <button 
                   onClick={handleSaveLnAddress} 
-                  className="mt-2 w-full px-4 py-2 rounded-md text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+                  className="mt-2 w-full px-4 py-2 rounded-md text-sm font-medium bg-primary hover:bg-primary-hover text-text-primary transition-colors duration-normal"
                 >
                   Save Address
                 </button>
-                {lnAddressStatusMessage && <p className="mt-2 text-xs text-center text-gray-400">{lnAddressStatusMessage}</p>}
-                <p className="mt-2 text-xs text-gray-500">
+                {lnAddressStatusMessage && <p className="mt-2 text-xs text-center text-text-secondary">{lnAddressStatusMessage}</p>}
+                <p className="mt-2 text-xs text-text-muted">
                   This is a global fallback. If Runstr attempts to send a reward and cannot find the recipient's Lightning Address from their Nostr profile, it will use this address instead.
                 </p>
               </div>
@@ -497,10 +497,10 @@ export const MenuBar = () => {
             <div className="flex flex-col space-y-4">
               <Link 
                 to="/nwc" 
-                className="flex items-center p-3 bg-[#111827] rounded-lg text-white"
+                className="flex items-center p-3 bg-bg-tertiary rounded-lg text-text-primary border border-border-secondary hover:bg-bg-secondary transition-colors duration-normal"
                 onClick={toggleSettings}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-bitcoin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
                 <span>Wallet</span>
@@ -518,7 +518,7 @@ export const MenuBar = () => {
               <li key={item.name} className="flex-1">
                 <Link 
                   to={item.path} 
-                  className={`flex flex-col items-center justify-center px-1 py-1 rounded-md h-full ${location.pathname === item.path ? 'text-purple-400' : 'text-gray-400'}`}
+                  className={`flex flex-col items-center justify-center px-1 py-1 rounded-md h-full transition-colors duration-normal ${location.pathname === item.path ? 'text-primary' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   {item.icon}
                   <span className="text-xs font-medium tracking-wider text-center whitespace-nowrap">{item.name}</span>
