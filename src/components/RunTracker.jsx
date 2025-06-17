@@ -454,88 +454,88 @@ ${additionalContent ? `\n${additionalContent}` : ''}
   }, [recentRun, autoPostToNostr, distanceUnit, autoPublishing]);
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">
+    <div className="w-full h-full flex flex-col bg-bg-primary text-text-primary relative">
       {/* Title Banner */}
-      <div className="bg-gradient-to-r from-indigo-800 to-purple-800 p-4 mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">{getActivityText('header')}</h2>
+      <div className="bg-gradient-to-r from-primary/80 to-secondary/80 p-4 mb-6 flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-text-primary">{getActivityText('header')}</h2>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 p-4">
         {/* Distance Card */}
-        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+        <div className="bg-bg-secondary p-4 rounded-xl shadow-lg flex flex-col border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-7 h-7 rounded-full bg-[#10B981]/20 flex items-center justify-center mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#10B981]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-7 h-7 rounded-full bg-success/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-            <span className="text-sm text-gray-400">Distance</span>
+            <span className="text-sm text-text-secondary">Distance</span>
           </div>
-          <div className="text-3xl font-bold">{convertDistance(distance, distanceUnit)}</div>
-          <div className="text-sm text-gray-400">{distanceUnit}</div>
+          <div className="text-3xl font-bold text-text-primary">{convertDistance(distance, distanceUnit)}</div>
+          <div className="text-sm text-text-muted">{distanceUnit}</div>
         </div>
 
         {/* Time Card */}
-        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+        <div className="bg-bg-secondary p-4 rounded-xl shadow-lg flex flex-col border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-7 h-7 rounded-full bg-purple-400/20 flex items-center justify-center mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <span className="text-sm text-gray-400">Time</span>
+            <span className="text-sm text-text-secondary">Time</span>
           </div>
-          <div className="text-3xl font-bold">{runDataService.formatTime(duration)}</div>
+          <div className="text-3xl font-bold text-text-primary">{runDataService.formatTime(duration)}</div>
         </div>
 
         {/* Pace Card / Dynamic Metric Card */}
-        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+        <div className="bg-bg-secondary p-4 rounded-xl shadow-lg flex flex-col border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-7 h-7 rounded-full bg-[#F59E0B]/20 flex items-center justify-center mr-2">
+            <div className="w-7 h-7 rounded-full bg-warning/20 flex items-center justify-center mr-2">
               {/* Icon can also be dynamic based on metric type if desired */}
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#F59E0B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
-            <span className="text-sm text-gray-400">{primaryMetricLabel}</span>
+            <span className="text-sm text-text-secondary">{primaryMetricLabel}</span>
           </div>
-          <div className="text-3xl font-bold">{primaryMetricValue}</div>
-          {primaryMetricUnit && <div className="text-sm text-gray-400">{primaryMetricUnit}</div>}
+          <div className="text-3xl font-bold text-text-primary">{primaryMetricValue}</div>
+          {primaryMetricUnit && <div className="text-sm text-text-muted">{primaryMetricUnit}</div>}
         </div>
 
         {/* Elevation Card */}
-        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+        <div className="bg-bg-secondary p-4 rounded-xl shadow-lg flex flex-col border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-7 h-7 rounded-full bg-[#F97316]/20 flex items-center justify-center mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#F97316]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-7 h-7 rounded-full bg-info/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
               </svg>
             </div>
-            <span className="text-sm text-gray-400">Elevation</span>
+            <span className="text-sm text-text-secondary">Elevation</span>
           </div>
-          <div className="text-3xl font-bold">{elevation ? formatElevation(elevation.gain, distanceUnit) : '0'}</div>
-          <div className="text-sm text-gray-400">{distanceUnit === 'mi' ? 'ft' : 'm'}</div>
+          <div className="text-3xl font-bold text-text-primary">{elevation ? formatElevation(elevation.gain, distanceUnit) : '0'}</div>
+          <div className="text-sm text-text-muted">{distanceUnit === 'mi' ? 'ft' : 'm'}</div>
         </div>
       </div>
       
       {/* Splits Table - Show only when tracking and splits exist */}
       {isTracking && splits && splits.length > 0 && (
-        <div className="bg-[#1a222e] rounded-xl shadow-lg mt-2 mx-4 p-4 overflow-hidden">
+        <div className="bg-bg-secondary rounded-xl shadow-lg mt-2 mx-4 p-4 overflow-hidden border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-6 h-6 rounded-full bg-[#8B5CF6]/20 flex items-center justify-center mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-300">Split Times</span>
+            <span className="text-sm font-medium text-text-secondary">Split Times</span>
           </div>
           <div className="mt-2">
             <SplitsTable splits={splits} distanceUnit={distanceUnit} />
           </div>
           {splits.length > 5 && (
-            <p className="text-xs text-gray-400 text-center mt-2">
+            <p className="text-xs text-text-muted text-center mt-2">
               Swipe to see more splits if needed
             </p>
           )}
@@ -545,7 +545,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {/* Start Activity Button */}
       {!isTracking ? (
         <button 
-          className="mx-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-xl shadow-lg flex items-center justify-center text-lg font-semibold my-4"
+          className="mx-4 bg-gradient-to-r from-primary to-secondary text-text-primary py-3 px-6 rounded-xl shadow-lg flex items-center justify-center text-lg font-semibold my-4 hover:from-primary-hover hover:to-secondary transition-colors duration-normal"
           onClick={initiateRun}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -558,21 +558,21 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         <div className="flex justify-between px-4 my-4">
           {isPaused ? (
             <button 
-              className="bg-green-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold"
+              className="bg-success text-text-primary py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold hover:bg-success/90 transition-colors duration-normal"
               onClick={resumeRun}
             >
               Resume
             </button>
           ) : (
             <button 
-              className="bg-yellow-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold"
+              className="bg-warning text-text-primary py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold hover:bg-warning/90 transition-colors duration-normal"
               onClick={pauseRun}
             >
               Pause
             </button>
           )}
           <button 
-            className="bg-red-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 ml-2 font-semibold"
+            className="bg-error text-text-primary py-3 px-6 rounded-xl shadow-lg flex-1 ml-2 font-semibold hover:bg-error/90 transition-colors duration-normal"
             onClick={() => {
               if (skipEndCountdown) {
                 stopRun();
@@ -603,8 +603,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {!isTracking && recentRun && (
         <div className="mt-6 mx-4">
           <div className="flex justify-between items-center mb-2">
-            <h3 className="text-lg font-semibold">{getActivityText('recent')}</h3>
-            <span className="text-xs text-gray-400">See All</span>
+            <h3 className="text-lg font-semibold text-text-primary">{getActivityText('recent')}</h3>
+            <span className="text-xs text-text-muted">See All</span>
           </div>
           
           <DashboardRunCard
@@ -654,8 +654,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {isCountingDown && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="flex flex-col items-center">
-            <div className="text-6xl font-bold mb-4">{countdown}</div>
-            <div className="text-xl">
+            <div className="text-6xl font-bold mb-4 text-text-primary">{countdown}</div>
+            <div className="text-xl text-text-secondary">
               {countdownType === 'start' ? 'Starting run...' : 'Stopping run...'}
             </div>
           </div>
@@ -665,28 +665,28 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {/* Post to Nostr modal */}
       {showPostModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="bg-[#1a222e] rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-xl font-semibold mb-4">Post Run to Nostr</h3>
+          <div className="bg-bg-secondary rounded-xl p-6 w-full max-w-md border border-border-primary">
+            <h3 className="text-xl font-semibold mb-4 text-text-primary">Post Run to Nostr</h3>
             <textarea
               value={additionalContent}
               onChange={(e) => setAdditionalContent(e.target.value)}
               placeholder="Add any additional comments or hashtags..."
               rows={4}
-              className="w-full bg-[#111827] border border-gray-700 rounded-lg p-3 mb-4 text-white"
+              className="w-full bg-bg-tertiary border border-border-secondary rounded-lg p-3 mb-4 text-text-primary placeholder-text-muted focus:border-border-focus outline-none"
               disabled={isPosting}
             />
             <div className="flex justify-end space-x-3">
               <button 
                 onClick={() => setShowPostModal(false)} 
                 disabled={isPosting}
-                className="px-4 py-2 rounded-lg border border-gray-600 text-gray-300"
+                className="px-4 py-2 rounded-lg border border-border-primary text-text-secondary hover:text-text-primary hover:border-border-focus transition-colors duration-normal"
               >
                 Cancel
               </button>
               <button 
                 onClick={handlePostSubmit} 
                 disabled={isPosting}
-                className="px-4 py-2 rounded-lg bg-indigo-600 text-white"
+                className="px-4 py-2 rounded-lg bg-primary text-text-primary hover:bg-primary-hover transition-colors duration-normal"
               >
                 {isPosting ? 'Posting...' : 'Post'}
               </button>

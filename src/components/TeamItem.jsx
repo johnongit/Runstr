@@ -14,7 +14,7 @@ export const TeamItem = ({ team }) => {
   return (
     <div 
       onClick={handleClick}
-      className="bg-[#1a222e] rounded-lg p-4 cursor-pointer transition-transform hover:scale-[1.01]"
+      className="bg-bg-secondary rounded-lg p-4 cursor-pointer transition-transform hover:scale-[1.01] border border-border-secondary"
     >
       <div className="flex items-center">
         {team.imageUrl ? (

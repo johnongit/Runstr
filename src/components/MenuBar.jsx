@@ -181,7 +181,7 @@ export const MenuBar = () => {
       {/* Settings Modal */}
       {settingsOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black bg-opacity-70">
-          <div className="bg-[#1a222e] rounded-t-xl sm:rounded-xl w-full max-w-md p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-bg-secondary rounded-t-xl sm:rounded-xl w-full max-w-md p-6 shadow-lg max-h-[90vh] overflow-y-auto border border-border-secondary">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">Settings</h3>
               <button onClick={toggleSettings} className="text-gray-400">
@@ -196,19 +196,19 @@ export const MenuBar = () => {
               <h4 className="text-lg font-semibold mb-3">Activity Types</h4>
               <div className="grid grid-cols-3 gap-2">
                 <button 
-                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.RUN ? 'bg-purple-600' : 'bg-[#111827]'} text-white text-center`}
+                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.RUN ? 'bg-primary' : 'bg-bg-tertiary'} text-text-primary text-center transition-colors duration-normal hover:bg-primary/80`}
                   onClick={() => handleActivityModeChange(ACTIVITY_TYPES.RUN)}
                 >
                   Run
                 </button>
                 <button 
-                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.WALK ? 'bg-purple-600' : 'bg-[#111827]'} text-white text-center`}
+                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.WALK ? 'bg-primary' : 'bg-bg-tertiary'} text-text-primary text-center transition-colors duration-normal hover:bg-primary/80`}
                   onClick={() => handleActivityModeChange(ACTIVITY_TYPES.WALK)}
                 >
                   Walk
                 </button>
                 <button 
-                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.CYCLE ? 'bg-purple-600' : 'bg-[#111827]'} text-white text-center`}
+                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.CYCLE ? 'bg-primary' : 'bg-bg-tertiary'} text-text-primary text-center transition-colors duration-normal hover:bg-primary/80`}
                   onClick={() => handleActivityModeChange(ACTIVITY_TYPES.CYCLE)}
                 >
                   Cycle
@@ -222,17 +222,17 @@ export const MenuBar = () => {
             {/* Run Behavior Section - NEW */}
             <div className="mb-6">
               <h4 className="text-lg font-semibold mb-3">Run Behavior</h4>
-              <div className="bg-[#111827] p-3 rounded-lg space-y-3">
+              <div className="bg-bg-tertiary p-3 rounded-lg space-y-3 border border-border-secondary">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400 mr-3">Skip Start Countdown</span>
+                  <span className="text-sm text-text-secondary mr-3">Skip Start Countdown</span>
                   <input 
                     type="checkbox"
-                    className="form-checkbox h-5 w-5 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 rounded"
+                    className="form-checkbox h-5 w-5 text-primary bg-bg-tertiary border-border-secondary focus:ring-primary rounded"
                     checked={skipStartCountdown}
                     onChange={() => setSkipStartCountdown(!skipStartCountdown)}
                   />
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-text-muted">
                   Start the run immediately when you tap "Start Run".
                 </p>
               </div>
@@ -241,17 +241,17 @@ export const MenuBar = () => {
             {/* Stats Settings Section - NEW */}
             <div className="mb-6">
               <h4 className="text-lg font-semibold mb-3">Stats Settings</h4>
-              <div className="bg-[#111827] p-3 rounded-lg space-y-3">
+              <div className="bg-bg-tertiary p-3 rounded-lg space-y-3 border border-border-secondary">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400 mr-3">Use Local Stats</span>
+                  <span className="text-sm text-text-secondary mr-3">Use Local Stats</span>
                   <input 
                     type="checkbox"
-                    className="form-checkbox h-5 w-5 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 rounded"
+                    className="form-checkbox h-5 w-5 text-primary bg-bg-tertiary border-border-secondary focus:ring-primary rounded"
                     checked={useLocalStats}
                     onChange={() => setUseLocalStats(!useLocalStats)}
                   />
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-text-muted">
                   When enabled, the Stats tab shows local run history instead of Nostr workout stats.
                 </p>
               </div>
@@ -261,22 +261,22 @@ export const MenuBar = () => {
             <div className="mb-6">
               <h4 className="text-lg font-semibold mb-3">Distance Units</h4>
               <div className="flex justify-center mb-2">
-                <div className="flex rounded-full bg-[#111827] p-1">
+                <div className="flex rounded-full bg-bg-tertiary p-1 border border-border-secondary">
                   <button 
-                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'km' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}
+                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'km' ? 'bg-primary text-text-primary' : 'text-text-muted hover:text-text-secondary'} transition-colors duration-normal`}
                     onClick={() => distanceUnit !== 'km' && toggleDistanceUnit()}
                   >
                     Kilometers
                   </button>
                   <button 
-                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'mi' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}
+                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'mi' ? 'bg-primary text-text-primary' : 'text-text-muted hover:text-text-secondary'} transition-colors duration-normal`}
                     onClick={() => distanceUnit !== 'mi' && toggleDistanceUnit()}
                   >
                     Miles
                   </button>
                 </div>
               </div>
-              <p className="text-sm text-gray-400 mt-2">
+              <p className="text-sm text-text-secondary mt-2">
                 All distances will be shown in {distanceUnit === 'km' ? 'kilometers' : 'miles'} throughout the app
               </p>
             </div>
@@ -284,11 +284,11 @@ export const MenuBar = () => {
             {/* Health Encryption Section */}
             <div className="mb-6">
               <h4 className="text-lg font-semibold mb-3">Health Data Privacy</h4>
-              <div className="flex items-center justify-between bg-[#111827] p-3 rounded-lg mb-3">
-                <span className="text-sm text-gray-400 mr-3">Encrypt Health Data (NIP-44)</span>
+              <div className="flex items-center justify-between bg-bg-tertiary p-3 rounded-lg mb-3 border border-border-secondary">
+                <span className="text-sm text-text-secondary mr-3">Encrypt Health Data (NIP-44)</span>
                 <input
                   type="checkbox"
-                  className="form-checkbox h-5 w-5 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 rounded"
+                  className="form-checkbox h-5 w-5 text-primary bg-bg-tertiary border-border-secondary focus:ring-primary rounded"
                   checked={healthEncryptionPref === 'encrypted'}
                   onChange={() => {
                     const currentPrefIsEncrypted = healthEncryptionPref === 'encrypted';
@@ -308,27 +308,27 @@ export const MenuBar = () => {
 
               {/* Publish Destination Section - ADDED HERE */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Publish Destination</label>
-                <div className="flex rounded-md bg-[#111827] p-1 space-x-1">
+                <label className="block text-sm font-medium text-text-secondary mb-1">Publish Destination</label>
+                <div className="flex rounded-md bg-bg-tertiary p-1 space-x-1 border border-border-secondary">
                   <button
-                    className={`flex-1 px-3 py-2 text-xs rounded-md ${
-                      publishMode === 'public' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:bg-gray-700'
+                    className={`flex-1 px-3 py-2 text-xs rounded-md transition-colors duration-normal ${
+                      publishMode === 'public' ? 'bg-primary text-text-primary' : 'text-text-muted hover:bg-bg-secondary hover:text-text-secondary'
                     }`}
                     onClick={() => setPublishMode('public')}
                   >
                     Public Relays
                   </button>
                   <button
-                    className={`flex-1 px-3 py-2 text-xs rounded-md ${
-                      publishMode === 'private' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:bg-gray-700'
+                    className={`flex-1 px-3 py-2 text-xs rounded-md transition-colors duration-normal ${
+                      publishMode === 'private' ? 'bg-primary text-text-primary' : 'text-text-muted hover:bg-bg-secondary hover:text-text-secondary'
                     }`}
                     onClick={() => setPublishMode('private')}
                   >
                     Private Relay
                   </button>
                   <button
-                    className={`flex-1 px-3 py-2 text-xs rounded-md ${
-                      publishMode === 'mixed' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:bg-gray-700'
+                    className={`flex-1 px-3 py-2 text-xs rounded-md transition-colors duration-normal ${
+                      publishMode === 'mixed' ? 'bg-primary text-text-primary' : 'text-text-muted hover:bg-bg-secondary hover:text-text-secondary'
                     }`}
                     onClick={() => setPublishMode('mixed')}
                   >
@@ -337,7 +337,7 @@ export const MenuBar = () => {
                 </div>
                 {(publishMode === 'private' || publishMode === 'mixed') && (
                   <div className="mt-2">
-                    <label htmlFor="privateRelayUrlInputModal" className="block text-xs font-medium text-gray-400 mb-1">
+                    <label htmlFor="privateRelayUrlInputModal" className="block text-xs font-medium text-text-muted mb-1">
                       Private Relay URL (wss://...)
                     </label>
                     <input
@@ -346,7 +346,7 @@ export const MenuBar = () => {
                       value={privateRelayUrl}
                       onChange={e => setPrivateRelayUrl(e.target.value)}
                       placeholder="wss://your-private-relay.com"
-                      className="w-full bg-[#0b101a] p-2 rounded-md text-white text-sm border border-gray-600 focus:ring-purple-500 focus:border-purple-500"
+                      className="w-full bg-bg-primary p-2 rounded-md text-text-primary text-sm border border-border-secondary focus:ring-primary focus:border-border-focus outline-none"
                     />
                   </div>
                 )}
@@ -511,7 +511,7 @@ export const MenuBar = () => {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 w-full bg-[#0a1525] py-2 z-40">
+      <nav className="fixed bottom-0 left-0 w-full bg-bg-primary py-2 z-40 border-t border-border-secondary">
         <div className="max-w-[500px] mx-auto px-2">
           <ul className="flex justify-between">
             {menuItems.map((item) => (
