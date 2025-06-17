@@ -92,8 +92,8 @@ const styles = {
     border: 'none',
   },
   tabActive: {
-    color: '#3B82F6',
-    borderBottomColor: '#3B82F6',
+    color: 'var(--primary)',
+    borderBottomColor: 'var(--primary)',
   },
   tabIcon: {
     marginRight: '0.5rem',

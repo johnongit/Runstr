@@ -5846,7 +5846,7 @@ input:checked + .toggle-slider:before {
 
 .nwc-wallet-connector .connect-button {
   padding: 0.75rem 1.5rem;
-  background-color: #3b82f6;
+  background-color: var(--primary);
   color: white;
   border: none;
   border-radius: 0 0.375rem 0.375rem 0;
@@ -5856,7 +5856,7 @@ input:checked + .toggle-slider:before {
 }
 
 .nwc-wallet-connector .connect-button:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: var(--primary-hover);
 }
 
 .nwc-wallet-connector .connect-button:disabled {
@@ -5955,12 +5955,12 @@ input:checked + .toggle-slider:before {
 }
 
 .nwc-wallet-connector .donate-button.runstr {
-  background-color: #3b82f6;
+  background-color: var(--primary);
   color: white;
 }
 
 .nwc-wallet-connector .donate-button.runstr:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: var(--primary-hover);
 }
 
 .nwc-wallet-connector .donate-button:disabled {
@@ -6054,7 +6054,7 @@ input:checked + .toggle-slider:before {
 }
 
 .wallet-note a {
-  color: #3b82f6;
+  color: var(--primary);
   text-decoration: none;
   transition: color 0.2s;
 }
@@ -6288,12 +6288,12 @@ input:checked + .toggle-slider:before {
 }
 
 .send-button {
-  background-color: #3b82f6;
+  background-color: var(--primary);
   color: white;
 }
 
 .send-button:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: var(--primary-hover);
 }
 
 .receive-button {

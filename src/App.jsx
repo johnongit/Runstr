@@ -35,16 +35,16 @@ const EnhancedLoadingFallback = () => {
   }, []);
   
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-      <p className="text-gray-300">Loading RUNSTR...</p>
+    <div className="flex flex-col items-center justify-center h-screen bg-bg-primary">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+      <p className="text-text-secondary">Loading RUNSTR...</p>
       
       {showTimeoutWarning && (
-        <div className="mt-8 p-4 bg-yellow-900/20 border border-yellow-800 rounded-lg max-w-md">
-          <p className="text-yellow-300 text-center mb-2">
+        <div className="mt-8 p-4 bg-warning-light border border-warning rounded-lg max-w-md">
+          <p className="text-warning text-center mb-2">
             Loading is taking longer than expected. Please be patient.
           </p>
-          <p className="text-yellow-400 text-sm text-center">
+          <p className="text-warning text-sm text-center">
             If this persists, try reloading the app.
           </p>
         </div>

@@ -494,7 +494,7 @@ export const MenuBar = () => {
               <li key={item.name} className="flex-1">
                 <Link 
                   to={item.path} 
-                  className={`flex flex-col items-center justify-center px-1 py-1 rounded-md h-full transition-colors duration-normal ${location.pathname === item.path ? 'text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+                  className={`flex flex-col items-center justify-center px-1 py-1 rounded-md h-full transition-colors duration-normal ${location.pathname === item.path ? 'bg-bg-secondary text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   {item.icon}
                   <span className="text-xs font-medium tracking-wider text-center whitespace-nowrap">{item.name}</span>

@@ -35,14 +35,7 @@ const ConnectNostrKeyBanner = ({ inline = false }) => {
       <button
         onClick={connectSigner}
         disabled={isConnecting}
-        style={{
-          background: '#3b82f6',
-          color: '#fff',
-          padding: '6px 12px',
-          borderRadius: '4px',
-          border: 'none',
-          cursor: 'pointer',
-        }}
+        className="bg-primary hover:bg-primary-hover text-text-primary px-3 py-1.5 rounded border-none cursor-pointer disabled:opacity-50"
       >
         {isConnecting ? 'Connecting…' : label}
       </button>
