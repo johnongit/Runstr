@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Button } from "@/components/ui/button";
 import { useRunTracker } from '../contexts/RunTrackerContext';
 import { useActivityMode } from '../contexts/ActivityModeContext';
 import runDataService, { ACTIVITY_TYPES } from '../services/RunDataService';
@@ -544,35 +545,37 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       
       {/* Start Activity Button */}
       {!isTracking ? (
-        <button 
-          className="mx-4 bg-gradient-to-r from-primary to-secondary text-text-primary py-3 px-6 rounded-xl shadow-lg flex items-center justify-center text-lg font-semibold my-4 hover:from-primary-hover hover:to-secondary transition-colors duration-normal"
+        <Button 
           onClick={initiateRun}
+          size="lg"
+          className="mx-4 my-4 bg-gradient-to-r from-primary to-secondary hover:from-primary-hover hover:to-secondary-hover text-lg font-semibold"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           {getActivityText('start')}
-        </button>
+        </Button>
       ) : (
         <div className="flex justify-between px-4 my-4">
           {isPaused ? (
-            <button 
-              className="bg-success text-text-primary py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold hover:bg-success/90 transition-colors duration-normal"
+            <Button 
               onClick={resumeRun}
+              variant="success"
+              className="flex-1 mr-2 font-semibold"
             >
               Resume
-            </button>
+            </Button>
           ) : (
-            <button 
-              className="bg-warning text-text-primary py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold hover:bg-warning/90 transition-colors duration-normal"
+            <Button 
               onClick={pauseRun}
+              variant="warning"
+              className="flex-1 mr-2 font-semibold"
             >
               Pause
-            </button>
+            </Button>
           )}
-          <button 
-            className="bg-error text-text-primary py-3 px-6 rounded-xl shadow-lg flex-1 ml-2 font-semibold hover:bg-error/90 transition-colors duration-normal"
+          <Button 
             onClick={() => {
               if (skipEndCountdown) {
                 stopRun();
@@ -580,9 +583,11 @@ ${additionalContent ? `\n${additionalContent}` : ''}
                 startCountdown('stop');
               }
             }}
+            variant="error"
+            className="flex-1 ml-2 font-semibold"
           >
             Stop
-          </button>
+          </Button>
         </div>
       )}
       
@@ -676,20 +681,20 @@ ${additionalContent ? `\n${additionalContent}` : ''}
               disabled={isPosting}
             />
             <div className="flex justify-end space-x-3">
-              <button 
+              <Button 
                 onClick={() => setShowPostModal(false)} 
                 disabled={isPosting}
-                className="px-4 py-2 rounded-lg border border-border-primary text-text-secondary hover:text-text-primary hover:border-border-focus transition-colors duration-normal"
+                variant="outline"
               >
                 Cancel
-              </button>
-              <button 
+              </Button>
+              <Button 
                 onClick={handlePostSubmit} 
                 disabled={isPosting}
-                className="px-4 py-2 rounded-lg bg-primary text-text-primary hover:bg-primary-hover transition-colors duration-normal"
+                variant="default"
               >
                 {isPosting ? 'Posting...' : 'Post'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
-import { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { Button } from "@/components/ui/button";
 import { useSettings } from '../contexts/SettingsContext';
 import { saveLeaderboardParticipation, getLeaderboardParticipation } from '../utils/leaderboardUtils';
 import { getRewardsSettings, saveRewardsSettings } from '../utils/rewardsSettings';
@@ -478,13 +479,14 @@ const Settings = () => {
             style={{ width: '100%', marginBottom: '0.5rem' }}
           />
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <button 
+            <Button 
               onClick={handleTestBlossomConnection}
               disabled={isTestingConnection || !blossomEndpoint}
-              className="bg-purple-500 hover:bg-purple-700 disabled:bg-gray-500 text-white font-bold py-1 px-3 rounded text-sm"
+              size="sm"
+              variant="default"
             >
               {isTestingConnection ? 'Testing...' : 'Test Connection'}
-            </button>
+            </Button>
             {connectionStatus && (
               <span className={connectionStatus.success ? 'text-green-400' : 'text-red-400'}>
                 {connectionStatus.message}
@@ -501,9 +503,14 @@ const Settings = () => {
         <h3>Integrations</h3>
         <div className="setting-item">
           <label>Bangle.js</label>
-          <button onClick={handleSyncFromWatch} className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+          <Button 
+            onClick={handleSyncFromWatch} 
+            variant="default"
+            size="default"
+            disabled={isSyncingWatch}
+          >
             {isSyncingWatch ? 'Syncing...' : 'Sync Watch'}
-          </button>
+          </Button>
         </div>
       </div>
 
