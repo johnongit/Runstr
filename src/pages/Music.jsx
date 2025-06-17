@@ -221,7 +221,7 @@ export function Music() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800 text-white">
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-4xl font-bold mb-8 text-center">Music</h1>
+        <h1 className="page-title mb-8 text-center">Music</h1>
         
 
 
@@ -235,7 +235,7 @@ export function Music() {
         
         {/* Blossom Library Section */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-left">
+          <h2 className="section-heading mb-4 text-left">
             Blossom Library
           </h2>
           {blossomLoading && (

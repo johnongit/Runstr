@@ -1,10 +1,11 @@
 import { useSettings } from '../contexts/SettingsContext';
 import { useNostrRunStats } from '../hooks/useNostrRunStats';
+import { Button } from "@/components/ui/button";
 
 const Stat = ({ label, value }) => (
   <div className="flex flex-col">
-    <span className="text-xs text-gray-400">{label}</span>
-    <span className="text-sm font-semibold text-gray-100">{value}</span>
+    <span className="small-text">{label}</span>
+    <span className="secondary-text font-semibold">{value}</span>
   </div>
 );
 
@@ -46,7 +47,7 @@ const NostrStatsPage = () => {
 
   return (
     <div className="p-4 space-y-6">
-      <h2 className="text-xl font-semibold text-purple-300">Nostr Workout Stats</h2>
+      <h2 className="page-title">Nostr Workout Stats</h2>
       {stats ? (
         <div className="space-y-4">
           {/* Overall Stats */}
@@ -59,7 +60,7 @@ const NostrStatsPage = () => {
 
           {/* Personal Bests */}
           <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-sm font-semibold text-purple-300 mb-3">Personal Bests</h3>
+            <h3 className="subsection-heading mb-3">Personal Bests</h3>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <Stat label="1K Best" value={formatPersonalBest(stats.personalBests['1k'])} />
               <Stat label="5K Best" value={formatPersonalBest(stats.personalBests['5k'])} />
@@ -69,7 +70,7 @@ const NostrStatsPage = () => {
 
           {/* Streak */}
           <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-sm font-semibold text-purple-300 mb-3">Activity Streak</h3>
+            <h3 className="subsection-heading mb-3">Activity Streak</h3>
             <div className="text-sm">
               <Stat label="Longest Streak" value={`${stats.longestStreak} days`} />
             </div>
@@ -77,8 +78,8 @@ const NostrStatsPage = () => {
         </div>
       ) : <p>No workouts on Nostr yet.</p>}
 
-      <h3 className="text-lg font-semibold mt-6 text-purple-300">Recent Workouts</h3>
-      <button onClick={reload} className="text-xs text-purple-400 mb-2">Reload</button>
+      <h3 className="section-heading mt-6">Recent Workouts</h3>
+      <Button onClick={reload} variant="ghost" size="sm">Reload</Button>
       <ul className="space-y-3">
         {workoutEvents.map(ev => (
           <li key={ev.id} className="bg-gray-900 border border-gray-700 p-3 rounded-md text-sm text-gray-200">

@@ -424,7 +424,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
   return (
     <div className="run-history">
       <div className="stats-overview">
-        <h2>{getActivityText('history')}</h2>
+        <h2 className="page-title">{getActivityText('history')}</h2>
         <div className="my-4">
           <Link 
             to="/nostr-stats" 
@@ -435,19 +435,19 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         </div>
         <div className="stats-grid">
           <div className="stat-card">
-            <h3>Total Distance</h3>
+            <h3 className="component-heading">Total Distance</h3>
             <p>{displayDistance(stats.totalDistance, distanceUnit)}</p>
           </div>
           <div className="stat-card">
-            <h3>Total Runs</h3>
+            <h3 className="component-heading">Total Runs</h3>
             <p>{stats.totalRuns}</p>
           </div>
           <div className="stat-card">
-            <h3>Current Streak</h3>
+            <h3 className="component-heading">Current Streak</h3>
             <p>{stats.currentStreak} days</p>
           </div>
           <div className="stat-card">
-            <h3>Average Pace</h3>
+            <h3 className="component-heading">Average Pace</h3>
             <p>
               {stats.averagePace === 0 
                 ? '-' 
@@ -456,7 +456,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             </p>
           </div>
           <div className="stat-card">
-            <h3>Fastest Pace</h3>
+            <h3 className="component-heading">Fastest Pace</h3>
             <p>
               {stats.fastestPace === 0
                 ? '-'
@@ -465,44 +465,44 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             </p>
           </div>
           <div className="stat-card">
-            <h3>Longest Run</h3>
+            <h3 className="component-heading">Longest Run</h3>
             <p>{displayDistance(stats.longestRun, distanceUnit)}</p>
           </div>
         </div>
 
         <div className="calorie-stats">
-          <h3>Calorie Tracking</h3>
+          <h3 className="section-heading">Calorie Tracking</h3>
           <div className="stats-grid">
             <div className="stat-card">
-              <h4>Total Calories Burned</h4>
+              <h4 className="component-heading">Total Calories Burned</h4>
               <p>{stats.totalCaloriesBurned.toLocaleString()} kcal</p>
             </div>
             <div className="stat-card">
-              <h4>Avg. Calories per {distanceUnit.toUpperCase()}</h4>
+              <h4 className="component-heading">Avg. Calories per {distanceUnit.toUpperCase()}</h4>
               <p>{Math.round(stats.averageCaloriesPerKm)} kcal</p>
             </div>
           </div>
         </div>
 
         <div className="recent-stats">
-          <h3>Recent Activity</h3>
+          <h3 className="section-heading">Recent Activity</h3>
           <div className="stats-grid">
             <div className="stat-card">
-              <h4>This Week</h4>
+              <h4 className="component-heading">This Week</h4>
               <p>{displayDistance(stats.thisWeekDistance, distanceUnit)}</p>
             </div>
             <div className="stat-card">
-              <h4>This Month</h4>
+              <h4 className="component-heading">This Month</h4>
               <p>{displayDistance(stats.thisMonthDistance, distanceUnit)}</p>
             </div>
           </div>
         </div>
 
         <div className="personal-bests">
-          <h3>Personal Bests</h3>
+          <h3 className="section-heading">Personal Bests</h3>
           <div className="stats-grid">
             <div className="stat-card">
-              <h4>5K</h4>
+              <h4 className="component-heading">5K</h4>
               <p>
                 {stats.personalBests['5k'] === 0
                   ? '-'
@@ -511,7 +511,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
               </p>
             </div>
             <div className="stat-card">
-              <h4>10K</h4>
+              <h4 className="component-heading">10K</h4>
               <p>
                 {stats.personalBests['10k'] === 0
                   ? '-'
@@ -520,7 +520,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
               </p>
             </div>
             <div className="stat-card">
-              <h4>Half Marathon</h4>
+              <h4 className="component-heading">Half Marathon</h4>
               <p>
                 {stats.personalBests['halfMarathon'] === 0
                   ? '-'
@@ -529,7 +529,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
               </p>
             </div>
             <div className="stat-card">
-              <h4>Marathon</h4>
+              <h4 className="component-heading">Marathon</h4>
               <p>
                 {stats.personalBests['marathon'] === 0
                   ? '-'
@@ -541,10 +541,10 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         </div>
 
         <div className="elevation-stats-overview">
-          <h3>Elevation Data</h3>
+          <h3 className="section-heading">Elevation Data</h3>
           <div className="stats-grid">
             <div className="stat-card">
-              <h4>Total Elevation Gain</h4>
+              <h4 className="component-heading">Total Elevation Gain</h4>
               <p>
                 {formatElevation(
                   runHistory.reduce((sum, run) => sum + (run.elevation?.gain || 0), 0),
@@ -553,7 +553,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
               </p>
             </div>
             <div className="stat-card">
-              <h4>Total Elevation Loss</h4>
+              <h4 className="component-heading">Total Elevation Loss</h4>
               <p>
                 {formatElevation(
                   runHistory.reduce((sum, run) => sum + (run.elevation?.loss || 0), 0),
@@ -565,7 +565,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         </div>
       </div>
 
-      <h2>Run History</h2>
+      <h2 className="section-heading">Run History</h2>
       {filteredHistory.length === 0 ? (
         <p>No runs recorded yet</p>
       ) : (
@@ -652,7 +652,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h3>Post Run to Nostr</h3>
+            <h3 className="subsection-heading">Post Run to Nostr</h3>
             <textarea
               value={additionalContent}
               onChange={(e) => setAdditionalContent(e.target.value)}
@@ -675,7 +675,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {showDeleteModal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h3>Confirm Deletion</h3>
+            <h3 className="subsection-heading">Confirm Deletion</h3>
             <p>Are you sure you want to delete this run?</p>
             {runToDelete && (
               <div className="run-summary">

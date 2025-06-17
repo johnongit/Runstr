@@ -458,7 +458,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     <div className="w-full h-full flex flex-col bg-bg-primary text-text-primary relative">
       {/* Title Banner */}
       <div className="bg-gradient-to-r from-primary/80 to-secondary/80 p-4 mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-text-primary">{getActivityText('header')}</h2>
+        <h2 className="page-title">{getActivityText('header')}</h2>
       </div>
 
       {/* Stats Grid */}
@@ -474,7 +474,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             </div>
             <span className="text-sm text-text-secondary">Distance</span>
           </div>
-          <div className="text-3xl font-bold text-text-primary">{convertDistance(distance, distanceUnit)}</div>
+          <div className="display-text">{convertDistance(distance, distanceUnit)}</div>
           <div className="text-sm text-text-muted">{distanceUnit}</div>
         </div>
 
@@ -488,7 +488,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             </div>
             <span className="text-sm text-text-secondary">Time</span>
           </div>
-          <div className="text-3xl font-bold text-text-primary">{runDataService.formatTime(duration)}</div>
+          <div className="display-text">{runDataService.formatTime(duration)}</div>
         </div>
 
         {/* Pace Card / Dynamic Metric Card */}
@@ -502,7 +502,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             </div>
             <span className="text-sm text-text-secondary">{primaryMetricLabel}</span>
           </div>
-          <div className="text-3xl font-bold text-text-primary">{primaryMetricValue}</div>
+          <div className="display-text">{primaryMetricValue}</div>
           {primaryMetricUnit && <div className="text-sm text-text-muted">{primaryMetricUnit}</div>}
         </div>
 
@@ -516,7 +516,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             </div>
             <span className="text-sm text-text-secondary">Elevation</span>
           </div>
-          <div className="text-3xl font-bold text-text-primary">{elevation ? formatElevation(elevation.gain, distanceUnit) : '0'}</div>
+          <div className="display-text">{elevation ? formatElevation(elevation.gain, distanceUnit) : '0'}</div>
           <div className="text-sm text-text-muted">{distanceUnit === 'mi' ? 'ft' : 'm'}</div>
         </div>
       </div>
@@ -608,7 +608,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {!isTracking && recentRun && (
         <div className="mt-6 mx-4">
           <div className="flex justify-between items-center mb-2">
-            <h3 className="text-lg font-semibold text-text-primary">{getActivityText('recent')}</h3>
+            <h3 className="subsection-heading">{getActivityText('recent')}</h3>
             <span className="text-xs text-text-muted">See All</span>
           </div>
           

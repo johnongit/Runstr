@@ -2,6 +2,7 @@ import React from 'react';
 import runDataService from '../../services/RunDataService';
 import { createWorkoutEvent, createAndPublishEvent } from '../../utils/nostr';
 import { displayDistance } from '../../utils/formatters';
+import { Button } from "@/components/ui/button";
 
 /**
  * A simple full-screen modal presenting the synced run summary and two buttons:
@@ -47,7 +48,7 @@ export const SyncConfirmationModal = ({ isOpen, onClose, run, distanceUnit = 'km
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
       <div className="bg-gray-900 w-full max-w-sm rounded-lg p-6 text-white relative">
-        <h3 className="text-xl font-bold mb-4 text-center">New Run Synced</h3>
+        <h3 className="subsection-heading mb-4 text-center">New Run Synced</h3>
 
         <div className="space-y-2 text-sm mb-6">
           <div><span className="text-gray-400">Distance:</span> {displayDistance(run.distance, distanceUnit)}</div>
@@ -58,9 +59,9 @@ export const SyncConfirmationModal = ({ isOpen, onClose, run, distanceUnit = 'km
         </div>
 
         <div className="flex flex-col space-y-3">
-          <button onClick={() => handleSave(false)} className="bg-indigo-600 hover:bg-indigo-700 py-2 rounded-md font-semibold">Save Locally</button>
-          <button onClick={() => handleSave(true)} className="bg-green-600 hover:bg-green-700 py-2 rounded-md font-semibold">Save & Post to Nostr</button>
-          <button onClick={onClose} className="text-sm text-gray-400 mt-2 underline">Cancel</button>
+          <Button onClick={() => handleSave(false)} variant="default" size="default">Save Locally</Button>
+          <Button onClick={() => handleSave(true)} variant="success" size="default">Save & Post to Nostr</Button>
+          <Button onClick={onClose} variant="ghost" size="sm">Cancel</Button>
         </div>
       </div>
     </div>

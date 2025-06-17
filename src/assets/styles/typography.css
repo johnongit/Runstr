@@ -1,0 +1,84 @@
+/* === RUNSTR TYPOGRAPHY SYSTEM === */
+/* Semantic typography classes using design tokens */
+
+/* Page Titles - Main page headings */
+.page-title {
+  @apply text-2xl font-bold text-text-primary;
+}
+
+/* Section Headings - Major sections within pages */
+.section-heading {
+  @apply text-xl font-semibold text-text-primary;
+}
+
+/* Subsection Headings - Smaller sections */
+.subsection-heading {
+  @apply text-lg font-medium text-text-primary;
+}
+
+/* Component Headings - UI component titles */
+.component-heading {
+  @apply text-base font-semibold text-text-primary;
+}
+
+/* Body Text - Primary content */
+.body-text {
+  @apply text-base font-normal text-text-primary;
+}
+
+/* Secondary Text - Supporting content */
+.secondary-text {
+  @apply text-sm font-normal text-text-secondary;
+}
+
+/* Small Text - Labels, captions */
+.small-text {
+  @apply text-xs font-normal text-text-muted;
+}
+
+/* Large Display Text - Hero/stats numbers */
+.display-text {
+  @apply text-3xl font-bold text-text-primary;
+}
+
+/* Button Text - Consistent button typography */
+.button-text {
+  @apply text-base font-medium;
+}
+
+/* Link Text - Consistent link styling */
+.link-text {
+  @apply text-base font-normal text-primary hover:text-primary-hover;
+}
+
+/* Status Text - Success, error, warning */
+.status-text-success {
+  @apply text-sm font-medium text-success;
+}
+
+.status-text-error {
+  @apply text-sm font-medium text-error;
+}
+
+.status-text-warning {
+  @apply text-sm font-medium text-warning;
+}
+
+.status-text-info {
+  @apply text-sm font-medium text-info;
+}
+
+/* Mobile-optimized responsive typography */
+@media (max-width: 640px) {
+  .page-title {
+    @apply text-xl;
+  }
+  
+  .section-heading {
+    @apply text-lg;
+  }
+  
+  .display-text {
+    @apply text-2xl;
+  }
+} 

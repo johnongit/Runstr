@@ -5,6 +5,7 @@ import { useRunFeed } from '../hooks/useRunFeed';
 import { usePostInteractions } from '../hooks/usePostInteractions';
 import { PostList } from './PostList';
 import { handleAppBackground } from '../utils/nostr';
+import { Button } from "@/components/ui/button";
 import './RunClub.css';
 
 // Progressive loading indicator component
@@ -171,18 +172,20 @@ const RunClub = () => {
         <div className="error-message">
           <p>{error}</p>
           <div className="error-buttons">
-            <button 
-              className="retry-button" 
+            <Button 
+              variant="outline"
+              size="default"
               onClick={refreshFeed}
             >
               Retry
-            </button>
-            <button 
-              className="diagnose-button" 
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="default"
               onClick={diagnoseConnection}
             >
               Diagnose Connection
-            </button>
+            </Button>
           </div>
           {diagnosticInfo && (
             <div className="diagnostic-info">
@@ -193,18 +196,20 @@ const RunClub = () => {
       ) : posts.length === 0 ? (
         <div className="no-posts-message">
           <p>No running posts found. Follow some runners or post your own run!</p>
-          <button 
-            className="retry-button" 
+          <Button 
+            variant="outline"
+            size="default"
             onClick={refreshFeed}
           >
             Refresh
-          </button>
-          <button 
-            className="diagnose-button" 
+          </Button>
+          <Button 
+            variant="secondary"
+            size="default"
             onClick={diagnoseConnection}
           >
             Diagnose Connection
-          </button>
+          </Button>
         </div>
       ) : (
         <>

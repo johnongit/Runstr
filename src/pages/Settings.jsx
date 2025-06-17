@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { useSettings } from '../contexts/SettingsContext';
 import { saveLeaderboardParticipation, getLeaderboardParticipation } from '../utils/leaderboardUtils';
 import { getRewardsSettings, saveRewardsSettings } from '../utils/rewardsSettings';
@@ -234,27 +235,22 @@ const Settings = () => {
 
   return (
     <div className="settings-page">
-      <h2>Settings</h2>
+      <h2 className="page-title">Settings</h2>
       
       <div className="settings-section">
-        <h3>Display Settings</h3>
+        <h3 className="section-heading">Display Settings</h3>
         
         <div className="setting-item">
           <label>Distance Units</label>
-          <div className="unit-toggle">
-            <button 
-              className={distanceUnit === 'km' ? 'active' : ''}
-              onClick={() => handleDistanceUnitChange('km')}
-            >
-              Kilometers
-            </button>
-            <button 
-              className={distanceUnit === 'mi' ? 'active' : ''}
-              onClick={() => handleDistanceUnitChange('mi')}
-            >
-              Miles
-            </button>
-          </div>
+          <ButtonGroup
+            value={distanceUnit}
+            onValueChange={handleDistanceUnitChange}
+            options={[
+              { value: 'km', label: 'Kilometers' },
+              { value: 'mi', label: 'Miles' }
+            ]}
+            size="default"
+          />
         </div>
         
         <div className="setting-item">
@@ -298,44 +294,40 @@ const Settings = () => {
         
         <div className="setting-item">
           <label>Publish Destination</label>
-          <div className="unit-toggle">
-            <button
-              className={publishMode === 'public' ? 'active' : ''}
-              onClick={() => setPublishMode('public')}
-            >Public Relays</button>
-            <button
-              className={publishMode === 'private' ? 'active' : ''}
-              onClick={() => setPublishMode('private')}
-            >Private Relay</button>
-            <button
-              className={publishMode === 'mixed' ? 'active' : ''}
-              onClick={() => setPublishMode('mixed')}
-            >Mixed</button>
-          </div>
+          <ButtonGroup
+            value={publishMode}
+            onValueChange={setPublishMode}
+            options={[
+              { value: 'public', label: 'Public Relays' },
+              { value: 'private', label: 'Private Relay' },
+              { value: 'mixed', label: 'Mixed' }
+            ]}
+            size="default"
+          />
           {publishMode !== 'public' && (
-            <div style={{ marginTop: '0.5rem' }}>
+            <div className="mt-2">
               {publishMode !== 'blossom' && (
                 <>
-                  <label>Private Relay URL</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">Private Relay URL</label>
                   <input
                     type="text"
                     value={privateRelayUrl}
                     onChange={e => setPrivateRelayUrl(e.target.value)}
                     placeholder="wss://your-relay.example.com"
-                    style={{ width: '100%' }}
+                    className="w-full bg-bg-tertiary p-2 rounded-md text-text-primary border border-border-secondary focus:ring-primary focus:border-border-focus outline-none"
                   />
                 </>
               )}
               {/* Blossom endpoint is stored for export feature */}
               {publishMode === 'blossom' && (
                 <>
-                  <label>Blossom Endpoint</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">Blossom Endpoint</label>
                   <input
                     type="text"
                     value={blossomEndpoint}
                     onChange={e => setBlossomEndpoint(e.target.value)}
                     placeholder="https://cdn.satellite.earth"
-                    style={{ width: '100%' }}
+                    className="w-full bg-bg-tertiary p-2 rounded-md text-text-primary border border-border-secondary focus:ring-primary focus:border-border-focus outline-none"
                   />
                 </>
               )}
@@ -345,7 +337,7 @@ const Settings = () => {
       </div>
       
       <div className="settings-section">
-        <h3>App Behavior</h3>
+        <h3 className="section-heading">App Behavior</h3>
         
         <div className="setting-item">
           <label htmlFor="autoSaveToggle">Auto-save Runs</label>
@@ -388,26 +380,16 @@ const Settings = () => {
 
         <div className="setting-item">
           <label>Workout Extras Publishing (Calories/Intensity)</label>
-          <div className="unit-toggle">
-            <button 
-              className={calorieIntensityPref === 'autoAccept' ? 'active' : ''}
-              onClick={() => handleCalorieIntensityChange('autoAccept')}
-            >
-              Auto-Accept
-            </button>
-            <button 
-              className={calorieIntensityPref === 'manual' ? 'active' : ''}
-              onClick={() => handleCalorieIntensityChange('manual')}
-            >
-              Manual
-            </button>
-            <button 
-              className={calorieIntensityPref === 'autoIgnore' ? 'active' : ''}
-              onClick={() => handleCalorieIntensityChange('autoIgnore')}
-            >
-              Auto-Ignore
-            </button>
-          </div>
+          <ButtonGroup
+            value={calorieIntensityPref}
+            onValueChange={handleCalorieIntensityChange}
+            options={[
+              { value: 'autoAccept', label: 'Auto-Accept' },
+              { value: 'manual', label: 'Manual' },
+              { value: 'autoIgnore', label: 'Auto-Ignore' }
+            ]}
+            size="default"
+          />
           <p className="setting-description">
             Choose how to handle publishing workout intensity and caloric data to Nostr.
           </p>
@@ -415,7 +397,7 @@ const Settings = () => {
       </div>
       
       <div className="settings-section">
-        <h3>Leaderboards & Rewards</h3>
+        <h3 className="section-heading">Leaderboards & Rewards</h3>
         
         <div className="setting-item">
           <label htmlFor="leaderboardToggle">Participate in Leaderboards</label>
@@ -462,13 +444,13 @@ const Settings = () => {
       </div>
       
       <div className="settings-section">
-        <h3>About</h3>
+        <h3 className="section-heading">About</h3>
         <p>Runstr App Version 1.1.0</p>
         <p>A Bitcoin-powered running app</p>
       </div>
 
       <div className="settings-section">
-        <h3>Music Server</h3>
+        <h3 className="section-heading">Music Server</h3>
         <div className="setting-item">
           <label>Blossom Music Server URL</label>
           <input
@@ -500,7 +482,7 @@ const Settings = () => {
       </div>
 
       <div className="settings-section">
-        <h3>Integrations</h3>
+        <h3 className="section-heading">Integrations</h3>
         <div className="setting-item">
           <label>Bangle.js</label>
           <Button 

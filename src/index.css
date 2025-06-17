@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* RUNSTR Design System Imports */
+@import './assets/styles/variables.css';
+@import './assets/styles/typography.css';
+
+/* RUNSTR Design System Imports */
+@import './assets/styles/variables.css';
+@import './assets/styles/typography.css';
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

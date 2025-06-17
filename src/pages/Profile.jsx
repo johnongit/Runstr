@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useRunProfile } from '../hooks/useRunProfile';
 import { publishHealthProfile } from '../utils/nostrHealth';
 import { useSettings } from '../contexts/SettingsContext';
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import '../assets/styles/profile.css';
 
 export const Profile = () => {
@@ -70,29 +72,22 @@ export const Profile = () => {
 
   return (
     <div className="profile-page">
-      <h2 className="text-2xl font-bold mb-6">User Profile</h2>
-      <p className="text-gray-400 mb-6">Update your profile for accurate calorie calculations</p>
+              <h2 className="page-title mb-6">User Profile</h2>
+              <p className="secondary-text mb-6">Update your profile for accurate calorie calculations</p>
       
       <div className="form-container">
         <div className="form-group">
           <div className="flex justify-between items-center mb-2">
             <label htmlFor="weight">Weight</label>
-            <div className="unit-toggle">
-              <button
-                type="button"
-                className={`unit-button ${unitPreferences.weight === 'kg' ? 'active' : ''}`}
-                onClick={() => handleUnitChange('weight', 'kg')}
-              >
-                kg
-              </button>
-              <button
-                type="button"
-                className={`unit-button ${unitPreferences.weight === 'lb' ? 'active' : ''}`}
-                onClick={() => handleUnitChange('weight', 'lb')}
-              >
-                lb
-              </button>
-            </div>
+            <ButtonGroup
+              value={unitPreferences.weight}
+              onValueChange={(value) => handleUnitChange('weight', value)}
+              options={[
+                { value: 'kg', label: 'kg' },
+                { value: 'lb', label: 'lb' }
+              ]}
+              size="sm"
+            />
           </div>
           <input
             id="weight"
@@ -106,22 +101,15 @@ export const Profile = () => {
         <div className="form-group height-inputs">
           <div className="flex justify-between items-center mb-2">
             <label>Height</label>
-            <div className="unit-toggle">
-              <button
-                type="button"
-                className={`unit-button ${unitPreferences.height === 'metric' ? 'active' : ''}`}
-                onClick={() => handleUnitChange('height', 'metric')}
-              >
-                cm
-              </button>
-              <button
-                type="button"
-                className={`unit-button ${unitPreferences.height === 'imperial' ? 'active' : ''}`}
-                onClick={() => handleUnitChange('height', 'imperial')}
-              >
-                ft/in
-              </button>
-            </div>
+            <ButtonGroup
+              value={unitPreferences.height}
+              onValueChange={(value) => handleUnitChange('height', value)}
+              options={[
+                { value: 'metric', label: 'cm' },
+                { value: 'imperial', label: 'ft/in' }
+              ]}
+              size="sm"
+            />
           </div>
           
           {unitPreferences.height === 'metric' ? (
@@ -206,25 +194,28 @@ export const Profile = () => {
         </div>
         
         <div className="form-buttons">
-          <button 
-            className="save-button"
+          <Button 
             onClick={handleProfileSubmit}
+            variant="default"
+            size="default"
           >
             Save Profile
-          </button>
-          <button 
-            className="nostr-button"
+          </Button>
+          <Button 
             onClick={handlePublishRequest}
             disabled={isPublishing}
+            variant="secondary"
+            size="default"
           >
             {isPublishing ? 'Publishing...' : 'Save Health Profile to Nostr'}
-          </button>
-          <button 
-            className="cancel-button"
+          </Button>
+          <Button 
             onClick={() => navigate('/history')}
+            variant="outline"
+            size="default"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -261,18 +252,20 @@ export const Profile = () => {
             </div>
             
             <div className="dialog-buttons">
-              <button 
-                className="cancel-button"
+              <Button 
                 onClick={handleCancel}
+                variant="outline"
+                size="default"
               >
                 Cancel
-              </button>
-              <button 
-                className="confirm-button"
+              </Button>
+              <Button 
                 onClick={handlePublishToNostr}
+                variant="default"
+                size="default"
               >
                 Publish
-              </button>
+              </Button>
             </div>
           </div>
         </div>

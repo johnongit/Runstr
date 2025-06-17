@@ -25,12 +25,12 @@ export const TeamItem = ({ team }) => {
           />
         ) : (
           <div className="w-12 h-12 rounded-full mr-4 bg-purple-900/50 flex items-center justify-center">
-            <span className="text-lg font-bold">{team.name.charAt(0)}</span>
+            <span className="component-heading">{team.name.charAt(0)}</span>
           </div>
         )}
         <div className="flex-1">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">{team.name}</h3>
+            <h3 className="component-heading">{team.name}</h3>
             {team.hasNostrGroup && (
               <span className="bg-purple-900/50 text-purple-400 text-xs px-2 py-1 rounded">
                 Nostr

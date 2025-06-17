@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { convertDistance } from '../utils/formatters';
+import { Button } from "@/components/ui/button";
 
 export const Goals = () => {
   // Goal state
@@ -289,7 +290,7 @@ export const Goals = () => {
         {/* Weekly Goal */}
         <div className={`goal-card ${goals.weekly.active ? 'active' : 'inactive'} ${getStatusClass(goals.weekly)}`}>
           <div className="goal-header">
-            <h3>Weekly Goal</h3>
+            <h3 className="section-heading">Weekly Goal</h3>
             <label className="toggle-switch">
               <input
                 type="checkbox"
@@ -324,17 +325,21 @@ export const Goals = () => {
                 </div>
               </div>
               <div className="form-buttons">
-                <button type="submit" className="save-button">Save</button>
-                <button type="button" className="cancel-button" onClick={handleCancelEdit}>Cancel</button>
+                <Button type="submit" variant="default" size="default">Save</Button>
+                <Button type="button" variant="outline" size="default" onClick={handleCancelEdit}>Cancel</Button>
               </div>
             </form>
           ) : (
             <div className="goal-content">
               <div className="goal-target">
                 <span>Target: {goals.weekly.target} {goals.weekly.unit}</span>
-                <button className="edit-button" onClick={() => handleEditGoal('weekly')}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleEditGoal('weekly')}
+                >
                   Edit
-                </button>
+                </Button>
               </div>
               
               <div className="goal-progress">
@@ -350,12 +355,13 @@ export const Goals = () => {
                 </div>
               </div>
               
-              <button 
-                className="details-button" 
+              <Button 
+                variant="ghost" 
+                size="sm"
                 onClick={() => toggleDetails('weekly')}
               >
                 {showingDetails === 'weekly' ? 'Hide Details' : 'Show Details'}
-              </button>
+              </Button>
               
               {showingDetails === 'weekly' && (
                 <div className="goal-details">
@@ -377,7 +383,7 @@ export const Goals = () => {
         {/* Monthly Goal */}
         <div className={`goal-card ${goals.monthly.active ? 'active' : 'inactive'} ${getStatusClass(goals.monthly)}`}>
           <div className="goal-header">
-            <h3>Monthly Goal</h3>
+            <h3 className="section-heading">Monthly Goal</h3>
             <label className="toggle-switch">
               <input
                 type="checkbox"
@@ -412,17 +418,21 @@ export const Goals = () => {
                 </div>
               </div>
               <div className="form-buttons">
-                <button type="submit" className="save-button">Save</button>
-                <button type="button" className="cancel-button" onClick={handleCancelEdit}>Cancel</button>
+                <Button type="submit" variant="default" size="default">Save</Button>
+                <Button type="button" variant="outline" size="default" onClick={handleCancelEdit}>Cancel</Button>
               </div>
             </form>
           ) : (
             <div className="goal-content">
               <div className="goal-target">
                 <span>Target: {goals.monthly.target} {goals.monthly.unit}</span>
-                <button className="edit-button" onClick={() => handleEditGoal('monthly')}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleEditGoal('monthly')}
+                >
                   Edit
-                </button>
+                </Button>
               </div>
               
               <div className="goal-progress">
@@ -438,12 +448,13 @@ export const Goals = () => {
                 </div>
               </div>
               
-              <button 
-                className="details-button" 
+              <Button 
+                variant="ghost" 
+                size="sm"
                 onClick={() => toggleDetails('monthly')}
               >
                 {showingDetails === 'monthly' ? 'Hide Details' : 'Show Details'}
-              </button>
+              </Button>
               
               {showingDetails === 'monthly' && (
                 <div className="goal-details">
@@ -465,7 +476,7 @@ export const Goals = () => {
         {/* Yearly Goal */}
         <div className={`goal-card ${goals.yearly.active ? 'active' : 'inactive'} ${getStatusClass(goals.yearly)}`}>
           <div className="goal-header">
-            <h3>Yearly Goal</h3>
+            <h3 className="section-heading">Yearly Goal</h3>
             <label className="toggle-switch">
               <input
                 type="checkbox"
@@ -500,17 +511,21 @@ export const Goals = () => {
                 </div>
               </div>
               <div className="form-buttons">
-                <button type="submit" className="save-button">Save</button>
-                <button type="button" className="cancel-button" onClick={handleCancelEdit}>Cancel</button>
+                <Button type="submit" variant="default" size="default">Save</Button>
+                <Button type="button" variant="outline" size="default" onClick={handleCancelEdit}>Cancel</Button>
               </div>
             </form>
           ) : (
             <div className="goal-content">
               <div className="goal-target">
                 <span>Target: {goals.yearly.target} {goals.yearly.unit}</span>
-                <button className="edit-button" onClick={() => handleEditGoal('yearly')}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleEditGoal('yearly')}
+                >
                   Edit
-                </button>
+                </Button>
               </div>
               
               <div className="goal-progress">
@@ -526,12 +541,13 @@ export const Goals = () => {
                 </div>
               </div>
               
-              <button 
-                className="details-button" 
+              <Button 
+                variant="ghost" 
+                size="sm"
                 onClick={() => toggleDetails('yearly')}
               >
                 {showingDetails === 'yearly' ? 'Hide Details' : 'Show Details'}
-              </button>
+              </Button>
               
               {showingDetails === 'yearly' && (
                 <div className="goal-details">
@@ -552,4 +568,4 @@ export const Goals = () => {
       </div>
     </div>
   );
-}; 
+};

@@ -69,7 +69,7 @@ export const PostRunWizardModal = ({ run, onClose }) => {
     <div className="modal-overlay">
       <div className="modal-content post-run-wizard w-full max-w-md">
         <div>
-          <h3 className="text-lg font-semibold mb-4 text-purple-300">Save Workout to Nostr</h3>
+          <h3 className="subsection-heading mb-4">Save Workout to Nostr</h3>
           <p className="mb-4 text-gray-300">
             Your workout summary will be published to Nostr as a workout record.
           </p>

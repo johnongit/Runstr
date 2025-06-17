@@ -6,7 +6,7 @@ console.log("AppRoutes.jsx is being executed");
 // Fallback component for when imports fail
 const ErrorFallback = ({ componentName }) => (
   <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg m-4">
-    <h2 className="text-xl font-bold text-white mb-2">Error Loading Component</h2>
+    <h2 className="section-heading mb-2">Error Loading Component</h2>
     <p className="text-red-300">Failed to load the {componentName} component.</p>
   </div>
 );

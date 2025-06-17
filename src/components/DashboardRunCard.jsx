@@ -17,7 +17,7 @@ export function DashboardRunCard({
       <div className="p-4 flex flex-col gap-3">
         <div className="flex justify-between items-start">
           <div className="flex flex-col">
-            <h3 className="text-lg font-semibold text-text-primary mb-1">{run.title}</h3>
+            <h3 className="component-heading mb-1">{run.title}</h3>
             <div className="text-sm text-text-secondary flex items-center gap-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>

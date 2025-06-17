@@ -82,7 +82,7 @@ export const GroupDiscovery = () => {
 
   return (
     <div className="container run-club-theme p-4">
-      <h2 className="text-2xl font-bold mb-4 text-white">Discover Groups</h2>
+      <h2 className="page-title mb-4">Discover Groups</h2>
       
       <form onSubmit={handleSearch} className="mb-6 flex gap-2">
         <input
@@ -107,7 +107,7 @@ export const GroupDiscovery = () => {
 
       {searchResults.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-xl font-semibold text-white">Search Results</h3>
+          <h3 className="section-heading">Search Results</h3>
           {searchResults.map(group => (
             <Link 
               to={`/team/${encodeURIComponent(group.naddr)}`} 
@@ -122,7 +122,7 @@ export const GroupDiscovery = () => {
                   onError={(e) => { e.target.src = '/default-avatar.png'; }}
                 />
                 <div>
-                  <h4 className="text-lg font-medium text-white">{group.name}</h4>
+                  <h4 className="component-heading">{group.name}</h4>
                   <p className="text-sm text-gray-400 truncate">{group.about}</p>
                    <p className="text-xs text-gray-500">ID: {group.identifier}</p>
                 </div>

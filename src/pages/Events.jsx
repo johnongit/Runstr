@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllEvents, initializeEvents } from '../services/EventService';
 import EventCard from '../components/EventCard';
+import { Button } from "@/components/ui/button";
 
 const Events = () => {
   const [events, setEvents] = useState([]);
@@ -45,7 +46,7 @@ const Events = () => {
         <h2>Events</h2>
         <div className="error-message">
           <p>{error}</p>
-          <button onClick={() => window.location.reload()}>Try Again</button>
+          <Button onClick={() => window.location.reload()} variant="outline" size="default">Try Again</Button>
         </div>
       </div>
     );

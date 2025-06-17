@@ -5,6 +5,8 @@ import { useActivityMode, ACTIVITY_TYPES } from '../contexts/ActivityModeContext
 import { useSettings } from '../contexts/SettingsContext';
 import rewardsPayoutService from '../services/rewardsPayoutService';
 import { testConnection, DEFAULT_SERVERS } from '../lib/blossom';
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 
 export const MenuBar = () => {
   const location = useLocation();
@@ -166,7 +168,7 @@ export const MenuBar = () => {
     <div className="w-full">
       {/* Header with Settings */}
       <header className="flex justify-between items-center p-4 w-full">
-        <Link to="/" className="text-xl font-bold">#RUNSTR</Link>
+        <Link to="/" className="section-heading">#RUNSTR</Link>
         <div className="min-w-[120px]">
           <FloatingMusicPlayer />
         </div>
@@ -183,7 +185,7 @@ export const MenuBar = () => {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black bg-opacity-70">
           <div className="bg-bg-secondary rounded-t-xl sm:rounded-xl w-full max-w-md p-6 shadow-lg max-h-[90vh] overflow-y-auto border border-border-secondary">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">Settings</h3>
+              <h3 className="section-heading">Settings</h3>
               <button onClick={toggleSettings} className="text-text-secondary hover:text-text-primary transition-colors duration-normal">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -193,27 +195,18 @@ export const MenuBar = () => {
             
             {/* Activity Types Section */}
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Activity Types</h4>
-              <div className="grid grid-cols-3 gap-2">
-                <button 
-                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.RUN ? 'bg-primary' : 'bg-bg-tertiary'} text-text-primary text-center transition-colors duration-normal hover:bg-primary/80`}
-                  onClick={() => handleActivityModeChange(ACTIVITY_TYPES.RUN)}
-                >
-                  Run
-                </button>
-                <button 
-                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.WALK ? 'bg-primary' : 'bg-bg-tertiary'} text-text-primary text-center transition-colors duration-normal hover:bg-primary/80`}
-                  onClick={() => handleActivityModeChange(ACTIVITY_TYPES.WALK)}
-                >
-                  Walk
-                </button>
-                <button 
-                  className={`p-3 rounded-lg ${mode === ACTIVITY_TYPES.CYCLE ? 'bg-primary' : 'bg-bg-tertiary'} text-text-primary text-center transition-colors duration-normal hover:bg-primary/80`}
-                  onClick={() => handleActivityModeChange(ACTIVITY_TYPES.CYCLE)}
-                >
-                  Cycle
-                </button>
-              </div>
+              <h4 className="subsection-heading mb-3">Activity Types</h4>
+              <ButtonGroup
+                value={mode}
+                onValueChange={handleActivityModeChange}
+                options={[
+                  { value: ACTIVITY_TYPES.RUN, label: 'Run' },
+                  { value: ACTIVITY_TYPES.WALK, label: 'Walk' },
+                  { value: ACTIVITY_TYPES.CYCLE, label: 'Cycle' }
+                ]}
+                size="default"
+                className="mb-2"
+              />
               <p className="text-sm text-text-secondary mt-2">
                 Currently tracking: {getActivityText()}
               </p>
@@ -221,7 +214,7 @@ export const MenuBar = () => {
             
             {/* Run Behavior Section - NEW */}
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Run Behavior</h4>
+              <h4 className="subsection-heading mb-3">Run Behavior</h4>
               <div className="bg-bg-tertiary p-3 rounded-lg space-y-3 border border-border-secondary">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-text-secondary mr-3">Skip Start Countdown</span>
@@ -240,7 +233,7 @@ export const MenuBar = () => {
             
             {/* Stats Settings Section - NEW */}
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Stats Settings</h4>
+              <h4 className="subsection-heading mb-3">Stats Settings</h4>
               <div className="bg-bg-tertiary p-3 rounded-lg space-y-3 border border-border-secondary">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-text-secondary mr-3">Use Local Stats</span>
@@ -259,23 +252,21 @@ export const MenuBar = () => {
             
             {/* Distance Unit Section */}
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Distance Units</h4>
-              <div className="flex justify-center mb-2">
-                <div className="flex rounded-full bg-bg-tertiary p-1 border border-border-secondary">
-                  <button 
-                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'km' ? 'bg-primary text-text-primary' : 'text-text-muted hover:text-text-secondary'} transition-colors duration-normal`}
-                    onClick={() => distanceUnit !== 'km' && toggleDistanceUnit()}
-                  >
-                    Kilometers
-                  </button>
-                  <button 
-                    className={`px-6 py-2 rounded-full text-sm ${distanceUnit === 'mi' ? 'bg-primary text-text-primary' : 'text-text-muted hover:text-text-secondary'} transition-colors duration-normal`}
-                    onClick={() => distanceUnit !== 'mi' && toggleDistanceUnit()}
-                  >
-                    Miles
-                  </button>
-                </div>
-              </div>
+              <h4 className="subsection-heading mb-3">Distance Units</h4>
+              <ButtonGroup
+                value={distanceUnit}
+                onValueChange={(newUnit) => {
+                  if (newUnit !== distanceUnit) {
+                    toggleDistanceUnit();
+                  }
+                }}
+                options={[
+                  { value: 'km', label: 'Kilometers' },
+                  { value: 'mi', label: 'Miles' }
+                ]}
+                size="default"
+                className="mb-2"
+              />
               <p className="text-sm text-text-secondary mt-2">
                 All distances will be shown in {distanceUnit === 'km' ? 'kilometers' : 'miles'} throughout the app
               </p>
@@ -283,7 +274,7 @@ export const MenuBar = () => {
             
             {/* Health Encryption Section */}
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Health Data Privacy</h4>
+              <h4 className="subsection-heading mb-3">Health Data Privacy</h4>
               <div className="flex items-center justify-between bg-bg-tertiary p-3 rounded-lg mb-3 border border-border-secondary">
                 <span className="text-sm text-text-secondary mr-3">Encrypt Health Data (NIP-44)</span>
                 <input
@@ -309,32 +300,17 @@ export const MenuBar = () => {
               {/* Publish Destination Section - ADDED HERE */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">Publish Destination</label>
-                <div className="flex rounded-md bg-bg-tertiary p-1 space-x-1 border border-border-secondary">
-                  <button
-                    className={`flex-1 px-3 py-2 text-xs rounded-md transition-colors duration-normal ${
-                      publishMode === 'public' ? 'bg-primary text-text-primary' : 'text-text-muted hover:bg-bg-secondary hover:text-text-secondary'
-                    }`}
-                    onClick={() => setPublishMode('public')}
-                  >
-                    Public Relays
-                  </button>
-                  <button
-                    className={`flex-1 px-3 py-2 text-xs rounded-md transition-colors duration-normal ${
-                      publishMode === 'private' ? 'bg-primary text-text-primary' : 'text-text-muted hover:bg-bg-secondary hover:text-text-secondary'
-                    }`}
-                    onClick={() => setPublishMode('private')}
-                  >
-                    Private Relay
-                  </button>
-                  <button
-                    className={`flex-1 px-3 py-2 text-xs rounded-md transition-colors duration-normal ${
-                      publishMode === 'mixed' ? 'bg-primary text-text-primary' : 'text-text-muted hover:bg-bg-secondary hover:text-text-secondary'
-                    }`}
-                    onClick={() => setPublishMode('mixed')}
-                  >
-                    Mixed
-                  </button>
-                </div>
+                <ButtonGroup
+                  value={publishMode}
+                  onValueChange={setPublishMode}
+                  options={[
+                    { value: 'public', label: 'Public Relays' },
+                    { value: 'private', label: 'Private Relay' },
+                    { value: 'mixed', label: 'Mixed' }
+                  ]}
+                  size="sm"
+                  className="mb-2"
+                />
                 {(publishMode === 'private' || publishMode === 'mixed') && (
                   <div className="mt-2">
                     <label htmlFor="privateRelayUrlInputModal" className="block text-xs font-medium text-text-muted mb-1">
@@ -355,7 +331,7 @@ export const MenuBar = () => {
             
             {/* Bitcoin Rewards Section */}
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Bitcoin Rewards</h4>
+              <h4 className="subsection-heading mb-3">Bitcoin Rewards</h4>
               {/*
               <div className="space-y-2">
                 <label htmlFor="lnAddressInput" className="text-sm text-text-secondary">Lightning Address (to receive streak rewards)</label>
@@ -393,7 +369,7 @@ export const MenuBar = () => {
             
             {/* Step Counting Settings Section */}
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Step Counting (Walking)</h4>
+              <h4 className="subsection-heading mb-3">Step Counting (Walking)</h4>
               <div className="space-y-3">
                 {/* NEW Pedometer Button - Replaced with Checkbox */}
                 <div className="flex items-center justify-between bg-bg-tertiary p-3 rounded-lg mb-3 border border-border-secondary">
@@ -411,7 +387,7 @@ export const MenuBar = () => {
             
             {/* Blossom Music Server Section */}
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Music Server</h4>
+              <h4 className="subsection-heading mb-3">Music Server</h4>
               <div className="space-y-3">
                 <div>
                   <label htmlFor="blossomEndpointSelect" className="block text-sm font-medium text-text-secondary mb-1">
@@ -470,7 +446,7 @@ export const MenuBar = () => {
             </div>
             
             <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-2 text-text-primary">Rewards</h4>
+              <h4 className="subsection-heading mb-2 text-text-primary">Rewards</h4>
               <div className="setting-item bg-bg-tertiary p-3 rounded-md border border-border-secondary">
                 <label htmlFor="manualLnAddressInput" className="block text-sm font-medium text-text-secondary mb-1">Fallback Lightning Address</label>
                 <input
