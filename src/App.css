@@ -38,3 +38,120 @@
   --bitcoin: #f7931a;
   --bitcoin-light: rgba(247, 147, 26, 0.2);
 }
+
+/* Wallet Selection Page Styles */
+.wallet-selection-section {
+  background: var(--card-bg, #1a1a1a);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border-color, #333);
+}
+
+.wallet-selection-section h2 {
+  color: var(--text-primary, #ffffff);
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.wallet-selection-section > p {
+  color: var(--text-secondary, #888);
+  margin: 0 0 24px 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.wallet-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.wallet-option {
+  background: var(--card-bg, #2a2a2a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.wallet-option:hover {
+  border-color: var(--accent-color, #f7931a);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.wallet-option h3 {
+  color: var(--text-primary, #ffffff);
+  margin: 0 0 12px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.wallet-option p {
+  color: var(--text-secondary, #888);
+  margin: 0 0 20px 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.wallet-option-button {
+  background: var(--text-primary, #ffffff);
+  color: var(--bg-primary, #000000);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  width: 100%;
+  min-height: 48px;
+}
+
+.wallet-option-button:hover {
+  background: var(--accent-color, #f7931a);
+  color: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.wallet-option-button:active {
+  transform: translateY(0);
+}
+
+.wallet-option-button.ecash-button {
+  background: var(--text-primary, #ffffff);
+  color: var(--bg-primary, #000000);
+}
+
+.wallet-option-button.ecash-button:hover {
+  background: var(--accent-color, #f7931a);
+  color: #000000;
+}
+
+/* Mobile Responsive for Wallet Selection */
+@media (max-width: 768px) {
+  .wallet-options {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .wallet-selection-section {
+    padding: 20px;
+  }
+  
+  .wallet-option {
+    padding: 16px;
+  }
+  
+  .wallet-option h3 {
+    font-size: 1.1rem;
+  }
+  
+  .wallet-option p {
+    font-size: 0.85rem;
+  }
+}

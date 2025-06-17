@@ -180,7 +180,7 @@ const App = () => {
                   <TeamsProvider>
                     <TeamChallengeProvider>
                       <WalletProvider>
-                                              <div className="relative w-full min-h-screen bg-bg-primary text-text-primary">
+                      <div className="relative w-full min-h-screen bg-bg-primary text-text-primary">
                         <MenuBar />
                         <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
                           <Suspense fallback={<EnhancedLoadingFallback />}>

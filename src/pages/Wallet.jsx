@@ -7,15 +7,7 @@ export const Wallet = () => {
   const { defaultZapAmount, updateDefaultZapAmount } = useContext(NostrContext);
   const [zapAmountInput, setZapAmountInput] = useState(defaultZapAmount.toString());
 
-  // Redirect to NWC page on component mount
-  useEffect(() => {
-    // Show message and redirect
-    const redirectTimer = setTimeout(() => {
-      navigate('/nwc');
-    }, 3000);
-    
-    return () => clearTimeout(redirectTimer);
-  }, [navigate]);
+  // Remove automatic redirect - let users choose their wallet type
 
   // Set the zapAmountInput whenever defaultZapAmount changes
   useEffect(() => {
@@ -30,11 +22,33 @@ export const Wallet = () => {
 
   return (
     <div className="wallet-container">
-      <div className="redirect-message">
-        <h2>Lightning Wallet</h2>
-        <p>The Cashu wallet has been removed. You will be redirected to the Bitcoin Connect page.</p>
-        <p>You can use your connected Bitcoin wallet for zaps and donations.</p>
-        <button onClick={() => navigate('/nwc')}>Go to Bitcoin Connect Now</button>
+      <div className="wallet-selection-section">
+        <h2>Wallet Options</h2>
+        <p>Choose your preferred wallet type for zaps, payments, and receiving rewards.</p>
+        
+        <div className="wallet-options">
+          <div className="wallet-option">
+            <h3>⚡ Lightning Wallet (NWC)</h3>
+            <p>Connect your Lightning wallet using Nostr Wallet Connect. Send zaps and make instant Bitcoin payments.</p>
+            <button 
+              onClick={() => navigate('/nwc')}
+              className="wallet-option-button"
+            >
+              Open Lightning Wallet
+            </button>
+          </div>
+
+          <div className="wallet-option">
+            <h3>🔒 Ecash Wallet (NIP-60)</h3>
+            <p>Private ecash tokens with Cashu mints. Send and receive tokens privately with cross-device sync.</p>
+            <button 
+              onClick={() => navigate('/ecash')}
+              className="wallet-option-button ecash-button"
+            >
+              Open Ecash Wallet
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="zap-settings-section">

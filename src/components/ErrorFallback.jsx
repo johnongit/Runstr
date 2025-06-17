@@ -27,7 +27,4 @@ ErrorFallback.propTypes = {
     message: PropTypes.string
   }),
   resetErrorBoundary: PropTypes.func
-};
-
-// Default export for easier importing
-export default ErrorFallback; 
+}; 
