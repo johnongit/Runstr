@@ -70,28 +70,33 @@ export const LocalTeamChat: React.FC<LocalTeamChatProps> = ({ teamId, userPubkey
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'400px', border:'1px solid #444', borderRadius:'6px' }}>
-      <div style={{ flexGrow:1, overflowY:'auto', padding:'8px' }}>
-        {messages.length === 0 && <p style={{ color:'#aaa', textAlign:'center' }}>No messages yet.</p>}
+    <div className="flex flex-col h-96 border border-border-secondary rounded-lg bg-bg-secondary">
+      <div className="flex-grow overflow-y-auto p-2">
+        {messages.length === 0 && <p className="text-text-muted text-center">No messages yet.</p>}
         {messages.map(msg => (
-          <div key={msg.id} style={{ marginBottom:'6px' }}>
-            <strong style={{ fontSize:'0.8rem' }}><DisplayName pubkey={msg.userId} /></strong>{' '}
-            <span style={{ fontSize:'0.7rem', color:'#888' }}>{formatTs(msg.timestamp)}</span>
-            <p style={{ margin:'2px 0', wordBreak:'break-word', whiteSpace:'pre-wrap' }}>{msg.content}</p>
+          <div key={msg.id} className="mb-1.5">
+            <strong className="text-xs text-text-primary"><DisplayName pubkey={msg.userId} /></strong>{' '}
+            <span className="text-xs text-text-muted">{formatTs(msg.timestamp)}</span>
+            <p className="my-0.5 text-text-primary break-words whitespace-pre-wrap">{msg.content}</p>
           </div>
         ))}
         <div ref={listEndRef} />
       </div>
-      {error && <p style={{ color:'salmon', fontSize:'0.8rem', padding:'4px' }}>{error}</p>}
-      <form onSubmit={handleSend} style={{ display:'flex', borderTop:'1px solid #555' }}>
+      {error && <p className="text-error text-xs p-1">{error}</p>}
+      <form onSubmit={handleSend} className="flex border-t border-border-secondary">
         <input
           type="text"
           value={newMessage}
           onChange={e => setNewMessage(e.target.value)}
           placeholder="Type a message…"
-          style={{ flexGrow:1, border:'none', padding:'8px', background:'#222', color:'#fff' }}
+          className="flex-grow border-none p-2 bg-bg-tertiary text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        <button type="submit" style={{ padding:'8px 12px', background:'#2563eb', color:'#fff', border:'none' }}>Send</button>
+        <button 
+          type="submit" 
+          className="px-3 py-2 bg-primary text-white border-none hover:bg-primary-hover transition-colors active:bg-white active:text-black focus:outline-none focus:ring-2 focus:ring-primary-hover"
+        >
+          Send
+        </button>
       </form>
     </div>
   );

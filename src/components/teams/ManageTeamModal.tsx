@@ -108,13 +108,13 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-800 p-5 sm:p-6 rounded-lg shadow-xl w-full max-w-lg text-white transform transition-all max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl sm:text-2xl font-bold mb-4 text-purple-300">Manage Team</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+      <div className="bg-bg-secondary p-5 sm:p-6 rounded-lg shadow-xl w-full max-w-lg text-text-primary transform transition-all max-h-[90vh] overflow-y-auto border border-border-secondary">
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 text-primary">Manage Team</h2>
         
         <div className="space-y-4">
           <div>
-            <label htmlFor="teamNameManage" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="teamNameManage" className="block text-sm font-medium text-text-primary mb-1">
               Team Name
             </label>
             <input
@@ -122,13 +122,13 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
               id="teamNameManage"
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
-              className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-purple-500 focus:border-purple-500 transition-colors"
+              className="w-full p-2 border border-border-secondary rounded-md bg-bg-tertiary text-text-primary focus:ring-primary focus:border-primary transition-colors"
               required
             />
           </div>
 
           <div>
-            <label htmlFor="teamDescriptionManage" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="teamDescriptionManage" className="block text-sm font-medium text-text-primary mb-1">
               Team Description
             </label>
             <textarea
@@ -136,13 +136,13 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
               value={teamDescription}
               onChange={(e) => setTeamDescription(e.target.value)}
               rows={3}
-              className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-purple-500 focus:border-purple-500 transition-colors"
+              className="w-full p-2 border border-border-secondary rounded-md bg-bg-tertiary text-text-primary focus:ring-primary focus:border-primary transition-colors"
               placeholder="Describe your team..."
             />
           </div>
 
           <div>
-            <label htmlFor="teamImageManage" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="teamImageManage" className="block text-sm font-medium text-text-primary mb-1">
               Team Image URL (Optional)
             </label>
             <input
@@ -150,7 +150,7 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
               id="teamImageManage"
               value={teamImage}
               onChange={(e) => setTeamImage(e.target.value)}
-              className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-purple-500 focus:border-purple-500 transition-colors"
+              className="w-full p-2 border border-border-secondary rounded-md bg-bg-tertiary text-text-primary focus:ring-primary focus:border-primary transition-colors"
               placeholder="https://example.com/image.png"
             />
           </div>
@@ -161,25 +161,25 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
                 type="checkbox"
                 checked={isPublic}
                 onChange={(e) => setIsPublic(e.target.checked)}
-                className="h-4 w-4 text-purple-600 border-gray-500 rounded bg-gray-700 focus:ring-purple-500"
+                className="h-4 w-4 text-primary border-border-secondary rounded bg-bg-tertiary focus:ring-primary"
               />
-              <span className="ml-2 text-sm text-gray-300">Publicly visible team</span>
+              <span className="ml-2 text-sm text-text-secondary">Publicly visible team</span>
             </label>
           </div>
         </div>
 
         {error && (
-          <div className="mt-4 p-3 bg-red-900/50 border border-red-500 rounded-md">
-            <p className="text-red-200 text-sm">{error}</p>
+          <div className="mt-4 p-3 bg-error-light border border-error rounded-md">
+            <p className="text-error text-sm">{error}</p>
           </div>
         )}
 
         {!isReady && (
-          <div className="mt-4 p-3 bg-yellow-700/60 text-yellow-200 border border-yellow-600 rounded-md text-sm space-y-2">
+          <div className="mt-4 p-3 bg-warning-light text-warning border border-warning rounded-md text-sm space-y-2">
             <p><strong>Signer Required</strong> – connect Amber to edit team.</p>
             <button
               onClick={connectSigner}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg transition-colors border border-border-secondary"
             >
               Connect Signer
             </button>
@@ -191,7 +191,7 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
             type="button"
             onClick={onClose}
             disabled={isUpdating}
-            className="px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 disabled:opacity-50 transition-colors w-full sm:w-auto"
+            className="px-4 py-2 border border-border-secondary rounded-md text-text-secondary hover:bg-bg-tertiary disabled:opacity-50 transition-colors w-full sm:w-auto"
           >
             Cancel
           </button>
@@ -199,7 +199,7 @@ const ManageTeamModal: React.FC<ManageTeamModalProps> = ({ team, onClose, onTeam
             type="button"
             onClick={handleUpdateTeam}
             disabled={!isReady || isUpdating}
-            className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
+            className="px-5 py-2 bg-primary hover:bg-primary-hover text-white font-bold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto border border-border-secondary"
           >
             {isUpdating ? 'Updating...' : 'Update Team'}
           </button>

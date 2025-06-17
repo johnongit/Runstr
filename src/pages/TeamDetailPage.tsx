@@ -448,19 +448,19 @@ const TeamDetailPage: React.FC = () => {
   };
 
   if (isLoading && !team) {
-    return <div className="p-4 text-white text-center">Loading team details...</div>;
+    return <div className="p-4 text-text-primary text-center bg-bg-primary min-h-screen">Loading team details...</div>;
   }
 
   if (!canReadData && !isLoading && !team) {
-      return <div className="p-4 text-white text-center">Connecting to Nostr... <br/> If this persists, please check your relay connections.</div>;
+      return <div className="p-4 text-text-primary text-center bg-bg-primary min-h-screen">Connecting to Nostr... <br/> If this persists, please check your relay connections.</div>;
   }
 
   if (error && !team) {
-    return <div className="p-4 bg-red-800 text-white rounded-md text-center">Error: {error}</div>;
+    return <div className="p-4 bg-bg-secondary text-error rounded-md text-center border border-error">Error: {error}</div>;
   }
 
   if (!team) {
-    return <div className="p-4 text-white text-center">Team not found or an error occurred.</div>;
+    return <div className="p-4 text-text-primary text-center bg-bg-primary min-h-screen">Team not found or an error occurred.</div>;
   }
 
   // Re-extract details from the fetched team event to ensure consistency
@@ -480,7 +480,7 @@ const TeamDetailPage: React.FC = () => {
 
   const renderTabs = () => {
     return (
-      <div className="mb-8 border-b border-gray-700">
+      <div className="mb-8 border-b border-border-secondary">
         <nav className="-mb-px flex space-x-6 sm:space-x-8 overflow-x-auto pb-px scrollbar-hide" aria-label="Tabs">
           {['chat', 'challenges', 'members', 'leaderboard'].map((tabName) => {
             let displayName = tabName;
@@ -493,8 +493,8 @@ const TeamDetailPage: React.FC = () => {
               onClick={() => setActiveTab(tabName as any)}
               className={`whitespace-nowrap py-4 px-3 sm:py-4 sm:px-4 border-b-2 font-medium text-sm sm:text-base min-w-0 flex-shrink-0
                 ${activeTab === tabName 
-                  ? 'border-purple-500 text-purple-400 bg-purple-500/10' 
-                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500 hover:bg-gray-700/50'}
+                  ? 'border-primary text-primary bg-primary-light' 
+                  : 'border-transparent text-text-muted hover:text-text-primary hover:border-border-secondary hover:bg-bg-tertiary'}
                 capitalize transition-all duration-150 rounded-t-lg`}
             >
               {displayName}
@@ -539,14 +539,14 @@ const TeamDetailPage: React.FC = () => {
 
   const renderChatTabContent = () => {
     if (!teamUUID) {
-      return <div className="text-gray-400 p-4 text-center">Chat unavailable – missing team ID</div>;
+      return <div className="text-text-muted p-4 text-center">Chat unavailable – missing team ID</div>;
     }
     return <LocalTeamChat teamId={teamUUID} userPubkey={currentUserPubkey} />;
   };
 
   const renderChallengesTabContent = () => {
-    if(isLoadingChallenges&&teamChallenges.length===0)return <div className="text-gray-400 p-4 text-center">Loading challenges...</div>;
-    if(!teamAIdentifierForChat)return <div className="text-gray-400 p-4 bg-gray-750 rounded-md">Challenges not available.</div>;
+    if(isLoadingChallenges&&teamChallenges.length===0)return <div className="text-text-muted p-4 text-center">Loading challenges...</div>;
+    if(!teamAIdentifierForChat)return <div className="text-text-muted p-4 bg-bg-secondary rounded-md border border-border-secondary">Challenges not available.</div>;
 
     return (
         <TeamChallengesTab 
@@ -562,8 +562,8 @@ const TeamDetailPage: React.FC = () => {
   };
 
   const renderCurrentTabContent = () => {
-    if (!team && !isLoading) return <div className="p-4 text-white text-center">Team data could not be loaded.</div>;
-    if (isLoading && !team) return <div className="p-4 text-white text-center">Loading team details...</div>;
+    if (!team && !isLoading) return <div className="p-4 text-text-primary text-center">Team data could not be loaded.</div>;
+    if (isLoading && !team) return <div className="p-4 text-text-primary text-center">Loading team details...</div>;
     if (!team) return null; 
 
     switch (activeTab) {
@@ -708,18 +708,18 @@ const TeamDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="p-4 max-w-4xl mx-auto text-white">
+    <div className="p-4 max-w-4xl mx-auto text-text-primary bg-bg-primary min-h-screen">
       {/* Team Header - Enhanced spacing and layout */}
-      <div className="mb-8 pb-6 border-b border-gray-700">
+      <div className="mb-8 pb-6 border-b border-border-secondary">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
           <div className="flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-purple-300 mb-2">{teamName}</h1>
-            <p className="text-gray-300 leading-relaxed text-base sm:text-lg">{teamDescription}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-2">{teamName}</h1>
+            <p className="text-text-secondary leading-relaxed text-base sm:text-lg">{teamDescription}</p>
           </div>
           {isCurrentUserCaptain && (
             <button
               onClick={() => setShowManageTeamModal(true)}
-              className="px-4 py-2 sm:px-6 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap text-sm sm:text-base"
+              className="px-4 py-2 sm:px-6 sm:py-3 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg transition-colors whitespace-nowrap text-sm sm:text-base border border-border-secondary"
             >
               Manage Team
             </button>
@@ -728,12 +728,12 @@ const TeamDetailPage: React.FC = () => {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm mb-6">
             <div className="flex flex-col">
-              <span className="text-gray-500 text-xs uppercase tracking-wide">Captain</span>
+              <span className="text-text-muted text-xs uppercase tracking-wide">Captain</span>
               <DisplayName pubkey={actualCaptain} />
             </div>
             <div className="flex flex-col">
-              <span className="text-gray-500 text-xs uppercase tracking-wide">Visibility</span>
-              <span className={`${teamIsPublic ? "text-purple-400" : "text-red-400"} font-medium`}>
+              <span className="text-text-muted text-xs uppercase tracking-wide">Visibility</span>
+              <span className={`${teamIsPublic ? "text-primary" : "text-error"} font-medium`}>
                 {teamIsPublic ? 'Public' : 'Private'}
               </span>
             </div>
@@ -747,8 +747,8 @@ const TeamDetailPage: React.FC = () => {
         {renderCurrentTabContent()}
       </div>
 
-      <div className="mt-12 pt-6 border-t border-gray-700 text-center">
-        <Link to="/teams" className="text-purple-400 hover:text-purple-300 transition-colors duration-150 text-lg">
+      <div className="mt-12 pt-6 border-t border-border-secondary text-center">
+        <Link to="/teams" className="text-primary hover:text-primary-hover transition-colors duration-150 text-lg">
           &larr; Back to Teams List
         </Link>
       </div>

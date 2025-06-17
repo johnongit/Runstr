@@ -80,23 +80,23 @@ export function WorkoutCard({
   return (
     <Card className={cn(
       "w-full max-w-2xl mx-auto overflow-hidden",
-      "bg-gradient-to-br from-slate-800 to-slate-900",
-      "border border-purple-500/20",
+      "bg-bg-secondary",
+      "border border-border-secondary",
       "rounded-xl shadow-lg",
       className
     )}>
       <CardHeader className="p-4 pb-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10 border-2 border-purple-500/30">
+            <Avatar className="h-10 w-10 border-2 border-border-secondary">
               <AvatarImage src={author?.avatar} alt={author?.name} />
-              <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white">{author?.name?.charAt(0)}</AvatarFallback>
+              <AvatarFallback className="bg-primary text-white">{author?.name?.charAt(0)}</AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="text-sm font-medium text-white">
+              <h3 className="text-sm font-medium text-text-primary">
                 {author?.name}
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-text-muted">
                 {author?.username && `@${author.username} · `}{author?.timeAgo}
               </p>
             </div>
@@ -105,8 +105,8 @@ export function WorkoutCard({
       </CardHeader>
 
       <CardContent className="p-4">
-        <h2 className="text-base font-semibold mb-2 text-white">{workout.title}</h2>
-        <p className="text-sm text-slate-300 mb-4">{workout.content}</p>
+        <h2 className="text-base font-semibold mb-2 text-text-primary">{workout.title}</h2>
+        <p className="text-sm text-text-secondary mb-4">{workout.content}</p>
 
         {/* Team and Challenge Badges */}
         {hasTeamsOrChallenges && (
@@ -115,7 +115,7 @@ export function WorkoutCard({
               <Badge 
                 key={`team-${index}`}
                 variant="outline" 
-                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30 text-green-300"
+                className="flex items-center gap-1 px-2 py-1 bg-success-light border-success text-success"
               >
                 <Users className="h-3 w-3" />
                 <span className="text-xs font-medium">
@@ -127,7 +127,7 @@ export function WorkoutCard({
               <Badge 
                 key={`challenge-${index}`}
                 variant="outline" 
-                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border-orange-500/30 text-orange-300"
+                className="flex items-center gap-1 px-2 py-1 bg-warning-light border-warning text-warning"
               >
                 <Trophy className="h-3 w-3" />
                 <span className="text-xs font-medium">
@@ -141,18 +141,18 @@ export function WorkoutCard({
         {/* Workout details */}
         <div className="flex flex-wrap gap-2 mb-4">
           {workout.date && (
-            <Badge variant="outline" className="flex items-center gap-1 px-2 py-1 border-purple-500/30 bg-purple-500/10 text-purple-300">
+            <Badge variant="outline" className="flex items-center gap-1 px-2 py-1 border-border-secondary bg-bg-tertiary text-text-muted">
               <Calendar className="h-3 w-3" />
               <span className="text-xs">{workout.date}</span>
             </Badge>
           )}
           {workout.location && (
-            <Badge variant="outline" className="flex items-center gap-1 px-2 py-1 border-purple-500/30 bg-purple-500/10 text-purple-300">
+            <Badge variant="outline" className="flex items-center gap-1 px-2 py-1 border-border-secondary bg-bg-tertiary text-text-muted">
               <MapPin className="h-3 w-3" />
               <span className="text-xs">{workout.location}</span>
             </Badge>
           )}
-          <Badge variant="outline" className="flex items-center gap-1 px-2 py-1 border-purple-500/30 bg-purple-500/10 text-purple-300">
+          <Badge variant="outline" className="flex items-center gap-1 px-2 py-1 border-border-secondary bg-bg-tertiary text-text-muted">
             <Clock className="h-3 w-3" />
             <span className="text-xs">{workout.timestamp}</span>
           </Badge>
@@ -160,16 +160,16 @@ export function WorkoutCard({
 
         {/* Metrics */}
         {metrics.length > 0 && (
-          <div className="grid grid-cols-3 gap-2 bg-gradient-to-r from-slate-700/50 to-slate-800/50 rounded-lg p-3 mb-2 border border-purple-500/20">
+          <div className="grid grid-cols-3 gap-2 bg-bg-tertiary rounded-lg p-3 mb-2 border border-border-secondary">
             {metrics.map((metric, index) => (
               <div key={index} className="flex flex-col items-center justify-center">
-                <div className="flex items-center gap-1 text-purple-400 mb-1">
+                <div className="flex items-center gap-1 text-primary mb-1">
                   {metric.icon}
                   <span className="text-xs font-medium">{metric.label}</span>
                 </div>
                 <div className="text-center">
-                  <span className="text-base font-bold text-white">{metric.value}</span>
-                  <span className="text-xs text-slate-400 ml-1">{metric.unit}</span>
+                  <span className="text-base font-bold text-text-primary">{metric.value}</span>
+                  <span className="text-xs text-text-muted ml-1">{metric.unit}</span>
                 </div>
               </div>
             ))}
@@ -177,7 +177,7 @@ export function WorkoutCard({
         )}
       </CardContent>
 
-      <CardFooter className="p-4 pt-0 flex justify-between items-center border-t border-purple-500/20">
+      <CardFooter className="p-4 pt-0 flex justify-between items-center border-t border-border-secondary">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -186,14 +186,14 @@ export function WorkoutCard({
                 size="sm"
                 onClick={handleZap}
                 className={cn(
-                  "flex items-center gap-2 hover:bg-purple-500/10",
-                  isZapped ? "text-amber-400" : "text-slate-400 hover:text-amber-400"
+                  "flex items-center gap-2 hover:bg-bg-tertiary",
+                  isZapped ? "text-warning" : "text-text-muted hover:text-warning"
                 )}
               >
                 <Zap
                   className={cn(
                     "h-4 w-4 transition-all",
-                    isZapped && "fill-amber-400"
+                    isZapped && "fill-warning"
                   )}
                 />
                 <span>{zaps}</span>
@@ -205,7 +205,7 @@ export function WorkoutCard({
           </Tooltip>
         </TooltipProvider>
         
-        <div className="text-xs text-purple-400">
+        <div className="text-xs text-primary">
           NIP-101e Kind 1301
         </div>
       </CardFooter>

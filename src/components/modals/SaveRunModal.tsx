@@ -8,6 +8,7 @@ import {
   getTeamUUID,
 } from '../../services/nostr/NostrTeamsService';
 import { createWorkoutEvent, createAndPublishEvent } from '../../utils/nostr';
+import { resolveTeamName, resolveChallengeNames, cacheTeamName } from '../../services/nameResolver';
 
 interface RunData {
   distance: number;
@@ -32,6 +33,7 @@ interface TeamAssociationOptions {
     teamCaptainPubkey: string;
     teamUUID: string;
     relayHint?: string;
+    teamName?: string;
 }
 
 const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSaveAndPublish, onClose }) => {
@@ -72,14 +74,39 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
 
     let teamAssociation: TeamAssociationOptions | undefined = undefined; // Initialize as undefined
     let challengeUUIDs: string[] = [];
+    let challengeNames: string[] = [];
 
     if (selectedTeamIdentifier) {
       const parts = selectedTeamIdentifier.split(':');
       if (parts.length === 2) {
         const [teamCaptainPubkey, teamUUID] = parts;
-        teamAssociation = { teamCaptainPubkey, teamUUID };
+        
+        // Resolve team name for enhanced content
+        const teamName = resolveTeamName(teamUUID, teamCaptainPubkey);
+        
+        // Cache team name for future use if we have it from the dropdown
+        const selectedTeam = userTeams.find(team => 
+          getTeamCaptain(team) === teamCaptainPubkey && getTeamUUID(team) === teamUUID
+        );
+        if (selectedTeam && !teamName) {
+          const teamNameFromDropdown = getTeamName(selectedTeam);
+          if (teamNameFromDropdown) {
+            cacheTeamName(teamUUID, teamCaptainPubkey, teamNameFromDropdown);
+          }
+        }
+        
+        teamAssociation = { 
+          teamCaptainPubkey, 
+          teamUUID, 
+          teamName: teamName || (selectedTeam ? getTeamName(selectedTeam) : undefined)
+        };
+        
+        // Get challenge participation and resolve names
         const stored = JSON.parse(localStorage.getItem(`runstr:challengeParticipation:${teamUUID}`) || '[]');
-        if (Array.isArray(stored)) challengeUUIDs = stored;
+        if (Array.isArray(stored)) {
+          challengeUUIDs = stored;
+          challengeNames = resolveChallengeNames(challengeUUIDs, teamUUID);
+        }
       }
     }
     
@@ -93,7 +120,7 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
     };
 
     // createWorkoutEvent expects options.teamAssociation to be of its defined type or undefined
-    const eventTemplate = createWorkoutEvent(finalRunDataForEvent, distanceUnit, { teamAssociation, challengeUUIDs });
+    const eventTemplate = createWorkoutEvent(finalRunDataForEvent, distanceUnit, { teamAssociation, challengeUUIDs, challengeNames });
 
     if (!eventTemplate) {
       setError('Failed to prepare workout event details.');

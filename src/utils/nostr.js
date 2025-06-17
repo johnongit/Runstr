@@ -941,7 +941,9 @@ export const diagnoseConnection = async () => {
  * @param {string} [options.teamAssociation.teamCaptainPubkey]
  * @param {string} [options.teamAssociation.teamUUID]
  * @param {string} [options.teamAssociation.relayHint]
+ * @param {string} [options.teamAssociation.teamName] - Human-readable team name
  * @param {Array} [options.challengeUUIDs] - Array of challenge UUIDs
+ * @param {Array} [options.challengeNames] - Array of challenge names corresponding to UUIDs
  * @returns {Object} Event template for a kind 1301 event
  */
 export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
@@ -949,7 +951,7 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
     throw new Error('No run data provided');
   }
 
-  const { teamAssociation, challengeUUIDs } = options;
+  const { teamAssociation, challengeUUIDs, challengeNames } = options;
   const workoutUUID = uuidv4(); // Unique ID for this workout record
 
   const activity = (run.activityType || 'run').toLowerCase();
@@ -979,6 +981,31 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
   // Using a more generic title for the workout, can be overridden by user if UI allows
   const workoutTitle = run.title || `${primaryHashtag} on ${runDate.toLocaleDateString()}`;
 
+  // Enhanced content generation following NIP-101e community linking
+  let contentParts = [];
+  
+  // Start with user notes or default activity description
+  const baseContent = run.notes || `Completed a ${distanceValue}${distanceUnit} ${activityVerb}. ${activityEmoji}`;
+  contentParts.push(baseContent);
+  
+  // Add team association if present
+  if (teamAssociation && teamAssociation.teamName) {
+    contentParts.push(`Team: ${teamAssociation.teamName}`);
+  } else if (teamAssociation && teamAssociation.teamUUID) {
+    contentParts.push(`Team: ${teamAssociation.teamUUID.slice(0, 8)}`);
+  }
+  
+  // Add challenge associations if present
+  if (Array.isArray(challengeNames) && challengeNames.length > 0) {
+    const challengeList = challengeNames.join(', ');
+    const challengeText = challengeNames.length === 1 ? 'Challenge' : 'Challenges';
+    contentParts.push(`${challengeText}: ${challengeList}`);
+  } else if (Array.isArray(challengeUUIDs) && challengeUUIDs.length > 0) {
+    const challengeList = challengeUUIDs.map(uuid => uuid.slice(0, 8)).join(', ');
+    const challengeText = challengeUUIDs.length === 1 ? 'Challenge' : 'Challenges';
+    contentParts.push(`${challengeText}: ${challengeList}`);
+  }
+
   const tags = [
     ["d", workoutUUID], // NIP-101e unique workout ID
     ["title", workoutTitle],
@@ -998,26 +1025,38 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
     // ["device", run.deviceInfo || "Runstr Mobile App"], (if available)
   ];
 
-  // NEW DENORMALIZED TAG FORMAT FOR TEAM ASSOCIATION (Phase 1)
+  // Enhanced NIP-101e team association tags
   if (teamAssociation && teamAssociation.teamUUID) {
     const { teamCaptainPubkey, teamUUID, relayHint = '', teamName = '' } = teamAssociation;
     const aTag = `33404:${teamCaptainPubkey || ''}:${teamUUID}`;
-    const tagArr = ["team", aTag];
-    tagArr.push(relayHint); // May be empty string if not provided
-    tagArr.push(teamName);  // May be empty string – UI will handle fallback
-    tags.push(tagArr);
+    // NIP-101e format: ["team", "33404:<pubkey>:<uuid>", "<relay>", "<team-name>"]
+    const teamTag = ["team", aTag];
+    if (relayHint) teamTag.push(relayHint);
+    if (teamName) teamTag.push(teamName);
+    tags.push(teamTag);
   }
 
-  // Add challenge tags if provided (A2 strategy hashtag)
+  // Enhanced NIP-101e challenge tags
   if (Array.isArray(challengeUUIDs)) {
-    challengeUUIDs.forEach(uuid => {
-      if (uuid && typeof uuid === 'string') tags.push(["t", `challenge:${uuid}`]);
+    challengeUUIDs.forEach((uuid, index) => {
+      if (uuid && typeof uuid === 'string') {
+        // Add hashtag for discovery
+        tags.push(["t", `challenge:${uuid}`]);
+        
+        // Add enhanced challenge tag if we have the challenge details
+        // This would require the challenge's captain pubkey and relay info
+        // For now, using hashtag approach but structure allows for enhancement
+        const challengeName = challengeNames && challengeNames[index] ? challengeNames[index] : '';
+        if (challengeName) {
+          tags.push(["challenge_name", uuid, challengeName]);
+        }
+      }
     });
   }
 
   return {
     kind: 1301,
-    content: run.notes || `Completed a ${activityVerb}. ${activityEmoji}`, // User notes or default content
+    content: contentParts.join(' • '), // Join content parts with bullet separator
     tags: tags,
     // created_at will be set by createAndPublishEvent or the signing process
   };

@@ -487,7 +487,7 @@ export const MenuBar = () => {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 w-full bg-bg-primary py-2 z-40 border-t border-border-secondary">
+      <nav className="fixed bottom-0 left-0 w-full bg-bg-primary bg-opacity-100 py-2 z-40 border-t border-border-secondary">
         <div className="max-w-[500px] mx-auto px-2">
           <ul className="flex justify-between">
             {menuItems.map((item) => (

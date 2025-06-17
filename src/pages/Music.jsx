@@ -219,7 +219,7 @@ export function Music() {
   }, [blossomEndpoint, blossomTracks]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800 text-white">
+    <div className="min-h-screen bg-bg-primary text-text-primary">
       <div className="container mx-auto px-4 py-8">
         <h1 className="page-title mb-8 text-center">Music</h1>
         
@@ -239,7 +239,7 @@ export function Music() {
             Blossom Library
           </h2>
           {blossomLoading && (
-            <div className="text-gray-400 text-left mb-4">
+            <div className="text-text-secondary text-left mb-4">
               {blossomEndpoint && blossomEndpoint !== '' 
                 ? `Loading tracks from ${blossomEndpoint}...`
                 : 'Searching for audio tracks across Blossom servers...'
@@ -247,12 +247,12 @@ export function Music() {
             </div>
           )}
           {blossomError && (
-            <div className="text-red-400 text-left mb-4">
+            <div className="text-error text-left mb-4">
               Error loading tracks: {blossomError}
             </div>
           )}
           {!blossomLoading && !blossomError && blossomTracks.length === 0 && (
-            <div className="text-gray-400 text-left mb-4">
+            <div className="text-text-muted text-left mb-4">
               {blossomEndpoint && blossomEndpoint !== '' 
                 ? `No audio files found on ${blossomEndpoint}.`
                 : 'No audio files found on Blossom servers. Try uploading some audio files to your Blossom server or check the console for detailed logs.'

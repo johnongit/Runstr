@@ -1,5 +1,6 @@
 import { createWorkoutEvent, createAndPublishEvent } from './nostr';
 import { getActiveRelayList } from '../contexts/SettingsContext';
+import { resolveTeamName, resolveChallengeNames } from '../services/nameResolver';
 
 /**
  * Publish a run's workout summary (kind 1301) plus optional NIP-101h events.
@@ -17,6 +18,7 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}) => {
   // 🏷️ Determine default posting team (A2 strategy – simple hashtag tag)
   let teamAssociation = undefined;
   let challengeUUIDs = [];
+  let challengeNames = [];
   
   try {
     const { getDefaultPostingTeamIdentifier } = await import('./settingsManager.ts');
@@ -25,14 +27,23 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}) => {
       const parts = defaultTeamId.split(':');
       if (parts.length === 2) {
         const [teamCaptainPubkey, teamUUID] = parts;
-        teamAssociation = { teamCaptainPubkey, teamUUID };
         
-        // 🏆 Get challenge participation for this team
+        // Resolve team name for enhanced content
+        const teamName = resolveTeamName(teamUUID, teamCaptainPubkey);
+        
+        teamAssociation = { 
+          teamCaptainPubkey, 
+          teamUUID,
+          teamName 
+        };
+        
+        // 🏆 Get challenge participation for this team and resolve names
         try {
           const challengeKey = `runstr:challengeParticipation:${teamUUID}`;
           const stored = JSON.parse(localStorage.getItem(challengeKey) || '[]');
           if (Array.isArray(stored)) {
             challengeUUIDs = stored;
+            challengeNames = resolveChallengeNames(challengeUUIDs, teamUUID);
           }
         } catch (challengeErr) {
           console.warn('runPublisher: could not retrieve challenge participation', challengeErr);
@@ -45,8 +56,8 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}) => {
 
   // 1️⃣ Publish workout summary if not already published earlier (ALWAYS PUBLISHED)
   if (!run.nostrWorkoutEventId) {
-    // Pass team association and challenge UUIDs to createWorkoutEvent
-    const summaryTemplate = createWorkoutEvent(run, distanceUnit, { teamAssociation, challengeUUIDs });
+    // Pass team association, challenge UUIDs, and resolved names to createWorkoutEvent
+    const summaryTemplate = createWorkoutEvent(run, distanceUnit, { teamAssociation, challengeUUIDs, challengeNames });
     try {
       const summaryResult = await createAndPublishEvent(summaryTemplate, null, { relays: relayList });
       results.push({ kind: 1301, success: true, result: summaryResult });

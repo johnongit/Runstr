@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import NDK, { NDKEvent, NDKSubscription } from '@nostr-dev-kit/ndk';
 import { v4 as uuidv4 } from 'uuid';
+import { useNavigate } from 'react-router-dom';
 import {
   prepareTeamChallengeEvent,
   subscribeToTeamChallenges,
@@ -9,6 +10,7 @@ import type { ChallengeDetails } from '../../services/nostr/NostrTeamsService';
 import { useNostr } from '../../hooks/useNostr';
 import { Event as NostrEvent } from 'nostr-tools';
 import toast from 'react-hot-toast';
+import { cacheChallengeNames } from '../../services/nameResolver';
 
 interface TeamChallengesTabProps {
   ndk: NDK;
@@ -44,6 +46,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
   currentUserPubkey,
   isCaptain,
 }) => {
+  const navigate = useNavigate();
   const [challenges, setChallenges] = useState<Array<ReturnType<typeof parseChallenge>>>([]);
   const [loading, setLoading] = useState(true);
   const [participating, setParticipating] = useState<string[]>([]);
@@ -74,7 +77,12 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       sub = subscribeToTeamChallenges(ndk, teamAIdentifier, (evt: NostrEvent) => {
         setChallenges(prev => {
           if (prev.find(c => c.id === evt.id)) return prev;
-          return [...prev, parseChallenge(evt)].sort((a, b) => (b.start || 0) - (a.start || 0));
+          const parsedChallenge = parseChallenge(evt);
+          
+          // Cache challenge name for future name resolution
+          cacheChallengeNames(parsedChallenge.uuid, teamUUID, parsedChallenge.name);
+          
+          return [...prev, parsedChallenge].sort((a, b) => (b.start || 0) - (a.start || 0));
         });
       });
     } catch (e) {
@@ -225,15 +233,15 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
     <div className="space-y-6">
       {/* Captain Challenge Creation Section */}
       {isCaptain && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <div className="bg-bg-secondary border border-border-secondary rounded-lg p-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-purple-300">Captain Controls</h3>
-              <p className="text-sm text-gray-400">Create challenges to motivate your team members</p>
+              <h3 className="text-lg font-semibold text-primary">Captain Controls</h3>
+              <p className="text-sm text-text-muted">Create challenges to motivate your team members</p>
             </div>
             <button 
               onClick={() => setShowModal(true)} 
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap"
+              className="px-6 py-3 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg transition-colors whitespace-nowrap border border-border-secondary"
             >
               + Create Challenge
             </button>
@@ -243,21 +251,21 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
 
       {/* Challenges List */}
       <div>
-        <h4 className="text-xl font-semibold text-gray-100 mb-4">
+        <h4 className="text-xl font-semibold text-text-primary mb-4">
           Challenges {!loading && `(${challenges.length})`}
         </h4>
         
         {loading && (
           <div className="text-center py-8">
-            <p className="text-gray-400">Loading challenges...</p>
+            <p className="text-text-muted">Loading challenges...</p>
           </div>
         )}
         
         {!loading && challenges.length === 0 && (
-          <div className="text-center py-8 bg-gray-800 rounded-lg border border-gray-700">
-            <p className="text-gray-400 mb-2">No challenges available.</p>
+          <div className="text-center py-8 bg-bg-secondary rounded-lg border border-border-secondary">
+            <p className="text-text-muted mb-2">No challenges available.</p>
             {isCaptain && (
-              <p className="text-sm text-gray-500">Create the first challenge to get your team motivated!</p>
+              <p className="text-sm text-text-muted">Create the first challenge to get your team motivated!</p>
             )}
           </div>
         )}
@@ -265,22 +273,27 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
         {!loading && challenges.length > 0 && (
           <div className="space-y-4">
             {challenges.map(ch => (
-              <div key={ch.id} className="border border-gray-700 rounded-lg p-4 bg-gray-800">
+              <div key={ch.id} className="border border-border-secondary rounded-lg p-4 bg-bg-secondary">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
-                  <h4 className="font-semibold text-gray-100 text-lg">{ch.name}</h4>
+                  <button 
+                    onClick={() => navigate(`/challenge/${captainPubkey}/${ch.uuid}`)}
+                    className="text-left font-semibold text-text-primary text-lg hover:text-primary transition-colors cursor-pointer"
+                  >
+                    {ch.name}
+                  </button>
                   {ch.goalValue && (
-                    <span className="px-3 py-1 bg-purple-600 text-white text-sm rounded-full whitespace-nowrap">
+                    <span className="px-3 py-1 bg-primary text-white text-sm rounded-full whitespace-nowrap">
                       Goal: {ch.goalValue} {ch.goalUnit}
                     </span>
                   )}
                 </div>
                 
                 {ch.description && (
-                  <p className="text-gray-300 mb-3">{ch.description}</p>
+                  <p className="text-text-secondary mb-3">{ch.description}</p>
                 )}
                 
                 {ch.start && (
-                  <p className="text-sm text-gray-400 mb-4">
+                  <p className="text-sm text-text-muted mb-4">
                     📅 {new Date(ch.start * 1000).toLocaleDateString()} – {ch.end ? new Date(ch.end * 1000).toLocaleDateString() : 'No end date'}
                   </p>
                 )}
@@ -290,8 +303,8 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                     onClick={() => toggleParticipation(ch.uuid)} 
                     className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${
                       participating.includes(ch.uuid) 
-                        ? 'bg-red-600 hover:bg-red-700 text-white' 
-                        : 'border border-purple-500 text-purple-400 hover:bg-purple-600/20'
+                        ? 'bg-error hover:bg-error text-white border border-border-secondary' 
+                        : 'border border-primary text-primary hover:bg-primary-light'
                     }`}
                   >
                     {participating.includes(ch.uuid) ? '✓ Leave Challenge' : '+ Participate'}
@@ -302,13 +315,13 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                     <>
                       <button 
                         onClick={() => handleEditChallenge(ch)}
-                        className="px-4 py-2 text-sm rounded-lg font-medium border border-yellow-500 text-yellow-400 hover:bg-yellow-600/20 transition-colors"
+                        className="px-4 py-2 text-sm rounded-lg font-medium border border-warning text-warning hover:bg-warning-light transition-colors"
                       >
                         Edit
                       </button>
                       <button 
                         onClick={() => handleDeleteChallenge(ch)}
-                        className="px-4 py-2 text-sm rounded-lg font-medium border border-red-500 text-red-400 hover:bg-red-600/20 transition-colors"
+                        className="px-4 py-2 text-sm rounded-lg font-medium border border-error text-error hover:bg-error-light transition-colors"
                       >
                         Delete
                       </button>
@@ -324,25 +337,25 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
       {/* Challenge Creation Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 p-6 rounded-lg w-full max-w-lg text-white max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4 text-purple-300">
+          <div className="bg-bg-secondary p-6 rounded-lg w-full max-w-lg text-text-primary max-h-[90vh] overflow-y-auto border border-border-secondary">
+            <h3 className="text-xl font-semibold mb-4 text-primary">
               {editingChallenge ? 'Edit Challenge' : 'Create New Challenge'}
             </h3>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Challenge Name</label>
+                <label className="block text-sm font-medium mb-2 text-text-primary">Challenge Name</label>
                 <input 
                   name="name" 
                   value={form.name} 
                   onChange={e => setForm({ ...form, name: e.target.value })} 
                   required 
                   placeholder="e.g., 5K Challenge"
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
+                  className="w-full p-3 bg-bg-tertiary border border-border-secondary rounded-lg focus:ring-primary focus:border-primary text-text-primary placeholder-text-muted" 
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-2">Description</label>
+                <label className="block text-sm font-medium mb-2 text-text-primary">Description</label>
                 <textarea 
                   name="description" 
                   value={form.description} 
@@ -350,13 +363,13 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                   required 
                   rows={3}
                   placeholder="Describe the challenge goals and rules..."
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
+                  className="w-full p-3 bg-bg-tertiary border border-border-secondary rounded-lg focus:ring-primary focus:border-primary text-text-primary placeholder-text-muted" 
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Goal Distance</label>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">Goal Distance</label>
                   <input 
                     type="number" 
                     value={form.goalValue} 
@@ -364,15 +377,15 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                     min="0"
                     step="0.1"
                     placeholder="5.0"
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
+                    className="w-full p-3 bg-bg-tertiary border border-border-secondary rounded-lg focus:ring-primary focus:border-primary text-text-primary placeholder-text-muted" 
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Unit</label>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit</label>
                   <select 
                     value={form.goalUnit} 
                     onChange={e => setForm({ ...form, goalUnit: e.target.value as 'km' | 'mi' })} 
-                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500"
+                    className="w-full p-3 bg-bg-tertiary border border-border-secondary rounded-lg focus:ring-primary focus:border-primary text-text-primary"
                   >
                     <option value="km">Kilometers</option>
                     <option value="mi">Miles</option>
@@ -381,22 +394,22 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-2">Start Date (Optional)</label>
+                <label className="block text-sm font-medium mb-2 text-text-primary">Start Date (Optional)</label>
                 <input 
                   type="datetime-local" 
                   value={form.start} 
                   onChange={e => setForm({ ...form, start: e.target.value })} 
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
+                  className="w-full p-3 bg-bg-tertiary border border-border-secondary rounded-lg focus:ring-primary focus:border-primary text-text-primary" 
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-2">End Date (Optional)</label>
+                <label className="block text-sm font-medium mb-2 text-text-primary">End Date (Optional)</label>
                 <input 
                   type="datetime-local" 
                   value={form.end} 
                   onChange={e => setForm({ ...form, end: e.target.value })} 
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500" 
+                  className="w-full p-3 bg-bg-tertiary border border-border-secondary rounded-lg focus:ring-primary focus:border-primary text-text-primary" 
                 />
               </div>
               
@@ -404,13 +417,13 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                 <button 
                   type="button" 
                   onClick={handleCloseModal} 
-                  className="px-6 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
+                  className="px-6 py-2 border border-border-secondary rounded-lg text-text-secondary hover:bg-bg-tertiary transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+                  className="px-6 py-2 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg transition-colors border border-border-secondary"
                 >
                   {editingChallenge ? 'Update Challenge' : 'Create Challenge'}
                 </button>
