@@ -40,6 +40,7 @@ const RunClub = safeLazy(() => import('./pages/RunClub'), 'RunClub');
 const Wallet = safeLazy(() => import('./pages/Wallet'), 'Wallet');
 const Music = safeLazy(() => import('./pages/Music'), 'Music');
 const NWC = safeLazy(() => import('./pages/NWC'), 'NWC');
+const EcashWallet = safeLazy(() => import('./pages/EcashWallet'), 'EcashWallet');
 const Goals = safeLazy(() => import('./pages/Goals'), 'Goals');
 const Events = safeLazy(() => import('./pages/Events'), 'Events');
 const EventDetail = safeLazy(() => import('./pages/EventDetail'), 'EventDetail');
@@ -83,6 +84,7 @@ const AppRoutes = () => {
         <Route path="/profile" element={<Profile />} />
         <Route path="/club" element={<RunClub />} />
         <Route path="/nwc" element={<NWC />} />
+        <Route path="/ecash" element={<EcashWallet />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/music" element={<Music />} />
         <Route path="/goals" element={<Goals />} />
