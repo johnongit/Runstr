@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 /**
  * Error fallback component for catching and displaying errors in the application
  */
-export const ErrorFallback = ({ error, resetErrorBoundary }) => {
+const ErrorFallback = ({ error, resetErrorBoundary }) => {
   return (
     <div className="flex items-center justify-center min-h-screen p-4 bg-bg-primary">
       <div className="p-6 bg-bg-secondary border border-border-secondary rounded-lg max-w-lg text-center">
@@ -27,4 +27,6 @@ ErrorFallback.propTypes = {
     message: PropTypes.string
   }),
   resetErrorBoundary: PropTypes.func
-}; 
+};
+
+export default ErrorFallback;
