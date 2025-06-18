@@ -472,7 +472,7 @@ export const MenuBar = () => {
 
             <div className="flex flex-col space-y-4">
               <Link 
-                to="/nwc" 
+                to="/wallet" 
                 className="flex items-center p-3 bg-bg-tertiary rounded-lg text-text-primary border border-border-secondary hover:bg-bg-secondary transition-colors duration-normal"
                 onClick={toggleSettings}
               >

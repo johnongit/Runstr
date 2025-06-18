@@ -456,11 +456,6 @@ ${additionalContent ? `\n${additionalContent}` : ''}
 
   return (
     <div className="w-full h-full flex flex-col bg-bg-primary text-text-primary relative">
-      {/* Title Banner */}
-      <div className="bg-gradient-to-r from-primary/80 to-secondary/80 p-4 mb-6 flex items-center justify-between">
-        <h2 className="page-title">{getActivityText('header')}</h2>
-      </div>
-
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 p-4">
         {/* Distance Card */}
