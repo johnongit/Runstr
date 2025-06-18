@@ -70,15 +70,24 @@ User reported that Blossom music integration was showing "Amber authentication a
 - **Rest of App**: Uses NDK signer set up in NostrContext that already handles Amber authentication
 - **Issue**: The app had already authenticated with Amber and set up the NDK signer, but Blossom integration was trying to check for Amber separately
 
+**Code Pattern Inconsistency:**
+- Other parts of the app use `ndk.signer` for signing events
+- Blossom integration was bypassing this established pattern
+- This created a disconnect between the app's authentication state and Blossom's authentication checks
+
 ### Solution Implemented
 
 **✅ Updated Authentication Pattern:**
 ```javascript
 // OLD (Direct Amber check):
 const isAmberAvailable = await AmberAuth.isAmberInstalled();
+if (isAmberAvailable) {
+  const signed = await AmberAuth.signEvent(event);
+}
 
 // NEW (NDK signer pattern):
 if (ndk && ndk.signer) {
+  const user = await ndk.signer.user();
   const signature = await ndk.signer.sign(event);
 }
 ```
@@ -86,18 +95,206 @@ if (ndk && ndk.signer) {
 **✅ Authentication Hierarchy:**
 1. **Primary**: NDK signer (handles Amber, private keys, browser extensions)
 2. **Fallback**: `window.nostr.signEvent()` for browser extensions
-3. **Final**: localStorage private keys
+3. **Final**: localStorage private keys (not implemented to avoid dependencies)
 
-**Expected Results:**
-- Should now show "NDK signer available (Amber or private key)"
-- Authentication should succeed with existing app login
-- User's MP3 files should be discovered and displayed
+**✅ UI Debug Updates:**
+- Updated Music page to check for `ndk.signer` availability instead of Amber directly
+- Shows comprehensive authentication status including all available methods
+- Provides better user guidance for authentication issues
+
+### Technical Details
 
 **Files Modified:**
 - `src/lib/blossom.js`: Updated `createBlossomAuth()` function
 - `src/pages/Music.jsx`: Updated authentication status check
 
+**Authentication Flow:**
+1. Check if NDK signer is available (already set up by NostrContext)
+2. Use NDK signer to sign Blossom auth events (kind 24242)
+3. Fallback to window.nostr if NDK signer unavailable
+4. Create proper `Authorization: Nostr <base64>` header
+
+**Import Updates:**
+- Added `import { ndk } from '../lib/ndkSingleton.js';` to use existing NDK instance
+- Removed direct AmberAuth dependency from Blossom integration
+
+### Expected Results
+
+**Authentication Success:**
+```
+✅ NDK signer available (Amber or private key)
+🔑 Using NDK signer for Blossom auth
+✅ NDK signer signed event successfully
+✅ Blossom auth header created successfully
+```
+
+**Server Communication:**
+- Should now successfully authenticate with Blossom servers
+- User's MP3 files should be discovered and displayed
+- Proper integration with existing app authentication
+
+### Testing Instructions
+
+1. **Verify Authentication**: Debug logs should show "NDK signer available"
+2. **Check Signing**: Should see "NDK signer signed event successfully"
+3. **Monitor Server Responses**: Should get 200 responses instead of 401 Unauthorized
+4. **Confirm Track Discovery**: User's audio files should appear in Blossom library
+
+### Lessons Learned
+
+- **Consistency**: Always use the same authentication patterns across the app
+- **Integration**: New features should leverage existing authentication infrastructure
+- **Testing**: Check authentication state in the same way other components do
+- **Documentation**: Authentication patterns should be clearly documented for future features
+
 ---
+
+## Bug Fix #1: Blossom Music Integration Authentication & Endpoint Discovery
+
+**Date:** 2025-01-14  
+**Reporter:** User  
+**Severity:** High  
+**Status:** ✅ Fixed  
+
+### Problem Description
+
+User reported that their MPEG audio files stored on blossom.band and cdn.satellite.earth servers weren't appearing in RUNSTR app's music library. The app showed "no audio files found" for user's servers but found 67-78 tracks from other public servers when searching "all servers."
+
+**User's Server Examples:**
+- `https://npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum.blossom.band/4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2.mp3`
+- `https://cdn.satellite.earth/0233c26d8bc5b696142c2a8f83cfa9ea93f7173dfa246916f51a17baca93fdbf.mp3`
+
+### Root Cause Analysis
+
+**Problem 1: Wrong Authentication Protocol**
+- **Issue**: Using NIP-98 (kind 27235) instead of Blossom protocol (kind 24242)
+- **Impact**: Servers rejected authentication attempts
+
+**Problem 2: Incorrect Endpoint Structure**
+- **Issue**: Using `https://blossom.band/list/<pubkey>` instead of `https://<npub>.blossom.band/list/<pubkey>`
+- **Impact**: 404 errors on endpoint discovery
+
+**Problem 3: Limited Endpoint Format Support**
+- **Issue**: Only trying hex pubkey format, not npub format
+- **Impact**: Some servers expect npub format in URLs
+
+### Solution Implemented
+
+**✅ Fixed Authentication Protocol:**
+```javascript
+// OLD (NIP-98):
+authEvent.kind = 27235;
+authEvent.tags = [['u', url], ['method', 'GET']];
+
+// NEW (Blossom):
+authEvent.kind = 24242;
+authEvent.content = 'List Blobs';
+authEvent.tags = [['t', 'list'], ['expiration', timestamp]];
+```
+
+**✅ Fixed Endpoint Discovery:**
+```javascript
+// OLD (limited):
+endpoints = [`${serverUrl}/list/${pubkey}`];
+
+// NEW (comprehensive):
+const npub = nip19.npubEncode(pubkey);
+endpoints = [
+  `https://${npub}.blossom.band/list/${pubkey}`, // npub subdomain + hex
+  `https://${npub}.blossom.band/list/${npub}`, // npub subdomain + npub
+  `${serverUrl}/list/${pubkey}`, // hex format
+  `${serverUrl}/list/${npub}`, // npub format
+  // ... more fallback endpoints
+];
+```
+
+**✅ Enhanced MIME Type Support:**
+- Accept `application/octet-stream` with audio extensions
+- More liberal filtering for edge cases
+- Detailed logging of MIME type detection
+
+### Expected Results
+
+- User's MP3 files should be discovered from both servers
+- Authentication should succeed with proper Blossom protocol
+- Endpoint discovery should try both hex and npub formats
+- Files should appear in "My Blossom Library" section
+
+### Files Modified
+
+- `src/lib/blossom.js`: Core authentication and endpoint logic
+- `src/pages/Music.jsx`: UI authentication status display
+
+### Testing Status
+
+- ✅ Build completed successfully
+- ⏳ Awaiting user testing with actual servers
+- 📋 Debug system in place for real-time troubleshooting
+
+---
+
+## Current Bug Fix Session - Button Styling Issues
+
+### Issues Identified:
+1. **Start Run Button** - Missing clear visual indication (needs white outline)
+2. **Teams Member Buttons** - Add/Remove buttons need black/white theme with white outline  
+3. **Pause/Stop Buttons** - White text on white background visibility issue
+4. **Music Control Icons** - Poor SVG icons that don't fit theme (deferred)
+
+### Analysis Results:
+
+**Teams Member Buttons (TeamDetailPage.tsx):**
+- Add Member button: Line 593 - `bg-purple-600 hover:bg-purple-700` (needs black/white)
+- Remove button: Line 611 - `bg-red-600 hover:bg-red-700` (needs black/white)
+
+**Start Run Button (RunTracker.jsx):**  
+- Line 544 - Uses `start-run` variant with `border-2 border-text-primary/40` (border too faint)
+
+**Pause/Stop Buttons (RunTracker.jsx):**
+- Lines 555-566 - Use `warning`/`error` variants with `border-2 border-text-primary/30` (borders too faint)
+
+### Root Cause:
+Button borders at 30-40% opacity don't provide sufficient visual indication of clickable elements.
+
+### Fix Strategy:
+1. Update Teams buttons to black background + white text + white border
+2. Increase Start Run button border opacity from 40% to 100%  
+3. Increase Pause/Stop button border opacity from 30% to 100%
+
+### Implementation Order:
+1. Teams member buttons (easiest CSS class changes)
+2. Start Run button (Button variant update) 
+3. Pause/Stop buttons (Button variant update)
+
+## COMPLETED FIXES:
+
+### ✅ Fix 1: Teams Member Buttons
+- **Add Member button**: Changed from `bg-purple-600 hover:bg-purple-700` to `bg-black hover:bg-gray-900` with `border-2 border-white`
+- **Remove button**: ✅ CONFIRMED FIXED! Changed from `bg-red-600 hover:bg-red-700` to `bg-black hover:bg-gray-900` with `border-2 border-white`
+
+### ✅ Fix 2: Start Run Button (src/components/ui/button.tsx)
+- **Changed**: `border-2 border-text-primary/40` → `border-2 border-text-primary`
+- **Result**: Start Run button now has 100% opacity white border for clear visual indication
+
+### ✅ Fix 3: Pause/Stop Buttons (src/components/ui/button.tsx)
+- **Warning variant**: `border-2 border-text-primary/30` → `border-2 border-text-primary`
+- **Error variant**: `border-2 border-text-primary/30` → `border-2 border-text-primary`
+- **Result**: Pause and Stop buttons now have 100% opacity white borders for clear visual indication
+
+## SUMMARY:
+**🎉 ALL 3 PRIMARY FIXES COMPLETED SUCCESSFULLY!** 
+
+**What was fixed:**
+1. **Teams Add Member button**: Now has black background with white border
+2. **Teams Remove button**: Now has black background with white border (consistent with Add Member)
+3. **Start Run button**: Now has 100% opacity white border for clear visibility
+4. **Pause/Stop buttons**: Now have 100% opacity white borders for clear visibility
+
+**Result**: All buttons now follow the consistent black/white theme with prominent white borders at 100% opacity, providing clear visual indication that they are clickable elements.
+
+**Next Steps:**
+- Music control icons improvement (deferred to later session)
+- Manual testing to verify all buttons display correctly in the app
 
 ## Issues (Ordered Easiest to Hardest Estimate)
 

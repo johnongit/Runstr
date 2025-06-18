@@ -12,7 +12,4 @@
     <!-- Status bar and navigation colors -->
     <color name="statusBarColor">#0F1419</color>
     <color name="navigationBarColor">#0F1419</color>
-    
-    <!-- Launcher icon background (keep existing if different) -->
-    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>

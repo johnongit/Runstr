@@ -589,7 +589,7 @@ const TeamDetailPage: React.FC = () => {
                   <button 
                     onClick={handleAddMember}
                     disabled={isAddingMember || !newMemberPubkey.trim()}
-                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    className="px-6 py-3 bg-black hover:bg-gray-900 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap border-2 border-white"
                   >
                     {isAddingMember ? 'Adding...' : 'Add Member'}
                   </button>
@@ -609,7 +609,7 @@ const TeamDetailPage: React.FC = () => {
                     {isCurrentUserCaptain && memberPubkey !== currentUserPubkey && (
                         <button 
                             onClick={() => handleRemoveMember(memberPubkey)}
-                            className="px-3 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 transition-colors whitespace-nowrap"
+                            className="px-3 py-2 text-sm bg-black hover:bg-gray-900 text-white rounded-lg disabled:opacity-50 transition-colors whitespace-nowrap border-2 border-white"
                         >
                             Remove
                         </button>
