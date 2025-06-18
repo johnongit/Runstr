@@ -34,8 +34,8 @@ const parseTeamTags = (tags: any[]) => {
   if (!Array.isArray(tags)) return [];
   
   return tags
-    .filter(tag => tag[0] === 'team' && tag[1])
-    .map(tag => {
+    .filter((tag: any) => tag[0] === 'team' && tag[1])
+    .map((tag: any) => {
       // Team tag format: ["team", "33404:captain:uuid", "relayHint", "teamName"]
       const aTag = tag[1];
       const relayHint = tag[2] || '';
@@ -55,25 +55,34 @@ const parseTeamTags = (tags: any[]) => {
       }
       return null;
     })
-    .filter(Boolean);
+    .filter((item: any) => item !== null);
 };
 
 // Helper to parse challenge tags from workout event
 const parseChallengeTags = (tags: any[]) => {
   if (!Array.isArray(tags)) return [];
   
-  return tags
+  // First, collect all challenge UUIDs from "t" tags
+  const challengeFromTTags = tags
     .filter(tag => tag[0] === 't' && tag[1] && tag[1].startsWith('challenge:'))
     .map(tag => {
-      // Challenge tag format: ["t", "challenge:uuid"]
       const challengeValue = tag[1];
       const uuid = challengeValue.replace('challenge:', '');
-      if (uuid) {
-        return { uuid, challengeValue };
-      }
-      return null;
+      return uuid ? { uuid, challengeValue } : null;
     })
     .filter(Boolean);
+
+  // Then, enhance with names from "challenge_name" tags
+  const challengeNameTags = tags.filter(tag => tag[0] === 'challenge_name' && tag[1] && tag[2]);
+  
+  return challengeFromTTags.map(challenge => {
+    // Look for a corresponding challenge_name tag
+    const nameTag = challengeNameTags.find(tag => tag[1] === challenge.uuid);
+    return {
+      ...challenge,
+      name: nameTag ? nameTag[2] : undefined // Add the name if available
+    };
+  });
 };
 
 export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; wallet: any }) => {
@@ -94,14 +103,14 @@ export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; w
     return `${team.pubkey}:${uuid}`;
   });
 
-  const visibleTeams = teamTags.filter(teamTag => 
-    userTeamIdentifiers.includes(teamTag.identifier)
+  const visibleTeams = teamTags.filter((teamTag: any) => 
+    teamTag && userTeamIdentifiers.includes(teamTag.identifier)
   );
 
   // Filter challenges - only show active challenges that user participates in
-  const visibleChallenges = challengeTags.filter(challengeTag => {
-    return activeChallenges.some(challenge => {
-      const challengeUuid = challenge.tags.find(t => t[0] === 'd')?.[1];
+  const visibleChallenges = challengeTags.filter((challengeTag: any) => {
+    return challengeTag && activeChallenges.some((challenge: any) => {
+      const challengeUuid = challenge.tags.find((t: any) => t[0] === 'd')?.[1];
       return challengeUuid === challengeTag.uuid;
     });
   });
@@ -120,25 +129,30 @@ export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; w
     date: new Date(post.created_at * 1000).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
     location: getTagValue(post.tags, 'location'),
     // Add team and challenge data
-    teams: visibleTeams,
-    challenges: visibleChallenges.map(challengeTag => {
+    teams: visibleTeams.filter((team: any) => team !== null),
+    challenges: visibleChallenges.map((challengeTag: any) => {
       // Find the full challenge data
-      const fullChallenge = activeChallenges.find(challenge => {
-        const challengeUuid = challenge.tags.find(t => t[0] === 'd')?.[1];
+      const fullChallenge = activeChallenges.find((challenge: any) => {
+        const challengeUuid = challenge.tags.find((t: any) => t[0] === 'd')?.[1];
         return challengeUuid === challengeTag.uuid;
       });
       
+      // Use the name from the challenge_name tag first, then fallback to fullChallenge name
+      const challengeName = challengeTag.name || 
+                           fullChallenge?.tags.find((t: any) => t[0] === 'name')?.[1] || 
+                           `Challenge ${challengeTag.uuid.slice(0, 8)}`;
+      
       return {
         uuid: challengeTag.uuid,
-        name: fullChallenge?.tags.find(t => t[0] === 'name')?.[1] || `Challenge ${challengeTag.uuid.slice(0, 8)}`,
-        ...challengeTag
+        name: challengeName,
+        challengeValue: challengeTag.challengeValue
       };
     })
   };
   
   // Pass through metrics processed by feedProcessor/nostr.js
   // The WorkoutCard component itself can handle icon mapping if we pass a label/type
-  const cardMetrics = post.metrics?.map(metric => {
+  const cardMetrics = post.metrics?.map((metric: any) => {
     let icon = null;
     const labelLower = metric.label?.toLowerCase() || '';
     if (labelLower.includes('dist')) {
