@@ -55,7 +55,19 @@
 }
 
 .controlButton:active {
-  transform: translateY(0);
+  transform: translateY(1px);
+  background: var(--primary-dark, #1a365d);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Ensure Unicode symbols are properly centered and crisp */
+.controlButton span {
+  line-height: 1;
+  text-align: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .nowPlaying {
