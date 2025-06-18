@@ -604,7 +604,6 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         <div className="mt-6 mx-4">
           <div className="flex justify-between items-center mb-2">
             <h3 className="subsection-heading">{getActivityText('recent')}</h3>
-            <span className="text-xs text-text-muted">See All</span>
           </div>
           
           <DashboardRunCard

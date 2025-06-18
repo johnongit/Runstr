@@ -844,21 +844,6 @@
   text-decoration: underline;
 }
 
-.feed-header-static {
-  padding: 20px;
-  text-align: center;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-secondary);
-}
-
-.feed-header-static h2 {
-  color: var(--text-primary);
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-}
-
 .feed-header-button {
   background: none;
   border: none;

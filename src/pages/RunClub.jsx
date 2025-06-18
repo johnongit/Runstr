@@ -63,10 +63,6 @@ export const RunClub = () => {
 
   return (
     <div className="run-club-container">
-      <div className="feed-header-static">
-        {/* Removed page title as requested */}
-      </div>
-
       {loading && posts.length === 0 ? (
         <div className="loading-indicator"><p>Loading posts...</p></div>
       ) : error ? null : posts.length === 0 ? (

@@ -77,8 +77,6 @@ const NostrStatsPage = () => {
         </div>
       ) : <p className="text-text-secondary">No workouts on Nostr yet.</p>}
 
-      <h3 className="section-heading mt-6">Recent Workouts</h3>
-      <Button onClick={reload} variant="ghost" size="sm">Reload</Button>
       <ul className="space-y-3">
         {workoutEvents.map(ev => (
           <li key={ev.id} className="bg-bg-secondary border border-border-secondary p-3 rounded-md text-sm text-text-primary">
