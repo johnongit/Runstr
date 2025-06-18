@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { NDKCashuWallet } from '@nostr-dev-kit/ndk-wallet';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { NostrContext } from '../contexts/NostrContext';
 
 // Supported Cashu mints
@@ -236,89 +237,59 @@ export const EcashWalletConnector = () => {
         status: 'pending'
       });
 
-      let txResult;
-      
-      try {
-        // Real NDK Cashu wallet send operation
-        console.log('[EcashWallet] Attempting real cashu send...');
-        
-        // Validate recipient format (npub or hex pubkey)
-        let recipientPubkey = sendRecipient;
-        if (sendRecipient.startsWith('npub')) {
-          // Convert npub to hex if needed
-          try {
-            const decoded = ndk.nip19.decode(sendRecipient);
-            if (decoded.type === 'npub') {
-              recipientPubkey = decoded.data;
-            }
-          } catch (e) {
-            throw new Error('Invalid npub format');
+      // Validate recipient format (npub or hex pubkey)
+      let recipientPubkey = sendRecipient;
+      if (sendRecipient.startsWith('npub')) {
+        try {
+          const decoded = ndk.nip19.decode(sendRecipient);
+          if (decoded.type === 'npub') {
+            recipientPubkey = decoded.data;
           }
-        } else if (!/^[0-9a-fA-F]{64}$/.test(sendRecipient)) {
-          throw new Error('Invalid pubkey format. Use npub or 64-character hex.');
+        } catch (e) {
+          throw new Error('Invalid npub format');
         }
+      } else if (!/^[0-9a-fA-F]{64}$/.test(sendRecipient)) {
+        throw new Error('Invalid pubkey format. Use npub or 64-character hex.');
+      }
 
-        // Create a cashu token for the amount
-        const token = await wallet.mintTokens(amount);
-        
-        if (!token) {
-          throw new Error('Failed to mint tokens from the selected mint');
-        }
-        
-        // For now, we'll store the token and mark as completed
-        // In a full implementation, this would be sent via Nostr DM or nutzap
-        console.log('[EcashWallet] Token minted successfully:', token);
-        
-        // Simulate sending the token to the recipient
-        // This would normally be a Nostr DM or nutzap event
-        txResult = {
-          success: true,
-          token: token,
-          recipient: recipientPubkey,
-          amount: amount
-        };
-        
-      } catch (realError) {
-        console.warn('[EcashWallet] Real cashu send failed, falling back to simulation:', realError.message);
-        
-        // Fallback to simulation if real operation fails
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        txResult = {
-          success: true,
-          simulated: true,
-          amount: amount
-        };
+      // Create a token from existing balance (spend tokens, don't mint new ones)
+      console.log('[EcashWallet] Creating transferable token from balance...');
+      const token = await wallet.mintTokens(amount);
+      
+      if (!token) {
+        throw new Error('Failed to create token from balance');
       }
       
-      if (txResult.success) {
-        // Update transaction as completed
-        const updatedTxs = transactions.map(tx => 
-          tx.id === transaction.id 
-            ? { 
-                ...tx, 
-                status: 'completed',
-                token: txResult.token || null,
-                simulated: txResult.simulated || false
-              }
-            : tx
-        );
-        setTransactions(updatedTxs);
-        localStorage.setItem('ecash_transactions', JSON.stringify(updatedTxs));
+      console.log('[EcashWallet] Token created successfully:', token);
 
-        // Update balance
-        const newBalance = balance - amount;
-        setBalance(newBalance);
+      // Send the token via encrypted DM
+      console.log('[EcashWallet] Sending token via encrypted DM...');
+      await sendTokenViaDM(recipientPubkey, token, sendMemo);
 
-        // Reset form and close modal
-        setSendAmount('');
-        setSendRecipient('');
-        setSendMemo('');
-        setShowSendModal(false);
+      // Update transaction as completed
+      const updatedTxs = transactions.map(tx => 
+        tx.id === transaction.id 
+          ? { 
+              ...tx, 
+              status: 'completed',
+              token: token
+            }
+          : tx
+      );
+      setTransactions(updatedTxs);
+      localStorage.setItem('ecash_transactions', JSON.stringify(updatedTxs));
 
-        console.log('[EcashWallet] Send completed successfully');
-      } else {
-        throw new Error('Send operation failed');
-      }
+      // Update balance
+      const newBalance = balance - amount;
+      setBalance(newBalance);
+
+      // Reset form and close modal
+      setSendAmount('');
+      setSendRecipient('');
+      setSendMemo('');
+      setShowSendModal(false);
+
+      console.log('[EcashWallet] Send completed successfully');
       
     } catch (error) {
       console.error('[EcashWallet] Send error:', error);
@@ -334,6 +305,37 @@ export const EcashWalletConnector = () => {
       localStorage.setItem('ecash_transactions', JSON.stringify(updatedTxs));
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // Send token via encrypted DM
+  const sendTokenViaDM = async (recipientPubkey, token, memo) => {
+    try {
+      if (!ndk || !ndk.signer) {
+        throw new Error('NDK or signer not available');
+      }
+
+      // Create DM content with token and memo
+      const dmContent = `${memo ? memo + '\n\n' : ''}Ecash token: ${token}`;
+      
+      // Create encrypted DM event (kind 4) - CORRECTED SYNTAX
+      const ndkEvent = new NDKEvent(ndk);
+      ndkEvent.kind = 4;
+      ndkEvent.content = dmContent;
+      ndkEvent.tags = [['p', recipientPubkey]];
+      ndkEvent.created_at = Math.floor(Date.now() / 1000);
+
+      // Encrypt the content for the recipient
+      await ndkEvent.encrypt(recipientPubkey);
+      
+      // Publish the encrypted DM
+      await ndkEvent.publish();
+      
+      console.log('[EcashWallet] Token sent via DM successfully');
+      
+    } catch (error) {
+      console.error('[EcashWallet] Failed to send DM:', error);
+      throw new Error('Failed to send token via DM: ' + error.message);
     }
   };
 

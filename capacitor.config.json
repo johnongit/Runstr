@@ -20,6 +20,8 @@
     }
   },
   "android": {
-    "useLegacyBridge": true
+    "useLegacyBridge": true,
+    "backgroundColor": "#0F1419",
+    "webContentsDebuggingEnabled": false
   }
 }

@@ -2,6 +2,51 @@
 
 This document tracks the progress and solutions for the identified issues. Solutions should prioritize simplicity and leverage existing application components and patterns, avoiding unnecessary complexity or code duplication.
 
+## Bug Fix #3: Android Window Background Color - Blue Bleeding Through
+
+**Date:** 2025-01-14  
+**Reporter:** User  
+**Severity:** Medium  
+**Status:** ✅ Fixed  
+
+### Problem Description
+
+User reported seeing blue color at the top of the app and at the bottom/sides when scrolling down. This was caused by the default Android window background showing through the app's interface, creating visual inconsistencies with the app's dark theme.
+
+### Root Cause Analysis
+
+**Color Inconsistency & Missing Android Background:**
+- **HTML/CSS**: Uses `#0F1419` (darker blue-gray) in `index.html` 
+- **React CSS**: Uses `#111827` (lighter blue-gray) in `src/index.css`
+- **Android Theme**: Had `<item name="android:background">@null</item>` allowing system default (blue) to show through
+- **Issue**: No defined Android window background color, inconsistent color scheme between HTML and CSS
+
+### Solution Implemented
+
+**✅ Standardized on `#0F1419` (darker color):**
+1. **Created `android/app/src/main/res/values/colors.xml`** with proper color definitions
+2. **Updated `android/app/src/main/res/values/styles.xml`** to use explicit window background colors instead of `@null`
+3. **Updated `src/index.css`** to change all instances of `#111827` to `#0F1419` for consistency
+4. **Enhanced `capacitor.config.json`** with WebView background color configuration
+
+**✅ Color Standardization:**
+- All background colors now consistently use `#0F1419`
+- Android window background properly set to match app theme
+- WebView background configured to prevent system defaults
+
+**Expected Results:**
+- No more blue color bleeding through at app edges
+- Consistent dark theme across all app surfaces
+- Proper background color when scrolling past content boundaries
+
+**Files Modified:**
+- `android/app/src/main/res/values/colors.xml` (created)
+- `android/app/src/main/res/values/styles.xml`
+- `src/index.css`
+- `capacitor.config.json`
+
+---
+
 ## Bug Fix #2: Blossom Integration Authentication Method Mismatch
 
 **Date:** 2025-01-14  
