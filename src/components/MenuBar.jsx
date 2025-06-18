@@ -7,6 +7,7 @@ import rewardsPayoutService from '../services/rewardsPayoutService';
 import { testConnection, DEFAULT_SERVERS } from '../lib/blossom';
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
+import './MenuBar.css';
 
 export const MenuBar = () => {
   const location = useLocation();
@@ -494,7 +495,7 @@ export const MenuBar = () => {
               <li key={item.name} className="flex-1">
                 <Link 
                   to={item.path} 
-                  className={`flex flex-col items-center justify-center px-1 py-1 rounded-md h-full transition-colors duration-normal ${location.pathname === item.path ? 'bg-bg-secondary text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+                  className={`menu-bar-item flex flex-col items-center justify-center px-1 py-1 rounded-md h-full transition-colors duration-normal ${location.pathname === item.path ? 'menu-bar-item-active' : 'menu-bar-item-inactive'}`}
                 >
                   {item.icon}
                   <span className="text-xs font-medium tracking-wider text-center whitespace-nowrap">{item.name}</span>

@@ -15,11 +15,11 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-text-primary shadow-md hover:bg-secondary-hover active:bg-secondary-hover",
         success:
-          "bg-success text-text-primary shadow-md hover:opacity-90 active:opacity-80",
+          "bg-success text-text-primary shadow-md hover:opacity-90 active:opacity-80 border border-text-primary/20",
         warning:
-          "bg-warning text-text-primary shadow-md hover:opacity-90 active:opacity-80",
+          "bg-warning text-text-primary shadow-md hover:opacity-90 active:opacity-80 border-2 border-text-primary/30",
         error:
-          "bg-error text-text-primary shadow-md hover:opacity-90 active:opacity-80",
+          "bg-error text-text-primary shadow-md hover:opacity-90 active:opacity-80 border-2 border-text-primary/30",
         bitcoin:
           "bg-bitcoin text-text-primary shadow-md hover:opacity-90 active:opacity-80",
         outline:
@@ -28,6 +28,8 @@ const buttonVariants = cva(
           "hover:bg-bg-tertiary hover:text-text-primary",
         link: 
           "text-primary underline-offset-4 hover:underline hover:text-primary-hover",
+        "start-run":
+          "bg-gradient-to-r from-primary to-secondary hover:from-primary-hover hover:to-secondary-hover text-text-primary border-2 border-text-primary/40 shadow-lg",
       },
       size: {
         default: "h-10 px-4 py-2 min-w-[44px]", // Mobile-friendly touch target

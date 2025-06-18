@@ -1,0 +1,86 @@
+/* MenuBar specific styles to override browser defaults and ensure consistent appearance */
+
+.menu-bar-item {
+  /* Remove any browser default styling */
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  text-decoration: none !important;
+  
+  /* Remove any blue highlighting or focus states */
+  color: inherit !important;
+  background-color: transparent !important;
+  border: none !important;
+  
+  /* Ensure touch actions are handled properly */
+  touch-action: manipulation;
+}
+
+.menu-bar-item:focus,
+.menu-bar-item:active,
+.menu-bar-item:visited,
+.menu-bar-item:link {
+  outline: none !important;
+  color: inherit !important;
+  background-color: transparent !important;
+  text-decoration: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Inactive menu items - muted text */
+.menu-bar-item-inactive {
+  color: var(--text-secondary) !important;
+}
+
+.menu-bar-item-inactive:hover {
+  color: var(--text-primary) !important;
+}
+
+/* Active menu items - white text on darker background */
+.menu-bar-item-active {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Override any focus/active states that might add blue coloring */
+.menu-bar-item-active:focus,
+.menu-bar-item-active:active,
+.menu-bar-item-active:visited {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Ensure pressed state looks like the active state */
+.menu-bar-item:active {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  transform: none !important;
+}
+
+/* Mobile-specific overrides for tap highlighting */
+@media (hover: none) and (pointer: coarse) {
+  .menu-bar-item {
+    -webkit-tap-highlight-color: transparent !important;
+    -moz-tap-highlight-color: transparent !important;
+    tap-highlight-color: transparent !important;
+  }
+  
+  .menu-bar-item:active {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+  }
+}
+
+/* Additional overrides for WebKit browsers on mobile */
+.menu-bar-item,
+.menu-bar-item *,
+.menu-bar-item:before,
+.menu-bar-item:after {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+} 
