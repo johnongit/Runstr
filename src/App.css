@@ -714,3 +714,316 @@
     font-size: 0.75rem;
   }
 }
+
+/* NWC Wallet Page Styles */
+.nwc-wallet-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.nwc-header-card {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.nwc-header-card h2 {
+  color: var(--text-primary, #ffffff);
+  margin: 0 0 16px 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.nwc-description {
+  color: var(--text-secondary, #888);
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.nwc-features-card {
+  text-align: left;
+}
+
+.nwc-features-card h3 {
+  color: var(--text-primary, #ffffff);
+  margin: 0 0 16px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.nwc-features-card .features-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.nwc-features-card .features-list li {
+  color: var(--text-secondary, #888);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.nwc-features-card .features-list li:last-child {
+  border-bottom: none;
+}
+
+/* Mobile Responsive for NWC Wallet */
+@media (max-width: 768px) {
+  .nwc-wallet-page {
+    padding: 16px;
+    gap: 16px;
+  }
+  
+  .nwc-header-card h2 {
+    font-size: 1.3rem;
+  }
+  
+  .nwc-description {
+    font-size: 0.9rem;
+  }
+  
+  .nwc-features-card .features-list li {
+    font-size: 0.85rem;
+  }
+}
+
+/* NWC Wallet Connector Styles */
+.nwc-wallet-connector {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.nwc-connection-card,
+.nwc-settings-card,
+.nwc-donation-card {
+  text-align: left;
+}
+
+.nwc-connection-card h3,
+.nwc-settings-card h3,
+.nwc-donation-card h3 {
+  color: var(--text-primary, #ffffff);
+  margin: 0 0 16px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.helper-text {
+  color: var(--text-secondary, #888);
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.helper-text.small {
+  font-size: 0.8rem;
+  margin: 8px 0 0 0;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.nwc-input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-primary, #1a1a1a);
+  color: var(--text-primary, #ffffff);
+  font-size: 0.9rem;
+}
+
+.nwc-input:focus {
+  outline: none;
+  border-color: var(--primary, #f7931a);
+}
+
+.connect-button,
+.auth-url-button,
+.save-button,
+.check-connection-button,
+.disconnect-button {
+  background: var(--primary, #f7931a);
+  color: var(--bg-primary, #000000);
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  padding: 12px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 48px;
+}
+
+.connect-button:hover:not(:disabled),
+.auth-url-button:hover:not(:disabled),
+.save-button:hover:not(:disabled),
+.check-connection-button:hover {
+  background: var(--primary-hover, #e88b00);
+  transform: translateY(-1px);
+}
+
+.connect-button:disabled,
+.save-button:disabled {
+  background: var(--text-muted, #666);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.auth-url-section {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.auth-url-button {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.connected-state {
+  text-align: center;
+}
+
+.success-message {
+  color: var(--success, #28a745);
+  margin: 0 0 16px 0;
+  font-weight: 500;
+}
+
+.error-message {
+  color: var(--error, #dc3545);
+  margin: 12px 0;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.disconnect-button {
+  background: var(--error, #dc3545);
+  color: white;
+  margin-left: 12px;
+}
+
+.disconnect-button:hover {
+  background: #c82333;
+}
+
+.zap-amount-setting {
+  margin-top: 16px;
+}
+
+.zap-amount-setting label {
+  display: block;
+  color: var(--text-secondary, #888);
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.zap-amount-setting input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-primary, #1a1a1a);
+  color: var(--text-primary, #ffffff);
+  font-size: 0.9rem;
+}
+
+.current-setting {
+  color: var(--text-secondary, #888);
+  margin: 8px 0 0 0;
+  font-size: 0.8rem;
+}
+
+.donation-buttons {
+  margin: 16px 0;
+  text-align: center;
+}
+
+.donate-button {
+  background: var(--primary, #f7931a);
+  color: var(--bg-primary, #000000);
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  padding: 12px 24px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 48px;
+  width: 100%;
+}
+
+.donate-button:hover:not(:disabled) {
+  background: var(--primary-hover, #e88b00);
+  transform: translateY(-1px);
+}
+
+.donate-button:disabled {
+  background: var(--text-muted, #666);
+  cursor: not-allowed;
+}
+
+.donation-status {
+  margin: 12px 0;
+  padding: 8px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.donation-status.success {
+  background: var(--success-light, #d4edda);
+  color: var(--success, #28a745);
+  border: 1px solid var(--success, #28a745);
+}
+
+.donation-status.error {
+  background: var(--error-light, #f8d7da);
+  color: var(--error, #dc3545);
+  border: 1px solid var(--error, #dc3545);
+}
+
+.donation-note {
+  color: var(--text-secondary, #888);
+  margin: 12px 0 0 0;
+  font-size: 0.8rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Mobile Responsive for NWC Connector */
+@media (max-width: 768px) {
+  .nwc-wallet-connector {
+    gap: 16px;
+  }
+  
+  .input-with-button {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .connect-button,
+  .save-button {
+    width: 100%;
+  }
+  
+  .connected-state .check-connection-button,
+  .connected-state .disconnect-button {
+    width: 48%;
+    margin: 4px;
+  }
+}
