@@ -4,6 +4,7 @@ import { useNostr } from '../hooks/useNostr';
 import { 
   subscribeToTeamChallenges,
   subscribeToTeamActivities,
+  fetchChallengeActivityFeed,
   NostrWorkoutEvent 
 } from '../services/nostr/NostrTeamsService';
 import { NDKSubscription } from '@nostr-dev-kit/ndk';
@@ -74,60 +75,37 @@ const ChallengeDetailPage: React.FC = () => {
     }
 
     let challengeSub: NDKSubscription | null = null;
-    let workoutsSub: NDKSubscription | null = null;
 
-    try {
-      const teamAIdentifier = `33404:${captainPubkey}:*`; // We need the actual team UUID, but this is a start
+    const loadChallengeData = async () => {
+      try {
+        const teamAIdentifier = `33404:${captainPubkey}:*`; // We need the actual team UUID, but this is a start
 
-      // Subscribe to challenges to find this specific challenge
-      challengeSub = subscribeToTeamChallenges(ndk, teamAIdentifier, (evt: NostrEvent) => {
-        const parsedChallenge = parseChallenge(evt);
-        if (parsedChallenge.uuid === challengeUUID) {
-          setChallenge(parsedChallenge);
-        }
-      });
+        // Subscribe to challenges to find this specific challenge
+        challengeSub = subscribeToTeamChallenges(ndk, teamAIdentifier, (evt: NostrEvent) => {
+          const parsedChallenge = parseChallenge(evt);
+          if (parsedChallenge.uuid === challengeUUID) {
+            setChallenge(parsedChallenge);
+          }
+        });
 
-      // Subscribe to workout events with challenge tags
-      // For now, we'll search for workouts with challenge hashtags
-      const workoutFilter = {
-        kinds: [1301],
-        "#t": [`challenge:${challengeUUID}`],
-        limit: 100
-      };
+        // Use the new enhanced fetchChallengeActivityFeed function
+        console.log('Loading challenge workouts using enhanced query...');
+        const workouts = await fetchChallengeActivityFeed(ndk, challengeUUID, 100);
+        
+        console.log(`Loaded ${workouts.length} challenge workouts`);
+        setChallengeWorkouts(workouts);
 
-      const workoutSubscription = ndk.subscribe(workoutFilter);
-      workoutSubscription.on('event', (event: any) => {
-        try {
-          // Parse workout data
-          const workoutData = {
-            id: event.id,
-            pubkey: event.pubkey,
-            content: event.content,
-            created_at: event.created_at,
-            tags: event.tags
-          };
+      } catch (err) {
+        console.error('Error setting up challenge subscriptions:', err);
+        setError('Failed to load challenge data');
+      }
+    };
 
-          setChallengeWorkouts(prev => {
-            if (prev.find(w => w.id === workoutData.id)) return prev;
-            return [...prev, workoutData].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-          });
-        } catch (err) {
-          console.warn('Error parsing workout event:', err);
-        }
-      });
-
-      workoutsSub = workoutSubscription;
-
-    } catch (err) {
-      console.error('Error setting up challenge subscriptions:', err);
-      setError('Failed to load challenge data');
-    }
-
+    loadChallengeData();
     setLoading(false);
 
     return () => {
       if (challengeSub) challengeSub.stop();
-      if (workoutsSub) workoutsSub.stop();
     };
   }, [ndk, ndkReady, captainPubkey, challengeUUID]);
 

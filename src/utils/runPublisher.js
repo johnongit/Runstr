@@ -17,6 +17,14 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
   const results = [];
   const relayList = getActiveRelayList();
 
+  // 🏷️ Get user's public key for team member identification
+  let userPubkey = null;
+  try {
+    userPubkey = localStorage.getItem('userPublicKey') || (typeof window !== 'undefined' && window.nostr ? await window.nostr.getPublicKey() : null);
+  } catch (pubkeyErr) {
+    console.warn('runPublisher: could not get user public key', pubkeyErr);
+  }
+
   // 🏷️ Determine team and challenge associations with enhanced fallback logic
   let teamAssociation = undefined;
   let challengeUUIDs = [];
@@ -117,63 +125,58 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
           const { ndk } = await import('../lib/ndkSingleton');
           const { fetchUserMemberTeams, getTeamCaptain, getTeamUUID, getTeamName } = await import('../services/nostr/NostrTeamsService');
           
-          if (ndk && ndk.connect) {
-            // Get user's public key from localStorage or window.nostr
-            const userPubkey = localStorage.getItem('userPublicKey') || (typeof window !== 'undefined' && window.nostr ? await window.nostr.getPublicKey() : null);
-            
-            if (userPubkey) {
-              const userTeams = await fetchUserMemberTeams(ndk, userPubkey);
-              if (userTeams && userTeams.length > 0) {
-                const firstTeam = userTeams[0];
-                const teamCaptainPubkey = getTeamCaptain(firstTeam);
-                const teamUUID = getTeamUUID(firstTeam);
-                const teamName = getTeamName(firstTeam);
+          if (ndk && ndk.connect && userPubkey) {
+            const userTeams = await fetchUserMemberTeams(ndk, userPubkey);
+            if (userTeams && userTeams.length > 0) {
+              const firstTeam = userTeams[0];
+              const teamCaptainPubkey = getTeamCaptain(firstTeam);
+              const teamUUID = getTeamUUID(firstTeam);
+              const teamName = getTeamName(firstTeam);
+              
+              if (teamCaptainPubkey && teamUUID) {
+                console.log('runPublisher: Auto-detected team for associations:', teamName || teamUUID);
+                teamAssociation = { 
+                  teamCaptainPubkey, 
+                  teamUUID,
+                  teamName 
+                };
                 
-                if (teamCaptainPubkey && teamUUID) {
-                  console.log('runPublisher: Auto-detected team for associations:', teamName || teamUUID);
-                  teamAssociation = { 
-                    teamCaptainPubkey, 
-                    teamUUID,
-                    teamName 
-                  };
-                  
-                  // Also check for challenge participation for this auto-detected team
-                  try {
-                    const challengeKey = `runstr:challengeParticipation:${teamUUID}`;
-                    const stored = JSON.parse(localStorage.getItem(challengeKey) || '[]');
-                    if (Array.isArray(stored) && stored.length > 0) {
-                      challengeUUIDs = stored;
-                      challengeNames = resolveChallengeNames(challengeUUIDs, teamUUID);
-                      
-                      // If no names were resolved, try fetching from NDK
-                      if (challengeNames.length === 0) {
-                        try {
-                          const { fetchTeamChallenges } = await import('../services/nostr/NostrTeamsService');
-                          const teamAIdentifier = `33404:${teamCaptainPubkey}:${teamUUID}`;
-                          const challenges = await fetchTeamChallenges(ndk, teamAIdentifier);
-                          
-                          // Match UUIDs with fetched challenges and cache names
-                          challengeUUIDs.forEach(uuid => {
-                            const challenge = challenges.find(c => {
-                              const challengeUuid = c.tags.find(t => t[0] === 'd')?.[1];
-                              return challengeUuid === uuid;
-                            });
-                            if (challenge) {
-                              const challengeName = challenge.tags.find(t => t[0] === 'name')?.[1];
-                              if (challengeName) {
-                                challengeNames.push(challengeName);
-                                cacheChallengeNames(uuid, teamUUID, challengeName);
-                              }
-                            }
+                // Also check for challenge participation for this auto-detected team
+                try {
+                  const challengeKey = `runstr:challengeParticipation:${teamUUID}`;
+                  const stored = JSON.parse(localStorage.getItem(challengeKey) || '[]');
+                  if (Array.isArray(stored) && stored.length > 0) {
+                    challengeUUIDs = stored;
+                    challengeNames = resolveChallengeNames(challengeUUIDs, teamUUID);
+                    
+                    // If no names were resolved, try fetching from NDK
+                    if (challengeNames.length === 0) {
+                      try {
+                        const { fetchTeamChallenges } = await import('../services/nostr/NostrTeamsService');
+                        const teamAIdentifier = `33404:${teamCaptainPubkey}:${teamUUID}`;
+                        const challenges = await fetchTeamChallenges(ndk, teamAIdentifier);
+                        
+                        // Match UUIDs with fetched challenges and cache names
+                        challengeUUIDs.forEach(uuid => {
+                          const challenge = challenges.find(c => {
+                            const challengeUuid = c.tags.find(t => t[0] === 'd')?.[1];
+                            return challengeUuid === uuid;
                           });
-                        } catch (challengeNdkError) {
-                          console.warn('runPublisher: could not fetch challenge data via NDK for auto-detected team', challengeNdkError);
-                        }
+                          if (challenge) {
+                            const challengeName = challenge.tags.find(t => t[0] === 'name')?.[1];
+                            if (challengeName) {
+                              challengeNames.push(challengeName);
+                              cacheChallengeNames(uuid, teamUUID, challengeName);
+                            }
+                          }
+                        });
+                      } catch (challengeNdkError) {
+                        console.warn('runPublisher: could not fetch challenge data via NDK for auto-detected team', challengeNdkError);
                       }
                     }
-                  } catch (challengeErr) {
-                    console.warn('runPublisher: could not retrieve challenge participation for auto-detected team', challengeErr);
                   }
+                } catch (challengeErr) {
+                  console.warn('runPublisher: could not retrieve challenge participation for auto-detected team', challengeErr);
                 }
               }
             }
@@ -200,7 +203,7 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
   // 1️⃣ Publish workout summary if not already published earlier (ALWAYS PUBLISHED)
   if (!run.nostrWorkoutEventId) {
     // Pass team association, challenge UUIDs, and resolved names to createWorkoutEvent
-    const summaryTemplate = createWorkoutEvent(run, distanceUnit, { teamAssociation, challengeUUIDs, challengeNames });
+    const summaryTemplate = createWorkoutEvent(run, distanceUnit, { teamAssociation, challengeUUIDs, challengeNames, userPubkey });
     try {
       const summaryResult = await createAndPublishEvent(summaryTemplate, null, { relays: relayList });
       results.push({ kind: 1301, success: true, result: summaryResult });

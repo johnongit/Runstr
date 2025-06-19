@@ -944,6 +944,7 @@ export const diagnoseConnection = async () => {
  * @param {string} [options.teamAssociation.teamName] - Human-readable team name
  * @param {Array} [options.challengeUUIDs] - Array of challenge UUIDs
  * @param {Array} [options.challengeNames] - Array of challenge names corresponding to UUIDs
+ * @param {string} [options.userPubkey] - User's public key for team member identification
  * @returns {Object} Event template for a kind 1301 event
  */
 export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
@@ -951,7 +952,7 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
     throw new Error('No run data provided');
   }
 
-  const { teamAssociation, challengeUUIDs, challengeNames } = options;
+  const { teamAssociation, challengeUUIDs, challengeNames, userPubkey } = options;
   const workoutUUID = uuidv4(); // Unique ID for this workout record
 
   const activity = (run.activityType || 'run').toLowerCase();
@@ -1029,23 +1030,36 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
   if (teamAssociation && teamAssociation.teamUUID) {
     const { teamCaptainPubkey, teamUUID, relayHint = '', teamName = '' } = teamAssociation;
     const aTag = `33404:${teamCaptainPubkey || ''}:${teamUUID}`;
+    
     // NIP-101e format: ["team", "33404:<pubkey>:<uuid>", "<relay>", "<team-name>"]
     const teamTag = ["team", aTag];
     if (relayHint) teamTag.push(relayHint);
     if (teamName) teamTag.push(teamName);
     tags.push(teamTag);
+    
+    // Add discoverable hashtag for efficient team feed queries
+    tags.push(["t", `team:${teamUUID}`]);
+    
+    // Add direct UUID tag for efficient team filtering
+    tags.push(["team_uuid", teamUUID]);
+    
+    // Add team member identification for verification
+    if (userPubkey) {
+      tags.push(["team_member", userPubkey]);
+    }
   }
 
   // Enhanced NIP-101e challenge tags
   if (Array.isArray(challengeUUIDs)) {
     challengeUUIDs.forEach((uuid, index) => {
       if (uuid && typeof uuid === 'string') {
-        // Add hashtag for discovery
+        // Add hashtag for discovery (keep existing approach)
         tags.push(["t", `challenge:${uuid}`]);
         
-        // Add enhanced challenge tag if we have the challenge details
-        // This would require the challenge's captain pubkey and relay info
-        // For now, using hashtag approach but structure allows for enhancement
+        // Add direct UUID tag for efficient challenge filtering
+        tags.push(["challenge_uuid", uuid]);
+        
+        // Add challenge name if available
         const challengeName = challengeNames && challengeNames[index] ? challengeNames[index] : '';
         if (challengeName) {
           tags.push(["challenge_name", uuid, challengeName]);

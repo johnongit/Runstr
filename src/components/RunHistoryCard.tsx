@@ -236,7 +236,7 @@ export const RunHistoryCard: React.FC<RunHistoryCardProps> = ({
         unit: distanceUnit,
     };
 
-    const eventTemplate = createWorkoutEvent(eventRunData, distanceUnit, { teamAssociation });
+    const eventTemplate = createWorkoutEvent(eventRunData, distanceUnit, { teamAssociation, userPubkey: publicKey });
 
     if (!eventTemplate) {
       setShareError('Failed to prepare workout event for Nostr.');

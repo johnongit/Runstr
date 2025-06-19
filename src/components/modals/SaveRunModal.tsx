@@ -120,7 +120,7 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
     };
 
     // createWorkoutEvent expects options.teamAssociation to be of its defined type or undefined
-    const eventTemplate = createWorkoutEvent(finalRunDataForEvent, distanceUnit, { teamAssociation, challengeUUIDs, challengeNames });
+    const eventTemplate = createWorkoutEvent(finalRunDataForEvent, distanceUnit, { teamAssociation, challengeUUIDs, challengeNames, userPubkey: publicKey });
 
     if (!eventTemplate) {
       setError('Failed to prepare workout event details.');

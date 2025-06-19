@@ -261,6 +261,7 @@ export async function fetchUserMemberTeams(
 
 /**
  * Fetches Kind 1301 workout records associated with a specific team.
+ * Uses enhanced querying strategy with multiple tag types for better performance.
  */
 export async function fetchTeamActivityFeed(
   ndk: NDK,
@@ -279,31 +280,169 @@ export async function fetchTeamActivityFeed(
     return [];
   }
 
-  // For A2 tagging strategy we use the simple hashtag-style t tag: "team:<uuid>"
-  const teamTagValue = `team:${teamUUID}`;
-
-  const filter: NDKFilter = {
+  // Strategy 1: Try direct UUID query first (most efficient)
+  const directFilter: NDKFilter = {
     kinds: [KIND_WORKOUT_RECORD as NDKKind],
-    '#t': [teamTagValue], // Query by t-tag value
+    '#team_uuid': [teamUUID], // Direct UUID tag from Phase 1
     limit: limit,
   };
 
-  if (since) filter.since = since;
-  if (until) filter.until = until;
+  // Strategy 2: Fallback to hashtag query (backward compatibility)  
+  const hashtagFilter: NDKFilter = {
+    kinds: [KIND_WORKOUT_RECORD as NDKKind],
+    '#t': [`team:${teamUUID}`], // Hashtag approach
+    limit: limit,
+  };
+
+  if (since) {
+    directFilter.since = since;
+    hashtagFilter.since = since;
+  }
+  if (until) {
+    directFilter.until = until;
+    hashtagFilter.until = until;
+  }
 
   try {
-    console.log(`Fetching team activity feed for team: ${teamTagValue}`, filter);
-    const eventsSet = await ndk.fetchEvents(filter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    // Try direct UUID query first
+    console.log(`Fetching team activity feed with direct UUID query for team: ${teamUUID}`, directFilter);
+    let eventsSet = await ndk.fetchEvents(directFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    
+    // If no results, try hashtag fallback
+    if (eventsSet.size === 0) {
+      console.log(`No results with team_uuid tag, trying hashtag fallback for: team:${teamUUID}`);
+      eventsSet = await ndk.fetchEvents(hashtagFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    }
     
     const workoutEvents: NostrWorkoutEvent[] = Array.from(eventsSet)
       .map(ndkEvent => ndkEvent.rawEvent() as NostrWorkoutEvent)
       .sort((a, b) => b.created_at - a.created_at); // Sort by newest first
     
-    console.log(`Fetched ${workoutEvents.length} workout events for the team feed.`);
+    console.log(`Fetched ${workoutEvents.length} workout events for team ${teamUUID} (${eventsSet.size > 0 ? 'direct' : 'hashtag'} query)`);
     return workoutEvents;
 
   } catch (error) {
     console.error("Error fetching team activity feed with NDK:", error);
+    return []; 
+  }
+}
+
+/**
+ * Fetches Kind 1301 workout records associated with a specific challenge.
+ * Uses enhanced querying strategy with multiple tag types for better performance.
+ */
+export async function fetchChallengeActivityFeed(
+  ndk: NDK,
+  challengeUUID: string,
+  limit: number = 20,
+  since?: number,
+  until?: number
+): Promise<NostrWorkoutEvent[]> {
+  if (!ndk) {
+    console.warn("NDK instance not provided to fetchChallengeActivityFeed.");
+    return [];
+  }
+  if (!challengeUUID) {
+    console.warn("Challenge UUID missing for fetchChallengeActivityFeed.");
+    return [];
+  }
+
+  // Strategy 1: Try direct UUID query first (most efficient)
+  const directFilter: NDKFilter = {
+    kinds: [KIND_WORKOUT_RECORD as NDKKind],
+    '#challenge_uuid': [challengeUUID], // Direct UUID tag from Phase 1
+    limit: limit,
+  };
+
+  // Strategy 2: Fallback to hashtag query (backward compatibility)  
+  const hashtagFilter: NDKFilter = {
+    kinds: [KIND_WORKOUT_RECORD as NDKKind],
+    '#t': [`challenge:${challengeUUID}`], // Hashtag approach
+    limit: limit,
+  };
+
+  if (since) {
+    directFilter.since = since;
+    hashtagFilter.since = since;
+  }
+  if (until) {
+    directFilter.until = until;
+    hashtagFilter.until = until;
+  }
+
+  try {
+    // Try direct UUID query first
+    console.log(`Fetching challenge activity feed with direct UUID query for challenge: ${challengeUUID}`, directFilter);
+    let eventsSet = await ndk.fetchEvents(directFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    
+    // If no results, try hashtag fallback
+    if (eventsSet.size === 0) {
+      console.log(`No results with challenge_uuid tag, trying hashtag fallback for: challenge:${challengeUUID}`);
+      eventsSet = await ndk.fetchEvents(hashtagFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    }
+    
+    const workoutEvents: NostrWorkoutEvent[] = Array.from(eventsSet)
+      .map(ndkEvent => ndkEvent.rawEvent() as NostrWorkoutEvent)
+      .sort((a, b) => b.created_at - a.created_at); // Sort by newest first
+    
+    console.log(`Fetched ${workoutEvents.length} workout events for challenge ${challengeUUID} (${eventsSet.size > 0 ? 'direct' : 'hashtag'} query)`);
+    return workoutEvents;
+
+  } catch (error) {
+    console.error("Error fetching challenge activity feed with NDK:", error);
+    return []; 
+  }
+}
+
+/**
+ * Fetches Kind 1301 workout records from team members for verification.
+ * Uses team member tag to validate team membership on workout events.
+ */
+export async function fetchTeamMemberWorkouts(
+  ndk: NDK,
+  teamMemberPubkeys: string[],
+  teamUUID?: string,
+  limit: number = 50,
+  since?: number,
+  until?: number
+): Promise<NostrWorkoutEvent[]> {
+  if (!ndk) {
+    console.warn("NDK instance not provided to fetchTeamMemberWorkouts.");
+    return [];
+  }
+  if (!teamMemberPubkeys || teamMemberPubkeys.length === 0) {
+    console.warn("No team member pubkeys provided for fetchTeamMemberWorkouts.");
+    return [];
+  }
+
+  // Filter by team member identification tags
+  const memberFilter: NDKFilter = {
+    kinds: [KIND_WORKOUT_RECORD as NDKKind],
+    '#team_member': teamMemberPubkeys, // Team member verification tags from Phase 1
+    limit: limit,
+  };
+
+  // Optional: Also filter by team UUID if provided
+  if (teamUUID) {
+    memberFilter['#team_uuid'] = [teamUUID];
+  }
+
+  if (since) memberFilter.since = since;
+  if (until) memberFilter.until = until;
+
+  try {
+    console.log(`Fetching workouts for ${teamMemberPubkeys.length} team members`, memberFilter);
+    const eventsSet = await ndk.fetchEvents(memberFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    
+    const workoutEvents: NostrWorkoutEvent[] = Array.from(eventsSet)
+      .map(ndkEvent => ndkEvent.rawEvent() as NostrWorkoutEvent)
+      .sort((a, b) => b.created_at - a.created_at); // Sort by newest first
+    
+    console.log(`Fetched ${workoutEvents.length} workout events from team members`);
+    return workoutEvents;
+
+  } catch (error) {
+    console.error("Error fetching team member workouts with NDK:", error);
     return []; 
   }
 }
