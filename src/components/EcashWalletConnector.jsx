@@ -1,6 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
-import { NDKCashuWallet } from '@nostr-dev-kit/ndk-wallet';
-import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { useEcashWallet } from '../contexts/EcashWalletContext';
 import { NostrContext } from '../contexts/NostrContext';
 
 // Supported Cashu mints
@@ -23,20 +22,34 @@ const SUPPORTED_MINTS = [
 ];
 
 export const EcashWalletConnector = () => {
-  const { ndk, user } = useContext(NostrContext);
-  
-  // State management
-  const [selectedMint, setSelectedMint] = useState('');
-  const [customMintUrl, setCustomMintUrl] = useState('');
-  const [wallet, setWallet] = useState(null);
-  const [balance, setBalance] = useState(0);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionError, setConnectionError] = useState('');
-  const [mintStatus, setMintStatus] = useState('');
-  const [isLoadingExisting, setIsLoadingExisting] = useState(false);
+  const { user } = useContext(NostrContext);
+  const {
+    // State from context
+    selectedMint,
+    customMintUrl,
+    wallet,
+    balance,
+    isConnecting,
+    isConnected,
+    connectionError,
+    mintStatus,
+    isLoadingExisting,
+    transactions,
+    
+    // Actions from context
+    setSelectedMint,
+    setCustomMintUrl,
+    connectToMint,
+    disconnect,
+    refreshBalance,
+    sendTokens,
+    getEffectiveMintUrl,
+    
+    // Constants
+    SUPPORTED_MINTS
+  } = useEcashWallet();
 
-  // Send/Receive Modal States
+  // Local UI state for modals
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [sendAmount, setSendAmount] = useState('');
@@ -44,170 +57,12 @@ export const EcashWalletConnector = () => {
   const [sendMemo, setSendMemo] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState('');
-
-  // Transaction History State
-  const [transactions, setTransactions] = useState([]);
   const [showTransactions, setShowTransactions] = useState(false);
-
-  // Initialize wallet on mount and check for existing wallet
-  useEffect(() => {
-    if (ndk && user) {
-      checkExistingWallet();
-      loadTransactionHistory();
-    }
-  }, [ndk, user]);
-
-  // Load transaction history from localStorage
-  const loadTransactionHistory = () => {
-    try {
-      const storedTxs = localStorage.getItem('ecash_transactions');
-      if (storedTxs) {
-        setTransactions(JSON.parse(storedTxs));
-      }
-    } catch (error) {
-      console.error('[EcashWallet] Error loading transaction history:', error);
-    }
-  };
-
-  // Save transaction to history
-  const saveTransaction = (transaction) => {
-    try {
-      const newTransaction = {
-        id: `ecash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date().toISOString(),
-        mint: getEffectiveMintUrl(),
-        ...transaction
-      };
-
-      const updatedTxs = [newTransaction, ...transactions].slice(0, 50); // Keep last 50 transactions
-      setTransactions(updatedTxs);
-      localStorage.setItem('ecash_transactions', JSON.stringify(updatedTxs));
-      
-      return newTransaction;
-    } catch (error) {
-      console.error('[EcashWallet] Error saving transaction:', error);
-    }
-  };
-
-  // Check for existing NIP-60 wallet events
-  const checkExistingWallet = async () => {
-    if (!ndk || !user) return;
-    
-    setIsLoadingExisting(true);
-    setMintStatus('Checking for existing wallet...');
-    
-    try {
-      console.log('[EcashWallet] Checking for existing NIP-60 wallet events...');
-      
-      // Look for existing wallet events (kind:37375 - wallet metadata)
-      const walletFilter = {
-        kinds: [37375],
-        authors: [user.pubkey],
-        limit: 10
-      };
-      
-      const walletEvents = await ndk.fetchEvents(walletFilter);
-      
-      if (walletEvents.size > 0) {
-        console.log(`[EcashWallet] Found ${walletEvents.size} existing wallet events`);
-        
-        // Get the most recent wallet event
-        const sortedEvents = Array.from(walletEvents).sort((a, b) => b.created_at - a.created_at);
-        const latestWalletEvent = sortedEvents[0];
-        
-        try {
-          // Try to parse wallet metadata
-          const walletData = JSON.parse(latestWalletEvent.content);
-          
-          if (walletData.mints && walletData.mints.length > 0) {
-            console.log('[EcashWallet] Found existing wallet with mints:', walletData.mints);
-            
-            // Auto-select the first mint from existing wallet
-            const existingMint = walletData.mints[0];
-            const supportedMint = SUPPORTED_MINTS.find(m => m.url === existingMint);
-            
-            if (supportedMint) {
-              setSelectedMint(existingMint);
-              console.log(`[EcashWallet] Auto-selected existing mint: ${supportedMint.name}`);
-            } else {
-              setSelectedMint('custom');
-              setCustomMintUrl(existingMint);
-              console.log(`[EcashWallet] Auto-selected custom mint: ${existingMint}`);
-            }
-            
-            // Automatically connect to the existing wallet
-            await connectToExistingWallet(existingMint);
-            return;
-          }
-        } catch (parseError) {
-          console.warn('[EcashWallet] Could not parse wallet metadata:', parseError);
-        }
-      }
-      
-      console.log('[EcashWallet] No existing wallet found, will create new one');
-      setMintStatus('');
-      
-    } catch (error) {
-      console.error('[EcashWallet] Error checking existing wallet:', error);
-      setConnectionError('Failed to check for existing wallet');
-    } finally {
-      setIsLoadingExisting(false);
-    }
-  };
-
-  // Connect to existing wallet from NIP-60 events
-  const connectToExistingWallet = async (mintUrl) => {
-    setIsConnecting(true);
-    setMintStatus('Connecting to existing wallet...');
-    
-    try {
-      console.log(`[EcashWallet] Connecting to existing wallet with mint: ${mintUrl}`);
-      
-      // Initialize NDK Cashu Wallet
-      const cashuWallet = new NDKCashuWallet(ndk);
-      
-      // Load existing proofs from Nostr events
-      await cashuWallet.start();
-      
-      // Add the existing mint to the wallet
-      cashuWallet.addMint(mintUrl);
-      
-      // Get current balance from loaded proofs  
-      const currentBalance = await cashuWallet.getBalance() || 0;
-      
-      // Set up wallet state
-      setWallet(cashuWallet);
-      setBalance(currentBalance);
-      setIsConnected(true);
-      
-      const mintName = SUPPORTED_MINTS.find(m => m.url === mintUrl)?.name || 'Custom Mint';
-      setMintStatus(`Connected to existing wallet: ${mintName}`);
-
-      // Listen for balance changes
-      cashuWallet.on('balance_changed', (newBalance) => {
-        console.log('[EcashWallet] Balance changed:', newBalance);
-        setBalance(newBalance);
-      });
-
-      console.log('[EcashWallet] Successfully connected to existing wallet');
-      
-    } catch (error) {
-      console.error('[EcashWallet] Error connecting to existing wallet:', error);
-      setConnectionError(`Failed to connect to existing wallet: ${error.message}`);
-      setMintStatus('');
-      // Reset selections so user can manually connect
-      setSelectedMint('');
-      setCustomMintUrl('');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
 
   // Handle mint selection
   const handleMintSelection = (mintUrl) => {
     setSelectedMint(mintUrl);
     setCustomMintUrl('');
-    setConnectionError('');
   };
 
   // Handle custom mint URL input
@@ -215,160 +70,12 @@ export const EcashWalletConnector = () => {
     const url = e.target.value;
     setCustomMintUrl(url);
     setSelectedMint('custom');
-    setConnectionError('');
-  };
-
-  // Get the effective mint URL (selected predefined mint or custom)
-  const getEffectiveMintUrl = () => {
-    if (selectedMint === 'custom') {
-      return customMintUrl;
-    }
-    return selectedMint;
   };
 
   // Connect to selected mint
   const handleConnect = async () => {
     const mintUrl = getEffectiveMintUrl();
-    
-    if (!mintUrl || !mintUrl.startsWith('https://')) {
-      setConnectionError('Please enter a valid mint URL starting with https://');
-      return;
-    }
-
-    if (!ndk || !user) {
-      setConnectionError('Nostr connection required. Please check your profile.');
-      return;
-    }
-
-    setIsConnecting(true);
-    setConnectionError('');
-    setMintStatus('Connecting to mint...');
-
-    try {
-      console.log(`[EcashWallet] Connecting to mint: ${mintUrl}`);
-      
-      // Initialize NDK Cashu Wallet
-      const cashuWallet = new NDKCashuWallet(ndk);
-      
-      // Start the wallet to initialize NIP-60 event handling
-      setMintStatus('Initializing wallet...');
-      await cashuWallet.start();
-      
-      // Add the selected mint to the wallet
-      setMintStatus('Adding mint to wallet...');
-      cashuWallet.addMint(mintUrl);
-      
-      // Test mint connection by trying to get mint info
-      setMintStatus('Testing mint connection...');
-      
-      // For new wallets, balance will be 0 initially
-      const currentBalance = await cashuWallet.getBalance() || 0;
-      
-      // Create wallet metadata event for NIP-60 compliance
-      setMintStatus('Creating wallet metadata...');
-      await createWalletMetadataEvent(mintUrl);
-      
-      // Set up wallet state
-      setWallet(cashuWallet);
-      setBalance(currentBalance);
-      setIsConnected(true);
-      setMintStatus(`Connected to ${SUPPORTED_MINTS.find(m => m.url === mintUrl)?.name || 'Custom Mint'}`);
-
-      // Listen for balance changes
-      cashuWallet.on('balance_changed', (newBalance) => {
-        console.log('[EcashWallet] Balance changed:', newBalance);
-        setBalance(newBalance);
-      });
-
-      console.log('[EcashWallet] Successfully connected to mint');
-      
-    } catch (error) {
-      console.error('[EcashWallet] Connection error:', error);
-      setConnectionError(`Failed to connect to mint: ${error.message}`);
-      setMintStatus('');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  // Create wallet metadata event (kind:37375) for NIP-60 compliance
-  const createWalletMetadataEvent = async (mintUrl) => {
-    try {
-      const walletMetadata = {
-        name: "RUNSTR Ecash Wallet",
-        mints: [mintUrl],
-        created_at: Math.floor(Date.now() / 1000)
-      };
-
-      const metadataEvent = new NDKEvent(ndk);
-      metadataEvent.kind = 37375;
-      metadataEvent.content = JSON.stringify(walletMetadata);
-      metadataEvent.tags = [
-        ['name', 'RUNSTR Ecash Wallet'],
-        ['mint', mintUrl]
-      ];
-      metadataEvent.created_at = Math.floor(Date.now() / 1000);
-
-      await metadataEvent.publish();
-      console.log('[EcashWallet] Wallet metadata event published');
-      
-    } catch (error) {
-      console.warn('[EcashWallet] Failed to create wallet metadata event:', error);
-      // Don't fail the connection for this
-    }
-  };
-
-  // Disconnect from mint
-  const handleDisconnect = () => {
-    if (wallet) {
-      // Clean up wallet listeners
-      try {
-        wallet.removeAllListeners('balance_changed');
-      } catch (error) {
-        console.warn('[EcashWallet] Error cleaning up wallet listeners:', error);
-      }
-    }
-    
-    setWallet(null);
-    setBalance(0);
-    setIsConnected(false);
-    setSelectedMint('');
-    setCustomMintUrl('');
-    setMintStatus('');
-    setConnectionError('');
-    console.log('[EcashWallet] Disconnected from mint');
-  };
-
-  // Refresh balance from wallet
-  const refreshBalance = async () => {
-    if (!wallet) {
-      setConnectionError('Wallet not connected');
-      return;
-    }
-    
-    try {
-      setMintStatus('Refreshing balance...');
-      
-      // Force wallet to refresh from Nostr events
-      await wallet.start();
-      
-      // Get updated balance
-      const currentBalance = await wallet.getBalance() || 0;
-      setBalance(currentBalance);
-      setMintStatus(`Balance refreshed: ${currentBalance} sats`);
-      
-      console.log('[EcashWallet] Balance refreshed:', currentBalance);
-      
-      // Clear status message after delay
-      setTimeout(() => {
-        setMintStatus(`Connected to ${SUPPORTED_MINTS.find(m => m.url === getEffectiveMintUrl())?.name || 'Custom Mint'}`);
-      }, 2000);
-      
-    } catch (error) {
-      console.error('[EcashWallet] Error refreshing balance:', error);
-      setConnectionError('Failed to refresh balance');
-      setMintStatus('');
-    }
+    await connectToMint(mintUrl);
   };
 
   // Handle send tokens
@@ -393,62 +100,7 @@ export const EcashWalletConnector = () => {
     setSendError('');
 
     try {
-      console.log(`[EcashWallet] Sending ${amount} sats to ${sendRecipient}`);
-      
-      // Record transaction as pending
-      const transaction = saveTransaction({
-        type: 'send',
-        amount,
-        recipient: sendRecipient,
-        memo: sendMemo,
-        status: 'pending'
-      });
-
-      // Validate recipient format (npub or hex pubkey)
-      let recipientPubkey = sendRecipient;
-      if (sendRecipient.startsWith('npub')) {
-        try {
-          const decoded = ndk.nip19.decode(sendRecipient);
-          if (decoded.type === 'npub') {
-            recipientPubkey = decoded.data;
-          }
-        } catch (e) {
-          throw new Error('Invalid npub format');
-        }
-      } else if (!/^[0-9a-fA-F]{64}$/.test(sendRecipient)) {
-        throw new Error('Invalid pubkey format. Use npub or 64-character hex.');
-      }
-
-      // Create a transferable token from existing balance (spend tokens)
-      console.log('[EcashWallet] Creating transferable token from balance...');
-      const token = await wallet.send(amount);
-      
-      if (!token) {
-        throw new Error('Failed to create transferable token. Please check your balance and try again.');
-      }
-      
-      console.log('[EcashWallet] Token created successfully:', token);
-
-      // Send the token via encrypted DM
-      console.log('[EcashWallet] Sending token via encrypted DM...');
-      await sendTokenViaDM(recipientPubkey, token, sendMemo);
-
-      // Update transaction as completed
-      const updatedTxs = transactions.map(tx => 
-        tx.id === transaction.id 
-          ? { 
-              ...tx, 
-              status: 'completed',
-              token: token
-            }
-          : tx
-      );
-      setTransactions(updatedTxs);
-      localStorage.setItem('ecash_transactions', JSON.stringify(updatedTxs));
-
-      // Refresh balance from wallet after successful send
-      const updatedBalance = await wallet.getBalance();
-      setBalance(updatedBalance);
+      await sendTokens(sendRecipient, amount, sendMemo);
 
       // Reset form and close modal
       setSendAmount('');
@@ -456,66 +108,17 @@ export const EcashWalletConnector = () => {
       setSendMemo('');
       setShowSendModal(false);
 
-      // Show success notification
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Ecash Sent', {
-          body: `Successfully sent ${amount} sats`,
-          icon: '/icon.png'
-        });
-      }
-
       console.log('[EcashWallet] Send completed successfully');
       
     } catch (error) {
-      console.error('[EcashWallet] Send error:', error);
       setSendError(`Failed to send tokens: ${error.message}`);
-      
-      // Update transaction as failed
-      const updatedTxs = transactions.map(tx => 
-        tx.id === transaction.id 
-          ? { ...tx, status: 'failed', error: error.message }
-          : tx
-      );
-      setTransactions(updatedTxs);
-      localStorage.setItem('ecash_transactions', JSON.stringify(updatedTxs));
     } finally {
       setIsSending(false);
     }
   };
 
-  // Send token via encrypted DM
-  const sendTokenViaDM = async (recipientPubkey, token, memo) => {
-    try {
-      if (!ndk || !ndk.signer) {
-        throw new Error('NDK or signer not available');
-      }
-
-      // Create DM content with token and memo
-      const dmContent = `${memo ? memo + '\n\n' : ''}Ecash token: ${token}`;
-      
-      // Create encrypted DM event (kind 4) - CORRECTED SYNTAX
-      const ndkEvent = new NDKEvent(ndk);
-      ndkEvent.kind = 4;
-      ndkEvent.content = dmContent;
-      ndkEvent.tags = [['p', recipientPubkey]];
-      ndkEvent.created_at = Math.floor(Date.now() / 1000);
-
-      // Encrypt the content for the recipient
-      await ndkEvent.encrypt(recipientPubkey);
-      
-      // Publish the encrypted DM
-      await ndkEvent.publish();
-      
-      console.log('[EcashWallet] Token sent via DM successfully');
-      
-    } catch (error) {
-      console.error('[EcashWallet] Failed to send DM:', error);
-      throw new Error('Failed to send token via DM: ' + error.message);
-    }
-  };
-
-  // Handle receiving tokens (enhanced with token detection)
-  const handleReceiveTokens = async (tokenString) => {
+  // Handle receive tokens - for manual token input
+  const handleManualReceiveTokens = async (tokenString) => {
     if (!wallet || !tokenString) {
       console.error('[EcashWallet] Cannot receive tokens: wallet not connected or no token provided');
       return false;
@@ -528,19 +131,6 @@ export const EcashWalletConnector = () => {
       const tokenData = await wallet.receiveTokens(tokenString);
       
       if (tokenData && tokenData.amount > 0) {
-        // Record successful receive transaction
-        const transaction = saveTransaction({
-          type: 'receive',
-          amount: tokenData.amount,
-          status: 'completed',
-          token: tokenString,
-          memo: 'Received ecash tokens'
-        });
-
-        // Refresh balance from wallet after successful receive
-        const updatedBalance = await wallet.getBalance();
-        setBalance(updatedBalance);
-
         console.log(`[EcashWallet] Successfully received ${tokenData.amount} sats`);
         
         // Show notification if available
@@ -558,16 +148,6 @@ export const EcashWalletConnector = () => {
       
     } catch (error) {
       console.error('[EcashWallet] Error receiving tokens:', error);
-      
-      // Record failed receive transaction
-      saveTransaction({
-        type: 'receive',
-        amount: 0,
-        status: 'failed',
-        error: error.message,
-        memo: 'Failed to receive tokens'
-      });
-      
       return false;
     }
   };
@@ -600,200 +180,131 @@ export const EcashWalletConnector = () => {
     };
   };
 
-  // Listen for incoming tokens via Nostr events
-  useEffect(() => {
-    if (!ndk || !user || !wallet) return;
-
-    const handleNostrEvent = async (event) => {
-      try {
-        // Check for DMs with cashu tokens
-        if (event.kind === 4 && event.pubkey !== user.pubkey) {
-          const content = event.content;
-          
-          // Look for cashu token patterns in the message
-          const tokenMatch = content.match(/cashu[A-Za-z0-9+/=]+/);
-          if (tokenMatch) {
-            console.log('[EcashWallet] Found potential cashu token in DM');
-            const success = await handleReceiveTokens(tokenMatch[0]);
-            if (success) {
-              console.log('[EcashWallet] Successfully processed token from DM');
-            }
-          }
-        }
-        
-        // Check for nutzap events (kind 9321)
-        if (event.kind === 9321 && event.tags.find(tag => tag[0] === 'p' && tag[1] === user.pubkey)) {
-          console.log('[EcashWallet] Received nutzap event');
-          const tokenTag = event.tags.find(tag => tag[0] === 'cashu');
-          if (tokenTag && tokenTag[1]) {
-            const success = await handleReceiveTokens(tokenTag[1]);
-            if (success) {
-              console.log('[EcashWallet] Successfully processed nutzap');
-            }
-          }
-        }
-      } catch (error) {
-        console.error('[EcashWallet] Error processing Nostr event:', error);
-      }
-    };
-
-    // Subscribe to DMs and nutzaps
-    const dmFilter = {
-      kinds: [4],
-      '#p': [user.pubkey],
-      since: Math.floor(Date.now() / 1000) - 3600 // Last hour
-    };
-    
-    const nutzapFilter = {
-      kinds: [9321],
-      '#p': [user.pubkey],
-      since: Math.floor(Date.now() / 1000) - 3600 // Last hour
-    };
-
-    const dmSub = ndk.subscribe([dmFilter], { closeOnEose: false });
-    const nutzapSub = ndk.subscribe([nutzapFilter], { closeOnEose: false });
-    
-    dmSub.on('event', handleNostrEvent);
-    nutzapSub.on('event', handleNostrEvent);
-
-    return () => {
-      dmSub.stop();
-      nutzapSub.stop();
-    };
-  }, [ndk, user, wallet]);
-
-  // Request notification permissions on component mount
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then(permission => {
-        console.log('[EcashWallet] Notification permission:', permission);
-      });
-    }
-  }, []);
-
   return (
     <div className="ecash-wallet-connector">
       
-      {/* Connection Section */}
-      <div className="connection-section">
-        <h3>Select Cashu Mint</h3>
+      {/* Connection Status Card */}
+      <div className="wallet-option ecash-connection-card">
+        <h3>{isConnected ? '✅ Wallet Connected' : '🔌 Connect to Mint'}</h3>
         
         {!isConnected ? (
           <>
-            {/* Predefined Mints */}
-            <div className="mint-selection">
-              <p className="helper-text">Choose a trusted Cashu mint:</p>
-              
+            <p>Choose a trusted Cashu mint to get started:</p>
+            
+            {/* Mint Selection Grid */}
+            <div className="ecash-mint-grid">
               {SUPPORTED_MINTS.map((mint) => (
                 <div 
                   key={mint.url}
-                  className={`mint-option ${selectedMint === mint.url ? 'selected' : ''}`}
+                  className={`ecash-mint-option ${selectedMint === mint.url ? 'selected' : ''}`}
                   onClick={() => handleMintSelection(mint.url)}
                 >
-                  <div className="mint-info">
-                    <strong>{mint.name}</strong>
-                    <p className="mint-description">{mint.description}</p>
-                    <p className="mint-url">{mint.url}</p>
-                  </div>
+                  <strong>{mint.name}</strong>
+                  <p className="mint-description">{mint.description}</p>
                 </div>
               ))}
               
-              {/* Custom Mint Input */}
-              <div className={`mint-option ${selectedMint === 'custom' ? 'selected' : ''}`}>
-                <div className="mint-info">
-                  <strong>Custom Mint</strong>
-                  <input
-                    type="text"
-                    value={customMintUrl}
-                    onChange={handleCustomMintChange}
-                    placeholder="https://your-mint-url.com"
-                    className="custom-mint-input"
-                  />
-                  <p className="mint-description">Enter your own mint URL</p>
-                </div>
+              {/* Custom Mint Option */}
+              <div className={`ecash-mint-option ${selectedMint === 'custom' ? 'selected' : ''}`}>
+                <strong>Custom Mint</strong>
+                <input
+                  type="text"
+                  value={customMintUrl}
+                  onChange={handleCustomMintChange}
+                  placeholder="https://your-mint-url.com"
+                  className="custom-mint-input"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <p className="mint-description">Enter your own mint URL</p>
               </div>
             </div>
 
             {/* Connect Button */}
             <button 
               onClick={handleConnect} 
-              disabled={isConnecting || !getEffectiveMintUrl()}
-              className="connect-button"
+              disabled={isConnecting || isLoadingExisting || !getEffectiveMintUrl()}
+              className="wallet-option-button"
             >
-              {isConnecting ? 'Connecting...' : 'Connect to Mint'}
+              {isConnecting ? 'Connecting...' : isLoadingExisting ? 'Loading...' : 'Connect to Mint'}
             </button>
             
-            {/* Connection Status */}
-            {mintStatus && (
-              <p className="mint-status">{mintStatus}</p>
-            )}
-            
-            {connectionError && (
-              <p className="error-message">{connectionError}</p>
-            )}
+            {/* Status Messages */}
+            {mintStatus && <p className="mint-status">{mintStatus}</p>}
+            {connectionError && <p className="error-message">{connectionError}</p>}
           </>
         ) : (
-          /* Connected State */
           <div className="connected-state">
-            <div className="wallet-info">
-              <h4>✅ Wallet Connected</h4>
-              <p className="connected-mint">{mintStatus}</p>
-              
-              {/* Balance Display */}
-              <div className="balance-section">
-                <div className="balance-display">
-                  <span className="balance-label">Balance:</span>
-                  <span className="balance-amount">{balance.toLocaleString()} sats</span>
-                </div>
-                <button onClick={refreshBalance} className="refresh-button">
-                  🔄 Refresh
-                </button>
-              </div>
-            </div>
-            
-            {/* Wallet Actions */}
-            <div className="wallet-actions">
-              <button 
-                className="action-button send-button" 
-                onClick={() => setShowSendModal(true)}
-                disabled={balance <= 0}
-              >
-                📤 Send Tokens
-              </button>
-              <button 
-                className="action-button receive-button" 
-                onClick={() => setShowReceiveModal(true)}
-              >
-                📥 Receive Tokens
-              </button>
-            </div>
-
-            {/* Transaction History Button */}
-            <div className="history-section">
-              <button 
-                className="history-button" 
-                onClick={() => setShowTransactions(!showTransactions)}
-              >
-                📋 Transaction History ({transactions.length})
-              </button>
-            </div>
-            
-            {/* Disconnect Button */}
-            <button onClick={handleDisconnect} className="disconnect-button">
+            <p className="connected-mint">{mintStatus}</p>
+            <button onClick={disconnect} className="disconnect-button">
               Disconnect
             </button>
           </div>
         )}
       </div>
 
-      {/* Transaction History Display */}
-      {showTransactions && transactions.length > 0 && (
-        <div className="transaction-history-section">
-          <h3>Recent Transactions</h3>
+      {/* Balance Card - Only show when connected */}
+      {isConnected && (
+        <div className="wallet-option ecash-balance-card">
+          <h3>💰 Wallet Balance</h3>
+          <div className="balance-display-large">
+            <span className="balance-amount-large">{balance.toLocaleString()}</span>
+            <span className="balance-unit">sats</span>
+          </div>
+          <button onClick={refreshBalance} className="refresh-balance-button">
+            🔄 Refresh Balance
+          </button>
+        </div>
+      )}
+
+      {/* Wallet Actions Card - Only show when connected */}
+      {isConnected && (
+        <div className="wallet-option ecash-actions-card">
+          <h3>⚡ Wallet Actions</h3>
+          <div className="wallet-actions-grid">
+            <div className="action-item" onClick={() => setShowSendModal(true)}>
+              <div className="action-icon">📤</div>
+              <div className="action-info">
+                <strong>Send Tokens</strong>
+                <p>Send ecash to any pubkey</p>
+              </div>
+              <button className="action-button" disabled={balance <= 0}>
+                Send
+              </button>
+            </div>
+
+            <div className="action-item" onClick={() => setShowReceiveModal(true)}>
+              <div className="action-icon">📥</div>
+              <div className="action-info">
+                <strong>Receive Tokens</strong>
+                <p>Get your receive info</p>
+              </div>
+              <button className="action-button">
+                Receive
+              </button>
+            </div>
+
+            <div className="action-item" onClick={() => setShowTransactions(!showTransactions)}>
+              <div className="action-icon">📋</div>
+              <div className="action-info">
+                <strong>Transaction History</strong>
+                <p>{transactions.length} transactions</p>
+              </div>
+              <button className="action-button">
+                {showTransactions ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction History Card - Only show when connected and toggled */}
+      {isConnected && showTransactions && transactions.length > 0 && (
+        <div className="wallet-option ecash-history-card">
+          <h3>📋 Recent Transactions</h3>
           <div className="transaction-list">
             {transactions.slice(0, 10).map((tx) => (
               <div key={tx.id} className={`transaction-item ${tx.type} ${tx.status}`}>
-                <div className="transaction-info">
+                <div className="transaction-header">
                   <div className="transaction-type">
                     {tx.type === 'send' ? '📤' : '📥'} {tx.type === 'send' ? 'Sent' : 'Received'}
                   </div>
@@ -817,6 +328,18 @@ export const EcashWalletConnector = () => {
           </div>
         </div>
       )}
+
+      {/* Features Info Card */}
+      <div className="wallet-option ecash-features-card">
+        <h3>🌟 Ecash Wallet Features</h3>
+        <ul className="features-list">
+          <li>🔒 Private token transactions</li>
+          <li>🌐 Sync across all your devices</li>
+          <li>⚡ Send/receive nutzaps in social feeds</li>
+          <li>📱 Works offline, syncs when online</li>
+          <li>🔄 Encrypted backup via Nostr events</li>
+        </ul>
+      </div>
 
       {/* Send Modal */}
       {showSendModal && (
@@ -959,7 +482,7 @@ export const EcashWalletConnector = () => {
                         }
                         
                         try {
-                          const success = await handleReceiveTokens(token);
+                          const success = await handleManualReceiveTokens(token);
                           if (success) {
                             tokenInput.value = '';
                             setShowReceiveModal(false);
@@ -1003,18 +526,6 @@ export const EcashWalletConnector = () => {
           </div>
         </div>
       )}
-
-      {/* Wallet Features Info */}
-      <div className="features-section">
-        <h3>Ecash Wallet Features</h3>
-        <ul className="features-list">
-          <li>🔒 Private token transactions</li>
-          <li>🌐 Sync across all your devices</li>
-          <li>⚡ Send/receive nutzaps in social feeds</li>
-          <li>📱 Works offline, syncs when online</li>
-          <li>🔄 Encrypted backup via Nostr events</li>
-        </ul>
-      </div>
     </div>
   );
 }; 

@@ -9,6 +9,7 @@ import { TeamChallengeProvider } from './contexts/TeamChallengeContext';
 import { ActivityModeProvider } from './contexts/ActivityModeContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { WalletProvider } from './contexts/WalletContext';
+import { EcashWalletProvider } from './contexts/EcashWalletContext';
 import { MenuBar } from './components/MenuBar';
 import { initializeEvents } from './services/EventService';
 import './App.css';
@@ -180,14 +181,16 @@ const App = () => {
                   <TeamsProvider>
                     <TeamChallengeProvider>
                       <WalletProvider>
-                      <div className="relative w-full min-h-screen bg-bg-primary text-text-primary">
-                        <MenuBar />
-                        <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
-                          <Suspense fallback={<EnhancedLoadingFallback />}>
-                            <AppRoutes />
-                          </Suspense>
-                        </main>
-                      </div>
+                        <EcashWalletProvider>
+                          <div className="relative w-full min-h-screen bg-bg-primary text-text-primary">
+                            <MenuBar />
+                            <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
+                              <Suspense fallback={<EnhancedLoadingFallback />}>
+                                <AppRoutes />
+                              </Suspense>
+                            </main>
+                          </div>
+                        </EcashWalletProvider>
                       </WalletProvider>
                     </TeamChallengeProvider>
                   </TeamsProvider>
