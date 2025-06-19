@@ -59,17 +59,29 @@ export const EcashWalletConnector = () => {
   const [sendError, setSendError] = useState('');
   const [showTransactions, setShowTransactions] = useState(false);
 
-  // Handle mint selection
-  const handleMintSelection = (mintUrl) => {
+  // Handle mint selection and auto-connect
+  const handleMintSelection = async (mintUrl) => {
     setSelectedMint(mintUrl);
     setCustomMintUrl('');
+    
+    // Auto-connect to selected mint
+    if (mintUrl && mintUrl !== 'custom') {
+      console.log('[EcashWallet] Auto-connecting to selected mint:', mintUrl);
+      await connectToMint(mintUrl);
+    }
   };
 
-  // Handle custom mint URL input
-  const handleCustomMintChange = (e) => {
+  // Handle custom mint URL input with auto-connect
+  const handleCustomMintChange = async (e) => {
     const url = e.target.value;
     setCustomMintUrl(url);
     setSelectedMint('custom');
+    
+    // Auto-connect if URL looks valid
+    if (url && url.startsWith('https://') && url.length > 10) {
+      console.log('[EcashWallet] Auto-connecting to custom mint:', url);
+      await connectToMint(url);
+    }
   };
 
   // Connect to selected mint
@@ -189,7 +201,7 @@ export const EcashWalletConnector = () => {
         
         {!isConnected ? (
           <>
-            <p>Choose a trusted Cashu mint to get started:</p>
+            <p>Choose a trusted Cashu mint (click to connect):</p>
             
             {/* Mint Selection Grid */}
             <div className="ecash-mint-grid">

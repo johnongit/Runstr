@@ -22,6 +22,9 @@ const SUPPORTED_MINTS = [
   }
 ];
 
+// Default to CoinOS mint
+const DEFAULT_MINT = SUPPORTED_MINTS[0].url; // CoinOS
+
 const EcashWalletContext = createContext();
 
 export const useEcashWallet = () => {
@@ -35,8 +38,8 @@ export const useEcashWallet = () => {
 export const EcashWalletProvider = ({ children }) => {
   const { ndk, user } = useContext(NostrContext);
   
-  // Wallet state
-  const [selectedMint, setSelectedMint] = useState('');
+  // Wallet state - Default to CoinOS mint
+  const [selectedMint, setSelectedMint] = useState(DEFAULT_MINT);
   const [customMintUrl, setCustomMintUrl] = useState('');
   const [wallet, setWallet] = useState(null);
   const [balance, setBalance] = useState(0);
@@ -49,11 +52,19 @@ export const EcashWalletProvider = ({ children }) => {
   // Transaction state
   const [transactions, setTransactions] = useState([]);
   
-  // Initialize wallet on mount and check for existing wallet
+  // Initialize wallet on mount - works with global NDK, doesn't require immediate user
   useEffect(() => {
-    if (ndk && user) {
-      checkExistingWallet();
+    if (ndk) {
+      // Load transaction history immediately
       loadTransactionHistory();
+      
+      // Check for existing wallet only if user is available (from Amber)
+      if (user) {
+        checkExistingWallet();
+      } else {
+        // If no user yet, still allow mint connection without metadata lookup
+        console.log('[EcashWallet] NDK available, user pending (Amber external signer)');
+      }
     }
   }, [ndk, user]);
 
@@ -97,7 +108,7 @@ export const EcashWalletProvider = ({ children }) => {
     return selectedMint;
   };
 
-  // Check for existing NIP-60 wallet events
+  // Check for existing NIP-60 wallet events (only when user is available)
   const checkExistingWallet = async () => {
     if (!ndk || !user) return;
     
@@ -152,7 +163,7 @@ export const EcashWalletProvider = ({ children }) => {
         }
       }
       
-      console.log('[EcashWallet] No existing wallet found, will create new one');
+      console.log('[EcashWallet] No existing wallet found');
       setMintStatus('');
       
     } catch (error) {
@@ -171,7 +182,7 @@ export const EcashWalletProvider = ({ children }) => {
     try {
       console.log(`[EcashWallet] Connecting to existing wallet with mint: ${mintUrl}`);
       
-      // Initialize NDK Cashu Wallet
+      // Initialize NDK Cashu Wallet with global NDK
       const cashuWallet = new NDKCashuWallet(ndk);
       
       // Load existing proofs from Nostr events
@@ -204,22 +215,23 @@ export const EcashWalletProvider = ({ children }) => {
       setConnectionError(`Failed to connect to existing wallet: ${error.message}`);
       setMintStatus('');
       // Reset selections so user can manually connect
-      setSelectedMint('');
+      setSelectedMint(DEFAULT_MINT); // Reset to CoinOS default
       setCustomMintUrl('');
     } finally {
       setIsConnecting(false);
     }
   };
 
-  // Connect to selected mint
+  // Connect to selected mint - AMBER COMPATIBLE (doesn't require immediate user)
   const connectToMint = async (mintUrl) => {
     if (!mintUrl || !mintUrl.startsWith('https://')) {
       setConnectionError('Please enter a valid mint URL starting with https://');
       return false;
     }
 
-    if (!ndk || !user) {
-      setConnectionError('Nostr connection required. Please check your profile.');
+    // Only require NDK (global connection), not immediate user (Amber signing)
+    if (!ndk) {
+      setConnectionError('Nostr connection not available. Please check your connection.');
       return false;
     }
 
@@ -230,7 +242,7 @@ export const EcashWalletProvider = ({ children }) => {
     try {
       console.log(`[EcashWallet] Connecting to mint: ${mintUrl}`);
       
-      // Initialize NDK Cashu Wallet
+      // Initialize NDK Cashu Wallet with global NDK
       const cashuWallet = new NDKCashuWallet(ndk);
       
       // Start the wallet to initialize NIP-60 event handling
@@ -241,15 +253,20 @@ export const EcashWalletProvider = ({ children }) => {
       setMintStatus('Adding mint to wallet...');
       cashuWallet.addMint(mintUrl);
       
-      // Test mint connection by trying to get mint info
+      // Test mint connection
       setMintStatus('Testing mint connection...');
       
       // For new wallets, balance will be 0 initially
       const currentBalance = await cashuWallet.getBalance() || 0;
       
-      // Create wallet metadata event for NIP-60 compliance
-      setMintStatus('Creating wallet metadata...');
-      await createWalletMetadataEvent(mintUrl);
+      // Create wallet metadata event ONLY if user is available (deferred auth)
+      if (user) {
+        setMintStatus('Creating wallet metadata...');
+        await createWalletMetadataEvent(mintUrl);
+      } else {
+        console.log('[EcashWallet] User not available (Amber), skipping metadata creation for now');
+        setMintStatus('Wallet connected (metadata will be created when needed)');
+      }
       
       // Set up wallet state
       setWallet(cashuWallet);
@@ -276,8 +293,14 @@ export const EcashWalletProvider = ({ children }) => {
     }
   };
 
-  // Create wallet metadata event (kind:37375) for NIP-60 compliance
+  // Create wallet metadata event (kind:37375) for NIP-60 compliance - DEFERRED AUTH
   const createWalletMetadataEvent = async (mintUrl) => {
+    // Only create metadata if user is available (Amber has been used for signing)
+    if (!user) {
+      console.log('[EcashWallet] User not available, deferring metadata creation');
+      return;
+    }
+
     try {
       const walletMetadata = {
         name: "RUNSTR Ecash Wallet",
@@ -317,7 +340,7 @@ export const EcashWalletProvider = ({ children }) => {
     setWallet(null);
     setBalance(0);
     setIsConnected(false);
-    setSelectedMint('');
+    setSelectedMint(DEFAULT_MINT); // Reset to CoinOS default
     setCustomMintUrl('');
     setMintStatus('');
     setConnectionError('');
@@ -356,7 +379,7 @@ export const EcashWalletProvider = ({ children }) => {
     }
   };
 
-  // Send tokens function
+  // Send tokens function - DEFERRED AUTH (requires Amber signing)
   const sendTokens = async (recipientPubkey, amount, memo = '') => {
     if (!wallet) {
       throw new Error('Wallet not connected');
@@ -364,6 +387,11 @@ export const EcashWalletProvider = ({ children }) => {
 
     if (amount > balance) {
       throw new Error('Insufficient balance');
+    }
+
+    // This operation requires signing, so user must be available (Amber interaction)
+    if (!user) {
+      throw new Error('Authentication required for sending tokens. Please sign in with Amber.');
     }
 
     try {
@@ -388,7 +416,7 @@ export const EcashWalletProvider = ({ children }) => {
       
       console.log('[EcashWallet] Token created successfully:', token);
 
-      // Send the token via encrypted DM
+      // Send the token via encrypted DM (requires Amber signing)
       console.log('[EcashWallet] Sending token via encrypted DM...');
       await sendTokenViaDM(recipientPubkey, token, memo);
 
@@ -438,11 +466,17 @@ export const EcashWalletProvider = ({ children }) => {
     }
   };
 
-  // Send token via encrypted DM
+  // Send token via encrypted DM - DEFERRED AUTH (requires Amber signing)
   const sendTokenViaDM = async (recipientPubkey, token, memo) => {
     try {
+      // Check for NDK signer availability (Amber interaction required)
       if (!ndk || !ndk.signer) {
-        throw new Error('NDK or signer not available');
+        throw new Error('NDK signer not available. Authentication required.');
+      }
+
+      // User must be available for encryption (Amber signing)
+      if (!user) {
+        throw new Error('User not available for encryption. Please authenticate with Amber.');
       }
 
       // Create DM content with token and memo
@@ -455,7 +489,7 @@ export const EcashWalletProvider = ({ children }) => {
       ndkEvent.tags = [['p', recipientPubkey]];
       ndkEvent.created_at = Math.floor(Date.now() / 1000);
 
-      // Encrypt and publish the DM
+      // Encrypt and publish the DM (triggers Amber signing)
       await ndkEvent.encrypt(user);
       await ndkEvent.publish();
       
@@ -466,6 +500,17 @@ export const EcashWalletProvider = ({ children }) => {
       throw new Error(`Failed to send DM: ${error.message}`);
     }
   };
+
+  // Auto-connect to CoinOS on first load if no wallet exists
+  useEffect(() => {
+    if (ndk && !isConnected && !isConnecting && !wallet && selectedMint === DEFAULT_MINT) {
+      console.log('[EcashWallet] Auto-connecting to default CoinOS mint...');
+      // Small delay to ensure context is fully initialized
+      setTimeout(() => {
+        connectToMint(DEFAULT_MINT);
+      }, 500);
+    }
+  }, [ndk, isConnected, isConnecting, wallet, selectedMint]);
 
   // Context value
   const contextValue = {

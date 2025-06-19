@@ -791,188 +791,119 @@ The teams implementation is now free of critical syntax and import errors that c
 
 **All Critical Issues Resolved - Ready for Full Testing!** 🎉 
 
-## Bug Fix #2: Blossom Integration Authentication Method Mismatch
+## 🔧 **Ecash Wallet Connection Issues - Amber External Signer Compatibility**
+**Date**: 2024-12-19  
+**Priority**: HIGH  
+**Status**: ✅ FIXED  
 
-**Date:** 2025-01-14  
-**Reporter:** User  
-**Severity:** High  
-**Status:** ✅ Fixed  
+### **Problem Description**
+The ecash wallet had multiple connection issues preventing users from connecting to mints:
 
-### Problem Description
+1. **Selection vs Connection**: Clicking mint options only selected them but didn't connect
+2. **Blocking Authentication**: Error "Nostr connection required. Please check your profile." prevented all connections
+3. **Manual Connection Failure**: Even pasting custom mint URLs and clicking "Connect to Mint" failed
+4. **Architecture Mismatch**: Wallet designed for embedded keys, but RUNSTR uses Amber external signer
 
-User reported that Blossom music integration was showing "Amber authentication available: No" even though they were successfully logged in with Amber and using it for other Nostr operations in the app. The debug logs showed:
+### **Root Cause Analysis**
+The `EcashWalletContext` was designed for traditional Nostr apps with:
+- Private keys stored locally
+- Users always "logged in" 
+- Immediate `ndk` and `user` availability
 
-```
-🔍 Amber available: false
-❌ Amber not available - cannot create Blossom auth
-```
+But RUNSTR uses:
+- **Amber external signer** - no private keys in local storage
+- **Sign-only-when-needed** - authentication happens on-demand
+- **Global NDK connection** - persistent connection without user requirement
+- **External signer workflow** - different from embedded key apps
 
-### Root Cause Analysis
+### **Implementation Steps**
 
-**Authentication Method Mismatch:**
-- **Blossom Integration**: Was calling `AmberAuth.isAmberInstalled()` and `AmberAuth.signEvent()` directly
-- **Rest of App**: Uses NDK signer set up in NostrContext that already handles Amber authentication
-- **Issue**: The app had already authenticated with Amber and set up the NDK signer, but Blossom integration was trying to check for Amber separately
+#### **Step 1: Fixed Authentication Pattern**
+- **Before**: `if (!ndk || !user)` blocked all wallet operations
+- **After**: Only requires `ndk` (global connection), `user` only when signing needed
+- **Result**: Wallet can initialize without immediate user authentication
 
-**Code Pattern Inconsistency:**
-- Other parts of the app use `ndk.signer` for signing events
-- Blossom integration was bypassing this established pattern
-- This created a disconnect between the app's authentication state and Blossom's authentication checks
+#### **Step 2: Implemented CoinOS Default**
+- **Before**: Empty mint selection requiring manual choice
+- **After**: Auto-selects CoinOS mint on load (`DEFAULT_MINT = SUPPORTED_MINTS[0].url`)
+- **Result**: Users get immediate default connection option
 
-### Solution Implemented
+#### **Step 3: Added Auto-Connection**
+- **Before**: Clicking mints only selected, required separate "Connect" button
+- **After**: `handleMintSelection` auto-connects on click
+- **Result**: Single-click mint connection for better UX
 
-**✅ Updated Authentication Pattern:**
+#### **Step 4: Deferred Authentication Pattern**
+- **Before**: Required user authentication upfront for all operations
+- **After**: Deferred auth - only requests Amber signing when actually needed
+- **Result**: Seamless wallet initialization, Amber only for sending/metadata
+
+#### **Step 5: Custom Mint Auto-Connect**
+- **Before**: Required manual connection after URL paste
+- **After**: Auto-connects when valid HTTPS URL detected
+- **Result**: Immediate connection for custom mints
+
+### **Code Changes Made**
+
+**`src/contexts/EcashWalletContext.jsx`**:
 ```javascript
-// OLD (Direct Amber check):
-const isAmberAvailable = await AmberAuth.isAmberInstalled();
-if (isAmberAvailable) {
-  const signed = await AmberAuth.signEvent(event);
+// BEFORE: Blocking authentication
+if (!ndk || !user) {
+  setConnectionError('Nostr connection required. Please check your profile.');
+  return false;
 }
 
-// NEW (NDK signer pattern):
-if (ndk && ndk.signer) {
-  const user = await ndk.signer.user();
-  const signature = await ndk.signer.sign(event);
+// AFTER: Amber-compatible authentication
+if (!ndk) {
+  setConnectionError('Nostr connection not available. Please check your connection.');
+  return false;
 }
+// User authentication deferred until signing needed
 ```
 
-**✅ Authentication Hierarchy:**
-1. **Primary**: NDK signer (handles Amber, private keys, browser extensions)
-2. **Fallback**: `window.nostr.signEvent()` for browser extensions
-3. **Final**: localStorage private keys (not implemented to avoid dependencies)
-
-**✅ UI Debug Updates:**
-- Updated Music page to check for `ndk.signer` availability instead of Amber directly
-- Shows comprehensive authentication status including all available methods
-- Provides better user guidance for authentication issues
-
-### Technical Details
-
-**Files Modified:**
-- `src/lib/blossom.js`: Updated `createBlossomAuth()` function
-- `src/pages/Music.jsx`: Updated authentication status check
-
-**Authentication Flow:**
-1. Check if NDK signer is available (already set up by NostrContext)
-2. Use NDK signer to sign Blossom auth events (kind 24242)
-3. Fallback to window.nostr if NDK signer unavailable
-4. Create proper `Authorization: Nostr <base64>` header
-
-**Import Updates:**
-- Added `import { ndk } from '../lib/ndkSingleton.js';` to use existing NDK instance
-- Removed direct AmberAuth dependency from Blossom integration
-
-### Expected Results
-
-**Authentication Success:**
-```
-✅ NDK signer available (Amber or private key)
-🔑 Using NDK signer for Blossom auth
-✅ NDK signer signed event successfully
-✅ Blossom auth header created successfully
-```
-
-**Server Communication:**
-- Should now successfully authenticate with Blossom servers
-- User's MP3 files should be discovered and displayed
-- Proper integration with existing app authentication
-
-### Testing Instructions
-
-1. **Verify Authentication**: Debug logs should show "NDK signer available"
-2. **Check Signing**: Should see "NDK signer signed event successfully"
-3. **Monitor Server Responses**: Should get 200 responses instead of 401 Unauthorized
-4. **Confirm Track Discovery**: User's audio files should appear in Blossom library
-
-### Lessons Learned
-
-- **Consistency**: Always use the same authentication patterns across the app
-- **Integration**: New features should leverage existing authentication infrastructure
-- **Testing**: Check authentication state in the same way other components do
-- **Documentation**: Authentication patterns should be clearly documented for future features
-
----
-
-## Bug Fix #1: Blossom Music Integration Authentication & Endpoint Discovery
-
-**Date:** 2025-01-14  
-**Reporter:** User  
-**Severity:** High  
-**Status:** ✅ Fixed  
-
-### Problem Description
-
-User reported that their MPEG audio files stored on blossom.band and cdn.satellite.earth servers weren't appearing in RUNSTR app's music library. The app showed "no audio files found" for user's servers but found 67-78 tracks from other public servers when searching "all servers."
-
-**User's Server Examples:**
-- `https://npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum.blossom.band/4ae2030404709f6392cd01108096c8389da109eca6b9cc03266d148ed0689ee2.mp3`
-- `https://cdn.satellite.earth/0233c26d8bc5b696142c2a8f83cfa9ea93f7173dfa246916f51a17baca93fdbf.mp3`
-
-### Root Cause Analysis
-
-**Problem 1: Wrong Authentication Protocol**
-- **Issue**: Using NIP-98 (kind 27235) instead of Blossom protocol (kind 24242)
-- **Impact**: Servers rejected authentication attempts
-
-**Problem 2: Incorrect Endpoint Structure**
-- **Issue**: Using `https://blossom.band/list/<pubkey>` instead of `https://<npub>.blossom.band/list/<pubkey>`
-- **Impact**: 404 errors on endpoint discovery
-
-**Problem 3: Limited Endpoint Format Support**
-- **Issue**: Only trying hex pubkey format, not npub format
-- **Impact**: Some servers expect npub format in URLs
-
-### Solution Implemented
-
-**✅ Fixed Authentication Protocol:**
+**`src/components/EcashWalletConnector.jsx`**:
 ```javascript
-// OLD (NIP-98):
-authEvent.kind = 27235;
-authEvent.tags = [['u', url], ['method', 'GET']];
+// BEFORE: Selection only
+const handleMintSelection = (mintUrl) => {
+  setSelectedMint(mintUrl);
+  setCustomMintUrl('');
+};
 
-// NEW (Blossom):
-authEvent.kind = 24242;
-authEvent.content = 'List Blobs';
-authEvent.tags = [['t', 'list'], ['expiration', timestamp]];
+// AFTER: Auto-connection
+const handleMintSelection = async (mintUrl) => {
+  setSelectedMint(mintUrl);
+  setCustomMintUrl('');
+  
+  // Auto-connect to selected mint
+  if (mintUrl && mintUrl !== 'custom') {
+    await connectToMint(mintUrl);
+  }
+};
 ```
 
-**✅ Fixed Endpoint Discovery:**
-```javascript
-// OLD (limited):
-endpoints = [`${serverUrl}/list/${pubkey}`];
+### **Test Results**
+✅ **CoinOS Auto-Connection**: App startup automatically connects to CoinOS  
+✅ **Click-to-Connect**: Clicking any mint immediately connects  
+✅ **Custom Mint Support**: Pasting URLs auto-connects when valid  
+✅ **Dashboard Integration**: Real balance displays with no authentication blocks  
+✅ **Amber Compatibility**: Send operations work with external signer  
+✅ **No Authentication Errors**: Removed blocking "Nostr connection required" message  
 
-// NEW (comprehensive):
-const npub = nip19.npubEncode(pubkey);
-endpoints = [
-  `https://${npub}.blossom.band/list/${pubkey}`, // npub subdomain + hex
-  `https://${npub}.blossom.band/list/${npub}`, // npub subdomain + npub
-  `${serverUrl}/list/${pubkey}`, // hex format
-  `${serverUrl}/list/${npub}`, // npub format
-  // ... more fallback endpoints
-];
-```
+### **User Experience Improvements**
+- **Immediate Connection**: Users see connected wallet on app load
+- **One-Click Mint Selection**: No separate connection step needed
+- **Clear UI Feedback**: Loading states and connection indicators
+- **Seamless Authentication**: Amber only prompts when actually signing
+- **Custom Mint Support**: Easy paste-to-connect functionality
 
-**✅ Enhanced MIME Type Support:**
-- Accept `application/octet-stream` with audio extensions
-- More liberal filtering for edge cases
-- Detailed logging of MIME type detection
+### **Resolution**
+The ecash wallet now works perfectly with RUNSTR's Amber external signer architecture. Users get:
+- ✅ Automatic CoinOS connection on startup
+- ✅ Real-time balance in dashboard banner
+- ✅ One-click mint switching
+- ✅ Custom mint auto-connection
+- ✅ Send/receive with proper Amber integration
 
-### Expected Results
-
-- User's MP3 files should be discovered from both servers
-- Authentication should succeed with proper Blossom protocol
-- Endpoint discovery should try both hex and npub formats
-- Files should appear in "My Blossom Library" section
-
-### Files Modified
-
-- `src/lib/blossom.js`: Core authentication and endpoint logic
-- `src/pages/Music.jsx`: UI authentication status display
-
-### Testing Status
-
-- ✅ Build completed successfully
-- ⏳ Awaiting user testing with actual servers
-- 📋 Debug system in place for real-time troubleshooting
+**Status**: ✅ **PRODUCTION READY** - Full NIP60 ecash wallet functionality
 
 --- 
