@@ -25,13 +25,29 @@ Transform the existing Feed tab into a "League" tab that displays a visual map a
 - [x] Position calculation system with real 1301 data
 - [x] User position visualization on course map
 - [x] Error handling and loading states
+- [x] Visual polish improvements (Phase 4 Quick Wins)
+  - [x] Random organic state-like map outline (non-Virginia specific)
+  - [x] User dot pulse/glow animation
+  - [x] Linear progress bar (0-1000 miles)
+  - [x] Distance formatting (1 decimal place)
+  - [x] Animated loading dots
+  - [x] Milestone markers at 250/500/750 miles
+- [x] **League Leaderboard System**
+  - [x] Top 10 user standings with real 1301 data
+  - [x] Nostr display name integration
+  - [x] Progress format: "Alice - 847.3 miles (84.7% complete)"
+  - [x] Automatic refresh with page data
+  - [x] Profile fetching for user names
+  - [x] Run count tracking per user
+  - [x] Error handling and loading states
+  - [x] Professional leaderboard UI design
 
 ### 🚧 In Progress
 - [ ] None currently
 
 ### ⏳ Planned
-- [ ] Bot system implementation
-- [ ] UI integration and styling polish
+- [ ] Bot system implementation (Phase 3)
+- [ ] Additional UI integration and styling polish
 
 ---
 

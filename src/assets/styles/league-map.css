@@ -68,6 +68,71 @@
   @apply flex justify-between mt-1;
 }
 
+/* Leaderboard styles */
+.league-leaderboard {
+  @apply mt-6 bg-bg-secondary rounded-lg p-4 border border-border-secondary;
+}
+
+.leaderboard-header {
+  @apply text-center border-b border-border-secondary pb-3 mb-4;
+}
+
+.leaderboard-loading {
+  @apply flex flex-col justify-center items-center py-8;
+}
+
+.leaderboard-error {
+  @apply flex flex-col justify-center items-center py-8;
+}
+
+.leaderboard-empty {
+  @apply text-center py-8;
+}
+
+.leaderboard-list {
+  @apply space-y-3;
+}
+
+.leaderboard-item {
+  @apply flex items-center justify-between p-3 bg-bg-tertiary rounded-lg border border-border-secondary hover:bg-bg-primary transition-colors duration-200;
+}
+
+.leaderboard-rank {
+  @apply flex-shrink-0 mr-3;
+}
+
+.rank-number {
+  @apply w-8 h-8 bg-primary text-text-primary rounded-full flex items-center justify-center text-sm font-bold;
+}
+
+.leaderboard-info {
+  @apply flex-grow;
+}
+
+.user-name {
+  @apply text-text-primary font-medium text-sm mb-1;
+}
+
+.user-progress {
+  @apply text-text-secondary text-xs space-x-2;
+}
+
+.distance {
+  @apply text-text-primary font-medium;
+}
+
+.percentage {
+  @apply text-text-muted;
+}
+
+.leaderboard-stats {
+  @apply flex-shrink-0 text-right;
+}
+
+.run-count {
+  @apply text-text-muted text-xs;
+}
+
 /* Loading animation with dots */
 .loading-dots {
   @apply flex space-x-1;

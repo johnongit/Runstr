@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLeaguePosition } from '../hooks/useLeaguePosition';
+import { useLeagueLeaderboard } from '../hooks/useLeagueLeaderboard';
 import '../assets/styles/league-map.css';
 
 export const LeagueMap = () => {
@@ -17,6 +18,14 @@ export const LeagueMap = () => {
     refresh: refreshPosition
   } = useLeaguePosition();
 
+  // Get leaderboard data
+  const {
+    leaderboard,
+    isLoading: leaderboardLoading,
+    error: leaderboardError,
+    refresh: refreshLeaderboard
+  } = useLeagueLeaderboard();
+
   useEffect(() => {
     // Simulate initial loading for UI polish
     const timer = setTimeout(() => setIsInitialLoad(false), 1000);
@@ -25,16 +34,17 @@ export const LeagueMap = () => {
 
   // Calculate user position on course path based on progress percentage
   const calculateUserPosition = (progressPercentage) => {
-    // Course path coordinates - updated for new organic outline
+    // Updated course path coordinates to match jagged outline
     const pathPoints = [
       { x: 55, y: 145 },   // Start (0%)
-      { x: 95, y: 135 },   // ~15%
-      { x: 155, y: 142 },  // ~30%
-      { x: 210, y: 148 },  // ~45%
-      { x: 275, y: 158 },  // ~60%
-      { x: 335, y: 170 },  // ~75%
-      { x: 370, y: 200 },  // ~90%
-      { x: 355, y: 240 },  // Finish (100%)
+      { x: 82, y: 135 },   // ~12%
+      { x: 128, y: 141 },  // ~25%
+      { x: 175, y: 148 },  // ~38%
+      { x: 220, y: 152 },  // ~50%
+      { x: 275, y: 161 },  // ~62%
+      { x: 325, y: 167 },  // ~75%
+      { x: 368, y: 195 },  // ~87%
+      { x: 358, y: 252 },  // Finish (100%)
     ];
     
     const progress = Math.min(100, Math.max(0, progressPercentage)) / 100;
@@ -112,7 +122,7 @@ export const LeagueMap = () => {
       </div>
       
       <div className="league-map-course">
-        {/* Organic state-like course outline */}
+        {/* Jagged state-like course outline */}
         <div className="course-outline-container">
           <svg 
             viewBox="0 0 400 280" 
@@ -122,22 +132,21 @@ export const LeagueMap = () => {
             {/* Course background */}
             <rect x="0" y="0" width="400" height="280" fill="transparent" />
             
-            {/* Organic state-like course outline */}
+            {/* Jagged state-like course outline */}
             <path
               d="M 55 145 
-                 C 65 135, 80 130, 95 135
-                 C 115 140, 135 138, 155 142
-                 C 175 146, 190 144, 210 148
-                 C 235 152, 255 155, 275 158
-                 C 295 161, 315 165, 335 170
-                 C 350 175, 365 185, 370 200
-                 C 375 215, 370 230, 355 240
-                 C 340 250, 320 245, 300 240
-                 C 280 235, 260 230, 240 225
-                 C 220 220, 200 215, 180 210
-                 C 160 205, 140 200, 120 195
-                 C 100 190, 85 180, 75 165
-                 C 65 155, 60 150, 55 145
+                 L 68 138 L 75 142 L 82 135 L 95 139 L 103 133 
+                 L 115 137 L 128 141 L 135 135 L 148 140 L 155 145 
+                 L 162 142 L 175 148 L 183 145 L 195 150 L 208 147 
+                 L 220 152 L 235 149 L 248 155 L 260 158 L 275 161 
+                 L 285 157 L 298 163 L 310 160 L 325 167 L 335 172 
+                 L 345 169 L 355 175 L 362 182 L 368 195 L 372 208 
+                 L 375 220 L 370 235 L 365 245 L 358 252 L 345 248 
+                 L 332 243 L 318 238 L 305 242 L 290 237 L 278 233 
+                 L 265 228 L 252 232 L 238 227 L 225 222 L 210 218 
+                 L 195 213 L 182 208 L 168 212 L 155 207 L 142 202 
+                 L 128 198 L 115 193 L 102 188 L 88 182 L 78 175 
+                 L 68 168 L 62 158 L 58 152 L 55 145 
                  Z"
               fill="none"
               stroke="currentColor"
@@ -147,9 +156,9 @@ export const LeagueMap = () => {
               className="text-text-primary course-outline"
             />
             
-            {/* Small inlet detail */}
+            {/* Small jagged inlet detail */}
             <path
-              d="M 285 165 C 295 160, 300 165, 295 170 C 290 168, 288 167, 285 165"
+              d="M 285 157 L 295 152 L 300 157 L 298 163 L 290 160 L 285 157"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"
@@ -157,9 +166,9 @@ export const LeagueMap = () => {
               className="text-text-primary course-detail"
             />
             
-            {/* Small peninsula detail */}
+            {/* Small jagged peninsula detail */}
             <path
-              d="M 180 148 C 185 145, 190 148, 188 152 C 185 150, 182 149, 180 148"
+              d="M 183 145 L 188 142 L 192 146 L 190 150 L 185 148 L 183 145"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"
@@ -293,6 +302,62 @@ export const LeagueMap = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* League Leaderboard */}
+      <div className="league-leaderboard">
+        <div className="leaderboard-header">
+          <h3 className="text-lg font-semibold text-text-primary mb-3">🏆 League Standings</h3>
+        </div>
+        
+        {leaderboardLoading ? (
+          <div className="leaderboard-loading">
+            <div className="loading-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <p className="text-text-secondary text-sm mt-2">Loading standings...</p>
+          </div>
+        ) : leaderboardError ? (
+          <div className="leaderboard-error">
+            <p className="text-red-400 text-sm mb-2">Error loading leaderboard</p>
+            <button 
+              onClick={refreshLeaderboard}
+              className="px-3 py-1 bg-primary hover:bg-primary-hover text-text-primary text-xs rounded-md transition-colors duration-normal"
+            >
+              Retry
+            </button>
+          </div>
+        ) : leaderboard.length === 0 ? (
+          <div className="leaderboard-empty">
+            <p className="text-text-secondary text-sm">
+              No runners found yet. Be the first to start the challenge!
+            </p>
+          </div>
+        ) : (
+          <div className="leaderboard-list">
+            {leaderboard.map((user, index) => (
+              <div key={user.pubkey} className="leaderboard-item">
+                <div className="leaderboard-rank">
+                  <span className="rank-number">{user.rank}</span>
+                </div>
+                <div className="leaderboard-info">
+                  <div className="user-name">
+                    {user.fallbackName}
+                  </div>
+                  <div className="user-progress">
+                    <span className="distance">{formatDistance(user.totalMiles)} miles</span>
+                    <span className="percentage">({formatDistance(user.percentComplete)}% complete)</span>
+                  </div>
+                </div>
+                <div className="leaderboard-stats">
+                  <span className="run-count">{user.runCount} runs</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
