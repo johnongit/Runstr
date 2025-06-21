@@ -1,19 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useEcashWallet } from '../contexts/EcashWalletContext';
+import { useNip60Wallet } from '../hooks/useNip60Wallet';
 
 export const DashboardWalletHeader = () => {
   const navigate = useNavigate();
   const { 
     balance, 
-    isConnected, 
-    isConnecting,
-    isLoadingExisting,
-    sendTokens,
-    transactions,
+    hasWallet: isConnected, 
+    loading: isConnecting,
+    loading: isLoadingExisting,
+    tokenEvents: transactions,
     SUPPORTED_MINTS,
-    getEffectiveMintUrl
-  } = useEcashWallet();
+    currentMint
+  } = useNip60Wallet();
 
   // Send Modal State
   const [showSendModal, setShowSendModal] = useState(false);
@@ -46,41 +45,11 @@ export const DashboardWalletHeader = () => {
     navigate('/ecash');
   };
 
-  // Handle sending tokens from dashboard
+  // Handle sending tokens from dashboard - redirect to full wallet
   const handleSendTokens = async () => {
-    if (!sendAmount || !sendRecipient) {
-      setSendError('Please fill in all required fields');
-      return;
-    }
-
-    const amount = parseInt(sendAmount);
-    if (isNaN(amount) || amount <= 0) {
-      setSendError('Please enter a valid amount');
-      return;
-    }
-
-    if (amount > balance) {
-      setSendError('Insufficient balance');
-      return;
-    }
-
-    setIsSending(true);
-    setSendError('');
-
-    try {
-      await sendTokens(sendRecipient, amount, sendMemo);
-      
-      // Reset form and close modal
-      setSendAmount('');
-      setSendRecipient('');
-      setSendMemo('');
-      setShowSendModal(false);
-      
-    } catch (error) {
-      setSendError(`Failed to send tokens: ${error.message}`);
-    } finally {
-      setIsSending(false);
-    }
+    // Close modal and navigate to full wallet for sending
+    setShowSendModal(false);
+    navigate('/ecash');
   };
 
   const formatBalance = (sats) => {
@@ -149,61 +118,21 @@ export const DashboardWalletHeader = () => {
         <div className="modal-overlay" onClick={() => setShowSendModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Send Ecash Tokens</h3>
+            <p>To send tokens, you'll be redirected to the full NIP-60 wallet interface.</p>
+            <p><strong>Balance:</strong> {balance.toLocaleString()} sats</p>
             
-            <div className="form-group">
-              <label>Recipient (pubkey/npub):</label>
-              <input
-                type="text"
-                value={sendRecipient}
-                onChange={(e) => setSendRecipient(e.target.value)}
-                placeholder="npub... or hex pubkey"
-                className="modal-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Amount (sats):</label>
-              <input
-                type="number"
-                value={sendAmount}
-                onChange={(e) => setSendAmount(e.target.value)}
-                placeholder="0"
-                min="1"
-                max={balance}
-                className="modal-input"
-              />
-              <small>Available: {balance.toLocaleString()} sats</small>
-            </div>
-
-            <div className="form-group">
-              <label>Memo (optional):</label>
-              <input
-                type="text"
-                value={sendMemo}
-                onChange={(e) => setSendMemo(e.target.value)}
-                placeholder="Payment description"
-                className="modal-input"
-              />
-            </div>
-
-            {sendError && (
-              <div className="error-message">{sendError}</div>
-            )}
-
             <div className="modal-buttons">
               <button 
                 onClick={() => setShowSendModal(false)}
                 className="cancel-button"
-                disabled={isSending}
               >
                 Cancel
               </button>
               <button 
                 onClick={handleSendTokens}
                 className="send-confirm-button"
-                disabled={isSending || !sendAmount || !sendRecipient}
               >
-                {isSending ? 'Sending...' : `Send ${sendAmount || 0} sats`}
+                Open Full Wallet
               </button>
             </div>
           </div>
