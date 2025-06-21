@@ -14,6 +14,50 @@ export const useNostrRunStats = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Level system utility functions
+  const calculateWorkoutXP = useCallback((distanceInMiles) => {
+    if (distanceInMiles < 1) return 0; // Below qualifying threshold
+    const baseXP = 10;
+    const distanceBonus = Math.floor(distanceInMiles - 1) * 5;
+    return baseXP + distanceBonus;
+  }, []);
+
+  const getXPRequiredForLevel = useCallback((level) => {
+    if (level <= 10) {
+      return level * 100;
+    }
+    const baseXP = 1000; // XP for level 10
+    const levelsAbove10 = level - 10;
+    return baseXP + (levelsAbove10 * 150) + (levelsAbove10 * (levelsAbove10 - 1) * 25);
+  }, []);
+
+  const calculateLevelFromXP = useCallback((totalXP) => {
+    let level = 1;
+    while (getXPRequiredForLevel(level + 1) <= totalXP) {
+      level++;
+    }
+    return level;
+  }, [getXPRequiredForLevel]);
+
+  const calculateLevelData = useCallback((totalXP, qualifyingWorkouts) => {
+    const currentLevel = calculateLevelFromXP(totalXP);
+    const xpForCurrentLevel = currentLevel > 1 ? getXPRequiredForLevel(currentLevel) : 0;
+    const xpForNextLevel = getXPRequiredForLevel(currentLevel + 1);
+    const progressXP = totalXP - xpForCurrentLevel;
+    const xpNeededForNext = xpForNextLevel - xpForCurrentLevel;
+    const progressPercentage = xpNeededForNext > 0 ? (progressXP / xpNeededForNext) * 100 : 0;
+
+    return {
+      currentLevel,
+      totalXP,
+      xpForCurrentLevel,
+      xpForNextLevel,
+      progressPercentage: Math.min(100, Math.max(0, progressPercentage)),
+      qualifyingWorkouts,
+      // selectedActivityClass will be handled by UI component with localStorage
+    };
+  }, [calculateLevelFromXP, getXPRequiredForLevel]);
+
   const aggregateStats = useCallback((events) => {
     if (!events || events.length === 0) return null;
     let totalDistance = 0; // metres or converted unit value based on unit tag
@@ -21,6 +65,10 @@ export const useNostrRunStats = () => {
     let elevationGain = 0;
     let firstTimestamp = null;
     let latestTimestamp = null;
+
+    // Level system tracking
+    let totalXP = 0;
+    let qualifyingWorkouts = 0;
 
     // Personal bests tracking
     const personalBests = {
@@ -42,6 +90,14 @@ export const useNostrRunStats = () => {
         const unit = distTag[2] || 'km';
         if (!isNaN(val)) {
           totalDistance += unit === 'km' ? val : (val * 1.609344);
+
+          // Calculate XP for level system
+          const distanceInMiles = unit === 'km' ? (val * 0.621371) : val;
+          const workoutXP = calculateWorkoutXP(distanceInMiles);
+          if (workoutXP > 0) {
+            totalXP += workoutXP;
+            qualifyingWorkouts++;
+          }
         }
 
         // Calculate personal bests for specific distances
@@ -133,6 +189,9 @@ export const useNostrRunStats = () => {
     const avgDistance = totalRuns > 0 ? totalDistance / totalRuns : 0;
     const avgDuration = totalRuns > 0 ? totalDuration / totalRuns : 0;
 
+    // Calculate level data
+    const levelData = calculateLevelData(totalXP, qualifyingWorkouts);
+
     return {
       totalRuns,
       totalDistanceKm: totalDistance, // always km for consistency
@@ -144,8 +203,9 @@ export const useNostrRunStats = () => {
       lastWorkout: latestTimestamp,
       personalBests,
       longestStreak: calculateLongestStreak(),
+      levelData, // Add level system data
     };
-  }, []);
+  }, [calculateWorkoutXP, calculateLevelData]);
 
   const loadEvents = useCallback(async () => {
     if (!userPubkey) {

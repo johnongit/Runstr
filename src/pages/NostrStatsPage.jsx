@@ -1,6 +1,7 @@
 import { useSettings } from '../contexts/SettingsContext';
 import { useNostrRunStats } from '../hooks/useNostrRunStats';
 import { Button } from "@/components/ui/button";
+import LevelSystemHeader from '../components/LevelSystemHeader';
 
 const Stat = ({ label, value }) => (
   <div className="flex flex-col">
@@ -47,6 +48,11 @@ const NostrStatsPage = () => {
 
   return (
     <div className="p-4 space-y-6 bg-bg-primary min-h-screen">
+      {/* Level System Header */}
+      {stats?.levelData && (
+        <LevelSystemHeader levelData={stats.levelData} />
+      )}
+
       {stats ? (
         <div className="space-y-4">
           {/* Overall Stats */}
