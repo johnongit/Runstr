@@ -1027,3 +1027,389 @@
     margin: 4px;
   }
 }
+
+/* NIP-60 Event-Driven Wallet Styles */
+.loading-state, .error-state {
+  text-align: center;
+  padding: 40px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+}
+
+.loading-state h2, .error-state h2 {
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+  font-size: 1.5rem;
+}
+
+.loading-state p, .error-state p {
+  color: var(--text-secondary);
+  margin: 0 0 16px 0;
+}
+
+.loading-spinner {
+  font-size: 2rem;
+  margin: 20px 0;
+}
+
+.retry-button {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+  background: var(--bitcoin);
+  transform: translateY(-1px);
+}
+
+/* Wallet Creation */
+.wallet-creation {
+  text-align: center;
+  padding: 40px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+}
+
+.wallet-creation h2 {
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+  font-size: 1.5rem;
+}
+
+.wallet-creation p {
+  color: var(--text-secondary);
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.mint-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.mint-option {
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-tertiary);
+}
+
+.mint-option.selected {
+  border-color: var(--bitcoin);
+  background: var(--bitcoin-light);
+}
+
+.mint-option:hover {
+  border-color: var(--border-primary);
+  transform: translateY(-2px);
+}
+
+.mint-option h3 {
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  font-size: 1.1rem;
+}
+
+.mint-option p {
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+}
+
+.mint-option small {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.create-wallet-btn {
+  background: var(--bitcoin);
+  color: #000;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: all 0.2s ease;
+}
+
+.create-wallet-btn:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.create-wallet-btn:hover:not(:disabled) {
+  background: #ff9500;
+  transform: translateY(-1px);
+}
+
+/* Wallet Header */
+.wallet-header {
+  background: var(--bg-secondary);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.wallet-header h2 {
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+  font-size: 1.5rem;
+}
+
+.wallet-info {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.balance-display, .mint-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.balance-label, .mint-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.balance-amount {
+  font-weight: bold;
+  color: var(--bitcoin);
+  font-size: 1.2rem;
+}
+
+.mint-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.wallet-description {
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
+}
+
+.wallet-description p {
+  color: var(--text-secondary);
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Wallet Actions */
+.wallet-actions {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.refresh-button {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.refresh-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.refresh-button:hover:not(:disabled) {
+  border-color: var(--bitcoin);
+  background: var(--bitcoin-light);
+}
+
+/* Transaction History */
+.transaction-history {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.transaction-history h3 {
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+  font-size: 1.2rem;
+}
+
+.no-events {
+  text-align: center;
+  padding: 20px;
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+}
+
+.no-events p {
+  color: var(--text-secondary);
+  margin: 8px 0;
+}
+
+.no-events p:first-child {
+  color: var(--bitcoin);
+  font-weight: 600;
+}
+
+.events-summary {
+  color: var(--text-secondary);
+  margin: 0 0 16px 0;
+  font-size: 0.9rem;
+}
+
+.event-list {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+}
+
+.event-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.event-item:last-child {
+  border-bottom: none;
+}
+
+.event-type {
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  min-width: 80px;
+  text-align: center;
+}
+
+.event-type.send {
+  background: rgba(255, 99, 99, 0.2);
+  color: #ff6363;
+}
+
+.event-type.receive {
+  background: rgba(99, 255, 99, 0.2);
+  color: #63ff63;
+}
+
+.event-type.unknown {
+  background: var(--text-muted);
+  color: var(--text-secondary);
+}
+
+.event-amount {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.event-date {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.more-events {
+  text-align: center;
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Debug Info */
+.debug-info {
+  margin-top: 30px;
+}
+
+.debug-info summary {
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+.debug-info summary:hover {
+  color: var(--text-primary);
+}
+
+.debug-info pre {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Mobile Responsive for NIP-60 */
+@media (max-width: 768px) {
+  .wallet-creation {
+    padding: 20px 16px;
+  }
+  
+  .mint-selection {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .mint-option {
+    padding: 12px;
+  }
+  
+  .wallet-info {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .balance-display, .mint-info {
+    justify-content: space-between;
+  }
+  
+  .event-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px;
+  }
+  
+  .event-type {
+    align-self: flex-start;
+    min-width: auto;
+  }
+  
+  .event-amount {
+    font-size: 1.1rem;
+  }
+  
+  .event-date {
+    align-self: flex-end;
+  }
+}

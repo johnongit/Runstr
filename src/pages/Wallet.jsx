@@ -40,7 +40,7 @@ export const Wallet = () => {
 
           <div className="wallet-option">
             <h3>🔒 Ecash Wallet (NIP-60)</h3>
-            <p>Private ecash tokens with Cashu mints. Send and receive tokens privately with cross-device sync.</p>
+            <p>Event-based ecash wallet using NIP-60. Automatically discovers existing wallets or creates new ones. Pure Nostr implementation.</p>
             <button 
               onClick={() => navigate('/ecash')}
               className="wallet-option-button ecash-button"
