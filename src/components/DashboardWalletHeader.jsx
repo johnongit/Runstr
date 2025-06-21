@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNip60Wallet } from '../hooks/useNip60Wallet';
 
@@ -12,7 +12,8 @@ export const DashboardWalletHeader = () => {
     isInitialized,
     tokenEvents: transactions,
     SUPPORTED_MINTS,
-    currentMint
+    currentMint,
+    refreshWallet
   } = useNip60Wallet();
 
   // Add debugging
@@ -22,8 +23,19 @@ export const DashboardWalletHeader = () => {
     loading,
     isInitialized,
     currentMint: currentMint?.name,
-    tokenCount: transactions?.length || 0
+    tokenCount: transactions?.length || 0,
+    walletEvent: !!hasWallet,
+    error: error
   });
+
+  // Auto-refresh if we're initialized but don't have a wallet
+  // This handles cases where different hook instances get different results
+  useEffect(() => {
+    if (isInitialized && !isConnected && !loading && !error) {
+      console.log('[DashboardWalletHeader] Wallet state seems inconsistent, refreshing...');
+      refreshWallet();
+    }
+  }, [isInitialized, isConnected, loading, error, refreshWallet]);
 
   // Send Modal State
   const [showSendModal, setShowSendModal] = useState(false);
