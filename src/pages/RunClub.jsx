@@ -64,8 +64,8 @@ export const RunClub = () => {
 
   return (
     <div className="league-page">
-      {/* League Map at the top */}
-      <LeagueMap />
+      {/* League Map at the top - pass feed data for leaderboard */}
+      <LeagueMap feedPosts={posts} feedLoading={loading} feedError={error} />
       
       {/* League Feed - existing 1301 feed below */}
       <div className="league-feed">

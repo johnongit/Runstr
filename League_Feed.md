@@ -41,6 +41,7 @@ Transform the existing Feed tab into a "League" tab that displays a visual map a
   - [x] Run count tracking per user
   - [x] Error handling and loading states
   - [x] Professional leaderboard UI design
+  - [x] **Optimized to reuse existing feed data** (no duplicate requests)
 
 ### 🚧 In Progress
 - [ ] None currently
@@ -66,6 +67,14 @@ Transform the existing Feed tab into a "League" tab that displays a visual map a
 - **Formula**: `position = (totalDistance / 1000) * courseLength`
 - **Updates**: Real-time for user, daily for bots
 - **Storage**: Local state with caching
+
+### Leaderboard System ⚡ **OPTIMIZED**
+- **Data Source**: Reuses existing feed data from `useRunFeed` hook
+- **Processing**: Client-side aggregation of user distances from feed posts
+- **Profile Data**: Uses already-fetched profile information from feed
+- **Performance**: Zero additional network requests (eliminates duplicate API calls)
+- **Refresh**: Automatically updates when feed refreshes
+- **Efficiency**: Processes existing 1301 posts instead of fetching separately
 
 ### Bot System
 - **Count**: 5-10 scripted bots

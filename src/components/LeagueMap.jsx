@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLeaguePosition } from '../hooks/useLeaguePosition';
-import { useLeagueLeaderboard } from '../hooks/useLeagueLeaderboard';
-import '../assets/styles/league-map.css';
 
-export const LeagueMap = () => {
+export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = null }) => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   
   // Get user's real position data
@@ -18,13 +16,73 @@ export const LeagueMap = () => {
     refresh: refreshPosition
   } = useLeaguePosition();
 
-  // Get leaderboard data
-  const {
-    leaderboard,
-    isLoading: leaderboardLoading,
-    error: leaderboardError,
-    refresh: refreshLeaderboard
-  } = useLeagueLeaderboard();
+  // Process feed posts into leaderboard data
+  const leaderboard = useMemo(() => {
+    if (!feedPosts || feedPosts.length === 0) return [];
+
+    const COURSE_TOTAL_MILES = 1000;
+
+    // Group posts by author pubkey and calculate total distance
+    const userStats = {};
+    
+    feedPosts.forEach(post => {
+      if (!post.author?.pubkey) return;
+      
+      const pubkey = post.author.pubkey;
+      
+      // Initialize user if not exists
+      if (!userStats[pubkey]) {
+        userStats[pubkey] = {
+          pubkey,
+          totalMiles: 0,
+          runCount: 0,
+          displayName: post.author?.profile?.display_name || post.author?.profile?.name || null,
+          name: post.author?.profile?.name || null,
+          picture: post.author?.profile?.picture || null,
+          latestRun: 0
+        };
+      }
+
+      // Extract distance from post
+      const distanceTag = post.tags?.find(tag => tag[0] === 'distance');
+      if (distanceTag && distanceTag[1]) {
+        const distanceValue = parseFloat(distanceTag[1]);
+        const unit = distanceTag[2] || 'km';
+        
+        if (!isNaN(distanceValue) && distanceValue > 0) {
+          // Convert to miles for consistent calculation
+          const distanceInMiles = unit === 'km' ? (distanceValue * 0.621371) : distanceValue;
+          userStats[pubkey].totalMiles += distanceInMiles;
+          userStats[pubkey].runCount++;
+          
+          // Track latest run
+          const runTime = post.created_at || 0;
+          if (runTime > userStats[pubkey].latestRun) {
+            userStats[pubkey].latestRun = runTime;
+          }
+        }
+      }
+    });
+
+    // Convert to array and calculate percentages
+    const users = Object.values(userStats)
+      .filter(user => user.totalMiles > 0)
+      .map(user => ({
+        ...user,
+        totalMiles: Math.round(user.totalMiles * 100) / 100,
+        percentComplete: Math.min(100, (user.totalMiles / COURSE_TOTAL_MILES) * 100),
+        fallbackName: user.displayName || user.name || `Runner ${user.pubkey.slice(0, 8)}`
+      }))
+      .sort((a, b) => b.totalMiles - a.totalMiles)
+      .slice(0, 10)
+      .map((user, index) => ({
+        ...user,
+        rank: index + 1
+      }));
+
+    console.log(`[LeagueMap] Processed leaderboard from ${feedPosts.length} posts, found ${users.length} users`);
+    return users;
+  }, [feedPosts]);
 
   useEffect(() => {
     // Simulate initial loading for UI polish
@@ -81,7 +139,10 @@ export const LeagueMap = () => {
   const userPosition = calculateUserPosition(mapPosition);
   const milestones = getMilestonePositions();
 
-  if (isInitialLoad || positionLoading) {
+  // Loading state - show loading if either position or feed is loading
+  const isLoading = isInitialLoad || positionLoading || feedLoading;
+
+  if (isLoading) {
     return (
       <div className="league-map-container">
         <div className="league-map-loading">
@@ -98,7 +159,7 @@ export const LeagueMap = () => {
     );
   }
 
-  if (positionError) {
+  if (positionError && !feedError) {
     return (
       <div className="league-map-container">
         <div className="league-map-error">
@@ -304,13 +365,13 @@ export const LeagueMap = () => {
         </div>
       </div>
 
-      {/* League Leaderboard */}
+      {/* League Leaderboard - using feed data */}
       <div className="league-leaderboard">
         <div className="leaderboard-header">
           <h3 className="text-lg font-semibold text-text-primary mb-3">🏆 League Standings</h3>
         </div>
         
-        {leaderboardLoading ? (
+        {feedLoading ? (
           <div className="leaderboard-loading">
             <div className="loading-dots">
               <span></span>
@@ -319,15 +380,9 @@ export const LeagueMap = () => {
             </div>
             <p className="text-text-secondary text-sm mt-2">Loading standings...</p>
           </div>
-        ) : leaderboardError ? (
+        ) : feedError ? (
           <div className="leaderboard-error">
             <p className="text-red-400 text-sm mb-2">Error loading leaderboard</p>
-            <button 
-              onClick={refreshLeaderboard}
-              className="px-3 py-1 bg-primary hover:bg-primary-hover text-text-primary text-xs rounded-md transition-colors duration-normal"
-            >
-              Retry
-            </button>
           </div>
         ) : leaderboard.length === 0 ? (
           <div className="leaderboard-empty">
@@ -337,7 +392,7 @@ export const LeagueMap = () => {
           </div>
         ) : (
           <div className="leaderboard-list">
-            {leaderboard.map((user, index) => (
+            {leaderboard.map((user) => (
               <div key={user.pubkey} className="leaderboard-item">
                 <div className="leaderboard-rank">
                   <span className="rank-number">{user.rank}</span>
