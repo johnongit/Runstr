@@ -274,9 +274,9 @@
 }
 
 .connect-button {
-  background: var(--text-primary, rgba(255, 255, 255, 0.87));
-  color: var(--bg-primary, #1a1a1a);
-  border: none;
+  background: #000000;
+  color: #ffffff;
+  border: 2px solid #ffffff;
   border-radius: 8px;
   padding: 10px 20px;
   font-size: 0.9rem;
@@ -287,8 +287,18 @@
 
 .connect-button:hover {
   background: var(--bitcoin, #f7931a);
+  color: #000000;
+  border-color: var(--bitcoin, #f7931a);
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.connect-button:disabled {
+  background: #333333;
+  color: #888888;
+  border-color: #555555;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Mobile responsive styles */

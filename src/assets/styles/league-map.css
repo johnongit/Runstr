@@ -1,0 +1,132 @@
+/* League Map Component Styles */
+.league-map-container {
+  @apply bg-bg-primary border-b border-border-secondary p-4 mb-4;
+}
+
+.league-map-loading {
+  @apply flex flex-col justify-center items-center h-48;
+}
+
+.league-map-error {
+  @apply flex flex-col justify-center items-center h-48;
+}
+
+.league-map-header {
+  @apply text-center mb-4;
+}
+
+.league-map-course {
+  @apply flex justify-center mb-4;
+}
+
+.course-outline-container {
+  @apply w-full max-w-md;
+}
+
+.course-outline {
+  @apply transition-colors duration-300;
+}
+
+.course-detail {
+  @apply opacity-80;
+}
+
+.league-map-progress {
+  @apply text-center;
+}
+
+.user-position {
+  @apply drop-shadow-sm transition-all duration-500;
+}
+
+.bot-position {
+  @apply opacity-70;
+}
+
+.milestone-marker {
+  @apply opacity-60;
+}
+
+.milestone-text {
+  @apply opacity-70;
+}
+
+/* Progress bar styles */
+.league-progress-bar {
+  @apply mb-4;
+}
+
+.progress-bar-container {
+  @apply w-full h-2 bg-bg-tertiary rounded-full relative overflow-hidden;
+}
+
+.progress-bar-fill {
+  @apply h-full bg-primary rounded-full transition-all duration-700 ease-out;
+}
+
+.progress-bar-labels {
+  @apply flex justify-between mt-1;
+}
+
+/* Loading animation with dots */
+.loading-dots {
+  @apply flex space-x-1;
+}
+
+.loading-dots span {
+  @apply w-2 h-2 bg-text-secondary rounded-full;
+  animation: loading-bounce 1.4s infinite ease-in-out both;
+}
+
+.loading-dots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes loading-bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+/* User position pulse animation */
+.user-pulse {
+  animation: user-pulse 2s infinite;
+}
+
+@keyframes user-pulse {
+  0% {
+    opacity: 1;
+    transform: scale(0.95);
+  }
+  70% {
+    opacity: 0.3;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+/* Completion celebration animation */
+.completion-celebration {
+  animation: celebrate 1.5s infinite;
+}
+
+@keyframes celebrate {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.1);
+  }
+} 

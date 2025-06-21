@@ -7,12 +7,23 @@ export const DashboardWalletHeader = () => {
   const { 
     balance, 
     hasWallet: isConnected, 
-    loading: isConnecting,
-    loading: isLoadingExisting,
+    loading,
+    error,
+    isInitialized,
     tokenEvents: transactions,
     SUPPORTED_MINTS,
     currentMint
   } = useNip60Wallet();
+
+  // Add debugging
+  console.log('[DashboardWalletHeader] Wallet State:', {
+    hasWallet: isConnected,
+    balance,
+    loading,
+    isInitialized,
+    currentMint: currentMint?.name,
+    tokenCount: transactions?.length || 0
+  });
 
   // Send Modal State
   const [showSendModal, setShowSendModal] = useState(false);
@@ -65,17 +76,16 @@ export const DashboardWalletHeader = () => {
         <div className="wallet-card disconnected">
           <div className="wallet-status">
             <span className="status-text">
-              {isLoadingExisting ? 'Checking for wallet...' : 
-               isConnecting ? 'Connecting...' : 
+              {loading ? 'Checking for wallet...' : 
                'Ecash Wallet Disconnected'}
             </span>
           </div>
           <button 
             className="connect-button"
             onClick={() => navigate('/ecash')}
-            disabled={isLoadingExisting || isConnecting}
+            disabled={loading}
           >
-            {isLoadingExisting || isConnecting ? '...' : 'Connect'}
+            {loading ? '...' : 'Connect'}
           </button>
         </div>
       </div>
