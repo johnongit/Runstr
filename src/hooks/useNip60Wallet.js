@@ -30,19 +30,19 @@ export const useNip60Wallet = () => {
   }, [ndk, user, walletState.isInitialized]);
 
   /**
-   * Auto-discover existing wallet or show creation UI
+   * Auto-discover existing wallet or show creation UI (NO SIGNER REQUIRED)
    */
   const discoverWallet = async () => {
     setWalletState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      console.log('[NIP60Wallet] Discovering existing wallet...');
+      console.log('[NIP60Wallet] Discovering existing wallet (read-only, no signer needed)...');
       const walletData = await findWalletEvents(ndk, user.pubkey);
       
       if (walletData && walletData.hasWallet) {
-        console.log('[NIP60Wallet] Found existing wallet');
+        console.log('[NIP60Wallet] Found existing wallet, loading token events...');
         
-        // Load token events for balance calculation
+        // Load token events for balance calculation (also read-only)
         const tokens = await queryTokenEvents(ndk, user.pubkey);
         
         setWalletState({
@@ -54,7 +54,7 @@ export const useNip60Wallet = () => {
           isInitialized: true
         });
       } else {
-        console.log('[NIP60Wallet] No existing wallet found');
+        console.log('[NIP60Wallet] No existing wallet found - user can create one');
         setWalletState({
           walletEvent: null,
           mintEvent: null,
@@ -65,18 +65,19 @@ export const useNip60Wallet = () => {
         });
       }
     } catch (error) {
-      console.error('[NIP60Wallet] Discovery error:', error);
+      console.error('[NIP60Wallet] Discovery error (this should not require signer):', error);
+      // Discovery errors are non-fatal - user can still create a wallet
       setWalletState(prev => ({
         ...prev,
         loading: false,
-        error: error.message,
+        error: null, // Don't show discovery errors to user
         isInitialized: true
       }));
     }
   };
 
   /**
-   * Create new wallet with selected mint
+   * Create new wallet with selected mint (REQUIRES AMBER SIGNER)
    */
   const createWallet = async (selectedMintUrl) => {
     if (!selectedMintUrl) {
@@ -86,7 +87,9 @@ export const useNip60Wallet = () => {
     setWalletState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      console.log('[NIP60Wallet] Creating new wallet...');
+      console.log('[NIP60Wallet] Creating new wallet (will prompt Amber for signing)...');
+      
+      // This will trigger Amber to prompt for signing
       const { walletEvent, mintEvent } = await createWalletEvents(ndk, selectedMintUrl);
       
       setWalletState({
@@ -98,6 +101,7 @@ export const useNip60Wallet = () => {
         isInitialized: true
       });
 
+      console.log('[NIP60Wallet] Wallet created successfully');
       return true;
     } catch (error) {
       console.error('[NIP60Wallet] Creation error:', error);

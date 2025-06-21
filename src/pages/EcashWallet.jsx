@@ -22,9 +22,15 @@ export const EcashWallet = () => {
     
     setIsCreating(true);
     try {
-      await createWallet(selectedMint);
+      console.log('[EcashWallet] User requested wallet creation, will prompt Amber...');
+      const success = await createWallet(selectedMint);
+      if (!success) {
+        // Error is already set by the hook
+        console.log('[EcashWallet] Wallet creation failed, error shown to user');
+      }
     } catch (error) {
       console.error('Failed to create wallet:', error);
+      // Error is handled by the hook
     } finally {
       setIsCreating(false);
     }
@@ -35,7 +41,7 @@ export const EcashWallet = () => {
       <div className="ecash-wallet-page">
         <div className="loading-state">
           <h2>🔍 Discovering NIP-60 Wallet...</h2>
-          <p>Querying relays for existing wallet events...</p>
+          <p>Querying relays for existing wallet events (no signing required)...</p>
           <div className="loading-spinner">⏳</div>
         </div>
       </div>
@@ -77,13 +83,41 @@ export const EcashWallet = () => {
             ))}
           </div>
 
+          {error && (
+            <div className="error-message" style={{ 
+              background: 'rgba(255, 99, 99, 0.2)', 
+              color: '#ff6363', 
+              padding: '12px', 
+              borderRadius: '8px', 
+              margin: '16px 0',
+              textAlign: 'center'
+            }}>
+              {error}
+            </div>
+          )}
+
           <button 
             onClick={handleCreateWallet}
             disabled={!selectedMint || isCreating}
             className="create-wallet-btn"
           >
-            {isCreating ? '⏳ Creating Wallet...' : '🔒 Create Wallet'}
+            {isCreating ? (
+              selectedMint ? '🔐 Requesting Amber Signature...' : '⏳ Creating Wallet...'
+            ) : (
+              '🔒 Create Wallet'
+            )}
           </button>
+          
+          {isCreating && (
+            <p style={{ 
+              color: 'var(--text-secondary)', 
+              fontSize: '0.9rem', 
+              marginTop: '12px',
+              textAlign: 'center'
+            }}>
+              📱 Check Amber for signing prompts. You'll need to approve 2 signatures to create your wallet.
+            </p>
+          )}
         </div>
       </div>
     );

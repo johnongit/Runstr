@@ -25,15 +25,19 @@ export const SUPPORTED_MINTS = [
 ];
 
 /**
- * Query for existing NIP-60 wallet events
+ * Query for existing NIP-60 wallet events (READ-ONLY - No signer required)
  */
 export const findWalletEvents = async (ndk, userPubkey) => {
-  if (!ndk || !userPubkey) return null;
+  if (!ndk || !userPubkey) {
+    console.log('[NIP60Events] Missing NDK or user pubkey for wallet discovery');
+    return null;
+  }
 
   try {
-    console.log('[NIP60Events] Querying for existing wallet events...');
+    console.log('[NIP60Events] Querying for existing wallet events (read-only)...');
     
     // Query for wallet metadata and mint lists in parallel
+    // Note: These are READ operations - no signer required
     const [walletEvents, mintEvents] = await Promise.all([
       ndk.fetchEvents({
         kinds: [NIP60_KINDS.WALLET_METADATA],
@@ -69,15 +73,19 @@ export const findWalletEvents = async (ndk, userPubkey) => {
 };
 
 /**
- * Create new NIP-60 wallet events
+ * Create new NIP-60 wallet events (REQUIRES SIGNER - Triggers Amber)
  */
 export const createWalletEvents = async (ndk, selectedMintUrl) => {
-  if (!ndk || !ndk.signer) {
-    throw new Error('NDK signer not available');
+  if (!ndk) {
+    throw new Error('NDK not available');
+  }
+
+  if (!ndk.signer) {
+    throw new Error('NDK signer not available. Please sign in with Amber to create a wallet.');
   }
 
   try {
-    console.log('[NIP60Events] Creating new wallet events...');
+    console.log('[NIP60Events] Creating new wallet events (requires signing)...');
     
     // Create wallet metadata event (kind:17375)
     const walletEvent = new NDKEvent(ndk);
@@ -105,8 +113,8 @@ export const createWalletEvents = async (ndk, selectedMintUrl) => {
       ['mint', selectedMintUrl]
     ];
 
-    // Publish both events
-    console.log('[NIP60Events] Publishing wallet events...');
+    // Publish both events - this will trigger Amber signing prompts
+    console.log('[NIP60Events] Publishing wallet events (will prompt Amber for signatures)...');
     await Promise.all([
       walletEvent.publish(),
       mintEvent.publish()
@@ -117,19 +125,31 @@ export const createWalletEvents = async (ndk, selectedMintUrl) => {
 
   } catch (error) {
     console.error('[NIP60Events] Error creating wallet events:', error);
-    throw error;
+    
+    // Provide user-friendly error messages for common Amber issues
+    if (error.message.includes('signer')) {
+      throw new Error('Signing failed. Please make sure Amber is installed and grant permission to RUNSTR.');
+    } else if (error.message.includes('rejected') || error.message.includes('denied')) {
+      throw new Error('Signing was cancelled. Wallet creation requires your signature to publish events.');
+    } else {
+      throw error;
+    }
   }
 };
 
 /**
- * Query for token events (balance calculation)
+ * Query for token events (READ-ONLY - No signer required)
  */
 export const queryTokenEvents = async (ndk, userPubkey, limit = 100) => {
-  if (!ndk || !userPubkey) return [];
+  if (!ndk || !userPubkey) {
+    console.log('[NIP60Events] Missing NDK or user pubkey for token query');
+    return [];
+  }
 
   try {
-    console.log('[NIP60Events] Querying for token events...');
+    console.log('[NIP60Events] Querying for token events (read-only)...');
     
+    // Note: This is a READ operation - no signer required
     const tokenEvents = await ndk.fetchEvents({
       kinds: [NIP60_KINDS.TOKEN_EVENT],
       authors: [userPubkey],
