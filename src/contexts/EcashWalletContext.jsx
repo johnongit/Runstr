@@ -185,11 +185,26 @@ export const EcashWalletProvider = ({ children }) => {
       // Initialize NDK Cashu Wallet with global NDK
       const cashuWallet = new NDKCashuWallet(ndk);
       
+      // Set mints as array property (correct NDK API)
+      cashuWallet.mints = [mintUrl];
+      
       // Load existing proofs from Nostr events
       await cashuWallet.start();
       
-      // Add the existing mint to the wallet
-      cashuWallet.addMint(mintUrl);
+      // REQUIRED: Generate and publish the wallet's P2PK for receiving tokens
+      setMintStatus('Generating wallet P2PK...');
+      await cashuWallet.getP2pk();
+      console.log(`[EcashWallet] P2PK generated: ${cashuWallet.p2pk}`);
+      
+      // REQUIRED: Publish the wallet's mint list for token/nutzap reception
+      if (user) {
+        setMintStatus('Publishing wallet configuration...');
+        await cashuWallet.publish();
+        console.log('[EcashWallet] Wallet published successfully');
+        
+        // Publish CashuMintList event (kind:10019) for nutzap reception
+        await publishCashuMintList([mintUrl]);
+      }
       
       // Get current balance from loaded proofs  
       const currentBalance = await cashuWallet.getBalance() || 0;
@@ -198,6 +213,10 @@ export const EcashWalletProvider = ({ children }) => {
       setWallet(cashuWallet);
       setBalance(currentBalance);
       setIsConnected(true);
+      
+      // Configure NDK to use this wallet for zapping (NIP-60 compliance)
+      ndk.wallet = cashuWallet;
+      console.log('[EcashWallet] NDK wallet configured for zapping');
       
       const mintName = SUPPORTED_MINTS.find(m => m.url === mintUrl)?.name || 'Custom Mint';
       setMintStatus(`Connected to existing wallet: ${mintName}`);
@@ -245,33 +264,50 @@ export const EcashWalletProvider = ({ children }) => {
       // Initialize NDK Cashu Wallet with global NDK
       const cashuWallet = new NDKCashuWallet(ndk);
       
+      // Set mints as array property (correct NDK API)
+      setMintStatus('Configuring wallet with mint...');
+      cashuWallet.mints = [mintUrl];
+      
       // Start the wallet to initialize NIP-60 event handling
       setMintStatus('Initializing wallet...');
       await cashuWallet.start();
       
-      // Add the selected mint to the wallet
-      setMintStatus('Adding mint to wallet...');
-      cashuWallet.addMint(mintUrl);
+      // REQUIRED: Generate and publish the wallet's P2PK for receiving tokens
+      setMintStatus('Generating wallet P2PK...');
+      await cashuWallet.getP2pk();
+      console.log(`[EcashWallet] P2PK generated: ${cashuWallet.p2pk}`);
       
-      // Test mint connection
+      // Test mint connection by getting balance
       setMintStatus('Testing mint connection...');
       
       // For new wallets, balance will be 0 initially
       const currentBalance = await cashuWallet.getBalance() || 0;
       
-      // Create wallet metadata event ONLY if user is available (deferred auth)
+      // REQUIRED: Publish wallet configuration if user is available
       if (user) {
-        setMintStatus('Creating wallet metadata...');
+        setMintStatus('Publishing wallet configuration...');
+        await cashuWallet.publish();
+        console.log('[EcashWallet] Wallet published successfully');
+        
+        // Publish CashuMintList event (kind:10019) for nutzap reception
+        await publishCashuMintList([mintUrl]);
+        
+        // Also create our legacy wallet metadata event for compatibility
         await createWalletMetadataEvent(mintUrl);
       } else {
-        console.log('[EcashWallet] User not available (Amber), skipping metadata creation for now');
-        setMintStatus('Wallet connected (metadata will be created when needed)');
+        console.log('[EcashWallet] User not available (Amber), deferring wallet publish');
+        setMintStatus('Wallet connected (will publish when user signs in)');
       }
       
       // Set up wallet state
       setWallet(cashuWallet);
       setBalance(currentBalance);
       setIsConnected(true);
+      
+      // Configure NDK to use this wallet for zapping (NIP-60 compliance)
+      ndk.wallet = cashuWallet;
+      console.log('[EcashWallet] NDK wallet configured for zapping');
+      
       setMintStatus(`Connected to ${SUPPORTED_MINTS.find(m => m.url === mintUrl)?.name || 'Custom Mint'}`);
 
       // Listen for balance changes
@@ -290,6 +326,122 @@ export const EcashWalletProvider = ({ children }) => {
       return false;
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  // Publish CashuMintList event (kind:10019) for nutzap reception - NIP-60 compliance
+  const publishCashuMintList = async (mints) => {
+    if (!user || !ndk) {
+      console.log('[EcashWallet] User/NDK not available, skipping CashuMintList publication');
+      return;
+    }
+
+    try {
+      console.log('[EcashWallet] Publishing CashuMintList event (kind:10019)...');
+      
+      const mintListEvent = new NDKEvent(ndk);
+      mintListEvent.kind = 10019; // CashuMintList
+      mintListEvent.content = JSON.stringify({
+        mints: mints.map(mint => ({ url: mint, units: ['sat'] }))
+      });
+      mintListEvent.tags = mints.map(mint => ['mint', mint]);
+      mintListEvent.created_at = Math.floor(Date.now() / 1000);
+
+      await mintListEvent.publish();
+      console.log('[EcashWallet] CashuMintList event published successfully');
+      
+    } catch (error) {
+      console.warn('[EcashWallet] Failed to publish CashuMintList event:', error);
+      // Don't fail the connection for this
+    }
+  };
+
+  // Deposit money to wallet via Lightning (NIP-60 compliance)
+  const depositMoney = async (amount) => {
+    if (!wallet) {
+      throw new Error('Wallet not connected');
+    }
+
+    if (!wallet.mints || wallet.mints.length === 0) {
+      throw new Error('No mints configured');
+    }
+
+    try {
+      console.log(`[EcashWallet] Starting deposit of ${amount} sats...`);
+      
+      const mint = wallet.mints[0]; // Use first mint
+      const deposit = wallet.deposit(amount, mint);
+      
+      // Get Lightning invoice
+      const bolt11 = await deposit.start();
+      console.log(`[EcashWallet] Lightning invoice generated: ${bolt11}`);
+      
+      // Listen for successful deposit
+      deposit.on('success', () => {
+        console.log('[EcashWallet] Deposit successful! Balance:', wallet.balance);
+        setBalance(wallet.balance);
+        
+        // Show success notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Deposit Successful', {
+            body: `Successfully deposited ${amount} sats`,
+            icon: '/icon.png'
+          });
+        }
+      });
+      
+      deposit.on('error', (error) => {
+        console.error('[EcashWallet] Deposit failed:', error);
+      });
+      
+      return { invoice: bolt11, deposit };
+      
+    } catch (error) {
+      console.error('[EcashWallet] Deposit error:', error);
+      throw error;
+    }
+  };
+
+  // Receive ecash tokens (NIP-60 compliance)
+  const receiveToken = async (token) => {
+    if (!wallet) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      console.log('[EcashWallet] Receiving ecash token...');
+      
+      const tokenEvent = await wallet.receiveToken(token);
+      
+      if (tokenEvent) {
+        console.log('[EcashWallet] Token received successfully:', tokenEvent);
+        
+        // Refresh balance
+        const newBalance = await wallet.getBalance();
+        setBalance(newBalance);
+        
+        // Save to transaction history
+        saveTransaction({
+          type: 'receive',
+          amount: tokenEvent.amount || 0,
+          status: 'completed',
+          token: token
+        });
+        
+        // Show success notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Ecash Received', {
+            body: `Successfully received ecash tokens`,
+            icon: '/icon.png'
+          });
+        }
+        
+        return tokenEvent;
+      }
+      
+    } catch (error) {
+      console.error('[EcashWallet] Error receiving token:', error);
+      throw error;
     }
   };
 
@@ -335,6 +487,12 @@ export const EcashWalletProvider = ({ children }) => {
       } catch (error) {
         console.warn('[EcashWallet] Error cleaning up wallet listeners:', error);
       }
+    }
+    
+    // Clear NDK wallet reference
+    if (ndk) {
+      ndk.wallet = undefined;
+      console.log('[EcashWallet] NDK wallet reference cleared');
     }
     
     setWallet(null);
@@ -534,6 +692,11 @@ export const EcashWalletProvider = ({ children }) => {
     refreshBalance,
     sendTokens,
     getEffectiveMintUrl,
+    
+    // New NIP-60 compliant methods
+    depositMoney,
+    receiveToken,
+    publishCashuMintList,
     
     // Constants
     SUPPORTED_MINTS
