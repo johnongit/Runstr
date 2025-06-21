@@ -21,15 +21,17 @@ Transform the existing Feed tab into a "League" tab that displays a visual map a
 - [x] Tab rename implementation (FEED → LEAGUE)
 - [x] Basic map component structure  
 - [x] League page integration with existing feed
+- [x] Virginia-state-like course outline design
+- [x] Position calculation system with real 1301 data
+- [x] User position visualization on course map
+- [x] Error handling and loading states
 
 ### 🚧 In Progress
 - [ ] None currently
 
 ### ⏳ Planned
-- [ ] Course outline design
-- [ ] Position calculation system
 - [ ] Bot system implementation
-- [ ] UI integration and styling
+- [ ] UI integration and styling polish
 
 ---
 
@@ -92,28 +94,31 @@ Transform the existing Feed tab into a "League" tab that displays a visual map a
 ### Phase 2: Map Implementation (Week 1-2)
 **Goal**: Functional map with course outline and position tracking
 
-#### Task 2.1: Course Outline Design ⏳
+#### Task 2.1: Course Outline Design ✅
 - **Implementation**: SVG path for course outline
-- **Shape**: Virginia-state-like outline
+- **Shape**: Virginia-state-like outline with geographic features
 - **Responsive**: Mobile-first design
 - **Colors**: Black outline on white/transparent background
 - **Time**: 4 hours
+- **Status**: Complete - Detailed Virginia-inspired course with eastern peninsula and western panhandle features
 
-#### Task 2.2: Position Calculation Hook ⏳
+#### Task 2.2: Position Calculation Hook ✅
 - **File**: `src/hooks/useLeaguePosition.js`
 - **Features**:
-  - Fetch user's 1301 records
-  - Calculate cumulative distance (ALL runs)
-  - Convert to map position percentage
-  - Cache results for performance
-- **Returns**: `{ totalDistance, mapPosition, qualifyingRuns }`
+  - Fetch user's 1301 records ✅
+  - Calculate cumulative distance (ALL runs) ✅
+  - Convert to map position percentage ✅
+  - Cache results for performance ✅
+- **Returns**: `{ totalDistance, mapPosition, qualifyingRuns }` ✅
 - **Time**: 4 hours
+- **Status**: Complete - Comprehensive hook with caching, error handling, and real-time data
 
-#### Task 2.3: User Position Visualization ⏳
-- **Features**: Dot on course outline representing user position
-- **Styling**: Distinctive color/style for user vs bots
-- **Labels**: Distance/position info on hover/tap
+#### Task 2.3: User Position Visualization ✅
+- **Features**: Dot on course outline representing user position ✅
+- **Styling**: Distinctive color/style for user vs bots ✅
+- **Labels**: Distance/position info display ✅
 - **Time**: 3 hours
+- **Status**: Complete - Dynamic user positioning with completion states and progress tracking
 
 ### Phase 3: Bot System (Week 2)
 **Goal**: Add bot competitors with scripted movement
