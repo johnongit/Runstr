@@ -208,6 +208,16 @@ export class CashuOperations {
    */
   decodeToken(tokenString) {
     try {
+      // Validate input type first
+      if (!tokenString || typeof tokenString !== 'string') {
+        console.error('[CashuOperations] Invalid token input:', {
+          tokenString,
+          type: typeof tokenString,
+          isString: typeof tokenString === 'string'
+        });
+        return null;
+      }
+
       // Remove cashu prefix if present
       const cleanToken = tokenString.replace(/^cashu/, '');
       
@@ -222,6 +232,11 @@ export class CashuOperations {
       return decoded;
     } catch (error) {
       console.error('[CashuOperations] Token decode error:', error);
+      console.error('[CashuOperations] Token input details:', {
+        tokenString,
+        type: typeof tokenString,
+        length: tokenString?.length || 0
+      });
       return null;
     }
   }

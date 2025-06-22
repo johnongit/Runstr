@@ -80,8 +80,8 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
           
           // 🏆 Get challenge participation for this team
           try {
-            const challengeKey = `runstr:challengeParticipation:${teamUUID}`;
-            const stored = JSON.parse(localStorage.getItem(challengeKey) || '[]');
+            const activeKey = `runstr:activeChallenges:${teamUUID}`;
+            const stored = JSON.parse(localStorage.getItem(activeKey) || '[]');
             if (Array.isArray(stored) && stored.length > 0) {
               challengeUUIDs = stored;
               challengeNames = resolveChallengeNames(challengeUUIDs, teamUUID);

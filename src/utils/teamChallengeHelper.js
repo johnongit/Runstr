@@ -48,7 +48,7 @@ export const getWorkoutAssociations = async (teamChallengeData = null) => {
           const [teamCaptainPubkey, teamUUID] = parts;
           
           // Try to resolve team name from cache
-          const teamName = resolveTeamName(teamCaptainPubkey, teamUUID);
+          const teamName = resolveTeamName(teamUUID, teamCaptainPubkey);
           
           teamAssociation = {
             teamCaptainPubkey,

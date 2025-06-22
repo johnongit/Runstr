@@ -26,16 +26,22 @@ if (!NWC_URI) {
 /** Parse nostr+walletconnect:// URI → { relayURL, servicePubkey, secretPrivKey } */
 function parseNwcUri(uri = NWC_URI) {
   try {
+    // Validate input
+    if (!uri || typeof uri !== 'string') {
+      console.error('[nwcService] Invalid URI input:', { uri, type: typeof uri });
+      return {};
+    }
+
     // Handle non-standard scheme (nostr+walletconnect://)
     let workUri = uri;
     if (uri.startsWith('nostr+walletconnect://')) {
       workUri = uri.replace('nostr+walletconnect://', 'http://'); // temporary scheme so URL() accepts
     }
     const parsed = new URL(workUri);
-    let servicePubkey = parsed.pathname.replace(/\/*/g, '');
+    let servicePubkey = parsed.pathname && typeof parsed.pathname === 'string' ? parsed.pathname.replace(/\/*/g, '') : '';
     if (!servicePubkey) {
       // Most NWC URIs put the pubkey in the host section (after //)
-      servicePubkey = parsed.hostname;
+      servicePubkey = parsed.hostname || '';
     }
     let relayURL = parsed.searchParams.get('relay');
     if (!relayURL) {
@@ -48,6 +54,7 @@ function parseNwcUri(uri = NWC_URI) {
     return { relayURL, servicePubkey, secretPrivKey: secret };
   } catch (err) {
     console.error('[nwcService] Failed to parse NWC URI', err);
+    console.error('[nwcService] URI details:', { uri, type: typeof uri, length: uri?.length || 0 });
     return {};
   }
 }

@@ -934,4 +934,290 @@ export function subscribeToTeamChallenges(
   const sub = ndk.subscribe(filter, { closeOnEose: false, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
   sub.on('event', (e: NDKEvent) => cb(e.rawEvent()));
   return sub;
+}
+
+/**
+ * Get team statistics based on tagged 1301 workout records
+ * Uses membership events to validate team membership, but queries 1301s for activity data
+ */
+export async function getTeamStatistics(
+  ndk: NDK,
+  teamCaptainPubkey: string,
+  teamUUID: string,
+  timeframe?: { since?: number; until?: number }
+): Promise<{
+  totalDistance: number;
+  totalWorkouts: number;
+  averagePace: number;
+  topPerformers: any[];
+  recentActivity: any[];
+}> {
+  if (!ndk) {
+    console.warn("NDK instance not provided to getTeamStatistics.");
+    return { totalDistance: 0, totalWorkouts: 0, averagePace: 0, topPerformers: [], recentActivity: [] };
+  }
+
+  try {
+    // 1. Get current team members from membership events
+    const teamMembers = await fetchTeamMemberships(ndk, `33404:${teamCaptainPubkey}:${teamUUID}`);
+    
+    if (teamMembers.length === 0) {
+      console.log('No team members found for statistics calculation');
+      return { totalDistance: 0, totalWorkouts: 0, averagePace: 0, topPerformers: [], recentActivity: [] };
+    }
+
+    // 2. Query 1301 workout records with team tags
+    const teamWorkoutFilter: NDKFilter = {
+      kinds: [KIND_WORKOUT_RECORD as NDKKind],
+      '#team_uuid': [teamUUID],
+      limit: 500 // Increase limit for statistics
+    };
+
+    if (timeframe?.since) teamWorkoutFilter.since = timeframe.since;
+    if (timeframe?.until) teamWorkoutFilter.until = timeframe.until;
+
+    console.log(`Fetching team statistics for team ${teamUUID} with ${teamMembers.length} members`);
+    const workoutEvents = await ndk.fetchEvents(teamWorkoutFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    
+    const workouts = Array.from(workoutEvents).map(e => e.rawEvent() as NostrWorkoutEvent);
+    
+    // 3. Filter workouts to only include current team members
+    const memberWorkouts = workouts.filter(workout => 
+      teamMembers.includes(workout.pubkey)
+    );
+
+    console.log(`Found ${memberWorkouts.length} workouts from ${teamMembers.length} team members`);
+
+    // 4. Calculate statistics
+    let totalDistance = 0;
+    let totalDuration = 0;
+    const memberStats = new Map<string, { distance: number; workouts: number; duration: number }>();
+
+    memberWorkouts.forEach(workout => {
+      // Extract distance and duration from tags
+      const distanceTag = workout.tags.find(t => t[0] === 'distance');
+      const durationTag = workout.tags.find(t => t[0] === 'duration');
+      
+      if (distanceTag && distanceTag[1]) {
+        const distance = parseFloat(distanceTag[1]);
+        const unit = distanceTag[2] || 'km';
+        
+        // Normalize to kilometers
+        const distanceKm = unit === 'mi' ? distance * 1.609344 : distance;
+        totalDistance += distanceKm;
+        
+        // Track member stats
+        const memberPubkey = workout.pubkey;
+        if (!memberStats.has(memberPubkey)) {
+          memberStats.set(memberPubkey, { distance: 0, workouts: 0, duration: 0 });
+        }
+        const stats = memberStats.get(memberPubkey)!;
+        stats.distance += distanceKm;
+        stats.workouts += 1;
+        
+        // Parse duration if available
+        if (durationTag && durationTag[1]) {
+          const durationStr = durationTag[1];
+          const durationSeconds = parseDurationToSeconds(durationStr);
+          totalDuration += durationSeconds;
+          stats.duration += durationSeconds;
+        }
+      }
+    });
+
+    // 5. Calculate average pace
+    const averagePace = totalDuration > 0 && totalDistance > 0 
+      ? (totalDuration / 60) / totalDistance // minutes per km
+      : 0;
+
+    // 6. Generate top performers
+    const topPerformers = Array.from(memberStats.entries())
+      .map(([pubkey, stats]) => ({
+        pubkey,
+        totalDistance: stats.distance,
+        totalWorkouts: stats.workouts,
+        averagePace: stats.duration > 0 && stats.distance > 0 
+          ? (stats.duration / 60) / stats.distance 
+          : 0
+      }))
+      .sort((a, b) => b.totalDistance - a.totalDistance)
+      .slice(0, 10);
+
+    // 7. Get recent activity (last 20 workouts)
+    const recentActivity = memberWorkouts
+      .sort((a, b) => b.created_at - a.created_at)
+      .slice(0, 20)
+      .map(workout => ({
+        id: workout.id,
+        pubkey: workout.pubkey,
+        created_at: workout.created_at,
+        distance: workout.tags.find(t => t[0] === 'distance')?.[1] || '0',
+        duration: workout.tags.find(t => t[0] === 'duration')?.[1] || '0:00:00'
+      }));
+
+    return {
+      totalDistance: Math.round(totalDistance * 100) / 100,
+      totalWorkouts: memberWorkouts.length,
+      averagePace: Math.round(averagePace * 100) / 100,
+      topPerformers,
+      recentActivity
+    };
+
+  } catch (error) {
+    console.error("Error calculating team statistics:", error);
+    return { totalDistance: 0, totalWorkouts: 0, averagePace: 0, topPerformers: [], recentActivity: [] };
+  }
+}
+
+/**
+ * Get challenge progress based on tagged 1301 workout records
+ * Uses challenge definition events and membership validation
+ */
+export async function getChallengeProgress(
+  ndk: NDK,
+  challengeUUID: string,
+  teamUUID?: string
+): Promise<{
+  challengeInfo: any;
+  participants: any[];
+  totalProgress: number;
+  goalProgress: number;
+  isComplete: boolean;
+}> {
+  if (!ndk) {
+    console.warn("NDK instance not provided to getChallengeProgress.");
+    return { challengeInfo: null, participants: [], totalProgress: 0, goalProgress: 0, isComplete: false };
+  }
+
+  try {
+    // 1. Get challenge definition
+    const challengeFilter: NDKFilter = {
+      kinds: [KIND_NIP101_TEAM_CHALLENGE as NDKKind],
+      '#d': [challengeUUID],
+      limit: 1
+    };
+
+    const challengeEvents = await ndk.fetchEvents(challengeFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    const challengeEvent = Array.from(challengeEvents)[0];
+    
+    if (!challengeEvent) {
+      console.log(`Challenge ${challengeUUID} not found`);
+      return { challengeInfo: null, participants: [], totalProgress: 0, goalProgress: 0, isComplete: false };
+    }
+
+    const challengeInfo = {
+      uuid: challengeUUID,
+      name: challengeEvent.tags.find(t => t[0] === 'name')?.[1] || 'Unnamed Challenge',
+      description: challengeEvent.content,
+      startTime: parseInt(challengeEvent.tags.find(t => t[0] === 'start_time')?.[1] || '0'),
+      endTime: parseInt(challengeEvent.tags.find(t => t[0] === 'end_time')?.[1] || '0'),
+      goalType: challengeEvent.tags.find(t => t[0] === 'goal_type')?.[1] || 'distance_total',
+      goalValue: parseFloat(challengeEvent.tags.find(t => t[0] === 'goal_value')?.[1] || '0'),
+      goalUnit: challengeEvent.tags.find(t => t[0] === 'goal_unit')?.[1] || 'km'
+    };
+
+    // 2. Query 1301 workout records with challenge tags
+    const challengeWorkoutFilter: NDKFilter = {
+      kinds: [KIND_WORKOUT_RECORD as NDKKind],
+      '#challenge_uuid': [challengeUUID],
+      limit: 1000
+    };
+
+    // Filter by challenge timeframe if specified
+    if (challengeInfo.startTime > 0) challengeWorkoutFilter.since = challengeInfo.startTime;
+    if (challengeInfo.endTime > 0) challengeWorkoutFilter.until = challengeInfo.endTime;
+
+    console.log(`Fetching challenge progress for challenge ${challengeUUID}`);
+    const workoutEvents = await ndk.fetchEvents(challengeWorkoutFilter, { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+    
+    const workouts = Array.from(workoutEvents).map(e => e.rawEvent() as NostrWorkoutEvent);
+
+    // 3. Calculate participant progress
+    const participantStats = new Map<string, { distance: number; workouts: number; lastActivity: number }>();
+
+    workouts.forEach(workout => {
+      const distanceTag = workout.tags.find(t => t[0] === 'distance');
+      
+      if (distanceTag && distanceTag[1]) {
+        const distance = parseFloat(distanceTag[1]);
+        const unit = distanceTag[2] || 'km';
+        
+        // Normalize to challenge goal unit
+        let normalizedDistance = distance;
+        if (challengeInfo.goalUnit === 'km' && unit === 'mi') {
+          normalizedDistance = distance * 1.609344;
+        } else if (challengeInfo.goalUnit === 'mi' && unit === 'km') {
+          normalizedDistance = distance / 1.609344;
+        }
+        
+        const participantPubkey = workout.pubkey;
+        if (!participantStats.has(participantPubkey)) {
+          participantStats.set(participantPubkey, { distance: 0, workouts: 0, lastActivity: 0 });
+        }
+        
+        const stats = participantStats.get(participantPubkey)!;
+        stats.distance += normalizedDistance;
+        stats.workouts += 1;
+        stats.lastActivity = Math.max(stats.lastActivity, workout.created_at);
+      }
+    });
+
+    // 4. Format participants with rankings
+    const participants = Array.from(participantStats.entries())
+      .map(([pubkey, stats]) => ({
+        pubkey,
+        distance: Math.round(stats.distance * 100) / 100,
+        workouts: stats.workouts,
+        lastActivity: stats.lastActivity,
+        progressPercent: challengeInfo.goalValue > 0 
+          ? Math.min(100, (stats.distance / challengeInfo.goalValue) * 100)
+          : 0
+      }))
+      .sort((a, b) => b.distance - a.distance);
+
+    // 5. Calculate total progress
+    const totalProgress = participants.reduce((sum, p) => sum + p.distance, 0);
+    const goalProgress = challengeInfo.goalValue > 0 
+      ? Math.min(100, (totalProgress / challengeInfo.goalValue) * 100)
+      : 0;
+    const isComplete = goalProgress >= 100;
+
+    return {
+      challengeInfo,
+      participants,
+      totalProgress: Math.round(totalProgress * 100) / 100,
+      goalProgress: Math.round(goalProgress * 100) / 100,
+      isComplete
+    };
+
+  } catch (error) {
+    console.error("Error calculating challenge progress:", error);
+    return { challengeInfo: null, participants: [], totalProgress: 0, goalProgress: 0, isComplete: false };
+  }
+}
+
+/**
+ * Helper function to parse duration string to seconds
+ */
+function parseDurationToSeconds(durationStr: string): number {
+  if (!durationStr) return 0;
+  
+  // Handle HH:MM:SS format
+  const parts = durationStr.split(':');
+  if (parts.length === 3) {
+    const hours = parseInt(parts[0]) || 0;
+    const minutes = parseInt(parts[1]) || 0;
+    const seconds = parseInt(parts[2]) || 0;
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+  
+  // Handle MM:SS format
+  if (parts.length === 2) {
+    const minutes = parseInt(parts[0]) || 0;
+    const seconds = parseInt(parts[1]) || 0;
+    return minutes * 60 + seconds;
+  }
+  
+  // Handle plain seconds
+  return parseInt(durationStr) || 0;
 } 

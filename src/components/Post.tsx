@@ -4,6 +4,7 @@ import { WorkoutCard } from './WorkoutRecordCard';
 import { getAvatarUrl } from '../utils/imageHelpers';
 import { Zap, Clock, TrendingUp, Timer, MapPin, Calendar } from 'lucide-react';
 import { useTeamChallenge } from '../contexts/TeamChallengeContext';
+import { getWorkoutTagData } from '../utils/tagDisplayUtils';
 
 // Helper to format timestamp to timeAgo string
 const formatTimeAgo = (timestamp: number) => {
@@ -29,61 +30,7 @@ const getTagValue = (tags: any[], tagName: string) => {
   return tag ? tag[1] : undefined;
 };
 
-// Helper to parse team tags from workout event
-const parseTeamTags = (tags: any[]) => {
-  if (!Array.isArray(tags)) return [];
-  
-  return tags
-    .filter((tag: any) => tag[0] === 'team' && tag[1])
-    .map((tag: any) => {
-      // Team tag format: ["team", "33404:captain:uuid", "relayHint", "teamName"]
-      const aTag = tag[1];
-      const relayHint = tag[2] || '';
-      const teamName = tag[3] || '';
-      
-      // Parse the a-tag: "33404:captain:uuid"
-      const parts = aTag.split(':');
-      if (parts.length === 3 && parts[0] === '33404') {
-        return {
-          aTag,
-          captain: parts[1],
-          uuid: parts[2],
-          relayHint,
-          teamName,
-          identifier: `${parts[1]}:${parts[2]}` // captain:uuid format
-        };
-      }
-      return null;
-    })
-    .filter((item: any): item is NonNullable<typeof item> => item !== null);
-};
-
-// Helper to parse challenge tags from workout event
-const parseChallengeTags = (tags: any[]) => {
-  if (!Array.isArray(tags)) return [];
-  
-  // First, collect all challenge UUIDs from "t" tags
-  const challengeFromTTags = tags
-    .filter(tag => tag[0] === 't' && tag[1] && tag[1].startsWith('challenge:'))
-    .map(tag => {
-      const challengeValue = tag[1];
-      const uuid = challengeValue.replace('challenge:', '');
-      return uuid ? { uuid, challengeValue } : null;
-    })
-    .filter(Boolean);
-
-  // Then, enhance with names from "challenge_name" tags
-  const challengeNameTags = tags.filter(tag => tag[0] === 'challenge_name' && tag[1] && tag[2]);
-  
-  return challengeFromTTags.map(challenge => {
-    // Look for a corresponding challenge_name tag
-    const nameTag = challengeNameTags.find(tag => tag[1] === challenge!.uuid);
-    return {
-      ...challenge,
-      name: nameTag ? nameTag[2] : undefined // Add the name if available
-    };
-  });
-};
+// Using enhanced tag parsing utilities from tagDisplayUtils
 
 export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; wallet: any }) => {
   const { userTeams, activeChallenges, isLoading } = useTeamChallenge();
@@ -93,15 +40,28 @@ export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; w
     return null; 
   }
 
-  // Parse team and challenge tags from the workout
-  const teamTags = parseTeamTags(post.tags);
-  const challengeTags = parseChallengeTags(post.tags);
+  // Use enhanced tag parsing utilities
+  const tagData = getWorkoutTagData(post.tags);
 
-  // Show all team tags from the workout record (these represent actual participation)
-  const visibleTeams = teamTags;
-
-  // Show all challenge tags from the workout record (these represent actual participation)
-  const visibleChallenges = challengeTags.filter((challengeTag: any) => challengeTag !== null);
+  // For backward compatibility, enhance challenge data with full challenge information
+  const enhancedChallenges = tagData.challenges.map((challengeTag: any) => {
+    // Find the full challenge data from context
+    const fullChallenge = activeChallenges.find((challenge: any) => {
+      const challengeUuid = challenge.tags.find((t: any) => t[0] === 'd')?.[1];
+      return challengeUuid === challengeTag.uuid;
+    });
+    
+    // Use the display name from tagData, with fallback to challenge context data
+    const challengeName = challengeTag.displayName || 
+                         fullChallenge?.tags.find((t: any) => t[0] === 'name')?.[1] || 
+                         `Challenge ${challengeTag.uuid.slice(0, 8)}`;
+    
+    return {
+      uuid: challengeTag.uuid,
+      name: challengeName,
+      challengeValue: challengeTag.challengeValue || `challenge:${challengeTag.uuid}`
+    };
+  });
 
   const authorData = {
     name: post.author?.profile?.name || post.author?.profile?.display_name || post.author?.pubkey?.slice(0, 8) + '…' || 'Runner',
@@ -116,26 +76,17 @@ export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; w
     timestamp: new Date(post.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     date: new Date(post.created_at * 1000).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
     location: getTagValue(post.tags, 'location'),
-    // Add team and challenge data
-    teams: visibleTeams,
-    challenges: visibleChallenges.map((challengeTag: any) => {
-      // Find the full challenge data
-      const fullChallenge = activeChallenges.find((challenge: any) => {
-        const challengeUuid = challenge.tags.find((t: any) => t[0] === 'd')?.[1];
-        return challengeUuid === challengeTag.uuid;
-      });
-      
-      // Use the name from the challenge_name tag first, then fallback to fullChallenge name
-      const challengeName = challengeTag.name || 
-                           fullChallenge?.tags.find((t: any) => t[0] === 'name')?.[1] || 
-                           `Challenge ${challengeTag.uuid.slice(0, 8)}`;
-      
-      return {
-        uuid: challengeTag.uuid,
-        name: challengeName,
-        challengeValue: challengeTag.challengeValue
-      };
-    })
+    // Use enhanced tag data
+    teams: tagData.teams,
+    challenges: enhancedChallenges,
+    // Add tag metadata for debugging/development
+    tagMetadata: {
+      hasTeams: tagData.hasTeams,
+      hasChallenges: tagData.hasChallenges,
+      hasAnyAffiliations: tagData.hasAnyAffiliations,
+      teamUuids: tagData.teamUuids,
+      challengeUuids: tagData.challengeUuids
+    }
   };
   
   // Pass through metrics processed by feedProcessor/nostr.js

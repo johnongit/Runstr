@@ -82,6 +82,29 @@ export const DashboardWalletHeader = () => {
     navigate('/ecash');
   };
 
+  // Debug function to test error handling
+  const handleDebugError = () => {
+    try {
+      // Test different types of errors
+      const errorType = Math.random();
+      if (errorType < 0.33) {
+        // Test undefined error
+        const undefinedError = undefined;
+        undefinedError.replace('test', 'fail');
+      } else if (errorType < 0.66) {
+        // Test null error message
+        const nullError = { message: null };
+        throw nullError;
+      } else {
+        // Test non-string error
+        const objectError = { someProperty: 'value', replace: 'not a function' };
+        throw objectError;
+      }
+    } catch (error) {
+      setReceiveError('DEBUG TEST ERROR - This should show detailed debug info in mobile-friendly format');
+    }
+  };
+
   // Handle sending tokens via NIP-61 nutzaps
   const handleSendTokens = async () => {
     if (!sendAmount || !sendRecipient) {
@@ -137,7 +160,33 @@ export const DashboardWalletHeader = () => {
 
     } catch (error) {
       console.error('[DashboardWalletHeader] Send error:', error);
-      setSendError('Failed to send nutzap: ' + error.message);
+      
+      // Safe error message construction for send operations
+      let safeErrorMessage;
+      try {
+        if (error && typeof error === 'object') {
+          safeErrorMessage = error.message || error.toString() || JSON.stringify(error);
+        } else if (error) {
+          safeErrorMessage = String(error);
+        } else {
+          safeErrorMessage = 'Unknown error occurred';
+        }
+      } catch (stringError) {
+        safeErrorMessage = 'Error occurred but cannot be displayed';
+      }
+      
+      const debugInfo = `
+NUTZAP SEND ERROR:
+Message: ${error?.message || 'No message'}
+Type: ${typeof error}
+Amount: ${amount || 'none'}
+Recipient: ${sendRecipient?.substring(0, 16) || 'none'}...
+Balance: ${balance || 0}
+Current Mint: ${currentMint?.url || 'none'}
+NDK Available: ${!!ndk}
+`;
+      
+      setSendError(`Failed to send nutzap: ${safeErrorMessage}\n\n${debugInfo}`);
     } finally {
       setIsSending(false);
     }
@@ -190,7 +239,49 @@ export const DashboardWalletHeader = () => {
 
     } catch (error) {
       console.error('[DashboardWalletHeader] Invoice error:', error);
-      setReceiveError('Failed to create invoice: ' + error.message);
+      
+      // Create detailed error information for mobile debugging
+      const errorDetails = {
+        message: error?.message || 'No message',
+        type: typeof error,
+        isError: error instanceof Error,
+        keys: error ? Object.keys(error) : [],
+        string: error?.toString?.() || 'Cannot convert to string',
+        stack: error?.stack || 'No stack trace'
+      };
+      
+      // Safe error message construction
+      let safeErrorMessage;
+      try {
+        if (error && typeof error === 'object') {
+          safeErrorMessage = error.message || error.toString() || JSON.stringify(error);
+        } else if (error) {
+          safeErrorMessage = String(error);
+        } else {
+          safeErrorMessage = 'Unknown error occurred';
+        }
+      } catch (stringError) {
+        safeErrorMessage = 'Error occurred but cannot be displayed';
+      }
+      
+      // Create comprehensive debug message for UI
+      const debugInfo = `
+ERROR DETAILS:
+Message: ${errorDetails.message}
+Type: ${errorDetails.type}
+Is Error Object: ${errorDetails.isError}
+Object Keys: ${errorDetails.keys.join(', ')}
+String Conversion: ${errorDetails.string}
+Stack (first 200 chars): ${errorDetails.stack.substring(0, 200)}
+
+CONTEXT:
+Amount: ${amount}
+Current Mint: ${currentMint?.url || 'none'}
+NDK Available: ${!!ndk}
+NDK Connected: ${ndk?.pool?.connectedRelays?.length || 0} relays
+`;
+      
+      setReceiveError(`Failed to create invoice: ${safeErrorMessage}\n\n${debugInfo}`);
     } finally {
       setIsReceiving(false);
     }
@@ -233,7 +324,31 @@ export const DashboardWalletHeader = () => {
 
     } catch (error) {
       console.error('[DashboardWalletHeader] Receive error:', error);
-      setReceiveError('Failed to receive token: ' + error.message);
+      
+      // Safe error message construction for token receive
+      let safeErrorMessage;
+      try {
+        if (error && typeof error === 'object') {
+          safeErrorMessage = error.message || error.toString() || JSON.stringify(error);
+        } else if (error) {
+          safeErrorMessage = String(error);
+        } else {
+          safeErrorMessage = 'Unknown error occurred';
+        }
+      } catch (stringError) {
+        safeErrorMessage = 'Error occurred but cannot be displayed';
+      }
+      
+      const debugInfo = `
+TOKEN RECEIVE ERROR:
+Message: ${error?.message || 'No message'}
+Type: ${typeof error}
+Token Length: ${receiveToken?.length || 0}
+Token Preview: ${receiveToken?.substring(0, 50) || 'empty'}...
+Current Mint: ${currentMint?.url || 'none'}
+`;
+      
+      setReceiveError(`Failed to receive token: ${safeErrorMessage}\n\n${debugInfo}`);
     } finally {
       setIsReceiving(false);
     }
@@ -295,6 +410,18 @@ export const DashboardWalletHeader = () => {
                 <span></span>
               </span>
             </button>
+            <button 
+              className="action-button debug-button" 
+              onClick={handleDebugError}
+              style={{
+                background: '#ff9800',
+                fontSize: '0.7rem',
+                minWidth: '45px'
+              }}
+              title="Test error handling"
+            >
+              🐛
+            </button>
           </div>
         </div>
       </div>
@@ -313,7 +440,11 @@ export const DashboardWalletHeader = () => {
                 padding: '8px', 
                 borderRadius: '6px', 
                 marginBottom: '12px',
-                fontSize: '0.9rem'
+                fontSize: '0.9rem',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'monospace'
               }}>
                 {sendError}
               </div>
@@ -440,7 +571,11 @@ export const DashboardWalletHeader = () => {
                 padding: '8px', 
                 borderRadius: '6px', 
                 marginBottom: '12px',
-                fontSize: '0.9rem'
+                fontSize: '0.9rem',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'monospace'
               }}>
                 {receiveError}
               </div>
