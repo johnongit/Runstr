@@ -6,6 +6,7 @@ import { useNostr } from '../hooks/useNostr';
 
 export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = null }) => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
   const { publicKey } = useNostr();
   
   // Get comprehensive leaderboard data with caching
@@ -27,7 +28,8 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   // Enhanced leaderboard with profile data
   const enhancedLeaderboard = useMemo(() => {
     return leaderboard.map(user => {
-      const profile = profiles.get(user.pubkey) || {};
+      // Fix: useProfiles returns an object, not a Map
+      const profile = profiles?.[user.pubkey] || profiles?.get?.(user.pubkey) || {};
       return {
         ...user,
         displayName: profile.display_name || profile.name || `Runner ${user.pubkey.slice(0, 8)}`,
@@ -62,7 +64,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
 
   // Loading state with lazy loading support
   const isLoading = isInitialLoad || (leaderboardLoading && leaderboard.length === 0);
-
+  
   if (isLoading) {
     return (
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-6 mb-4">
@@ -82,7 +84,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     return (
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-6 mb-4">
         <div className="flex flex-col justify-center items-center h-32">
-          <p className="text-red-400 text-sm mb-2">Error loading league data</p>
+          <p className="text-red-400 text-sm mb-2">Error loading league data: {leaderboardError}</p>
           <button 
             onClick={refreshLeaderboard}
             className="px-3 py-1 bg-primary hover:bg-primary-hover text-text-primary text-sm rounded-md transition-colors"

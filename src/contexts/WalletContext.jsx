@@ -15,7 +15,7 @@ const DEFAULT_MINT_URL = 'https://mint.coinos.io';
 const WalletContext = createContext();
 
 export const WalletProvider = ({ children }) => {
-  const { ndk, user } = useContext(NostrContext);
+  const { ndk, publicKey } = useContext(NostrContext);
   
   // Centralized wallet state
   const [walletState, setWalletState] = useState({
@@ -29,26 +29,37 @@ export const WalletProvider = ({ children }) => {
 
   // Auto-discover wallet on user connection
   useEffect(() => {
-    if (ndk && user && !walletState.isInitialized) {
+    if (ndk && publicKey && !walletState.isInitialized) {
       discoverWallet();
     }
-  }, [ndk, user, walletState.isInitialized]);
+  }, [ndk, publicKey, walletState.isInitialized]);
 
   /**
    * Auto-discover existing wallet or prepare for creation
    */
   const discoverWallet = async () => {
+    if (!publicKey) {
+      console.log('[WalletProvider] No publicKey available, cannot discover wallet');
+      setWalletState(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Please sign in with Amber to access your wallet',
+        isInitialized: true
+      }));
+      return;
+    }
+
     setWalletState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      console.log('[WalletProvider] Discovering existing NIP60 wallet...');
-      const walletData = await findWalletEvents(ndk, user.pubkey);
+      console.log('[WalletProvider] Discovering existing NIP60 wallet for pubkey:', publicKey.substring(0, 8) + '...');
+      const walletData = await findWalletEvents(ndk, publicKey);
       
       if (walletData && walletData.hasWallet) {
         console.log('[WalletProvider] Found existing wallet');
         
         // Load token events for balance calculation
-        const tokens = await queryTokenEvents(ndk, user.pubkey);
+        const tokens = await queryTokenEvents(ndk, publicKey);
         
         setWalletState({
           walletEvent: walletData.walletEvent,
@@ -84,6 +95,10 @@ export const WalletProvider = ({ children }) => {
    * Initialize new wallet with default CoinOS mint
    */
   const initializeWallet = async (mintUrl = DEFAULT_MINT_URL) => {
+    if (!publicKey) {
+      throw new Error('Please sign in with Amber first to initialize your wallet.');
+    }
+
     if (!ndk || !ndk.signer) {
       throw new Error('NDK signer not available. Please sign in with Amber to initialize your wallet.');
     }
@@ -91,7 +106,7 @@ export const WalletProvider = ({ children }) => {
     setWalletState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      console.log('[WalletProvider] Initializing new wallet with mint:', mintUrl);
+      console.log('[WalletProvider] Initializing new wallet with mint:', mintUrl, 'for pubkey:', publicKey.substring(0, 8) + '...');
       const result = await createWalletEvents(ndk, mintUrl);
       
       if (result && result.walletEvent) {
@@ -116,8 +131,9 @@ export const WalletProvider = ({ children }) => {
    * Refresh wallet data (re-query all events)
    */
   const refreshWallet = async () => {
-    if (!walletState.isInitialized) return;
+    if (!walletState.isInitialized || !publicKey) return;
     
+    console.log('[WalletProvider] Refreshing wallet data for pubkey:', publicKey.substring(0, 8) + '...');
     setWalletState(prev => ({ ...prev, loading: true, error: null }));
     await discoverWallet();
   };
