@@ -361,8 +361,17 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     setWorkoutSaved(false);
     
     try {
-      // Create a workout event with kind 1301 format
-      const workoutEvent = createWorkoutEvent(recentRun, distanceUnit);
+      // Get team and challenge associations
+      const { getWorkoutAssociations } = await import('../utils/teamChallengeHelper');
+      const { teamAssociation, challengeUUIDs, challengeNames, userPubkey } = await getWorkoutAssociations();
+      
+      // Create a workout event with kind 1301 format including team/challenge tags
+      const workoutEvent = createWorkoutEvent(recentRun, distanceUnit, { 
+        teamAssociation, 
+        challengeUUIDs, 
+        challengeNames, 
+        userPubkey 
+      });
       
       // Use the existing createAndPublishEvent function
       const publishedEvent = await createAndPublishEvent(workoutEvent);

@@ -216,36 +216,35 @@ export const RunHistoryCard: React.FC<RunHistoryCardProps> = ({
     setShareError(null);
     setShareSuccess(null);
 
-    let teamAssociation: { teamCaptainPubkey: string; teamUUID: string; relayHint?: string } | undefined = undefined;
-    const defaultTeamId = getDefaultPostingTeamIdentifier();
-
-    if (defaultTeamId) {
-      const parts = defaultTeamId.split(':');
-      if (parts.length === 2) {
-        const [teamCaptainPubkey, teamUUIDValue] = parts; // Renamed to avoid conflict with teamUUID from useParams
-        teamAssociation = { teamCaptainPubkey, teamUUID: teamUUIDValue };
-      }
-    }
-    
-    const eventRunData: RunData = {
-        ...run,
-        activityType: run.activityType || 'run',
-        date: run.date || Date.now(),
-        title: run.title || `${run.activityType || 'Activity'} on ${new Date(run.date || Date.now()).toLocaleDateString()}`,
-        notes: run.notes || '',
-        unit: distanceUnit,
-    };
-
-    const eventTemplate = createWorkoutEvent(eventRunData, distanceUnit, { teamAssociation, userPubkey: publicKey });
-
-    if (!eventTemplate) {
-      setShareError('Failed to prepare workout event for Nostr.');
-      setIsSharing(false);
-      setTimeout(() => setShareError(null), 5000);
-      return;
-    }
-
     try {
+      // Get team and challenge associations
+      const { getWorkoutAssociations } = await import('../utils/teamChallengeHelper');
+      const { teamAssociation, challengeUUIDs, challengeNames, userPubkey } = await getWorkoutAssociations();
+      
+      const eventRunData: RunData = {
+          ...run,
+          activityType: run.activityType || 'run',
+          date: run.date || Date.now(),
+          title: run.title || `${run.activityType || 'Activity'} on ${new Date(run.date || Date.now()).toLocaleDateString()}`,
+          notes: run.notes || '',
+          unit: distanceUnit,
+      };
+
+      // Create workout event with team/challenge tags
+      const eventTemplate = createWorkoutEvent(eventRunData, distanceUnit, { 
+        teamAssociation, 
+        challengeUUIDs, 
+        challengeNames, 
+        userPubkey: userPubkey || publicKey 
+      });
+
+      if (!eventTemplate) {
+        setShareError('Failed to prepare workout event for Nostr.');
+        setIsSharing(false);
+        setTimeout(() => setShareError(null), 5000);
+        return;
+      }
+
       const publishedEventOutcome = await createAndPublishEvent(eventTemplate, publicKey);
       if (publishedEventOutcome && publishedEventOutcome.success) {
         console.log('RunHistoryCard: Workout event published:', publishedEventOutcome);

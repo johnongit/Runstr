@@ -334,7 +334,17 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     let publishedWorkoutEventId = null;
     
     try {
-      const workoutEvent = createWorkoutEvent(run, distanceUnit);
+      // Get team and challenge associations
+      const { getWorkoutAssociations } = await import('../utils/teamChallengeHelper');
+      const { teamAssociation, challengeUUIDs, challengeNames, userPubkey } = await getWorkoutAssociations();
+      
+      // Create workout event with team/challenge tags
+      const workoutEvent = createWorkoutEvent(run, distanceUnit, { 
+        teamAssociation, 
+        challengeUUIDs, 
+        challengeNames, 
+        userPubkey 
+      });
       const publishedEvent = await createAndPublishEvent(workoutEvent);
       publishedWorkoutEventId = publishedEvent?.id;
 

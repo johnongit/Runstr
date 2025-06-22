@@ -25,7 +25,17 @@ export const SyncConfirmationModal = ({ isOpen, onClose, run, distanceUnit = 'km
     // Optionally publish
     if (postToNostr && savedRun) {
       try {
-        const nostrEvent = createWorkoutEvent(savedRun, distanceUnit);
+        // Get team and challenge associations
+        const { getWorkoutAssociations } = await import('../../utils/teamChallengeHelper');
+        const { teamAssociation, challengeUUIDs, challengeNames, userPubkey } = await getWorkoutAssociations();
+        
+        // Create workout event with team/challenge tags
+        const nostrEvent = createWorkoutEvent(savedRun, distanceUnit, { 
+          teamAssociation, 
+          challengeUUIDs, 
+          challengeNames, 
+          userPubkey 
+        });
         const published = await createAndPublishEvent(nostrEvent);
         if (published?.id) {
           runDataService.updateRun(savedRun.id, { nostrWorkoutEventId: published.id });

@@ -70,7 +70,7 @@ export const MenuBar = () => {
       path: '/club', 
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8V6a2 2 0 012-2h6a2 2 0 012 2v2M7 8v6a6 6 0 006 6 6 6 0 006-6V8M9 20h6M12 14v6" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 21h6M12 15v6M8 6h8l-1-3H9l-1 3zM7 6v5a5 5 0 0010 0V6" />
         </svg>
       ) 
     },
@@ -186,8 +186,7 @@ export const MenuBar = () => {
             onClick={toggleSettings}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.166 2.621v.858c-.966.147-1.939.328-2.914.541-.951.209-1.669.992-1.669 1.955v.687c0 1.706 1.419 3.113 3.17 3.113 1.73 0 3.125-1.37 3.125-3.059V4.533a59.052 59.052 0 0 1 4.288-.448c.027-.638.442-1.165.889-1.463v-.64C12.166 1.416 11.75.848 11.176.848c-.566 0-1.01.564-1.01 1.255v.518a58.945 58.945 0 0 0-5 0ZM18.791 12.621h-3.125v1.5c0 1.706 1.419 3.113 3.17 3.113 1.73 0 3.125-1.37 3.125-3.059v-.554h-3.17ZM11.25 16.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 0 1.5h-.75v3c0 .414-.336.75-.75.75s-.75-.336-.75-.75v-3Z" />
             </svg>
           </button>
         </div>
