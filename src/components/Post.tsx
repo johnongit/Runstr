@@ -55,7 +55,7 @@ const parseTeamTags = (tags: any[]) => {
       }
       return null;
     })
-    .filter((item: any) => item !== null);
+    .filter((item: any): item is NonNullable<typeof item> => item !== null);
 };
 
 // Helper to parse challenge tags from workout event
@@ -77,7 +77,7 @@ const parseChallengeTags = (tags: any[]) => {
   
   return challengeFromTTags.map(challenge => {
     // Look for a corresponding challenge_name tag
-    const nameTag = challengeNameTags.find(tag => tag[1] === challenge.uuid);
+    const nameTag = challengeNameTags.find(tag => tag[1] === challenge!.uuid);
     return {
       ...challenge,
       name: nameTag ? nameTag[2] : undefined // Add the name if available
@@ -97,23 +97,11 @@ export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; w
   const teamTags = parseTeamTags(post.tags);
   const challengeTags = parseChallengeTags(post.tags);
 
-  // Filter teams - only show if user is a member
-  const userTeamIdentifiers = userTeams.map(team => {
-    const uuid = team.tags.find(t => t[0] === 'd')?.[1];
-    return `${team.pubkey}:${uuid}`;
-  });
+  // Show all team tags from the workout record (these represent actual participation)
+  const visibleTeams = teamTags;
 
-  const visibleTeams = teamTags.filter((teamTag: any) => 
-    teamTag && userTeamIdentifiers.includes(teamTag.identifier)
-  );
-
-  // Filter challenges - only show active challenges that user participates in
-  const visibleChallenges = challengeTags.filter((challengeTag: any) => {
-    return challengeTag && activeChallenges.some((challenge: any) => {
-      const challengeUuid = challenge.tags.find((t: any) => t[0] === 'd')?.[1];
-      return challengeUuid === challengeTag.uuid;
-    });
-  });
+  // Show all challenge tags from the workout record (these represent actual participation)
+  const visibleChallenges = challengeTags.filter((challengeTag: any) => challengeTag !== null);
 
   const authorData = {
     name: post.author?.profile?.name || post.author?.profile?.display_name || post.author?.pubkey?.slice(0, 8) + '…' || 'Runner',
@@ -129,7 +117,7 @@ export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; w
     date: new Date(post.created_at * 1000).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
     location: getTagValue(post.tags, 'location'),
     // Add team and challenge data
-    teams: visibleTeams.filter((team: any) => team !== null),
+    teams: visibleTeams,
     challenges: visibleChallenges.map((challengeTag: any) => {
       // Find the full challenge data
       const fullChallenge = activeChallenges.find((challenge: any) => {

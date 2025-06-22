@@ -141,10 +141,10 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
                   teamName 
                 };
                 
-                // Also check for challenge participation for this auto-detected team
+                // Also check for active challenge preferences for this auto-detected team
                 try {
-                  const challengeKey = `runstr:challengeParticipation:${teamUUID}`;
-                  const stored = JSON.parse(localStorage.getItem(challengeKey) || '[]');
+                  const activeKey = `runstr:activeChallenges:${teamUUID}`;
+                  const stored = JSON.parse(localStorage.getItem(activeKey) || '[]');
                   if (Array.isArray(stored) && stored.length > 0) {
                     challengeUUIDs = stored;
                     challengeNames = resolveChallengeNames(challengeUUIDs, teamUUID);

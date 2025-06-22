@@ -101,8 +101,8 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
           teamName: teamName || (selectedTeam ? getTeamName(selectedTeam) : undefined)
         };
         
-        // Get challenge participation and resolve names
-        const stored = JSON.parse(localStorage.getItem(`runstr:challengeParticipation:${teamUUID}`) || '[]');
+        // Get active challenge preferences and resolve names
+        const stored = JSON.parse(localStorage.getItem(`runstr:activeChallenges:${teamUUID}`) || '[]');
         if (Array.isArray(stored)) {
           challengeUUIDs = stored;
           challengeNames = resolveChallengeNames(challengeUUIDs, teamUUID);

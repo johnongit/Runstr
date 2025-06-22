@@ -22,7 +22,7 @@ interface TeamChallengesTabProps {
   isCaptain: boolean;
 }
 
-const localKey = (teamUUID: string) => `runstr:challengeParticipation:${teamUUID}`;
+
 
 const parseChallenge = (evt: NostrEvent) => {
   const tag = (k: string) => evt.tags.find(t => t[0] === k)?.[1];
@@ -49,7 +49,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<Array<ReturnType<typeof parseChallenge>>>([]);
   const [loading, setLoading] = useState(true);
-  const [participating, setParticipating] = useState<string[]>([]);
+  const [activeChallenges, setActiveChallenges] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingChallenge, setEditingChallenge] = useState<ReturnType<typeof parseChallenge> | null>(null);
   const [form, setForm] = useState<{ name: string; description: string; goalValue: number; goalUnit: 'km' | 'mi'; start: string; end: string }>({
@@ -63,10 +63,11 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
 
   const { connectSigner } = (useNostr() as any);
 
-  // Load participation list
+  // Load active challenge preferences (challenges to tag future workouts with)
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem(localKey(teamUUID)) || '[]');
-    if (Array.isArray(stored)) setParticipating(stored);
+    const activeKey = `runstr:activeChallenges:${teamUUID}`;
+    const stored = JSON.parse(localStorage.getItem(activeKey) || '[]');
+    if (Array.isArray(stored)) setActiveChallenges(stored);
   }, [teamUUID]);
 
   // Subscribe to challenges
@@ -102,10 +103,11 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCaptain, currentUserPubkey]);
 
-  const toggleParticipation = (uuid: string) => {
-    const newSet = participating.includes(uuid) ? participating.filter(u => u !== uuid) : [...participating, uuid];
-    setParticipating(newSet);
-    localStorage.setItem(localKey(teamUUID), JSON.stringify(newSet));
+  const toggleChallengeParticipation = (uuid: string) => {
+    const newSet = activeChallenges.includes(uuid) ? activeChallenges.filter(u => u !== uuid) : [...activeChallenges, uuid];
+    setActiveChallenges(newSet);
+    const activeKey = `runstr:activeChallenges:${teamUUID}`;
+    localStorage.setItem(activeKey, JSON.stringify(newSet));
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -134,7 +136,7 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
     };
 
     const toastId = toast.loading(editingChallenge ? 'Updating challenge...' : 'Publishing challenge...');
-    const tmpl = prepareTeamChallengeEvent(teamAIdentifier, details, finalPubkey, editingChallenge?.uuid);
+    const tmpl = prepareTeamChallengeEvent(teamAIdentifier, details, finalPubkey);
     if (!tmpl) {
       toast.error('Failed to build challenge event', { id: toastId });
       return;
@@ -208,11 +210,12 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
         toast.success('Challenge deleted!', { id: toastId });
         // Remove from local state
         setChallenges(prev => prev.filter(c => c.id !== challenge.id));
-        // Remove from participation if user was participating
-        if (participating.includes(challenge.uuid)) {
-          const newParticipating = participating.filter(u => u !== challenge.uuid);
-          setParticipating(newParticipating);
-          localStorage.setItem(localKey(teamUUID), JSON.stringify(newParticipating));
+        // Remove from active challenges if user was participating
+        if (activeChallenges.includes(challenge.uuid)) {
+          const newActiveChallenges = activeChallenges.filter(u => u !== challenge.uuid);
+          setActiveChallenges(newActiveChallenges);
+          const activeKey = `runstr:activeChallenges:${teamUUID}`;
+          localStorage.setItem(activeKey, JSON.stringify(newActiveChallenges));
         }
       } else {
         toast.error('Delete failed. No relays accepted the event.', { id: toastId });
@@ -300,14 +303,14 @@ const TeamChallengesTab: React.FC<TeamChallengesTabProps> = ({
                 
                 <div className="flex flex-wrap gap-2">
                   <button 
-                    onClick={() => toggleParticipation(ch.uuid)} 
+                    onClick={() => toggleChallengeParticipation(ch.uuid)} 
                     className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${
-                      participating.includes(ch.uuid) 
+                      activeChallenges.includes(ch.uuid) 
                         ? 'bg-error hover:bg-error text-white border border-border-secondary' 
                         : 'border border-primary text-primary hover:bg-primary-light'
                     }`}
                   >
-                    {participating.includes(ch.uuid) ? '✓ Leave Challenge' : '+ Participate'}
+                    {activeChallenges.includes(ch.uuid) ? '✓ Stop Tagging' : '+ Tag Future Workouts'}
                   </button>
                   
                   {/* Captain Controls */}
