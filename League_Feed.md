@@ -2,46 +2,53 @@
 
 ## 🎯 Feature Overview
 
-Transform the existing Feed tab into a "League" tab that displays a visual map at the top showing user and bot progress through a fictional course outline, with the existing 1301 workout feed displayed below.
+Transform the existing Feed tab into a "League" tab that displays a **500-mile linear race** at the top with comprehensive leaderboard, followed by the existing 1301 workout feed below.
 
 ### Core Vision
 - **Tab Rename**: Feed → League
-- **Visual Map**: Course outline (Virginia-state-like shape) showing progress dots
-- **Position Tracking**: All runs count toward cumulative distance progress
-- **Bot Competition**: 5-10 scripted bots with different movement patterns
-- **Design**: Black/white minimalism matching existing RUNSTR aesthetic
-- **Feed Integration**: Unchanged 1301 feed below the map
+- **Linear Race Track**: Horizontal race line showing 500-mile progression  
+- **Comprehensive Leaderboard**: All-time user rankings based on total distance from ALL 1301 records
+- **Position Tracking**: Visual dots on race track for top 10 runners (1st-10th place)
+- **Caching System**: localStorage with 30-minute expiry for fast loading
+- **Lazy Loading**: Show cached data immediately, update in background
+- **Design**: Workout-card styling matching existing RUNSTR aesthetic
+- **Feed Integration**: Unchanged 1301 feed below the league components
 
 ---
 
 ## 📋 Implementation Status
 
 ### ✅ Completed
-- [x] Initial planning and design decisions
+- [x] **Complete League System Redesign (Jan 2025)**
 - [x] Tab rename implementation (FEED → LEAGUE)
-- [x] Basic map component structure  
-- [x] League page integration with existing feed
-- [x] Virginia-state-like course outline design
-- [x] Position calculation system with real 1301 data
-- [x] User position visualization on course map
-- [x] Error handling and loading states
-- [x] Visual polish improvements (Phase 4 Quick Wins)
-  - [x] Random organic state-like map outline (non-Virginia specific)
-  - [x] User dot pulse/glow animation
-  - [x] Linear progress bar (0-1000 miles)
-  - [x] Distance formatting (1 decimal place)
-  - [x] Animated loading dots
-  - [x] Milestone markers at 250/500/750 miles
-- [x] **League Leaderboard System**
-  - [x] Top 10 user standings with real 1301 data
-  - [x] Nostr display name integration
-  - [x] Progress format: "Alice - 847.3 miles (84.7% complete)"
-  - [x] Automatic refresh with page data
-  - [x] Profile fetching for user names
-  - [x] Run count tracking per user
-  - [x] Error handling and loading states
-  - [x] Professional leaderboard UI design
-  - [x] **Optimized to reuse existing feed data** (no duplicate requests)
+- [x] **Linear Race Track Implementation**
+  - [x] 500-mile horizontal race line design
+  - [x] Visual positioning dots for top 10 runners (1st-10th place)
+  - [x] Gold/Silver/Bronze color coding for podium positions
+  - [x] Current user highlighting with pulse animation
+  - [x] Mile markers at 100, 200, 300, 400 miles
+  - [x] Responsive SVG design for mobile/desktop
+- [x] **Comprehensive Leaderboard System**
+  - [x] `useLeagueLeaderboard` hook with caching and lazy loading
+  - [x] Fetches ALL 1301 records from ALL users (not just feed data)
+  - [x] localStorage caching with 30-minute expiry
+  - [x] Duplicate filtering (same user, same distance, within 5 minutes)
+  - [x] Background refresh while showing cached data
+  - [x] Nostr profile integration with display names
+  - [x] Workout-card styling matching existing theme
+  - [x] Error handling and fallback to stale cache
+- [x] **Updated Distance System**
+  - [x] Changed from 1000 miles to 500 miles total distance
+  - [x] Updated `useLeaguePosition` hook to match
+  - [x] Progress percentage calculations for 500-mile race
+- [x] **Enhanced UI/UX**
+  - [x] Lazy loading prevents long loading screens
+  - [x] Loading skeletons with animated dots
+  - [x] Medal emojis for top 3 positions (🥇🥈🥉)
+  - [x] Current user identification with "YOU" badge
+  - [x] Mini progress bars for each runner
+  - [x] Refresh button with loading states
+  - [x] Responsive design for mobile devices
 
 ### 🚧 In Progress
 - [ ] None currently
@@ -54,34 +61,35 @@ Transform the existing Feed tab into a "League" tab that displays a visual map a
 
 ## 🗺️ Technical Specifications
 
-### Map Design
-- **Style**: Course outline resembling a geographic boundary (Virginia-state-like)
-- **Dimensions**: 300-400px wide, 200-250px tall
-- **Colors**: Black/white minimalism matching RUNSTR theme
-- **Elements**: Course outline, progress dots for users/bots, territory markers
-- **Total Distance**: 1000 miles for round numbers
+### Linear Race Track Design
+- **Style**: Horizontal race line with positioning dots
+- **Dimensions**: Responsive SVG (400x120 viewBox, scales to container)
+- **Colors**: Gold/Silver/Bronze for top 3, gray for others, orange for current user
+- **Elements**: Race line, start/finish markers, mile markers, runner dots with rank numbers
+- **Total Distance**: 500 miles for manageable progression
 
 ### Position Calculation
 - **Method**: Cumulative distance from ALL runs (no threshold)
-- **Source**: Kind 1301 workout records
-- **Formula**: `position = (totalDistance / 1000) * courseLength`
-- **Updates**: Real-time for user, daily for bots
-- **Storage**: Local state with caching
+- **Source**: Kind 1301 workout records from ALL users
+- **Formula**: `position = (totalDistance / 500) * 100` (percentage along track)
+- **Updates**: Background refresh every 30 minutes, immediate from cache
+- **Storage**: localStorage with 30-minute expiry
 
-### Leaderboard System ⚡ **OPTIMIZED**
-- **Data Source**: Reuses existing feed data from `useRunFeed` hook
-- **Processing**: Client-side aggregation of user distances from feed posts
-- **Profile Data**: Uses already-fetched profile information from feed
-- **Performance**: Zero additional network requests (eliminates duplicate API calls)
-- **Refresh**: Automatically updates when feed refreshes
-- **Efficiency**: Processes existing 1301 posts instead of fetching separately
+### Comprehensive Leaderboard System ⚡ **COMPLETELY REDESIGNED**
+- **Data Source**: `useLeagueLeaderboard` hook - fetches ALL 1301 records directly
+- **Processing**: Server-side aggregation of ALL user distances across the network
+- **Performance**: localStorage caching + lazy loading (show cache first, update background)
+- **Duplicate Filtering**: Prevents same user/distance/time duplicates (5-minute window)
+- **Profile Data**: Integrated Nostr profile fetching for display names
+- **Refresh**: Manual refresh button + automatic 30-minute background updates
+- **Efficiency**: Comprehensive data with smart caching for optimal UX
 
-### Bot System
-- **Count**: 5-10 scripted bots
-- **Personalities**: Different movement patterns (consistent, weekend warrior, etc.)
-- **Movement**: Daily updates, scripted patterns
-- **Storage**: Local component state (no Nostr events)
-- **Reset**: Acceptable on app restart
+### Caching & Performance Strategy
+- **Cache Duration**: 30 minutes for leaderboard data
+- **Cache Strategy**: Show cached data immediately, update in background
+- **Fallback**: Use stale cache on network errors
+- **Loading States**: Skeleton loading, lazy loading prevents long waits
+- **Data Limit**: 5000 events max to prevent overwhelming queries
 
 ---
 
@@ -344,4 +352,26 @@ LeaguePage/
 ---
 
 *Last Updated: January 2025*
-*Status: Planning Phase* 
+*Status: **CORE IMPLEMENTATION COMPLETE** ✅*
+
+## 🎉 **IMPLEMENTATION SUMMARY**
+
+**The League tab has been successfully transformed with the new design:**
+
+### ✅ **What's Working Now:**
+- **500-Mile Linear Race Track**: Horizontal race line with top 10 runner positions
+- **Comprehensive Leaderboard**: Full network data with localStorage caching
+- **Lazy Loading**: Instant display from cache, background updates
+- **Professional UI**: Workout-card styling, medal emojis, progress indicators
+- **Smart Performance**: 30-minute caching, duplicate filtering, error fallbacks
+
+### 📁 **Files Updated:**
+- `src/hooks/useLeagueLeaderboard.js` - **NEW** comprehensive leaderboard hook
+- `src/hooks/useLeaguePosition.js` - Updated to 500 miles
+- `src/components/LeagueMap.jsx` - **COMPLETELY REWRITTEN** linear race track
+- `src/assets/styles/league-map.css` - Updated styles for new design
+
+### 🚀 **Ready for Production:**
+The League feature now provides a compelling competitive experience with real data, fast loading, and intuitive visual design that matches RUNSTR's aesthetic.
+
+--- 

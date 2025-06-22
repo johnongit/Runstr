@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNip60Wallet } from '../hooks/useNip60Wallet';
+import { useNip60 } from '../contexts/WalletContext';
 
 export const EcashWallet = () => {
   const {
@@ -9,30 +9,28 @@ export const EcashWallet = () => {
     balance,
     currentMint,
     tokenEvents,
-    createWallet,
+    initializeWallet,
     refreshWallet,
-    SUPPORTED_MINTS
-  } = useNip60Wallet();
+    SUPPORTED_MINTS,
+    DEFAULT_MINT_URL
+  } = useNip60();
 
-  const [selectedMint, setSelectedMint] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
 
-  const handleCreateWallet = async () => {
-    if (!selectedMint) return;
-    
-    setIsCreating(true);
+  const handleInitializeWallet = async () => {
+    setIsInitializing(true);
     try {
-      console.log('[EcashWallet] User requested wallet creation, will prompt Amber...');
-      const success = await createWallet(selectedMint);
+      console.log('[EcashWallet] User requested wallet initialization with CoinOS...');
+      const success = await initializeWallet(DEFAULT_MINT_URL);
       if (!success) {
-        // Error is already set by the hook
-        console.log('[EcashWallet] Wallet creation failed, error shown to user');
+        // Error is already set by the context
+        console.log('[EcashWallet] Wallet initialization failed, error shown to user');
       }
     } catch (error) {
-      console.error('Failed to create wallet:', error);
-      // Error is handled by the hook
+      console.error('Failed to initialize wallet:', error);
+      // Error is handled by the context
     } finally {
-      setIsCreating(false);
+      setIsInitializing(false);
     }
   };
 
@@ -40,8 +38,8 @@ export const EcashWallet = () => {
     return (
       <div className="ecash-wallet-page">
         <div className="loading-state">
-          <h2>🔍 Discovering NIP-60 Wallet...</h2>
-          <p>Querying relays for existing wallet events (no signing required)...</p>
+          <h2>🔍 Checking for Wallet...</h2>
+          <p>Looking for your existing wallet (no signing required)...</p>
           <div className="loading-spinner">⏳</div>
         </div>
       </div>
@@ -66,21 +64,19 @@ export const EcashWallet = () => {
     return (
       <div className="ecash-wallet-page">
         <div className="wallet-creation">
-          <h2>🆕 Create NIP-60 Wallet</h2>
-          <p>No existing wallet found. Create a new ecash wallet by selecting a mint:</p>
+          <h2>🚀 Initialize Your Wallet</h2>
+          <p>No existing wallet found. Initialize your wallet to start receiving and sending sats.</p>
           
-          <div className="mint-selection">
-            {SUPPORTED_MINTS.map(mint => (
-              <div 
-                key={mint.url}
-                className={`mint-option ${selectedMint === mint.url ? 'selected' : ''}`}
-                onClick={() => setSelectedMint(mint.url)}
-              >
-                <h3>{mint.name}</h3>
-                <p>{mint.description}</p>
-                <small>{mint.url}</small>
-              </div>
-            ))}
+          <div className="wallet-setup-info">
+            <div className="setup-step">
+              <h3>What happens when you initialize:</h3>
+              <ul>
+                <li>📱 Your wallet will be created securely using your Nostr identity</li>
+                <li>🔒 Default mint: CoinOS (trusted and reliable)</li>
+                <li>⚡ Zero starting balance - ready to receive sats</li>
+                <li>⚙️ Advanced mint settings available in Settings</li>
+              </ul>
+            </div>
           </div>
 
           {error && (
@@ -97,25 +93,21 @@ export const EcashWallet = () => {
           )}
 
           <button 
-            onClick={handleCreateWallet}
-            disabled={!selectedMint || isCreating}
+            onClick={handleInitializeWallet}
+            disabled={isInitializing}
             className="create-wallet-btn"
           >
-            {isCreating ? (
-              selectedMint ? '🔐 Requesting Amber Signature...' : '⏳ Creating Wallet...'
-            ) : (
-              '🔒 Create Wallet'
-            )}
+            {isInitializing ? '🔐 Requesting Amber Signature...' : '🚀 Initialize Wallet'}
           </button>
           
-          {isCreating && (
+          {isInitializing && (
             <p style={{ 
               color: 'var(--text-secondary)', 
               fontSize: '0.9rem', 
               marginTop: '12px',
               textAlign: 'center'
             }}>
-              📱 Check Amber for signing prompts. You'll need to approve 2 signatures to create your wallet.
+              📱 Check Amber for signing prompts. You'll need to approve 2 signatures to initialize your wallet.
             </p>
           )}
         </div>
@@ -126,19 +118,19 @@ export const EcashWallet = () => {
   return (
     <div className="ecash-wallet-page">
       <div className="wallet-header">
-        <h2>🔒 NIP-60 Ecash Wallet</h2>
+        <h2>💰 Your Wallet</h2>
         <div className="wallet-info">
           <div className="balance-display">
             <span className="balance-label">Balance:</span>
             <span className="balance-amount">{balance} sats</span>
           </div>
           <div className="mint-info">
-            <span className="mint-label">Mint:</span>
+            <span className="mint-label">Provider:</span>
             <span className="mint-name">{currentMint?.name || 'Unknown'}</span>
           </div>
         </div>
         <div className="wallet-description">
-          <p>Event-based ecash wallet using pure NIP-60 implementation. Balance calculated from {tokenEvents.length} token events.</p>
+          <p>Secure wallet powered by Nostr. Balance calculated from {tokenEvents.length} transactions.</p>
         </div>
       </div>
 
@@ -149,15 +141,15 @@ export const EcashWallet = () => {
       </div>
 
       <div className="transaction-history">
-        <h3>📝 Event History</h3>
+        <h3>📝 Transaction History</h3>
         {tokenEvents.length === 0 ? (
           <div className="no-events">
-            <p>🎉 Wallet created successfully!</p>
-            <p>No token events found yet. Your wallet is ready to receive ecash tokens.</p>
+            <p>🎉 Wallet initialized successfully!</p>
+            <p>No transactions yet. Your wallet is ready to receive sats.</p>
           </div>
         ) : (
           <div className="event-list">
-            <p className="events-summary">Found {tokenEvents.length} token events</p>
+            <p className="events-summary">Found {tokenEvents.length} transactions</p>
             {tokenEvents.slice(0, 10).map(event => (
               <div key={event.id} className="event-item">
                 <span className={`event-type ${event.content?.type || 'unknown'}`}>
@@ -173,7 +165,7 @@ export const EcashWallet = () => {
               </div>
             ))}
             {tokenEvents.length > 10 && (
-              <p className="more-events">... and {tokenEvents.length - 10} more events</p>
+              <p className="more-events">... and {tokenEvents.length - 10} more transactions</p>
             )}
           </div>
         )}
@@ -181,14 +173,14 @@ export const EcashWallet = () => {
 
       <div className="debug-info">
         <details>
-          <summary>🔧 Debug: Raw Event Data</summary>
+          <summary>🔧 Technical Details</summary>
           <pre>{JSON.stringify({ 
             hasWallet, 
             balance, 
-            eventCount: tokenEvents.length,
-            currentMint: currentMint?.url,
-            walletEventId: hasWallet ? 'present' : 'none',
-            mintEventId: currentMint ? 'present' : 'none'
+            transactionCount: tokenEvents.length,
+            provider: currentMint?.name,
+            walletStatus: hasWallet ? 'initialized' : 'not initialized',
+            providerStatus: currentMint ? 'connected' : 'none'
           }, null, 2)}</pre>
         </details>
       </div>

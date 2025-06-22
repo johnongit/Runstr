@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNip60Wallet } from '../hooks/useNip60Wallet';
+import { useNip60 } from '../contexts/WalletContext';
 
 export const DashboardWalletHeader = () => {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ export const DashboardWalletHeader = () => {
     SUPPORTED_MINTS,
     currentMint,
     refreshWallet
-  } = useNip60Wallet();
+  } = useNip60();
 
   // Add debugging
   console.log('[DashboardWalletHeader] Wallet State:', {
@@ -89,7 +89,7 @@ export const DashboardWalletHeader = () => {
           <div className="wallet-status">
             <span className="status-text">
               {loading ? 'Checking for wallet...' : 
-               'Ecash Wallet Disconnected'}
+               'Wallet Not Initialized'}
             </span>
           </div>
           <button 
@@ -97,7 +97,7 @@ export const DashboardWalletHeader = () => {
             onClick={() => navigate('/ecash')}
             disabled={loading}
           >
-            {loading ? '...' : 'Connect'}
+            {loading ? '...' : 'Initialize Wallet'}
           </button>
         </div>
       </div>
@@ -139,8 +139,8 @@ export const DashboardWalletHeader = () => {
       {showSendModal && (
         <div className="modal-overlay" onClick={() => setShowSendModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Send Ecash Tokens</h3>
-            <p>To send tokens, you'll be redirected to the full NIP-60 wallet interface.</p>
+            <h3>Send</h3>
+            <p>To send sats, you'll be redirected to the full wallet interface.</p>
             <p><strong>Balance:</strong> {balance.toLocaleString()} sats</p>
             
             <div className="modal-buttons">
@@ -165,8 +165,8 @@ export const DashboardWalletHeader = () => {
       {showReceiveModal && (
         <div className="modal-overlay" onClick={() => setShowReceiveModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Receive Ecash Tokens</h3>
-            <p>To receive tokens, share your information or visit the full wallet page.</p>
+            <h3>Receive</h3>
+            <p>To receive sats, share your information or visit the full wallet page.</p>
             <div className="modal-buttons">
               <button 
                 onClick={() => setShowReceiveModal(false)}

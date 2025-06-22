@@ -19,7 +19,7 @@ export const useLeaguePosition = () => {
   const [lastFetchTime, setLastFetchTime] = useState(0);
 
   // Constants
-  const COURSE_TOTAL_MILES = 1000;
+  const COURSE_TOTAL_MILES = 500; // Updated to match league race distance
   const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes cache
 
   /**

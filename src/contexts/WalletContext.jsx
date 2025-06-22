@@ -1,212 +1,151 @@
-import { createContext, useState, useEffect, useCallback } from 'react';
-import PropTypes from 'prop-types';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { NostrContext } from './NostrContext';
 import { 
-  getWalletAPI,
-  getConnectionState, 
-  subscribeToConnectionChanges, 
-  CONNECTION_STATES,
-  initWalletService
-} from '../services/wallet/WalletPersistenceService';
+  findWalletEvents, 
+  createWalletEvents, 
+  queryTokenEvents, 
+  calculateBalance,
+  SUPPORTED_MINTS,
+  getMintInfo 
+} from '../utils/nip60Events';
 
-// Export connection states
-export { CONNECTION_STATES };
+// Default mint for new users (CoinOS)
+const DEFAULT_MINT_URL = 'https://mint.coinos.io';
 
-// Create the context with initial values
-export const WalletContext = createContext({
-  wallet: null,
-  connectionState: CONNECTION_STATES.DISCONNECTED,
-  error: null,
-  balance: null,
-  reconnectWithSavedCredentials: () => {},
-  connectWithUrl: () => {},
-  checkConnection: () => {},
-  disconnect: () => {},
-  ensureConnected: () => Promise.resolve(false),
-  generateZapInvoice: () => Promise.resolve(''),
-  refreshBalance: () => Promise.resolve(0),
-});
+const WalletContext = createContext();
 
-/**
- * WalletProvider component for managing global wallet state
- */
 export const WalletProvider = ({ children }) => {
-  // Core state
-  const [wallet, setWallet] = useState(null);
-  const [connectionState, setConnectionState] = useState(CONNECTION_STATES.DISCONNECTED);
-  const [error, setError] = useState(null);
-  const [balance, setBalance] = useState(null);
+  const { ndk, user } = useContext(NostrContext);
+  
+  // Centralized wallet state
+  const [walletState, setWalletState] = useState({
+    walletEvent: null,
+    mintEvent: null,
+    tokenEvents: [],
+    loading: false,
+    error: null,
+    isInitialized: false
+  });
 
-  // Initialize wallet API
+  // Auto-discover wallet on user connection
   useEffect(() => {
-    console.log('[WalletContext] Initializing wallet provider');
-    
-    // Set the wallet API from our persistence service
-    const walletAPI = getWalletAPI();
-    setWallet(walletAPI);
-    
-    // Initialize the service (attempt to reconnect)
-    initWalletService().catch(err => {
-      console.error('[WalletContext] Error initializing wallet service:', err);
-      setError(err.message || 'Failed to initialize wallet service');
-    });
-    
-    // Subscribe to connection state changes
-    const unsubscribe = subscribeToConnectionChanges((state) => {
-      console.log('[WalletContext] Connection state changed:', state);
-      setConnectionState(state);
-      
-      // If connected, refresh balance
-      if (state === CONNECTION_STATES.CONNECTED) {
-        refreshBalance();
-      }
-    });
-    
-    // Cleanup subscription
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+    if (ndk && user && !walletState.isInitialized) {
+      discoverWallet();
+    }
+  }, [ndk, user, walletState.isInitialized]);
 
   /**
-   * Reconnect using saved credentials from local storage
+   * Auto-discover existing wallet or prepare for creation
    */
-  const reconnectWithSavedCredentials = useCallback(async () => {
-    if (!wallet) return false;
+  const discoverWallet = async () => {
+    setWalletState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      setError(null);
-      const connected = await wallet.ensureConnected();
+      console.log('[WalletProvider] Discovering existing NIP60 wallet...');
+      const walletData = await findWalletEvents(ndk, user.pubkey);
       
-      if (connected) {
-        refreshBalance();
+      if (walletData && walletData.hasWallet) {
+        console.log('[WalletProvider] Found existing wallet');
+        
+        // Load token events for balance calculation
+        const tokens = await queryTokenEvents(ndk, user.pubkey);
+        
+        setWalletState({
+          walletEvent: walletData.walletEvent,
+          mintEvent: walletData.mintEvent,
+          tokenEvents: tokens,
+          loading: false,
+          error: null,
+          isInitialized: true
+        });
+      } else {
+        console.log('[WalletProvider] No existing wallet found - ready for initialization');
+        setWalletState({
+          walletEvent: null,
+          mintEvent: null,
+          tokenEvents: [],
+          loading: false,
+          error: null,
+          isInitialized: true
+        });
       }
+    } catch (error) {
+      console.error('[WalletProvider] Discovery error:', error);
+      setWalletState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message,
+        isInitialized: true
+      }));
+    }
+  };
+
+  /**
+   * Initialize new wallet with default CoinOS mint
+   */
+  const initializeWallet = async (mintUrl = DEFAULT_MINT_URL) => {
+    if (!ndk || !ndk.signer) {
+      throw new Error('NDK signer not available. Please sign in with Amber to initialize your wallet.');
+    }
+
+    setWalletState(prev => ({ ...prev, loading: true, error: null }));
+
+    try {
+      console.log('[WalletProvider] Initializing new wallet with mint:', mintUrl);
+      const result = await createWalletEvents(ndk, mintUrl);
       
-      return connected;
-    } catch (err) {
-      console.error('[WalletContext] Failed to reconnect wallet:', err);
-      setError(err.message || 'Failed to reconnect wallet');
+      if (result && result.walletEvent) {
+        // Refresh wallet data after creation
+        await discoverWallet();
+        return true;
+      } else {
+        throw new Error('Failed to create wallet events');
+      }
+    } catch (error) {
+      console.error('[WalletProvider] Wallet initialization error:', error);
+      setWalletState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message
+      }));
       return false;
     }
-  }, [wallet]);
+  };
 
   /**
-   * Connect wallet with NWC URL
-   * @param {string} url - NWC connection URL
+   * Refresh wallet data (re-query all events)
    */
-  const connectWithUrl = useCallback(async (url) => {
-    if (!wallet) return false;
+  const refreshWallet = async () => {
+    if (!walletState.isInitialized) return;
     
-    try {
-      setError(null);
-      const connected = await wallet.connect(url);
-      
-      if (connected) {
-        refreshBalance();
-      }
-      
-      return connected;
-    } catch (err) {
-      console.error('[WalletContext] Failed to connect wallet:', err);
-      setError(err.message || 'Failed to connect wallet');
-      return false;
-    }
-  }, [wallet]);
+    setWalletState(prev => ({ ...prev, loading: true, error: null }));
+    await discoverWallet();
+  };
 
-  /**
-   * Check if wallet is still connected
-   */
-  const checkConnection = useCallback(async () => {
-    if (!wallet) return false;
-    
-    try {
-      return await wallet.checkConnection();
-    } catch (err) {
-      console.error('[WalletContext] Wallet connection check failed:', err);
-      setError(err.message || 'Wallet connection check failed');
-      return false;
-    }
-  }, [wallet]);
-
-  /**
-   * Disconnect the wallet
-   */
-  const disconnect = useCallback(() => {
-    if (!wallet) return;
-    
-    try {
-      wallet.disconnect();
-      setBalance(null);
-    } catch (err) {
-      console.error('[WalletContext] Failed to disconnect wallet:', err);
-      setError(err.message || 'Failed to disconnect wallet');
-    }
-  }, [wallet]);
-
-  /**
-   * Ensure wallet is connected before making payments
-   * Attempts to reconnect if disconnected
-   */
-  const ensureConnected = useCallback(async () => {
-    if (!wallet) return false;
-    return await wallet.ensureConnected();
-  }, [wallet]);
-
-  /**
-   * Generate a zap invoice for the given amount
-   * @param {string} pubkey - Pubkey to zap
-   * @param {number} amount - Amount in sats
-   * @param {string} comment - Optional comment for the invoice
-   */
-  const generateZapInvoice = useCallback(async (pubkey, amount, comment = '') => {
-    if (!wallet) throw new Error('Wallet not initialized');
-    
-    try {
-      const connected = await ensureConnected();
-      if (!connected) throw new Error('Wallet not connected');
-      
-      return await wallet.generateZapInvoice(pubkey, amount, comment);
-    } catch (err) {
-      console.error('[WalletContext] Failed to generate zap invoice:', err);
-      // Handle specific error for zapping (HTTP 422)
-      if (err.message && err.message.includes('422')) {
-        throw new Error('Unable to generate invoice. Check your wallet connection and try again.');
-      }
-      throw err;
-    }
-  }, [wallet, ensureConnected]);
-
-  /**
-   * Refresh wallet balance
-   */
-  const refreshBalance = useCallback(async () => {
-    if (!wallet) return 0;
-    
-    try {
-      const connected = await ensureConnected();
-      if (!connected) return 0;
-      
-      const currentBalance = await wallet.getBalance();
-      setBalance(currentBalance);
-      return currentBalance;
-    } catch (err) {
-      console.error('[WalletContext] Failed to fetch wallet balance:', err);
-      setError(err.message || 'Failed to fetch wallet balance');
-      return 0;
-    }
-  }, [wallet, ensureConnected]);
+  // Computed values
+  const hasWallet = walletState.walletEvent !== null;
+  const balance = calculateBalance(walletState.tokenEvents);
+  const currentMint = walletState.mintEvent ? getMintInfo(walletState.mintEvent) : null;
 
   const contextValue = {
-    wallet,
-    connectionState,
-    error,
+    // State
+    loading: walletState.loading,
+    error: walletState.error,
+    isInitialized: walletState.isInitialized,
+    hasWallet,
     balance,
-    reconnectWithSavedCredentials,
-    connectWithUrl,
-    checkConnection,
-    disconnect,
-    ensureConnected,
-    generateZapInvoice,
-    refreshBalance,
+    currentMint,
+    tokenEvents: walletState.tokenEvents,
+    walletEvent: walletState.walletEvent,
+    mintEvent: walletState.mintEvent,
+    
+    // Actions
+    initializeWallet,
+    refreshWallet,
+    
+    // Constants
+    SUPPORTED_MINTS,
+    DEFAULT_MINT_URL
   };
 
   return (
@@ -216,8 +155,17 @@ export const WalletProvider = ({ children }) => {
   );
 };
 
-WalletProvider.propTypes = {
-  children: PropTypes.node.isRequired,
+// Hook to consume NIP60 wallet context
+export const useNip60 = () => {
+  const context = useContext(WalletContext);
+  if (!context) {
+    throw new Error('useNip60 must be used within a WalletProvider');
+  }
+  return context;
 };
 
-export default WalletProvider; 
+// Legacy export for backward compatibility
+export const useWallet = useNip60;
+
+// Export context for advanced usage
+export { WalletContext }; 
