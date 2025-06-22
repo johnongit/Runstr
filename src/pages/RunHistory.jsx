@@ -12,6 +12,7 @@ import { RunHistoryCard } from '../components/RunHistoryCard';
 import { SaveRunExtrasModal } from '../components/SaveRunExtrasModal';
 import { rewardUserActivity } from '../services/rewardService';
 import { NostrContext } from '../contexts/NostrContext';
+import appToast from '../utils/toast';
 
 const AVERAGE_STRIDE_LENGTH_METERS = 0.73; // average stride length (adjusted from 0.762)
 
@@ -245,7 +246,7 @@ export const RunHistory = () => {
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to delete run');
       } else {
-        alert('Failed to delete run');
+        appToast.error('Failed to delete run');
       }
     }
     
@@ -309,7 +310,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Successfully posted to Nostr!');
       } else {
-        alert('Successfully posted to Nostr!');
+        appToast.success('Successfully posted to Nostr!');
       }
     } catch (error) {
       console.error('Error posting to Nostr:', error);
@@ -318,7 +319,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to post to Nostr: ' + error.message);
       } else {
-        alert('Failed to post to Nostr: ' + error.message);
+        appToast.error('Failed to post to Nostr: ' + error.message);
       }
     } finally {
       setIsPosting(false);
@@ -358,7 +359,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         if (window.Android && window.Android.showToast) {
           window.Android.showToast(msg);
         } else {
-          alert(msg);
+          appToast.info(msg);
         }
         // Open the extras modal
         setCurrentRunForExtras(run);
@@ -373,7 +374,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to save main workout record: ' + error.message);
       } else {
-        alert('Failed to save main workout record: ' + error.message);
+        appToast.error('Failed to save main workout record: ' + error.message);
       }
     } finally {
       // We don't set isSavingWorkout to false here if modal is opening
@@ -401,7 +402,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast(errorMsg);
       } else {
-        alert(errorMsg);
+        appToast.error(errorMsg);
       }
     } else {
       let successMsg = 'Workout extras published successfully!';
@@ -413,7 +414,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast(successMsg);
       } else {
-        alert(successMsg);
+        appToast.success(successMsg);
       }
     }
     // The modal itself calls onClose which triggers handleCloseSaveExtrasModal to reset states.

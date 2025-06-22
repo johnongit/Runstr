@@ -18,6 +18,7 @@ import { lightweightProcessPosts } from './utils/feedProcessor';
 import { storeFeedCache, isCacheFresh } from './utils/feedCache';
 import { NostrContext } from './contexts/NostrContext.jsx';
 import './utils/errorSilencer';
+import { Toaster } from 'react-hot-toast';
 
 console.log("App.jsx is loading");
 
@@ -187,6 +188,7 @@ const App = () => {
                               <AppRoutes />
                             </Suspense>
                           </main>
+                          <Toaster position="top-center" />
                         </div>
                       </WalletProvider>
                     </TeamChallengeProvider>

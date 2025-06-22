@@ -1,4 +1,8 @@
 import PropTypes from 'prop-types';
+import React from 'react';
+import { Button } from './ui/button';
+import { LoadingButton } from './ui/LoadingSpinner';
+import appToast from '../utils/toast';
 
 export function DashboardRunCard({ 
   run, 
@@ -73,43 +77,41 @@ export function DashboardRunCard({
         </div>
 
         <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-border-secondary">
-          <button 
-            className="flex items-center justify-start p-2 px-4 text-sm font-medium rounded-lg bg-bg-tertiary text-primary border border-border-secondary hover:bg-primary/10 transition-colors duration-normal"
-            onClick={() => onShare(run)}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-              <polyline points="16 6 12 2 8 6"></polyline>
-              <line x1="12" y1="2" x2="12" y2="15"></line>
-            </svg>
-            Post to Nostr
-          </button>
-          
-          <button 
-            className="flex items-center justify-start p-2 px-4 text-sm font-medium rounded-lg bg-bg-tertiary text-success border border-border-secondary hover:bg-success/10 transition-colors duration-normal disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => onSave(run)}
-            disabled={isSaving || isWorkoutSaved}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            {isSaving ? 'Saving...' : isWorkoutSaved ? 'Record Saved' : 'Save Workout Record'}
-          </button>
-          
-          <button 
-            className="flex items-center justify-start p-2 px-4 text-sm font-medium rounded-lg bg-bg-tertiary text-error border border-border-secondary hover:bg-error/10 transition-colors duration-normal disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => onDelete(run)}
-            disabled={isDeleting}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-              <path d="M3 6h18"></path>
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-            </svg>
-            {isDeleting ? 'Deleting...' : 'Delete'}
-          </button>
+          <div className="flex space-x-2">
+            <LoadingButton
+              onClick={onShare}
+              isLoading={false}
+              loadingText="Sharing..."
+              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg border-2 border-white transition-colors"
+            >
+              Share to Nostr
+            </LoadingButton>
+            
+            <LoadingButton
+              onClick={onSave}
+              isLoading={isSaving}
+              loadingText="Saving..."
+              disabled={isWorkoutSaved}
+              className={`flex-1 font-medium py-2 px-4 rounded-lg border-2 border-white transition-colors ${
+                isWorkoutSaved 
+                  ? 'bg-green-600 text-white cursor-not-allowed' 
+                  : 'bg-black hover:bg-gray-900 text-white'
+              }`}
+            >
+              {isWorkoutSaved ? 'Saved ✓' : 'Save Workout Record'}
+            </LoadingButton>
+            
+            <LoadingButton
+              onClick={onDelete}
+              isLoading={isDeleting}
+              loadingText="Deleting..."
+              className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg border-2 border-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </LoadingButton>
+          </div>
         </div>
       </div>
     </div>

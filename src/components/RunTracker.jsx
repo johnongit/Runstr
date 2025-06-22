@@ -15,6 +15,7 @@ import { useContext } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { NostrContext } from '../contexts/NostrContext';
 import { publishRun } from '../utils/runPublisher';
+import appToast from '../utils/toast';
 
 export const RunTracker = () => {
   const { 
@@ -191,7 +192,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast(successMsg);
       } else {
-        alert(successMsg);
+        appToast.success(successMsg);
       }
     } catch (error) {
       console.error('Error posting to Nostr:', error);
@@ -199,7 +200,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to post to Nostr: ' + error.message);
       } else {
-        alert('Failed to post to Nostr: ' + error.message);
+        appToast.error('Failed to post to Nostr: ' + error.message);
       }
     } finally {
       setIsPosting(false);
@@ -230,7 +231,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       }
     } else {
       // If permissions haven't been granted yet, show a message
-      alert('Location permission is required for tracking. Please restart the app to grant permissions.');
+      appToast.error('Location permission is required for tracking. Please restart the app to grant permissions.');
       // Set the flag to show permission dialog next time the app starts
       localStorage.removeItem('permissionsGranted');
     }
@@ -392,7 +393,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to save workout record: ' + error.message);
       } else {
-        alert('Failed to save workout record: ' + error.message);
+        appToast.error('Failed to save workout record: ' + error.message);
       }
     } finally {
       setIsSavingWorkout(false);
@@ -422,7 +423,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Run deleted successfully');
       } else {
-        alert('Run deleted successfully');
+        appToast.success('Run deleted successfully');
       }
       
       // If there are other runs, load the next most recent run
@@ -439,7 +440,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to delete run: ' + error.message);
       } else {
-        alert('Failed to delete run: ' + error.message);
+        appToast.error('Failed to delete run: ' + error.message);
       }
     } finally {
       setIsDeleting(false);
