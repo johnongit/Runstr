@@ -440,15 +440,21 @@ export class AlbyWallet {
           
           if (isAmberAvailable) {
             console.log('[AlbyWallet] Signing zap request with Amber');
-            // Amber signing happens asynchronously via deep linking
-            // We need a way to get the result back, which would typically
-            // be handled via the setupDeepLinkHandling callback
-            
-            // For now, we'll fall back to regular invoices on Android
-            // until a proper integration with the deep link handler is implemented
-            console.log('[AlbyWallet] Falling back to regular invoice on Android until full Amber integration is complete');
-            const regularInvoice = await this.generateInvoice(amount, `Zap for ${pubkey.substring(0, 8)}...`);
-            return regularInvoice;
+            try {
+              // Get user's public key first if needed
+              const userPubkey = localStorage.getItem('userPublicKey') || await AmberAuth.getPublicKey();
+              zapRequest.pubkey = userPubkey;
+              
+              // Sign the zap request with Amber
+              const signedZapRequest = await AmberAuth.signEvent(zapRequest);
+              console.log('[AlbyWallet] Zap request signed with Amber successfully');
+              
+              encodedZapRequest = btoa(JSON.stringify(signedZapRequest));
+              console.log('[AlbyWallet] Encoded zap request (length):', encodedZapRequest.length);
+            } catch (amberSignError) {
+              console.error('[AlbyWallet] Amber signing failed:', amberSignError);
+              throw new Error(`Failed to sign zap request with Amber: ${amberSignError.message || 'Unknown error'}`);
+            }
           } else {
             console.log('[AlbyWallet] Amber not available, checking for window.nostr');
           }

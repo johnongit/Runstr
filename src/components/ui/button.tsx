@@ -17,9 +17,9 @@ const buttonVariants = cva(
         success:
           "bg-success text-text-primary shadow-md hover:opacity-90 active:opacity-80 border border-text-primary/20",
         warning:
-          "bg-warning text-text-primary shadow-md hover:opacity-90 active:opacity-80 border-2 border-text-primary",
+          "bg-warning text-text-primary shadow-md hover:opacity-90 active:opacity-80",
         error:
-          "bg-error text-text-primary shadow-md hover:opacity-90 active:opacity-80 border-2 border-text-primary",
+          "bg-error text-text-primary shadow-md hover:opacity-90 active:opacity-80",
         bitcoin:
           "bg-bitcoin text-text-primary shadow-md hover:opacity-90 active:opacity-80",
         outline:

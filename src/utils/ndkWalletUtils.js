@@ -1,4 +1,5 @@
 import { NDKCashuWallet } from '@nostr-dev-kit/ndk-wallet';
+import { Platform } from './react-native-shim.js';
 
 /**
  * Utility for managing a persistent NDKCashuWallet instance
@@ -19,7 +20,18 @@ export const getOrCreateWallet = async (ndk, mintUrl) => {
     throw new Error('NDK instance is required');
   }
 
-  if (!ndk.signer) {
+  // For Amber on Android, check if Amber is installed rather than requiring persistent signer
+  if (Platform.OS === 'android') {
+    const AmberAuth = await import('../services/AmberAuth.js').then(m => m.default);
+    const isAmberAvailable = await AmberAuth.isAmberInstalled();
+    
+    if (!isAmberAvailable) {
+      throw new Error('Please install Amber to manage your wallet.');
+    }
+    
+    // Amber is available - operations can proceed, signing will happen via deep link when needed
+  } else if (!ndk.signer) {
+    // For web/other platforms, require traditional signer
     throw new Error('NDK signer not available. Please sign in with Amber first.');
   }
 

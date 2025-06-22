@@ -1,4 +1,5 @@
 import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { Platform } from './react-native-shim.js';
 
 export const NIP60_KINDS = {
   WALLET_METADATA: 17375,
@@ -80,7 +81,18 @@ export const createWalletEvents = async (ndk, selectedMintUrl) => {
     throw new Error('NDK not available');
   }
 
-  if (!ndk.signer) {
+  // For Amber on Android, check if Amber is installed rather than requiring persistent signer
+  if (Platform.OS === 'android') {
+    const AmberAuth = await import('../services/AmberAuth.js').then(m => m.default);
+    const isAmberAvailable = await AmberAuth.isAmberInstalled();
+    
+    if (!isAmberAvailable) {
+      throw new Error('Please install Amber to create a wallet.');
+    }
+    
+    // Amber is available - wallet creation can proceed, signing will happen via deep link when needed
+  } else if (!ndk.signer) {
+    // For web/other platforms, require traditional signer
     throw new Error('NDK signer not available. Please sign in with Amber to create a wallet.');
   }
 
@@ -195,7 +207,22 @@ export const calculateBalance = (tokenEvents) => {
  * Create a token transfer event
  */
 export const createTokenEvent = async (ndk, recipientPubkey, amount, mintUrl, tokenString, memo = '') => {
-  if (!ndk || !ndk.signer) {
+  if (!ndk) {
+    throw new Error('NDK not available');
+  }
+
+  // For Amber on Android, check if Amber is available rather than requiring persistent signer
+  if (Platform.OS === 'android') {
+    const AmberAuth = await import('../services/AmberAuth.js').then(m => m.default);
+    const isAmberAvailable = await AmberAuth.isAmberInstalled();
+    
+    if (!isAmberAvailable) {
+      throw new Error('Please install Amber to create token events.');
+    }
+    
+    // Amber is available - token event creation can proceed
+  } else if (!ndk.signer) {
+    // For web/other platforms, require traditional signer
     throw new Error('NDK signer not available');
   }
 
@@ -233,7 +260,22 @@ export const createTokenEvent = async (ndk, recipientPubkey, amount, mintUrl, to
  * Send token via encrypted DM
  */
 export const sendTokenViaDM = async (ndk, recipientPubkey, tokenString, memo = '') => {
-  if (!ndk || !ndk.signer) {
+  if (!ndk) {
+    throw new Error('NDK not available');
+  }
+
+  // For Amber on Android, check if Amber is available rather than requiring persistent signer
+  if (Platform.OS === 'android') {
+    const AmberAuth = await import('../services/AmberAuth.js').then(m => m.default);
+    const isAmberAvailable = await AmberAuth.isAmberInstalled();
+    
+    if (!isAmberAvailable) {
+      throw new Error('Please install Amber to create token events.');
+    }
+    
+    // Amber is available - token event creation can proceed
+  } else if (!ndk.signer) {
+    // For web/other platforms, require traditional signer
     throw new Error('NDK signer not available');
   }
 

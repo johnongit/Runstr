@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { NostrContext } from './NostrContext';
+import { Platform } from '../utils/react-native-shim.js';
 import { 
   findWalletEvents, 
   createWalletEvents, 
@@ -99,7 +100,22 @@ export const WalletProvider = ({ children }) => {
       throw new Error('Please sign in with Amber first to initialize your wallet.');
     }
 
-    if (!ndk || !ndk.signer) {
+    if (!ndk) {
+      throw new Error('NDK not available. Please try again.');
+    }
+
+    // For Amber on Android, check if Amber is available rather than requiring persistent signer
+    if (Platform.OS === 'android') {
+      const AmberAuth = await import('../services/AmberAuth.js').then(m => m.default);
+      const isAmberAvailable = await AmberAuth.isAmberInstalled();
+      
+      if (!isAmberAvailable) {
+        throw new Error('Please install Amber to initialize your wallet.');
+      }
+      
+      // Amber is available - wallet initialization can proceed, signing will happen via deep link when needed
+    } else if (!ndk.signer) {
+      // For web/other platforms, require traditional signer
       throw new Error('NDK signer not available. Please sign in with Amber to initialize your wallet.');
     }
 

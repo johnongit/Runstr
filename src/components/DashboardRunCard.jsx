@@ -82,9 +82,9 @@ export function DashboardRunCard({
               onClick={onShare}
               isLoading={false}
               loadingText="Sharing..."
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg border-2 border-white transition-colors"
+              className="flex-1 bg-bg-primary hover:bg-bg-tertiary text-text-primary font-medium py-2 px-4 rounded-lg border border-border-primary transition-colors"
             >
-              Share to Nostr
+              Share
             </LoadingButton>
             
             <LoadingButton
@@ -92,20 +92,20 @@ export function DashboardRunCard({
               isLoading={isSaving}
               loadingText="Saving..."
               disabled={isWorkoutSaved}
-              className={`flex-1 font-medium py-2 px-4 rounded-lg border-2 border-white transition-colors ${
+              className={`flex-1 font-medium py-2 px-4 rounded-lg border border-border-primary transition-colors ${
                 isWorkoutSaved 
-                  ? 'bg-green-600 text-white cursor-not-allowed' 
-                  : 'bg-black hover:bg-gray-900 text-white'
+                  ? 'bg-success text-text-primary cursor-not-allowed' 
+                  : 'bg-bg-primary hover:bg-bg-tertiary text-text-primary'
               }`}
             >
-              {isWorkoutSaved ? 'Saved ✓' : 'Save Workout Record'}
+              {isWorkoutSaved ? 'Saved ✓' : 'Save'}
             </LoadingButton>
             
             <LoadingButton
               onClick={onDelete}
               isLoading={isDeleting}
               loadingText="Deleting..."
-              className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg border-2 border-white transition-colors"
+              className="px-3 py-2 bg-bg-primary hover:bg-bg-tertiary text-text-primary rounded-lg border border-border-primary transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
