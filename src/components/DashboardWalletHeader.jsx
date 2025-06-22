@@ -4,6 +4,7 @@ import { useNip60 } from '../contexts/WalletContext';
 import { NostrContext } from '../contexts/NostrContext';
 import { NDKCashuWallet, NDKNutzapMonitor } from '@nostr-dev-kit/ndk-wallet';
 import { createTokenEvent, sendTokenViaDM, extractCashuToken } from '../utils/nip60Events';
+import { getOrCreateWallet } from '../utils/ndkWalletUtils';
 
 export const DashboardWalletHeader = () => {
   const navigate = useNavigate();
@@ -109,17 +110,10 @@ export const DashboardWalletHeader = () => {
     setSendSuccess('');
 
     try {
-      console.log('[DashboardWalletHeader] Creating NDK wallet and sending nutzap...');
+      console.log('[DashboardWalletHeader] Getting initialized wallet for sending nutzap...');
 
-      // Create NDK Cashu Wallet
-      const wallet = new NDKCashuWallet(ndk);
-      wallet.mints = [currentMint.url];
-      
-      // Initialize wallet if needed
-      if (!wallet.p2pk) {
-        await wallet.getP2pk();
-        await wallet.publish();
-      }
+      // Get properly initialized wallet instance
+      const wallet = await getOrCreateWallet(ndk, currentMint.url);
 
       // Send nutzap (NIP-61) instead of manual token creation
       // This will create and publish the proper nutzap event
@@ -171,17 +165,10 @@ export const DashboardWalletHeader = () => {
     setReceiveError('');
 
     try {
-      console.log('[DashboardWalletHeader] Creating NDK wallet and generating deposit invoice...');
+      console.log('[DashboardWalletHeader] Getting initialized wallet for generating deposit invoice...');
 
-      // Create NDK Cashu Wallet
-      const wallet = new NDKCashuWallet(ndk);
-      wallet.mints = [currentMint.url];
-      
-      // Initialize wallet if needed
-      if (!wallet.p2pk) {
-        await wallet.getP2pk();
-        await wallet.publish();
-      }
+      // Get properly initialized wallet instance
+      const wallet = await getOrCreateWallet(ndk, currentMint.url);
 
       // Use wallet.deposit() method instead of direct mint operations
       const deposit = wallet.deposit(amount, currentMint.url);
@@ -220,17 +207,10 @@ export const DashboardWalletHeader = () => {
     setReceiveError('');
 
     try {
-      console.log('[DashboardWalletHeader] Creating NDK wallet and receiving token...');
+      console.log('[DashboardWalletHeader] Getting initialized wallet for receiving token...');
 
-      // Create NDK Cashu Wallet
-      const wallet = new NDKCashuWallet(ndk);
-      wallet.mints = [currentMint.url];
-      
-      // Initialize wallet if needed
-      if (!wallet.p2pk) {
-        await wallet.getP2pk();
-        await wallet.publish();
-      }
+      // Get properly initialized wallet instance
+      const wallet = await getOrCreateWallet(ndk, currentMint.url);
 
       // Use wallet.receiveToken() method instead of manual parsing
       const tokenEvent = await wallet.receiveToken(receiveToken);

@@ -54,12 +54,80 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     return Number(distance || 0).toFixed(1);
   };
 
+  // Calculate distributed positions to prevent overlapping
+  const calculateDistributedPositions = (users) => {
+    if (users.length === 0) return [];
+    
+    const TRACK_WIDTH = 320; // SVG track width in pixels
+    const TRACK_START = 40;  // SVG track start position
+    const TRACK_END = 360;   // SVG track end position
+    const MIN_SPACING = 15;  // Minimum pixels between dots (increased for better visibility)
+    
+    // Sort users by distance (maintaining ranking order)
+    const sortedUsers = [...users].sort((a, b) => b.totalMiles - a.totalMiles);
+    
+    // Calculate ideal positions based on actual progress
+    let positions = sortedUsers.map(user => ({
+      ...user,
+      idealX: TRACK_START + (calculateTrackPosition(user.totalMiles) / 100 * TRACK_WIDTH),
+      adjustedX: TRACK_START + (calculateTrackPosition(user.totalMiles) / 100 * TRACK_WIDTH)
+    }));
+    
+    // Multi-pass algorithm to resolve all conflicts
+    let hasConflicts = true;
+    let maxIterations = 10; // Prevent infinite loops
+    let iteration = 0;
+    
+    while (hasConflicts && iteration < maxIterations) {
+      hasConflicts = false;
+      iteration++;
+      
+      // Check each pair of adjacent users (in ranking order)
+      for (let i = 0; i < positions.length - 1; i++) {
+        const currentUser = positions[i];
+        const nextUser = positions[i + 1];
+        
+        const distance = currentUser.adjustedX - nextUser.adjustedX;
+        
+        if (distance < MIN_SPACING) {
+          hasConflicts = true;
+          
+          // Calculate how much we need to separate them
+          const adjustment = (MIN_SPACING - distance) / 2;
+          
+          // Move current user forward and next user backward
+          currentUser.adjustedX = Math.min(TRACK_END - 5, currentUser.adjustedX + adjustment);
+          nextUser.adjustedX = Math.max(TRACK_START, nextUser.adjustedX - adjustment);
+          
+          // If we can't move the leading user forward enough, move the trailing user back more
+          if (currentUser.adjustedX - nextUser.adjustedX < MIN_SPACING) {
+            nextUser.adjustedX = currentUser.adjustedX - MIN_SPACING;
+            nextUser.adjustedX = Math.max(TRACK_START, nextUser.adjustedX);
+          }
+        }
+      }
+    }
+    
+    // Final pass: ensure no one goes beyond track boundaries and maintain minimum spacing
+    for (let i = 0; i < positions.length; i++) {
+      positions[i].adjustedX = Math.max(TRACK_START, Math.min(TRACK_END - 5, positions[i].adjustedX));
+    }
+    
+    // If users are still bunched up at the start, spread them out evenly
+    const startLineUsers = positions.filter(p => p.adjustedX <= TRACK_START + MIN_SPACING);
+    if (startLineUsers.length > 1) {
+      for (let i = 0; i < startLineUsers.length; i++) {
+        startLineUsers[i].adjustedX = TRACK_START + (i * MIN_SPACING);
+      }
+    }
+    
+    return positions;
+  };
+
   // Calculate positions for leaderboard users on the track
   const racePositions = useMemo(() => {
-    return enhancedLeaderboard.map(user => ({
-      ...user,
-      trackPosition: calculateTrackPosition(user.totalMiles)
-    }));
+    const topUsers = enhancedLeaderboard.slice(0, 10);
+    return calculateDistributedPositions(topUsers);
   }, [enhancedLeaderboard, courseTotal]);
 
   // Loading state with lazy loading support
@@ -70,9 +138,9 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-6 mb-4">
         <div className="flex flex-col justify-center items-center h-32">
           <div className="flex space-x-1 mb-3">
-            <span className="w-2 h-2 bg-text-secondary rounded-full animate-bounce"></span>
-            <span className="w-2 h-2 bg-text-secondary rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></span>
-            <span className="w-2 h-2 bg-text-secondary rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
+            <span className="w-2 h-2 bg-text-secondary rounded-full"></span>
+            <span className="w-2 h-2 bg-text-secondary rounded-full"></span>
+            <span className="w-2 h-2 bg-text-secondary rounded-full"></span>
           </div>
           <p className="text-text-secondary">Loading League Race...</p>
         </div>
@@ -87,7 +155,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
           <p className="text-red-400 text-sm mb-2">Error loading league data: {leaderboardError}</p>
           <button 
             onClick={refreshLeaderboard}
-            className="px-3 py-1 bg-primary hover:bg-primary-hover text-text-primary text-sm rounded-md transition-colors"
+            className="px-3 py-1 bg-primary text-text-primary text-sm rounded-md"
           >
             Retry
           </button>
@@ -100,29 +168,26 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     <div className="space-y-4 mb-4">
       {/* Linear Race Track */}
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-4">
-        <div className="text-center mb-4">
-          <h2 className="text-xl font-bold text-text-primary mb-1">🏁 500 MILE LEAGUE RACE</h2>
-          <p className="text-text-secondary text-sm">
-            Top 10 Runners • Updated {lastUpdated?.toLocaleTimeString() || 'Recently'}
-            {leaderboardLoading && <span className="ml-2 text-primary">Updating...</span>}
-          </p>
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-lg font-semibold text-text-primary">🏁 League Race Progress</h3>
+          <div className="text-xs text-text-secondary">
+            {lastUpdated && `Updated ${new Date(lastUpdated).toLocaleTimeString()}`}
+          </div>
         </div>
         
-        <div className="w-full max-w-2xl mx-auto">
+        <div className="relative">
           <svg 
-            viewBox="0 0 400 120" 
-            className="w-full h-24"
+            viewBox="0 0 400 100" 
+            className="w-full h-24 race-track-svg"
+            preserveAspectRatio="xMidYMid meet"
           >
-            {/* Track background */}
-            <rect x="0" y="0" width="400" height="120" fill="transparent" />
-            
-            {/* Main race track line */}
+            {/* Track line */}
             <line 
               x1="40" y1="60" x2="360" y2="60" 
               stroke="currentColor" 
               strokeWidth="4" 
               strokeLinecap="round"
-              className="text-border-secondary"
+              className="text-text-muted"
             />
             
             {/* Start line */}
@@ -133,7 +198,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
               strokeLinecap="round"
               className="text-text-primary"
             />
-            <text x="15" y="45" fontSize="10" fill="currentColor" className="text-text-secondary">START</text>
+            <text x="40" y="45" fontSize="10" textAnchor="middle" fill="currentColor" className="text-text-secondary">START</text>
             
             {/* Finish line */}
             <line 
@@ -164,8 +229,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
             })}
             
             {/* Position runners on track */}
-            {racePositions.slice(0, 10).map((user, index) => {
-              const x = 40 + (user.trackPosition / 100 * 320);
+            {racePositions.map((user, index) => {
               const colors = {
                 1: '#FFD700', // Gold
                 2: '#C0C0C0', // Silver  
@@ -178,18 +242,18 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
                 <g key={user.pubkey}>
                   {/* Position dot */}
                   <circle 
-                    cx={x} 
+                    cx={user.adjustedX} 
                     cy="60" 
                     r="6" 
                     fill={color}
                     stroke={user.isCurrentUser ? "#FF6B35" : "#000"}
                     strokeWidth={user.isCurrentUser ? "2" : "1"}
-                    className="drop-shadow-sm transition-all duration-300 cursor-pointer hover:scale-110"
+                    className="drop-shadow-sm"
                   />
                   
                   {/* Rank number */}
                   <text 
-                    x={x} 
+                    x={user.adjustedX} 
                     y="64" 
                     fontSize="10" 
                     fontWeight="bold"
@@ -198,19 +262,6 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
                   >
                     {user.rank}
                   </text>
-                  
-                  {/* User pulse animation for current user */}
-                  {user.isCurrentUser && (
-                    <circle 
-                      cx={x} 
-                      cy="60" 
-                      r="10" 
-                      fill="none" 
-                      stroke="#FF6B35" 
-                      strokeWidth="2"
-                      className="animate-ping"
-                    />
-                  )}
                 </g>
               );
             })}
@@ -225,9 +276,9 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
           {leaderboardLoading && (
             <div className="flex items-center">
               <div className="flex space-x-1">
-                <span className="w-1 h-1 bg-text-secondary rounded-full animate-bounce"></span>
-                <span className="w-1 h-1 bg-text-secondary rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></span>
-                <span className="w-1 h-1 bg-text-secondary rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
+                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
+                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
+                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
               </div>
             </div>
           )}
@@ -242,64 +293,58 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
             {enhancedLeaderboard.slice(0, 10).map((user) => (
               <div 
                 key={user.pubkey} 
-                className={`flex items-center p-3 hover:bg-bg-tertiary transition-colors duration-200 ${
-                  user.isCurrentUser ? 'bg-primary/10' : ''
+                className={`flex items-center justify-between p-4 ${
+                  user.isCurrentUser ? 'bg-primary/5 border-l-4 border-primary' : ''
                 }`}
               >
-                <div className="flex-shrink-0 mr-3">
-                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                    user.rank === 1 ? 'bg-yellow-500 text-black' :
-                    user.rank === 2 ? 'bg-gray-400 text-black' :
-                    user.rank === 3 ? 'bg-orange-600 text-white' :
-                    'bg-primary text-text-primary'
-                  }`}>
-                    {user.rank <= 3 ? ['🥇', '🥈', '🥉'][user.rank - 1] : user.rank}
-                  </span>
-                </div>
-                
-                <div className="flex-grow min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="text-text-primary font-medium text-sm truncate">
-                      {user.displayName}
-                    </div>
-                    {user.isCurrentUser && (
-                      <span className="px-2 py-1 bg-primary text-text-primary text-xs rounded-full font-bold">
-                        YOU
+                <div className="flex items-center space-x-3">
+                  {/* Rank Badge */}
+                  <div className={`
+                    flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold
+                    ${user.rank === 1 ? 'bg-yellow-500 text-black' : ''}
+                    ${user.rank === 2 ? 'bg-gray-400 text-black' : ''}
+                    ${user.rank === 3 ? 'bg-orange-600 text-white' : ''}
+                    ${user.rank > 3 ? 'bg-bg-tertiary text-text-secondary border border-border-secondary' : ''}
+                  `}>
+                    {user.rank}
+                  </div>
+                  
+                  {/* User Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-text-primary truncate">
+                        {user.displayName}
                       </span>
-                    )}
-                  </div>
-                  <div className="text-text-secondary text-xs mt-1">
-                    <span className="text-text-primary font-medium">{formatDistance(user.totalMiles)} mi</span>
-                    <span className="text-text-muted ml-1">• {formatDistance(user.progressPercentage)}%</span>
-                    <span className="text-text-muted ml-1">• {user.runCount} runs</span>
+                      {user.isCurrentUser && (
+                        <span className="px-2 py-1 bg-primary text-text-primary text-xs rounded-full font-bold">
+                          YOU
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-text-secondary">
+                      {user.runCount} run{user.runCount !== 1 ? 's' : ''}
+                    </div>
                   </div>
                 </div>
                 
-                <div className="flex-shrink-0 ml-3">
-                  <div className="w-12 h-2 bg-bg-primary rounded-full overflow-hidden">
+                {/* Stats */}
+                <div className="text-right">
+                  <div className="font-semibold text-text-primary">
+                    {formatDistance(user.totalMiles)} mi
+                  </div>
+                  <div className="text-xs text-text-secondary">
+                    {user.progressPercentage.toFixed(1)}% complete
+                  </div>
+                  {/* Mini progress bar */}
+                  <div className="w-16 h-1 bg-bg-tertiary rounded-full mt-1">
                     <div 
-                      className="h-full bg-primary rounded-full transition-all duration-500" 
+                      className="h-full bg-primary rounded-full"
                       style={{ width: `${Math.min(100, user.progressPercentage)}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
               </div>
             ))}
-          </div>
-        )}
-        
-        {enhancedLeaderboard.length > 0 && (
-          <div className="p-3 border-t border-border-secondary bg-bg-tertiary flex justify-between items-center">
-            <button 
-              onClick={refreshLeaderboard}
-              className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-200 disabled:opacity-50"
-              disabled={leaderboardLoading}
-            >
-              {leaderboardLoading ? 'Updating...' : 'Refresh'}
-            </button>
-            <span className="text-xs text-text-muted">
-              Last updated: {lastUpdated?.toLocaleTimeString() || 'Never'}
-            </span>
           </div>
         )}
       </div>
