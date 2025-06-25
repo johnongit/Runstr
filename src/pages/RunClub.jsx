@@ -4,6 +4,7 @@ import { WalletContext } from '../contexts/WalletContext.jsx';
 import { useRunFeed } from '../hooks/useRunFeed';
 import { usePostInteractions } from '../hooks/usePostInteractions';
 import { PostList } from '../components/PostList';
+import { LeagueMap } from '../components/LeagueMap';
 import { handleAppBackground } from '../utils/nostr';
 import '../components/RunClub.css';
 
@@ -62,35 +63,37 @@ export const RunClub = () => {
   };
 
   return (
-    <div className="run-club-container">
-      <div className="feed-header-static">
-        <h2>RUNSTR FEED</h2>
+    <div className="league-page">
+      {/* League Map at the top - pass feed data for leaderboard */}
+      <LeagueMap feedPosts={posts} feedLoading={loading} feedError={error} />
+      
+      {/* League Feed - existing 1301 feed below */}
+      <div className="league-feed">
+        {loading && posts.length === 0 ? (
+          <div className="loading-indicator"><p>Loading posts...</p></div>
+        ) : error ? null : posts.length === 0 ? (
+          <div className="no-posts-message">
+            <p>No running posts found</p>
+            <button className="retry-button" onClick={refreshFeed}>Refresh</button>
+          </div>
+        ) : (
+          <PostList
+            posts={posts}
+            loading={loading}
+            page={1}
+            userLikes={userLikes}
+            userReposts={userReposts}
+            handleLike={handleLike}
+            handleRepost={handleRepost}
+            handleZap={(post) => handleZap(post, wallet)}
+            handleCommentClick={handleCommentClick}
+            handleComment={handleComment}
+            commentText={commentText}
+            setCommentText={setCommentText}
+            wallet={wallet}
+          />
+        )}
       </div>
-
-      {loading && posts.length === 0 ? (
-        <div className="loading-indicator"><p>Loading posts...</p></div>
-      ) : error ? null : posts.length === 0 ? (
-        <div className="no-posts-message">
-          <p>No running posts found</p>
-          <button className="retry-button" onClick={refreshFeed}>Refresh</button>
-        </div>
-      ) : (
-        <PostList
-          posts={posts}
-          loading={loading}
-          page={1}
-          userLikes={userLikes}
-          userReposts={userReposts}
-          handleLike={handleLike}
-          handleRepost={handleRepost}
-          handleZap={(post) => handleZap(post, wallet)}
-          handleCommentClick={handleCommentClick}
-          handleComment={handleComment}
-          commentText={commentText}
-          setCommentText={setCommentText}
-          wallet={wallet}
-        />
-      )}
     </div>
   );
 };

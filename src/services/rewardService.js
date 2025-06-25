@@ -143,7 +143,23 @@ export async function sendRewardZap(recipientPubkey, amountSats, message, zapTyp
     return { success: false, message: 'Reward wallet connection failed.', error: error.message };
   }
 
-  const lud16 = await getLud16FromProfile(recipientPubkey);
+  let lud16 = fallbackLightningAddress; // Prioritize explicitly passed fallback from function arguments
+
+  // If no argument fallback, try the manually set global fallback from localStorage
+  if (!lud16) {
+    const globallySetManualAddress = localStorage.getItem('manualLightningAddress');
+    if (globallySetManualAddress && globallySetManualAddress.includes('@')) {
+      lud16 = globallySetManualAddress;
+      console.log(`[RewardService] Using globally set manual Lightning Address as fallback: ${lud16} for recipient ${recipientPubkey}`);
+    }
+  }
+
+  // If still no address, try fetching from the recipient's profile
+  if (!lud16) {
+    console.log(`[RewardService] No manual or argument fallback LN Address for ${recipientPubkey}, attempting profile lookup.`);
+    lud16 = await getLud16FromProfile(recipientPubkey);
+  }
+
   if (!lud16) {
     return { success: false, message: 'Recipient does not have a Lightning Address (lud16/lud06) in their profile.', error: 'No lud16/lud06' };
   }
@@ -281,6 +297,7 @@ export async function rewardStreakCompletion(recipientPubkey, streakDays, lightn
   const STREAK_REWARD_AMOUNT_SATS = 100; // linear model (100 per day)
   const message = `Congrats on your ${streakDays}-day streak! +${STREAK_REWARD_AMOUNT_SATS} sats from Runstr! 🔥`;
   const rewardType = 'streak_completion';
+  // Pass the explicit lightningAddress from arguments if available, sendRewardZap will handle internal fallbacks
   return sendRewardZap(recipientPubkey, STREAK_REWARD_AMOUNT_SATS, message, rewardType, lightningAddress);
 }
 
@@ -299,6 +316,7 @@ export async function rewardUserActivity(recipientPubkey, activityType, usedPriv
   const zapType = activityType === 'profile_update' ? 'profile_update_reward' : 'workout_record_reward';
 
   try {
+    // Pass the explicit lightningAddress from arguments if available, sendRewardZap will handle internal fallbacks
     const result = await sendRewardZap(recipientPubkey, finalAmount, message, zapType, lightningAddress);
     return result;
   } catch (error) {

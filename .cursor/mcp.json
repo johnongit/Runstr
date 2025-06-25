@@ -16,6 +16,18 @@
                 "DEFAULT_SUBTASKS": 5,
                 "DEFAULT_PRIORITY": "medium"
             }
+        },
+        "Modular-Health-NIPs Docs": {
+            "url": "https://gitmcp.io/HealthNoteLabs/Modular-Health-NIPs"
+        },
+        "primal-android-app Docs": {
+            "url": "https://gitmcp.io/PrimalHQ/primal-android-app"
+        },
+        "Runstr Docs": {
+            "url": "https://gitmcp.io/HealthNoteLabs/Runstr"
+        },
+        "primal-server Docs": {
+            "url": "https://gitmcp.io/PrimalHQ/primal-server"
         }
     }
 }

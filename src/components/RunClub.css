@@ -1,14 +1,15 @@
-/* Run Club Styles - Optimized for Android */
+/* Run Club Styles - Using Design System Variables */
 .team-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 16px;
-  color: #fff;
+  color: var(--text-primary);
+  background: var(--bg-primary);
 }
 
 .team-tabs {
   display: flex;
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid var(--border-secondary);
   margin-bottom: 20px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch; /* Smooth scrolling for Android */
@@ -33,7 +34,7 @@
   right: 0;
   height: 100%;
   width: 30px;
-  background: linear-gradient(to right, rgba(36, 36, 36, 0), rgba(36, 36, 36, 0.8));
+  background: linear-gradient(to right, var(--bg-primary), var(--bg-primary));
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s;
@@ -49,7 +50,7 @@
   border: none;
   cursor: pointer;
   font-weight: 500;
-  color: #fff;
+  color: var(--text-primary);
   position: relative;
   min-width: 80px; /* Minimum width for better tapping */
   text-align: center;
@@ -59,8 +60,8 @@
 }
 
 .team-tabs .tab-button.active { /* Increased specificity */
-  color: #ffffff !important; /* Ensure text is white, overriding other rules */
-  background-color: rgba(58, 134, 255, 0.8); /* Semi-transparent blue background */
+  color: var(--text-primary) !important; /* Ensure text is white */
+  background: var(--primary); /* Purple gradient background */
   border-radius: 6px 6px 0 0; /* Rounded top corners */
   font-weight: 600; /* Make text slightly bolder when active */
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
@@ -73,16 +74,17 @@
   left: 0;
   width: 100%;
   height: 3px; /* Thicker indicator for better visibility on mobile */
-  background-color: #3a86ff;
+  background: var(--primary);
   display: none; /* Hide the underline since we're using background color */
 }
 
 .tab-content {
-  background-color: #242424;
+  background: var(--bg-secondary);
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   padding: 16px;
-  color: #fff;
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
 }
 
 /* Team items - Mobile optimized */
@@ -96,20 +98,20 @@
   display: flex;
   padding: 16px;
   border-radius: 8px;
-  background-color: #333;
-  border: 1px solid #444;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
   min-height: 80px; /* Minimum height for better tapping */
 }
 
 .team-item:active {
-  background-color: #444; /* Android active state */
+  background: var(--bg-tertiary);
   transform: scale(0.98);
 }
 
 .team-item.has-new-messages {
-  border-left: 4px solid #3a86ff;
+  border-left: 4px solid var(--primary);
 }
 
 .team-avatar {
@@ -139,22 +141,22 @@
 .team-name {
   margin: 0 0 5px;
   font-size: 16px;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .team-description {
   margin: 0 0 10px;
-  color: #aaa;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
 .team-meta {
   font-size: 12px;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .new-badge {
-  background-color: #3a86ff;
+  background: var(--primary);
   color: white;
   font-size: 11px;
   padding: 2px 6px;
@@ -171,7 +173,7 @@
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 16px;
 }
 
@@ -180,9 +182,9 @@
   width: 100%;
   padding: 12px; /* Larger input areas for touchscreens */
   border-radius: 4px;
-  border: 1px solid #444;
-  background-color: #333;
-  color: #fff;
+  border: 1px solid var(--border-secondary);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
   font-size: 16px; /* Better for mobile readability */
 }
 
@@ -200,16 +202,16 @@
   flex: 1;
   padding: 12px; /* Larger input areas for touch */
   border-radius: 4px;
-  border: 1px solid #444;
-  background-color: #333;
-  color: #fff;
+  border: 1px solid var(--border-secondary);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
   font-size: 16px;
 }
 
 .search-container button,
 .cta-buttons button,
 .invite-button {
-  background-color: #3a86ff;
+  background: var(--primary);
   color: white;
   border: none;
   padding: 12px 16px; /* Larger tap targets */
@@ -218,12 +220,14 @@
   font-weight: 600;
   font-size: 16px;
   min-width: 80px; /* Minimum width for tapping */
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .search-container button:active,
 .cta-buttons button:active,
 .invite-button:active {
-  background-color: #2a75e8;
+  background: var(--primary-hover);
   transform: scale(0.98);
 }
 
@@ -259,20 +263,21 @@
 .my-teams-tab h2,
 .join-team-tab h2,
 .create-team-tab h2 {
-  color: #fff;
+  color: var(--text-primary);
   margin-bottom: 20px;
   text-align: center;
 }
 
 .invite-section {
-  background-color: #333;
+  background-color: var(--bg-tertiary);
   padding: 20px;
   border-radius: 8px;
   margin-top: 30px;
+  border: 1px solid var(--border-secondary);
 }
 
 .invite-section h3 {
-  color: #fff;
+  color: var(--text-primary);
   margin-top: 0;
 }
 
@@ -287,9 +292,9 @@
   flex: 1;
   padding: 12px;
   border-radius: 4px;
-  border: 1px solid #444;
-  background-color: #242424;
-  color: #fff;
+  border: 1px solid var(--border-secondary);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   min-width: 200px;
   font-size: 16px;
 }
@@ -297,41 +302,41 @@
 .invite-tip {
   margin-top: 15px;
   font-size: 0.9rem;
-  color: #aaa;
+  color: var(--text-muted);
 }
 
 .invite-success {
   margin-top: 10px;
   padding: 10px;
-  background-color: rgba(40, 167, 69, 0.2);
-  border: 1px solid #28a745;
+  background-color: var(--success-light);
+  border: 1px solid var(--success);
   border-radius: 4px;
-  color: #28a745;
+  color: var(--success);
 }
 
 .invite-error {
   margin-top: 10px;
   padding: 10px;
-  background-color: rgba(220, 53, 69, 0.2);
-  border: 1px solid #dc3545;
+  background-color: var(--error-light);
+  border: 1px solid var(--error);
   border-radius: 4px;
-  color: #dc3545;
+  color: var(--error);
 }
 
 .loading {
   text-align: center;
   padding: 30px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 1.1rem;
 }
 
 .error-message {
-  background-color: rgba(255, 0, 0, 0.2);
-  color: #ff5252;
+  background-color: var(--error-light);
+  color: var(--error);
   padding: 15px;
   margin: 15px 0;
   border-radius: 8px;
-  border: 1px solid rgba(255, 0, 0, 0.3);
+  border: 1px solid var(--error);
   text-align: center;
   font-weight: 500;
   max-width: 600px;
@@ -342,7 +347,7 @@
 /* Form buttons - Android optimized */
 .primary-button, 
 .create-team-button {
-  background-color: #3a86ff;
+  background: var(--primary);
   color: white;
   font-weight: 600;
   padding: 14px 20px; /* Taller buttons for Android */
@@ -350,22 +355,23 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 16px;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
   display: block;
   margin: 20px auto;
   min-width: 200px;
   -webkit-tap-highlight-color: transparent; /* Remove tap highlight on Android */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .primary-button:active,
 .create-team-button:active {
-  background-color: #2a75e8;
+  background: var(--primary-hover);
   transform: scale(0.98);
 }
 
 .primary-button:disabled,
 .create-team-button:disabled {
-  background-color: #666;
+  background: var(--text-muted);
   cursor: not-allowed;
   transform: none;
 }
@@ -373,7 +379,7 @@
 /* Form hint */
 .form-hint {
   display: block;
-  color: #aaa;
+  color: var(--text-muted);
   font-size: 0.85rem;
   margin-top: 5px;
   font-style: italic;
@@ -382,11 +388,12 @@
 /* No results message */
 .no-results {
   text-align: center;
-  background-color: #333;
+  background-color: var(--bg-tertiary);
   padding: 20px;
   border-radius: 8px;
   margin: 20px 0;
-  color: #aaa;
+  color: var(--text-muted);
+  border: 1px solid var(--border-secondary);
 }
 
 /* Search results */
@@ -406,7 +413,7 @@
 }
 
 .chat-container {
-  border: 1px solid #444;
+  border: 1px solid var(--border-secondary);
   border-radius: 8px;
   overflow: hidden;
   height: calc(100vh - 250px); /* Adjust for mobile height */
@@ -418,14 +425,14 @@
   flex: 1;
   overflow-y: auto;
   padding: 15px;
-  background-color: #242424;
+  background-color: var(--bg-primary);
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on Android */
   max-height: calc(100vh - 350px); /* Better height for mobile */
 }
 
 .no-messages {
   text-align: center;
-  color: #888;
+  color: var(--text-muted);
   padding: 40px 0;
 }
 
@@ -437,18 +444,20 @@
 
 .message.my-message {
   margin-left: auto;
-  background-color: #3a86ff22;
+  background: var(--primary-light);
   border-radius: 18px 18px 0 18px;
+  border: 1px solid var(--border-secondary);
 }
 
 .message:not(.my-message) {
-  background-color: #333;
+  background: var(--bg-secondary);
   border-radius: 18px 18px 18px 0;
+  border: 1px solid var(--border-secondary);
 }
 
 .message-header {
   font-size: 12px;
-  color: #888;
+  color: var(--text-muted);
   margin-bottom: 4px;
   display: flex;
   justify-content: space-between;
@@ -463,48 +472,50 @@
   padding: 10px 15px;
   border-radius: inherit;
   word-break: break-word;
+  color: var(--text-primary);
 }
 
 .message-input-container {
   display: flex;
   padding: 12px;
-  background-color: #333;
-  border-top: 1px solid #444;
+  background-color: var(--bg-tertiary);
+  border-top: 1px solid var(--border-secondary);
 }
 
 .message-input-container textarea {
   flex: 1;
   padding: 12px;
-  border: 1px solid #444;
+  border: 1px solid var(--border-secondary);
   border-radius: 4px;
   font-size: 16px; /* Better size for mobile input */
   resize: none;
   min-height: 50px;
   max-height: 100px;
-  background-color: #242424;
-  color: #fff;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .message-input-container button {
   margin-left: 10px;
   padding: 0 20px;
-  background-color: #3a86ff;
+  background: var(--primary);
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   min-width: 80px;
   min-height: 50px;
+  transition: all 0.2s ease;
 }
 
-.message-input-container button:disabled {
-  background-color: #666;
-  cursor: not-allowed;
+.message-input-container button:active {
+  background: var(--primary-hover);
 }
 
 /* Message options - Optimized for touch */
 .message-options {
   position: relative;
+  display: inline-block;
 }
 
 .options-toggle {
@@ -512,44 +523,43 @@
   border: none;
   font-size: 18px; /* Larger for touch */
   cursor: pointer;
-  color: #888;
+  color: var(--text-muted);
   padding: 4px 10px;
   border-radius: 4px;
-  min-width: 40px;
-  min-height: 30px;
+  transition: background-color 0.2s ease;
 }
 
 .options-toggle:active {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--border-secondary);
 }
 
 .options-menu {
   position: absolute;
   right: 0;
   top: 100%;
-  background-color: #333;
+  background-color: var(--bg-tertiary);
   border-radius: 4px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   z-index: 10;
   min-width: 140px;
   overflow: hidden;
-  border: 1px solid #444;
+  border: 1px solid var(--border-secondary);
 }
 
 .options-menu button {
   display: block;
   width: 100%;
-  text-align: left;
+  padding: 10px 15px;
   background: none;
   border: none;
-  padding: 12px 15px; /* Larger touch targets */
+  text-align: left;
   cursor: pointer;
   font-size: 14px;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .options-menu button:active {
-  background-color: #444;
+  background-color: var(--border-secondary);
 }
 
 /* Mobile-specific adjustments */
@@ -559,12 +569,12 @@
   }
   
   .tab-button {
-    padding: 10px 15px;
+    padding: 8px 12px;
     font-size: 14px;
-    min-width: 70px;
   }
   
   .team-item {
+    min-height: 60px;
     padding: 12px;
   }
   
@@ -574,7 +584,7 @@
   }
   
   .team-name {
-    font-size: 15px;
+    font-size: 14px;
   }
   
   .message {
@@ -589,71 +599,66 @@
     margin-top: 10px;
   }
   
-  /* Ensure buttons don't overflow on small screens */
   .action-button,
-  .share-btn,
-  .delete-btn {
-    padding: 8px 10px;
-    min-width: 0;
-    font-size: 13px;
-    flex-basis: calc(33.333% - 10px);
-  }
-  
-  /* For smallest screens, adjust layout further */
-  @media (max-width: 350px) {
-    .run-actions {
-      gap: 5px;
-    }
-    
-    .action-button,
-    .share-btn,
-    .delete-btn {
-      padding: 6px 8px;
-      font-size: 12px;
-      flex-basis: calc(50% - 5px);
-    }
+  .retry-button,
+  .diagnose-button {
+    padding: 8px 16px;
+    font-size: 14px;
   }
 }
 
-/* Medium screens */
+@media (max-width: 350px) {
+  .run-actions {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-button,
+  .retry-button,
+  .diagnose-button {
+    width: 100%;
+    margin: 5px 0;
+  }
+}
+
 @media (min-width: 481px) and (max-width: 768px) {
   .teams-list {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   }
 }
 
 .run-club-container {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 16px;
+  padding: 0;
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg-primary);
 }
 
 .loading-indicator {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  padding: 40px 20px;
-  color: rgba(255, 255, 255, 0.7);
+  align-items: center;
+  padding: 40px;
+  color: var(--text-primary);
 }
 
 .loading-spinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid rgba(100, 108, 255, 0.3);
+  border: 4px solid var(--border-secondary);
+  border-left: 4px solid var(--primary);
   border-radius: 50%;
-  border-top-color: #646cff;
+  width: 40px;
+  height: 40px;
   animation: spin 1s linear infinite;
-  margin-bottom: 15px;
 }
 
 .error-message {
-  background-color: rgba(255, 90, 90, 0.2);
-  border: 1px solid rgba(255, 90, 90, 0.4);
+  background-color: var(--error-light);
+  color: var(--error);
+  padding: 15px;
+  margin: 15px 0;
   border-radius: 8px;
-  padding: 20px;
-  margin: 20px 0;
+  border: 1px solid var(--error);
   text-align: center;
+  font-weight: 500;
 }
 
 .error-buttons {
@@ -664,301 +669,255 @@
 }
 
 .retry-button, .diagnose-button {
-  background-color: #646cff;
+  background: var(--primary);
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 8px 15px;
+  padding: 10px 20px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
-.diagnose-button {
-  background-color: #444;
+.retry-button:active,
+.diagnose-button:active {
+  background: var(--primary-hover);
+  transform: scale(0.98);
 }
 
 .diagnostic-info {
-  margin-top: 15px;
-  padding: 10px;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  font-size: 14px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  padding: 15px;
+  margin: 15px 0;
+  color: var(--text-primary);
 }
 
 .no-posts-message {
-  background-color: rgba(100, 108, 255, 0.1);
-  border: 1px solid rgba(100, 108, 255, 0.3);
-  border-radius: 8px;
-  padding: 30px 20px;
-  margin: 20px 0;
   text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  margin: 20px;
+  border: 1px solid var(--border-secondary);
 }
 
-/* Debug overlay styles */
 .debug-toggle {
   position: fixed;
-  bottom: 10px;
-  right: 10px;
-  background: rgba(0,0,0,0.7);
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: var(--primary);
   color: white;
   border: none;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  z-index: 1000;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  width: 50px;
+  height: 50px;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.debug-toggle:hover {
+  transform: scale(1.1);
+}
+
+.debug-toggle:active {
+  transform: scale(0.95);
 }
 
 .debug-overlay {
   position: fixed;
-  bottom: 0;
+  top: 0;
   left: 0;
   right: 0;
-  background: rgba(0,0,0,0.9);
-  color: white;
-  padding: 15px;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
   z-index: 999;
-  max-height: 200px;
+  padding: 20px;
   overflow-y: auto;
-  border-top: 2px solid #646cff;
-  font-family: monospace;
-  font-size: 14px;
+  color: var(--text-primary);
 }
 
 .debug-overlay h3 {
-  margin: 0 0 10px 0;
-  color: #646cff;
-  font-size: 16px;
+  color: var(--primary);
+  margin-bottom: 15px;
+  font-size: 18px;
 }
 
 .debug-overlay p {
-  margin: 5px 0;
-  line-height: 1.4;
+  margin: 10px 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .debug-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 10px;
+  margin: 20px 0;
+  flex-wrap: wrap;
 }
 
 .debug-button {
-  background: #646cff;
-  border: none;
+  background: var(--primary);
   color: white;
-  padding: 5px 10px;
+  border: none;
+  padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
 }
 
 .debug-button.secondary {
-  background: #444;
+  background: var(--text-muted);
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-/* Load more button styles */
 .load-more-container {
-  display: flex;
-  justify-content: center;
-  margin: 20px 0 30px;
-  width: 100%;
+  text-align: center;
+  padding: 20px;
+  margin: 20px 0;
 }
 
 .load-more-button {
-  background-color: #4176ff;
+  background: var(--primary);
   color: white;
   border: none;
+  padding: 12px 24px;
   border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 0.9rem;
-  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 150px;
 }
 
 .load-more-button:hover {
-  background-color: #3060db;
+  background: var(--primary-hover);
+  transform: translateY(-2px);
+}
+
+.load-more-button:active {
+  transform: translateY(0);
 }
 
 .load-more-button:disabled {
-  background-color: #a0b1d9;
+  background: var(--text-muted);
   cursor: not-allowed;
+  transform: none;
 }
 
-/* Message spacing and padding improvements */
-.message {
-  margin-bottom: 15px;
-  max-width: 85%; /* Wider on mobile */
-  padding: 1px; /* Prevent margin collapse */
-}
-
-.message.my-message {
-  margin-left: auto;
-  background-color: #3a86ff22;
-  border-radius: 18px 18px 0 18px;
-}
-
-.message:not(.my-message) {
-  background-color: #333;
-  border-radius: 18px 18px 18px 0;
-}
-
-.message-header {
-  font-size: 12px;
-  color: #888;
-  margin-bottom: 4px;
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 10px 0 10px;
-}
-
-.message-content {
-  padding: 10px 15px;
-  border-radius: inherit;
-  word-break: break-word;
-}
-
-/* Fix button alignment and spacing in action groups */
-.run-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  margin-top: 15px;
-  flex-wrap: wrap;
-  padding: 0 5px;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.action-button,
-.share-btn,
-.delete-btn {
-  padding: 8px 12px;
-  font-size: 14px;
-  border-radius: 6px;
-  min-width: auto;
-  max-width: 100%;
-  flex: 0 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Text truncation with proper ellipsis */
 .team-description,
-.message-content,
-.club-description {
+.team-description.collapsed {
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2; /* Number of lines to show */
-  -webkit-box-orient: vertical;
+  margin-bottom: 10px;
   line-height: 1.4;
-  max-height: 2.8em; /* line-height × line-clamp */
+  max-height: calc(1.4em * 3);
+  transition: all 0.3s ease;
 }
 
 .expanded-text {
-  -webkit-line-clamp: unset;
-  max-height: none;
+  display: block !important;
+  max-height: none !important;
+  -webkit-line-clamp: none !important;
 }
 
 .read-more {
-  color: #3a86ff;
-  font-size: 0.85em;
-  margin-top: 4px;
-  display: inline-block;
+  color: var(--primary);
+  background: none;
+  border: none;
   cursor: pointer;
+  font-size: 0.9em;
+  text-decoration: underline;
 }
 
-/* Feed header button styles */
 .feed-header-button {
   background: none;
   border: none;
   cursor: pointer;
-  display: block;
+  transition: all 0.2s ease;
+  color: var(--text-primary);
+  padding: 20px;
   width: 100%;
-  text-align: left;
-  padding: 0;
-  position: relative;
-  transition: opacity 0.2s;
+  text-align: center;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .feed-header-button:hover {
-  opacity: 0.8;
+  background: var(--bg-secondary);
 }
 
 .feed-header-button:active {
-  opacity: 0.6;
+  background: var(--bg-tertiary);
 }
 
 .feed-header-button h2 {
-  margin: 0 0 12px 0;
-  font-size: 1.6rem;
-  color: var(--text-color, #fff);
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
 }
 
 .feed-header-button .refresh-icon {
-  display: inline-block;
   margin-left: 10px;
-  font-size: 1.2rem;
-  animation: spin 1s linear infinite;
+  transition: transform 0.5s ease;
+}
+
+.feed-header-button.refreshing .refresh-icon {
+  transform: rotate(360deg);
 }
 
 .feed-header-button.refreshing h2 {
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .feed-header-button:disabled {
   cursor: not-allowed;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
-/* Make sure the button doesn't interfere with existing styles */
 .run-club-container button.feed-header-button {
-  width: auto;
-  height: auto;
-  min-height: unset;
-  border-radius: 0;
-  margin: 0;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  display: block;
+  padding: 20px;
+  width: 100%;
+  text-align: center;
 }
 
-/* Progressive loading indicator styles */
 .progressive-loading {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   padding: 20px;
-  margin: 10px 0;
-  background-color: rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  gap: 8px;
 }
 
 .loading-animation {
   display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 4px;
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
-  background-color: #0088cc;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  opacity: 0.6;
-  animation: pulse 1.4s infinite ease-in-out;
+  background: var(--primary);
+  animation: pulse 1.4s ease-in-out infinite both;
 }
 
 .dot:nth-child(2) {
@@ -970,51 +929,55 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
-    transform: scale(0.8);
-    opacity: 0.6;
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
   }
-  50% {
-    transform: scale(1.2);
+  40% {
+    transform: scale(1);
     opacity: 1;
   }
 }
 
 .posts-loading-more {
-  display: flex;
-  flex-direction: column;
+  text-align: center;
+  padding: 20px;
 }
 
 .posts-loading-more .progressive-loading {
-  margin-top: 20px;
-  background-color: transparent;
+  justify-content: center;
 }
 
-/* ChatRoom.jsx specific message item styling */
 .message-item {
-  display: flex;
-  justify-content: space-between; /* Pushes content and button to opposite ends */
-  align-items: center; /* Vertically aligns items in the center */
-  padding: 8px 0; /* Add some padding for spacing */
-  border-bottom: 1px solid #333; /* Optional: separator between messages */
+  position: relative;
+  transition: all 0.2s ease;
 }
 
 .message-main-area {
-  flex-grow: 1; /* Allows this area to take up available space */
-  margin-right: 8px; /* Adds some space between content and button */
+  padding: 10px 15px;
 }
 
 .message-item .pin-button {
-  flex-shrink: 0; /* Prevents the button from shrinking */
-  /* Add other styling as needed, e.g., padding, min-width */
-  padding: 6px 10px;
-  border: 1px solid #555;
-  background-color: #444;
-  color: #fff;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-secondary);
   border-radius: 4px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: all 0.2s ease;
 }
 
 .message-item .pin-button:hover {
-  background-color: #555;
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 } 

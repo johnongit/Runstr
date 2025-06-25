@@ -3,8 +3,13 @@
   "appName": "Runstr",
   "webDir": "dist",
   "plugins": {
+    "StatusBar": {
+      "style": "Dark",
+      "backgroundColor": "#0F1419",
+      "androidStatusBarColor": "#0F1419"
+    },
     "BackgroundGeolocation": {
-      "locationProvider": 1,
+      "locationProvider": 3,
       "desiredAccuracy": 10,
       "stationaryRadius": 50,
       "distanceFilter": 30,
@@ -15,6 +20,8 @@
     }
   },
   "android": {
-    "useLegacyBridge": true
+    "useLegacyBridge": true,
+    "backgroundColor": "#0F1419",
+    "webContentsDebuggingEnabled": false
   }
 }

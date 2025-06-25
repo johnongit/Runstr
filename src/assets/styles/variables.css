@@ -1,52 +1,113 @@
 :root {
-  /* Color variables */
-  --primary-color: #3a86ff;
-  --secondary-color: #ff006e;
-  --success-color: #28a745;
-  --danger-color: #dc3545;
-  --warning-color: #ffc107;
-  --info-color: #17a2b8;
+  /* === RUNSTR DESIGN SYSTEM v2.0 === */
+  /* Optimized for outdoor mobile running app usage */
   
-  /* Bitcoin colors */
-  --bitcoin-orange: #f7931a;
-  --bitcoin-orange-light: rgba(247, 147, 26, 0.1);
+  /* Core Backgrounds (Dark theme optimized for battery & outdoor visibility) */
+  --bg-primary: #000000;      /* Pure black background - maximum battery efficiency */
+  --bg-secondary: #1A1A1A;    /* Dark gray cards - readable contrast */
+  --bg-tertiary: #2A2A2A;     /* Medium gray inputs - interactive elements */
+  --bg-highlight: rgba(255, 255, 255, 0.05); /* Subtle white tint for highlights */
   
-  /* Background colors */
-  --bg-dark: #121212;
-  --bg-darker: #0a0a0a;
-  --bg-light: #1e1e1e;
-  --bg-highlight: rgba(255, 255, 255, 0.05);
+  /* High Contrast Text (WCAG AA compliant for outdoor visibility) */
+  --text-primary: #FFFFFF;    /* Pure white text - maximum readability */
+  --text-secondary: #E0E0E0;  /* Light gray text - good contrast */
+  --text-muted: #A0A0A0;      /* Medium gray text - sufficient contrast */
+  --text-inverse: #000000;    /* Black text for light backgrounds */
   
-  /* Text colors */
-  --text-primary: rgba(255, 255, 255, 0.9);
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --text-muted: rgba(255, 255, 255, 0.5);
+  /* Brand Colors (Black/White minimalistic system) */
+  --primary: #FFFFFF;         /* White - primary actions */
+  --primary-hover: #E0E0E0;   /* Light gray hover state */
+  --primary-light: rgba(255, 255, 255, 0.1); /* Light white background */
+  --secondary: #808080;       /* Medium gray - secondary actions */
+  --secondary-hover: #606060; /* Darker gray hover state */
   
-  /* Border colors */
-  --border-color: rgba(255, 255, 255, 0.1);
-  --border-color-active: rgba(255, 255, 255, 0.3);
+  /* Status Colors (High contrast for outdoor visibility) */
+  --success: #48BB78;         /* Green - achievements, distance completed */
+  --success-light: rgba(72, 187, 120, 0.1);
+  --warning: #ED8936;         /* Orange - pace alerts, performance warnings */
+  --warning-light: rgba(237, 137, 54, 0.1);
+  --error: #F56565;           /* Red - errors, danger zones */
+  --error-light: rgba(245, 101, 101, 0.1);
+  --info: #4299E1;            /* Blue - informational messages */
+  --info-light: rgba(66, 153, 225, 0.1);
   
-  /* Animation durations */
-  --animation-speed-fast: 0.2s;
-  --animation-speed-normal: 0.3s;
-  --animation-speed-slow: 0.5s;
+  /* Bitcoin Integration Colors */
+  --bitcoin: #F7931A;         /* Bitcoin orange - preserved brand color */
+  --bitcoin-light: rgba(247, 147, 26, 0.1);
   
-  /* Spacing */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
+  /* Border Colors (Subtle but visible) */
+  --border-primary: rgba(255, 255, 255, 0.2);   /* Primary borders */
+  --border-secondary: rgba(255, 255, 255, 0.1); /* Subtle borders */
+  --border-focus: #FFFFFF;    /* Focus state borders */
   
-  /* Border radius */
-  --border-radius-sm: 4px;
-  --border-radius-md: 8px;
-  --border-radius-lg: 12px;
-  --border-radius-xl: 16px;
-  --border-radius-pill: 9999px;
+  /* Typography Scale (Mobile-optimized for running) */
+  --text-xs: 0.75rem;    /* 12px - small labels */
+  --text-sm: 0.875rem;   /* 14px - secondary text */
+  --text-base: 1rem;     /* 16px - body text */
+  --text-lg: 1.125rem;   /* 18px - large body text */
+  --text-xl: 1.25rem;    /* 20px - headings */
+  --text-2xl: 1.5rem;    /* 24px - large headings */
+  --text-3xl: 1.875rem;  /* 30px - hero text */
   
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  /* Font Weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  
+  /* Spacing Scale (Consistent rhythm) */
+  --spacing-1: 0.25rem;   /* 4px */
+  --spacing-2: 0.5rem;    /* 8px */
+  --spacing-3: 0.75rem;   /* 12px */
+  --spacing-4: 1rem;      /* 16px */
+  --spacing-5: 1.25rem;   /* 20px */
+  --spacing-6: 1.5rem;    /* 24px */
+  --spacing-8: 2rem;      /* 32px */
+  --spacing-10: 2.5rem;   /* 40px */
+  --spacing-12: 3rem;     /* 48px */
+  
+  /* Border Radius Scale */
+  --radius-sm: 0.25rem;   /* 4px - small elements */
+  --radius-md: 0.5rem;    /* 8px - buttons, inputs */
+  --radius-lg: 0.75rem;   /* 12px - cards */
+  --radius-xl: 1rem;      /* 16px - large cards */
+  --radius-full: 9999px;  /* Full rounded - pills, avatars */
+  
+  /* Shadow System (Subtle for dark theme) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.2);
+  
+  /* Animation Durations (Optimized for mobile performance) */
+  --animation-fast: 150ms;   /* Quick interactions */
+  --animation-normal: 200ms; /* Standard transitions */
+  --animation-slow: 300ms;   /* Complex animations */
+  
+  /* Z-Index Scale (Layering system) */
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-overlay: 20;
+  --z-modal: 30;
+  --z-notification: 40;
+  --z-max: 50;
+  
+  /* Legacy Support (Backward compatibility) */
+  /* These will be phased out as we migrate components */
+  --primary-color: var(--primary);
+  --secondary-color: var(--secondary);
+  --success-color: var(--success);
+  --danger-color: var(--error);
+  --warning-color: var(--warning);
+  --info-color: var(--info);
+  --bitcoin-orange: var(--bitcoin);
+  --bitcoin-orange-light: var(--bitcoin-light);
+  --bg-dark: var(--bg-primary);
+  --bg-darker: #000000; /* Pure black - consistent with new system */
+  --bg-light: var(--bg-secondary);
+  --text-primary: var(--text-primary);
+  --text-secondary: var(--text-secondary);
+  --text-muted: var(--text-muted);
+  --border-color: var(--border-secondary);
+  --border-color-active: var(--border-primary);
 } 

@@ -3,7 +3,6 @@
 @import './streakRewards.css';
 @import './leaderboard.css';
 @import './bitcoinTransactions.css';
-@import './achievements.css';
 
 /* Global styles */
 body {
@@ -18,4 +17,32 @@ body {
   box-sizing: border-box;
 }
 
-/* Add additional global styles below */ 
+/* Add additional global styles below */
+
+/* Global music player button improvements */
+.music-control-button {
+  transition: all 0.15s ease;
+}
+
+.music-control-button:active {
+  transform: scale(0.95) translateY(1px);
+  filter: brightness(0.9);
+}
+
+.music-control-button span {
+  display: inline-block;
+  transition: transform 0.1s ease;
+}
+
+.music-control-button:active span {
+  transform: scale(0.9);
+}
+
+/* Ensure Unicode symbols render consistently */
+.unicode-icon {
+  font-family: 'SF Pro Display', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+  line-height: 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+} 

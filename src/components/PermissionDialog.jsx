@@ -149,39 +149,39 @@ export const PermissionDialog = ({ onContinue, onCancel }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content permission-dialog">
-        <h3>Welcome to Runstr!</h3>
+      <div className="modal-content permission-dialog bg-bg-secondary border border-border-secondary">
+        <h3 className="text-text-primary">Welcome to Runstr!</h3>
         
-        <p>This privacy-focused app keeps your data private and under your control.</p>
+        <p className="text-text-primary">This privacy-focused app keeps your data private and under your control.</p>
         
-        <p>To use the app, we need these permissions:</p>
+        <p className="text-text-primary">To use the app, we need these permissions:</p>
         
-        <div className="permission-item">
-          <h4>1. Location Access</h4>
-          <p>This allows us to accurately track your runs, measure your distance, calculate your pace, and map your routes. Your location data is stored ONLY on your device and is never sold or shared with third parties.</p>
+        <div className="permission-item bg-bg-tertiary p-4 rounded-lg border border-border-secondary mb-4">
+          <h4 className="text-text-primary">1. Location Access</h4>
+          <p className="text-text-secondary">This allows us to accurately track your runs, measure your distance, calculate your pace, and map your routes. Your location data is stored ONLY on your device and is never sold or shared with third parties.</p>
         </div>
         
-        <div className="permission-item">
-          <h4>2. Amber Signer Trust</h4>
-          <p>The app requires basic permission in Amber Signer when prompted. This secure connection lets you safely share your runs on Nostr only when YOU choose to do so. Only minimal permissions are needed - you don&apos;t need to grant full trust.</p>
+        <div className="permission-item bg-bg-tertiary p-4 rounded-lg border border-border-secondary mb-4">
+          <h4 className="text-text-primary">2. Amber Signer Trust</h4>
+          <p className="text-text-secondary">The app requires basic permission in Amber Signer when prompted. This secure connection lets you safely share your runs on Nostr only when YOU choose to do so. Only minimal permissions are needed - you don&apos;t need to grant full trust.</p>
         </div>
         
-        <p>We do not harvest or sell your data. Your privacy is our priority - all tracking information remains on your device unless you explicitly choose to share it.</p>
+        <p className="text-text-primary">We do not harvest or sell your data. Your privacy is our priority - all tracking information remains on your device unless you explicitly choose to share it.</p>
         
-        <p>Without these permissions, key features like complete run tracking, route mapping, and optional social sharing won&apos;t be available.</p>
+        <p className="text-text-primary">Without these permissions, key features like complete run tracking, route mapping, and optional social sharing won&apos;t be available.</p>
         
-        <p className="permission-footer">Ready to run with Nostr?</p>
+        <p className="permission-footer text-text-primary font-semibold">Ready to run with Nostr?</p>
         
         <div className="modal-buttons">
           <button 
-            className="primary-btn" 
+            className="bg-text-primary text-bg-primary hover:bg-text-secondary px-6 py-3 rounded-md font-semibold border border-border-secondary transition-colors duration-200" 
             onClick={handleContinue}
             disabled={isProcessing}
           >
             {isProcessing ? 'Processing...' : 'Continue'}
           </button>
           <button 
-            className="secondary-btn" 
+            className="bg-bg-tertiary text-text-primary hover:bg-bg-secondary px-6 py-3 rounded-md font-semibold border border-border-secondary transition-colors duration-200" 
             onClick={handleCancel}
             disabled={isProcessing}
           >

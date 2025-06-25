@@ -373,7 +373,8 @@ export const NWCWalletConnector = () => {
 
   return (
     <div className="nwc-wallet-connector">
-      <div className="connection-section">
+      {/* Connection Card */}
+      <div className="wallet-option nwc-connection-card">
         <h3>Connect your Lightning Wallet with NWC</h3>
         
         {!isConnected ? (
@@ -434,7 +435,8 @@ export const NWCWalletConnector = () => {
         )}
       </div>
 
-      <div className="zap-settings-section">
+      {/* Zap Settings Card */}
+      <div className="wallet-option nwc-settings-card">
         <h3>Default Zap Settings</h3>
         <div className="zap-amount-setting">
           <label htmlFor="defaultZapAmount">Default Zap Amount (sats):</label>
@@ -462,7 +464,8 @@ export const NWCWalletConnector = () => {
         </div>
       </div>
 
-      <div className="donation-section">
+      {/* Donation Card */}
+      <div className="wallet-option nwc-donation-card">
         <h3>Support RUNSTR</h3>
         <p>Donate to help the project continue building awesome software!</p>
         

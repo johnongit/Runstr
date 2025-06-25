@@ -18,13 +18,15 @@
 .playlist {
   display: flex;
   align-items: center;
-  color: #f0f0f0;
+  color: var(--text-primary);
   border-radius: 8px;
   overflow: hidden;
   flex: 1 1 100%;
   max-width: 100%;
   box-sizing: border-box;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  transition: all 0.2s ease;
 }
 
 .playlistsContainer > .playlist:nth-child(odd) {
@@ -34,6 +36,7 @@
 .playlist:hover {
   opacity: 0.7;
   cursor: pointer;
+  background-color: var(--bg-tertiary);
 }
 
 .playlistArt {
@@ -56,15 +59,21 @@
 }
 
 .playlistMetadata small {
-  color: #ccc;
+  color: var(--text-muted);
 }
 
 .playlistMetadata p {
   margin: 2px 0;
+  color: var(--text-primary);
 }
 
 .playlistMetadata p:first-child {
   font-weight: bold;
+  color: var(--text-primary);
+}
+
+.playlistMetadata p:not(:first-child) {
+  color: var(--text-secondary);
 }
 
 @media (min-width: 800px) {

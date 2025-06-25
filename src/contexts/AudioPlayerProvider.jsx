@@ -28,6 +28,12 @@ export const AudioPlayerProvider = ({ children }) => {
       setCurrentBlobUrl(null);
     }
 
+    // Handle Blossom tracks - they already have direct mediaUrl
+    if (track && track.source === 'blossom') {
+      console.log(`[AudioPlayerProvider] Using direct Blossom URL: ${track.mediaUrl}`);
+      return track.mediaUrl;
+    }
+
     if (currentPlaylistId === LIKED && track && track.id) {
       const targetStreamUrl = `${WAVLAKE_API_BASE_URL}/stream/track/${track.id}`;
       console.log(`[AudioPlayerProvider] Fetching liked track stream from: ${targetStreamUrl}`);
@@ -74,26 +80,35 @@ export const AudioPlayerProvider = ({ children }) => {
     return track ? track.mediaUrl : null;
   }, [currentBlobUrl]);
 
-  // Load playlist when playlist ID changes
-  const loadPlaylist = useCallback(async (playlistId) => {
+  // Load playlist when playlist ID changes or when a playlist object is passed directly
+  const loadPlaylist = useCallback(async (playlistIdOrObject, directPlaylist = null) => {
     try {
-      console.log(`[AudioPlayerProvider] Loading playlist: ${playlistId}`);
-      const fetchedPlaylist = await fetchPlaylist(playlistId);
+      let fetchedPlaylist;
+      
+      // If directPlaylist is provided, use it (for Blossom)
+      if (directPlaylist) {
+        console.log(`[AudioPlayerProvider] Loading direct playlist: ${directPlaylist.title}`);
+        fetchedPlaylist = directPlaylist;
+      } else {
+        // Otherwise, fetch from WavLake API
+        console.log(`[AudioPlayerProvider] Loading playlist: ${playlistIdOrObject}`);
+        fetchedPlaylist = await fetchPlaylist(playlistIdOrObject);
+      }
       
       if (!fetchedPlaylist) {
-        console.error(`[AudioPlayerProvider] Playlist not found: ${playlistId}`);
+        console.error(`[AudioPlayerProvider] Playlist not found: ${playlistIdOrObject}`);
         alert(`Could not load playlist: Playlist not found`);
         return;
       }
       
       if (!fetchedPlaylist.tracks || !Array.isArray(fetchedPlaylist.tracks)) {
-        console.error(`[AudioPlayerProvider] Invalid playlist format: ${playlistId}`, fetchedPlaylist);
+        console.error(`[AudioPlayerProvider] Invalid playlist format: ${playlistIdOrObject}`, fetchedPlaylist);
         alert(`Could not load playlist: Invalid playlist format`);
         return;
       }
       
       if (fetchedPlaylist.tracks.length === 0) {
-        console.warn(`[AudioPlayerProvider] Playlist is empty: ${playlistId}`);
+        console.warn(`[AudioPlayerProvider] Playlist is empty: ${playlistIdOrObject}`);
         alert(`This playlist is empty`);
         setPlaylist(null);
         dispatch({ type: 'SET_TRACK', payload: null });

@@ -1,8 +1,14 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { useSettings } from '../contexts/SettingsContext';
 import { saveLeaderboardParticipation, getLeaderboardParticipation } from '../utils/leaderboardUtils';
 import { getRewardsSettings, saveRewardsSettings } from '../utils/rewardsSettings';
 import { Link } from 'react-router-dom';
+import { NostrContext } from '../contexts/NostrContext';
+import { fetchRunDataFromWatch, mapWatchDataToRun } from '../services/BluetoothService';
+import { SyncConfirmationModal } from '../components/modals/SyncConfirmationModal';
+import { testConnection } from '../lib/blossom';
 
 const Settings = () => {
   const { 
@@ -19,11 +25,14 @@ const Settings = () => {
     setPrivateRelayUrl,
     blossomEndpoint,
     setBlossomEndpoint,
+    autoPostToNostr,
+    setAutoPostToNostr,
     // skipStartCountdown,
     // setSkipStartCountdown,
     // skipEndCountdown,
     // setSkipEndCountdown
   } = useSettings();
+  const { publicKey } = useContext(NostrContext);
   
   const [showPaceInMinutes, setShowPaceInMinutes] = useState(true);
   const [autoSaveRuns, setAutoSaveRuns] = useState(true);
@@ -32,6 +41,13 @@ const Settings = () => {
   const [leaderboardParticipation, setLeaderboardParticipation] = useState(true);
   const [autoClaimRewards, setAutoClaimRewards] = useState(false);
   const [rewardsEnabled, setRewardsEnabled] = useState(true);
+  const [isSyncingWatch, setIsSyncingWatch] = useState(false);
+  const [syncedRun, setSyncedRun] = useState(null);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  
+  // Blossom connection test state
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState(null);
   
   // Load settings from localStorage
   useEffect(() => {
@@ -140,6 +156,25 @@ const Settings = () => {
     });
   };
 
+  const handleSyncFromWatch = async () => {
+    try {
+      setIsSyncingWatch(true);
+      const rawData = await fetchRunDataFromWatch();
+      const mappedRun = mapWatchDataToRun(rawData, distanceUnit);
+      setSyncedRun(mappedRun);
+      setShowSyncModal(true);
+    } catch (err) {
+      console.error('Failed to sync from watch:', err);
+      if (window.Android && window.Android.showToast) {
+        window.Android.showToast(err.message || 'Failed to sync from watch');
+      } else {
+        alert(err.message || 'Failed to sync from watch');
+      }
+    } finally {
+      setIsSyncingWatch(false);
+    }
+  };
+
   const handleCalorieIntensityChange = (preference) => {
     setCalorieIntensityPref(preference);
   };
@@ -159,29 +194,63 @@ const Settings = () => {
     setHealthEncryptionPref(enable ? 'encrypted' : 'plaintext');
   };
 
+  const handleAutoPostToggle = (e) => {
+    const value = e.target.checked;
+    setAutoPostToNostr(value);
+  };
+
+  const handleTestBlossomConnection = async () => {
+    if (!blossomEndpoint) {
+      setConnectionStatus({ success: false, message: 'Please enter a Blossom server URL first' });
+      return;
+    }
+
+    setIsTestingConnection(true);
+    setConnectionStatus(null);
+
+    try {
+      const isConnected = await testConnection(blossomEndpoint);
+      if (isConnected) {
+        setConnectionStatus({ 
+          success: true, 
+          message: 'Successfully connected to Blossom server!' 
+        });
+      } else {
+        setConnectionStatus({ 
+          success: false, 
+          message: 'Could not connect to Blossom server. Please check the URL.' 
+        });
+      }
+    } catch (error) {
+      setConnectionStatus({ 
+        success: false, 
+        message: `Connection failed: ${error.message}` 
+      });
+    } finally {
+      setIsTestingConnection(false);
+      // Clear status after 5 seconds
+      setTimeout(() => setConnectionStatus(null), 5000);
+    }
+  };
+
   return (
     <div className="settings-page">
-      <h2>Settings</h2>
+      <h2 className="page-title">Settings</h2>
       
       <div className="settings-section">
-        <h3>Display Settings</h3>
+        <h3 className="section-heading">Display Settings</h3>
         
         <div className="setting-item">
           <label>Distance Units</label>
-          <div className="unit-toggle">
-            <button 
-              className={distanceUnit === 'km' ? 'active' : ''}
-              onClick={() => handleDistanceUnitChange('km')}
-            >
-              Kilometers
-            </button>
-            <button 
-              className={distanceUnit === 'mi' ? 'active' : ''}
-              onClick={() => handleDistanceUnitChange('mi')}
-            >
-              Miles
-            </button>
-          </div>
+          <ButtonGroup
+            value={distanceUnit}
+            onValueChange={handleDistanceUnitChange}
+            options={[
+              { value: 'km', label: 'Kilometers' },
+              { value: 'mi', label: 'Miles' }
+            ]}
+            size="default"
+          />
         </div>
         
         <div className="setting-item">
@@ -225,44 +294,40 @@ const Settings = () => {
         
         <div className="setting-item">
           <label>Publish Destination</label>
-          <div className="unit-toggle">
-            <button
-              className={publishMode === 'public' ? 'active' : ''}
-              onClick={() => setPublishMode('public')}
-            >Public Relays</button>
-            <button
-              className={publishMode === 'private' ? 'active' : ''}
-              onClick={() => setPublishMode('private')}
-            >Private Relay</button>
-            <button
-              className={publishMode === 'mixed' ? 'active' : ''}
-              onClick={() => setPublishMode('mixed')}
-            >Mixed</button>
-          </div>
+          <ButtonGroup
+            value={publishMode}
+            onValueChange={setPublishMode}
+            options={[
+              { value: 'public', label: 'Public Relays' },
+              { value: 'private', label: 'Private Relay' },
+              { value: 'mixed', label: 'Mixed' }
+            ]}
+            size="default"
+          />
           {publishMode !== 'public' && (
-            <div style={{ marginTop: '0.5rem' }}>
+            <div className="mt-2">
               {publishMode !== 'blossom' && (
                 <>
-                  <label>Private Relay URL</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">Private Relay URL</label>
                   <input
                     type="text"
                     value={privateRelayUrl}
                     onChange={e => setPrivateRelayUrl(e.target.value)}
                     placeholder="wss://your-relay.example.com"
-                    style={{ width: '100%' }}
+                    className="w-full bg-bg-tertiary p-2 rounded-md text-text-primary border border-border-secondary focus:ring-primary focus:border-border-focus outline-none"
                   />
                 </>
               )}
               {/* Blossom endpoint is stored for export feature */}
               {publishMode === 'blossom' && (
                 <>
-                  <label>Blossom Endpoint</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">Blossom Endpoint</label>
                   <input
                     type="text"
                     value={blossomEndpoint}
                     onChange={e => setBlossomEndpoint(e.target.value)}
-                    placeholder="https://blossom.example.com/upload"
-                    style={{ width: '100%' }}
+                    placeholder="https://cdn.satellite.earth"
+                    className="w-full bg-bg-tertiary p-2 rounded-md text-text-primary border border-border-secondary focus:ring-primary focus:border-border-focus outline-none"
                   />
                 </>
               )}
@@ -272,7 +337,7 @@ const Settings = () => {
       </div>
       
       <div className="settings-section">
-        <h3>App Behavior</h3>
+        <h3 className="section-heading">App Behavior</h3>
         
         <div className="setting-item">
           <label htmlFor="autoSaveToggle">Auto-save Runs</label>
@@ -301,27 +366,30 @@ const Settings = () => {
         </div>
 
         <div className="setting-item">
-          <label>Workout Extras Publishing (Calories/Intensity)</label>
-          <div className="unit-toggle">
-            <button 
-              className={calorieIntensityPref === 'autoAccept' ? 'active' : ''}
-              onClick={() => handleCalorieIntensityChange('autoAccept')}
-            >
-              Auto-Accept
-            </button>
-            <button 
-              className={calorieIntensityPref === 'manual' ? 'active' : ''}
-              onClick={() => handleCalorieIntensityChange('manual')}
-            >
-              Manual
-            </button>
-            <button 
-              className={calorieIntensityPref === 'autoIgnore' ? 'active' : ''}
-              onClick={() => handleCalorieIntensityChange('autoIgnore')}
-            >
-              Auto-Ignore
-            </button>
+          <label htmlFor="autoPostToggle">Auto-post Workouts to Nostr</label>
+          <div className="toggle-switch">
+            <input
+              type="checkbox"
+              id="autoPostToggle"
+              checked={autoPostToNostr}
+              onChange={handleAutoPostToggle}
+            />
+            <span className="toggle-slider"></span>
           </div>
+        </div>
+
+        <div className="setting-item">
+          <label>Workout Extras Publishing (Calories/Intensity)</label>
+          <ButtonGroup
+            value={calorieIntensityPref}
+            onValueChange={handleCalorieIntensityChange}
+            options={[
+              { value: 'autoAccept', label: 'Auto-Accept' },
+              { value: 'manual', label: 'Manual' },
+              { value: 'autoIgnore', label: 'Auto-Ignore' }
+            ]}
+            size="default"
+          />
           <p className="setting-description">
             Choose how to handle publishing workout intensity and caloric data to Nostr.
           </p>
@@ -329,7 +397,7 @@ const Settings = () => {
       </div>
       
       <div className="settings-section">
-        <h3>Leaderboards & Rewards</h3>
+        <h3 className="section-heading">Leaderboards & Rewards</h3>
         
         <div className="setting-item">
           <label htmlFor="leaderboardToggle">Participate in Leaderboards</label>
@@ -376,10 +444,65 @@ const Settings = () => {
       </div>
       
       <div className="settings-section">
-        <h3>About</h3>
+        <h3 className="section-heading">About</h3>
         <p>Runstr App Version 1.1.0</p>
         <p>A Bitcoin-powered running app</p>
       </div>
+
+      <div className="settings-section">
+        <h3 className="section-heading">Music Server</h3>
+        <div className="setting-item">
+          <label>Blossom Music Server URL</label>
+          <input
+            type="text"
+            value={blossomEndpoint}
+            onChange={e => setBlossomEndpoint(e.target.value)}
+            placeholder="https://cdn.satellite.earth"
+            style={{ width: '100%', marginBottom: '0.5rem' }}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <Button 
+              onClick={handleTestBlossomConnection}
+              disabled={isTestingConnection || !blossomEndpoint}
+              size="sm"
+              variant="default"
+            >
+              {isTestingConnection ? 'Testing...' : 'Test Connection'}
+            </Button>
+            {connectionStatus && (
+              <span className={connectionStatus.success ? 'text-green-400' : 'text-red-400'}>
+                {connectionStatus.message}
+              </span>
+            )}
+          </div>
+          <p className="setting-description">
+            Connect to your personal Blossom server to access your music library. Leave empty to disable music server integration.
+          </p>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3 className="section-heading">Integrations</h3>
+        <div className="setting-item">
+          <label>Bangle.js</label>
+          <Button 
+            onClick={handleSyncFromWatch} 
+            variant="default"
+            size="default"
+            disabled={isSyncingWatch}
+          >
+            {isSyncingWatch ? 'Syncing...' : 'Sync Watch'}
+          </Button>
+        </div>
+      </div>
+
+      <SyncConfirmationModal
+        isOpen={showSyncModal}
+        onClose={() => { setShowSyncModal(false); setSyncedRun(null); }}
+        run={syncedRun}
+        distanceUnit={distanceUnit}
+        publicKey={publicKey}
+      />
     </div>
   );
 };

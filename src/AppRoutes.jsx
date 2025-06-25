@@ -1,12 +1,12 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 
 console.log("AppRoutes.jsx is being executed");
 
 // Fallback component for when imports fail
 const ErrorFallback = ({ componentName }) => (
   <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg m-4">
-    <h2 className="text-xl font-bold text-white mb-2">Error Loading Component</h2>
+    <h2 className="section-heading mb-2">Error Loading Component</h2>
     <p className="text-red-300">Failed to load the {componentName} component.</p>
   </div>
 );
@@ -40,19 +40,21 @@ const RunClub = safeLazy(() => import('./pages/RunClub'), 'RunClub');
 const Wallet = safeLazy(() => import('./pages/Wallet'), 'Wallet');
 const Music = safeLazy(() => import('./pages/Music'), 'Music');
 const NWC = safeLazy(() => import('./pages/NWC'), 'NWC');
+// const EcashWallet = safeLazy(() => import('./pages/EcashWallet'), 'EcashWallet'); // Temporarily disabled
 const Goals = safeLazy(() => import('./pages/Goals'), 'Goals');
 const Events = safeLazy(() => import('./pages/Events'), 'Events');
 const EventDetail = safeLazy(() => import('./pages/EventDetail'), 'EventDetail');
 const Profile = safeLazy(() => import('./pages/Profile'), 'Profile');
-const About = safeLazy(() => import('./pages/About'), 'About');
 const NostrStatsPage = safeLazy(() => import('./pages/NostrStatsPage'), 'NostrStatsPage');
-const GroupDiscoveryScreen = safeLazy(() => import('./components/GroupDiscoveryScreen'), 'GroupDiscoveryScreen');
-const TeamDetail = safeLazy(() => import('./pages/TeamDetail'), 'TeamDetail');
+const TeamsPage = safeLazy(() => import('./pages/TeamsPage'), 'TeamsPage');
+const CreateTeamFormV2 = safeLazy(() => import('./components/teams/CreateTeamFormV2'), 'CreateTeamFormV2');
+const TeamDetailPage = safeLazy(() => import('./pages/TeamDetailPage'), 'TeamDetailPage');
+const ChallengeDetailPage = safeLazy(() => import('./pages/ChallengeDetailPage'), 'ChallengeDetailPage');
 
 // Loading component to show while lazy loading
 const LoadingComponent = () => (
   <div className="flex justify-center items-center h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
   </div>
 );
 
@@ -82,16 +84,18 @@ const AppRoutes = () => {
         <Route path="/profile" element={<Profile />} />
         <Route path="/club" element={<RunClub />} />
         <Route path="/nwc" element={<NWC />} />
+        {/* Ecash wallet route temporarily disabled - redirect to wallet page */}
+        <Route path="/ecash" element={<Navigate to="/wallet" replace />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/music" element={<Music />} />
         <Route path="/goals" element={<Goals />} />
         <Route path="/events" element={<Events />} />
         <Route path="/event/:eventId" element={<EventDetail />} />
-        <Route path="/about" element={<About />} />
         
-        {/* Teams routes */}
-        <Route path="/teams" element={<GroupDiscoveryScreen />} />
-        <Route path="/teams/:teamId" element={<TeamDetail />} />
+        <Route path="/teams" element={<TeamsPage />} />
+        <Route path="/teams/new" element={<CreateTeamFormV2 />} />
+        <Route path="/teams/:captainPubkey/:teamUUID" element={<TeamDetailPage />} />
+        <Route path="/challenge/:captainPubkey/:challengeUUID" element={<ChallengeDetailPage />} />
         
         <Route path="/nostr-stats" element={<NostrStatsPage />} />
         <Route path="/" element={<RunTracker />} />

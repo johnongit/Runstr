@@ -138,4 +138,80 @@ FEATURE BRAINSTORM: NOSTR STATS & PRIVACY ENHANCEMENTS
 *   Erase local data & GPX: Confirmed GPX files included.
 *   NIP-44 Encryption: Confirmed for "Private Save" using user's own keys.
 *   Consent for encryption: Handled by persistent, granular privacy preferences.
-*   Charting library: Keep current. 
+*   Charting library: Keep current.
+
+## Simplified Implementation Plan (V3) - NIP-101e Exclusive
+
+*This updated plan reflects the decision to focus exclusively on Nostr for all stats aggregation, removing the dual-source complexity. This is the simplest, most direct path to a Nostr-native experience.*
+
+### Core Principles
+- **Nostr is the Source of Truth:** All aggregated stats, charts, and historical data displayed on the "Stats" page are derived *only* from `kind: 1301` events on Nostr.
+- **Local Storage is a Staging Area:** The "Run History" page shows runs stored on the device. It's a place to view local-only runs and manage their publication status (e.g., "Published", "Unpublished", "Failed"). It is NOT used for stat aggregation.
+- **NIP-101e is Exclusive:** All NIP-101h event creation related to workout publishing will be removed.
+
+### Phase 1: Streamline Data Publishing
+
+*(Goal: Ensure every workout publishes a clean, single `kind: 1301` event with all necessary data, and prevent duplicates.)*
+
+**Step 1.1: Enhance `kind: 1301` Tags for Rich UI**
+*   **Action:** Add denormalized team/challenge names to `kind: 1301` tags during creation.
+*   **File to Modify:** `src/utils/nostr.js` (in `createWorkoutEvent`).
+*   **Logic:** When creating a `kind: 1301` event, add the human-readable name as the 4th element in the `team` or `challenge` tag.
+    *   Example: `["team", "<a-tag>", "<relay-hint>", "RUNSTR Team"]`
+
+**Step 1.2: Prevent Duplicate Publishing**
+*   **Action:** Use a `nostrEventId` flag in the local run object to prevent re-publishing.
+*   **Files to Modify:** `src/pages/RunHistory.jsx`, `src/components/RunHistoryCard.tsx`.
+*   **Logic:** Before publishing, check if `run.nostrEventId` exists. If so, disable the publish button. If not, publish and then save the new event ID to the local run object.
+
+**Step 1.3: Remove All NIP-101h Publishing from Workouts**
+*   **Action:** Drastically simplify the publishing flow to *only* handle `kind: 1301`.
+*   **File to Modify:** `src/utils/runPublisher.js`.
+*   **Logic:** Remove all code related to `buildIntensityEvent`, `buildCalorieEvent`, `buildDistanceEvent`, etc. The entire function should be reduced to creating and publishing a single `kind: 1301` event.
+
+### Phase 2: Implement Nostr-Native Stats
+
+*(Goal: Replace the stats page with a new version that sources its data exclusively from Nostr.)*
+
+**Step 2.1: Create `useNostrRunStats` Hook**
+*   **Action:** Build a reusable hook to handle fetching and aggregating stats from `kind: 1301` events.
+*   **File to Create:** `src/hooks/useNostrRunStats.js`.
+*   **Logic:**
+    -   Fetch all `kind: 1301` events for the current user.
+    -   Parse tags from each event (`distance`, `duration`, `created_at`, etc.).
+    -   Perform aggregation (totals, averages, personal bests).
+    -   Return loading state, error state, and the final aggregated stats object.
+
+**Step 2.2: Build the New Stats Page**
+*   **Action:** Replace the content of the main stats page to display the data from the new hook.
+*   **File to Modify:** `src/pages/StatsPage.jsx` (or equivalent).
+*   **Logic:**
+    -   Remove all logic related to fetching local runs.
+    -   Integrate the `useNostrRunStats` hook.
+    -   Connect the data from the hook to your charts and display components. This page will now reflect the user's global, published activity.
+
+### Phase 3: Final UI Polish
+
+*(Goal: Update the UI to reflect the new data structure and publishing flow.)*
+
+**Step 3.1: Enhance Workout Card UI**
+*   **Action:** Display team and challenge info on the `RunHistory` cards.
+*   **File to Modify:** `src/components/RunHistoryCard.tsx`.
+*   **Logic:**
+    -   When rendering a card, check its Nostr event tags.
+    -   If a `team` or `challenge` tag exists, display the name from the 4th element of the tag. E.g., `<strong>Team:</strong> RUNSTR Team`.
+
+**Step 3.2: Implement Auto-Post Setting**
+*   **Action:** Add a setting to make publishing seamless.
+*   **Files to Modify:** `src/contexts/SettingsContext.jsx`, `src/pages/SettingsPage.jsx`, `src/components/RunTracker.jsx`.
+*   **Logic:**
+    -   Add `autoPostToNostr: false` to settings.
+    -   Add a UI toggle for the user.
+    -   In `RunTracker.jsx`, when a run stops, check this setting and trigger the publish flow if enabled.
+
+**Step 3.3: Deprecate `NostrStatsPage.jsx`**
+*   **Action:** The page is now redundant.
+*   **File to Delete:** `src/pages/NostrStatsPage.jsx`.
+*   **Cleanup:** Remove any routes/links pointing to the old page.
+
+Let's proceed with this plan, starting with Phase 1. Shall we begin with Step 1.1? 

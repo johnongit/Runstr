@@ -31,7 +31,7 @@ export class NWCWallet {
       this.pubKey = getPublicKey(this.secretKey);
 
       // The host portion after the double slashes is the wallet pubkey
-      this.walletPubKey = url.hostname || url.pathname.replace(/^\/+/, '');
+      this.walletPubKey = url.hostname || (url.pathname && typeof url.pathname === 'string' ? url.pathname.replace(/^\/+/, '') : '');
 
       // Query string carries relay + secret
       const params = url.searchParams ?? new URLSearchParams(url.search);

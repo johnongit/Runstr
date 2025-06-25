@@ -1,10 +1,11 @@
 import { Suspense, lazy, useEffect, useState, useContext } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
-import { NostrProvider } from './contexts/NostrProvider';
+import { NostrProvider } from './contexts/NostrContext.jsx';
 import { AuthProvider } from './components/AuthProvider';
 import { AudioPlayerProvider } from './contexts/AudioPlayerProvider';
 import { RunTrackerProvider } from './contexts/RunTrackerContext';
 import { TeamsProvider } from './contexts/TeamsContext';
+import { TeamChallengeProvider } from './contexts/TeamChallengeContext';
 import { ActivityModeProvider } from './contexts/ActivityModeContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { WalletProvider } from './contexts/WalletContext';
@@ -17,6 +18,7 @@ import { lightweightProcessPosts } from './utils/feedProcessor';
 import { storeFeedCache, isCacheFresh } from './utils/feedCache';
 import { NostrContext } from './contexts/NostrContext.jsx';
 import './utils/errorSilencer';
+import { Toaster } from 'react-hot-toast';
 
 console.log("App.jsx is loading");
 
@@ -34,16 +36,16 @@ const EnhancedLoadingFallback = () => {
   }, []);
   
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-      <p className="text-gray-300">Loading RUNSTR...</p>
+    <div className="flex flex-col items-center justify-center h-screen bg-bg-primary">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+      <p className="text-text-secondary">Loading RUNSTR...</p>
       
       {showTimeoutWarning && (
-        <div className="mt-8 p-4 bg-yellow-900/20 border border-yellow-800 rounded-lg max-w-md">
-          <p className="text-yellow-300 text-center mb-2">
+        <div className="mt-8 p-4 bg-warning-light border border-warning rounded-lg max-w-md">
+          <p className="text-warning text-center mb-2">
             Loading is taking longer than expected. Please be patient.
           </p>
-          <p className="text-yellow-400 text-sm text-center">
+          <p className="text-warning text-sm text-center">
             If this persists, try reloading the app.
           </p>
         </div>
@@ -177,16 +179,19 @@ const App = () => {
               <ActivityModeProvider>
                 <RunTrackerProvider>
                   <TeamsProvider>
-                    <WalletProvider>
-                      <div className="relative w-full h-full bg-[#111827] text-white">
-                        <MenuBar />
-                        <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
-                          <Suspense fallback={<EnhancedLoadingFallback />}>
-                            <AppRoutes />
-                          </Suspense>
-                        </main>
-                      </div>
-                    </WalletProvider>
+                    <TeamChallengeProvider>
+                      <WalletProvider>
+                        <div className="relative w-full min-h-screen bg-bg-primary text-text-primary">
+                          <MenuBar />
+                          <main className="pb-24 w-full mx-auto px-4 max-w-screen-md">
+                            <Suspense fallback={<EnhancedLoadingFallback />}>
+                              <AppRoutes />
+                            </Suspense>
+                          </main>
+                          <Toaster position="top-center" />
+                        </div>
+                      </WalletProvider>
+                    </TeamChallengeProvider>
                   </TeamsProvider>
                 </RunTrackerProvider>
               </ActivityModeProvider>

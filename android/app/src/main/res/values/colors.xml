@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary theme colors -->
+    <color name="colorPrimary">#0F1419</color>
+    <color name="colorPrimaryDark">#0F1419</color>
+    <color name="colorAccent">#FFFFFF</color>
+    
+    <!-- Background colors -->
+    <color name="windowBackground">#0F1419</color>
+    <color name="backgroundColor">#0F1419</color>
+    
+    <!-- Status bar and navigation colors -->
+    <color name="statusBarColor">#0F1419</color>
+    <color name="navigationBarColor">#0F1419</color>
+</resources>

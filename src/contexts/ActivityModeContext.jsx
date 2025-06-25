@@ -56,7 +56,7 @@ export const ActivityModeProvider = ({ children }) => {
       case 'start':
         return `Start ${mode === ACTIVITY_TYPES.RUN ? 'Run' : mode === ACTIVITY_TYPES.WALK ? 'Walk' : 'Cycle'}`;
       case 'header':
-        return `${mode === ACTIVITY_TYPES.RUN ? 'Run' : mode === ACTIVITY_TYPES.WALK ? 'Walk' : 'Cycle'} with Nostr`;
+        return `${mode === ACTIVITY_TYPES.RUN ? 'Run' : mode === ACTIVITY_TYPES.WALK ? 'Walk' : 'Cycle'}`;
       case 'recent':
         return `Recent ${mode === ACTIVITY_TYPES.RUN ? 'Runs' : mode === ACTIVITY_TYPES.WALK ? 'Walks' : 'Cycles'}`;
       case 'history':

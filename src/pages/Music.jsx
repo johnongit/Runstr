@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useContext } from 'react';
 import {
   fetchLibraryPlaylists,
-  fetchLikedPlaylist,
   fetchTop40,
   fetchTrendingHipHop,
   fetchTrendingRock
@@ -9,10 +8,16 @@ import {
 import { PlaylistSection } from '../components/PlaylistSection';
 import { MusicPlayer } from '../components/MusicPlayer';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { useSettings } from '../contexts/SettingsContext';
+import { NostrContext } from '../contexts/NostrContext';
+import { getAllTracks, getTracksFromServer, DEFAULT_SERVERS, setDebugCallback } from '../lib/blossom';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 
 export function Music() {
   const hasMounted = useRef(false);
   const { loadPlaylist, currentTrack } = useAudioPlayer();
+  const { blossomEndpoint } = useSettings();
+  const { publicKey, ndk } = useContext(NostrContext);
 
   const [pubkey, setPubkey] = useState(null);
 
@@ -21,7 +26,13 @@ export function Music() {
   const [trendingHipHopPlaylist, setTrendingHipHopPlaylist] = useState();
 
   const [libraryPlaylists, setLibraryPlaylists] = useState();
-  const [likedPlaylist, setLikedPlaylist] = useState();
+  
+  // Blossom-related state
+  const [blossomTracks, setBlossomTracks] = useState([]);
+  const [blossomLoading, setBlossomLoading] = useState(false);
+  const [blossomError, setBlossomError] = useState(null);
+  
+  // Debug logging removed for production
 
   useEffect(() => {
     window.nostr
@@ -90,22 +101,59 @@ export function Music() {
         .catch((err) => {
           console.error('error fetching library playlists', err);
         });
-
-      fetchLikedPlaylist()
-        .then((playlist) => {
-          setLikedPlaylist(playlist);
-        })
-        .catch((err) => {
-          console.error('error fetching liked playlists', err);
-        });
     } else {
       setLibraryPlaylists();
-      setLikedPlaylist();
     }
   }, [pubkey]);
 
+  // Load Blossom tracks when server URL is available
+  useEffect(() => {
+    const loadBlossomTracks = async () => {
+      if (!pubkey) return;
+      
+      setBlossomLoading(true);
+      setBlossomError(null);
+
+      try {
+        let tracks = [];
+        
+        if (blossomEndpoint && blossomEndpoint !== '') {
+          // Load tracks from specific server
+          tracks = await getTracksFromServer(blossomEndpoint, pubkey);
+        } else {
+          // Load tracks from all default servers
+          tracks = await getAllTracks(DEFAULT_SERVERS, pubkey);
+        }
+        
+        setBlossomTracks(tracks);
+        
+      } catch (error) {
+        console.error('[Music] Error loading tracks:', error);
+        const errorMsg = `Error loading tracks: ${error.message}`;
+        setBlossomError(errorMsg);
+        setBlossomTracks([]);
+      } finally {
+        setBlossomLoading(false);
+      }
+    };
+
+    loadBlossomTracks();
+  }, [blossomEndpoint, pubkey]);
+
   const handleSelectPlaylist = (playlistId) => {
     loadPlaylist(playlistId);
+  };
+
+  const handleSelectBlossomLibrary = () => {
+    // Create a virtual playlist for Blossom tracks
+    const blossomPlaylist = {
+      id: 'blossom',
+      title: 'My Blossom Library',
+      tracks: blossomTracks
+    };
+    
+    // Load the Blossom playlist using the new signature
+    loadPlaylist('blossom', blossomPlaylist);
   };
 
   const trendingPlaylists = useMemo(
@@ -118,16 +166,64 @@ export function Music() {
 
   const userPlaylists = useMemo(() => {
     const playlists = [];
-    if (likedPlaylist) playlists.push(likedPlaylist);
     if (libraryPlaylists) playlists.push(...libraryPlaylists);
 
     return playlists;
-  }, [libraryPlaylists, likedPlaylist]);
+  }, [libraryPlaylists]);
+
+  // Create a virtual playlist object for Blossom library
+  const blossomPlaylistDisplay = useMemo(() => {
+    if (blossomTracks.length === 0) return [];
+    
+    // Helper function to get playlist name from server URL
+    const getPlaylistNameFromServer = (serverUrl) => {
+      if (!serverUrl || serverUrl === '') {
+        return 'Blossom Music Library';
+      }
+      
+      // Find the server in DEFAULT_SERVERS
+      const server = DEFAULT_SERVERS.find(s => s.url === serverUrl);
+      if (server) {
+        // Convert server names to playlist format
+        if (server.url.includes('satellite.earth')) {
+          return 'Satellite.Earth Playlist';
+        } else if (server.url.includes('blossom.band')) {
+          return 'Blossom.Band Playlist';
+        } else if (server.url.includes('primal')) {
+          return 'Primal.Band Playlist';
+        } else {
+          return `${server.name} Playlist`;
+        }
+      }
+      
+      // For custom servers, try to extract domain name
+      try {
+        const domain = new URL(serverUrl).hostname;
+        return `${domain} Playlist`;
+      } catch {
+        return 'Blossom Music Library';
+      }
+    };
+    
+    const playlistTitle = getPlaylistNameFromServer(blossomEndpoint);
+    const description = blossomEndpoint && blossomEndpoint !== '' 
+      ? `${blossomTracks.length} tracks from ${blossomEndpoint}`
+      : `${blossomTracks.length} tracks from Blossom servers`;
+    
+    return [{
+      id: 'blossom',
+      title: playlistTitle,
+      description: description,
+      tracks: blossomTracks
+    }];
+  }, [blossomEndpoint, blossomTracks]);
 
   return (
-    <div className="container text-center py-12">
-      <h1 className="text-2xl font-bold mb-4">WAVLAKE</h1>
-      <div className="bg-[#1a1a1a] rounded-lg p-4 sm:p-8 w-full mx-auto">
+    <div className="min-h-screen bg-bg-primary text-text-primary">
+      <div className="container mx-auto px-4 py-8">
+        {/* Removed page title as requested */}
+
+
         {currentTrack && <MusicPlayer />}
 
         <PlaylistSection
@@ -135,6 +231,42 @@ export function Music() {
           playlists={trendingPlaylists}
           handlePlaylistClick={handleSelectPlaylist}
         />
+        
+        {/* Blossom Library Section */}
+        <div className="mb-8">
+          <h2 className="section-heading mb-4 text-left">
+            Blossom Library
+          </h2>
+          {blossomLoading && (
+            <div className="text-text-secondary text-left mb-4">
+              {blossomEndpoint && blossomEndpoint !== '' 
+                ? `Loading tracks from ${blossomEndpoint}...`
+                : 'Searching for audio tracks across Blossom servers...'
+              }
+            </div>
+          )}
+          {blossomError && (
+            <div className="text-error text-left mb-4">
+              Error loading tracks: {blossomError}
+            </div>
+          )}
+          {!blossomLoading && !blossomError && blossomTracks.length === 0 && (
+            <div className="text-text-muted text-left mb-4">
+              {blossomEndpoint && blossomEndpoint !== '' 
+                ? `No audio files found on ${blossomEndpoint}.`
+                : 'No audio files found on Blossom servers. Try uploading some audio files to your Blossom server or check the console for detailed logs.'
+              }
+            </div>
+          )}
+          {blossomPlaylistDisplay.length > 0 && (
+            <PlaylistSection
+              title=""
+              playlists={blossomPlaylistDisplay}
+              handlePlaylistClick={handleSelectBlossomLibrary}
+            />
+          )}
+        </div>
+        
         <PlaylistSection
           title="Library"
           playlists={userPlaylists}

@@ -12,6 +12,7 @@ import { RunHistoryCard } from '../components/RunHistoryCard';
 import { SaveRunExtrasModal } from '../components/SaveRunExtrasModal';
 import { rewardUserActivity } from '../services/rewardService';
 import { NostrContext } from '../contexts/NostrContext';
+import appToast from '../utils/toast';
 
 const AVERAGE_STRIDE_LENGTH_METERS = 0.73; // average stride length (adjusted from 0.762)
 
@@ -50,6 +51,14 @@ const getCustomStrideLength = () => {
   }
   return AVERAGE_STRIDE_LENGTH_METERS;
 };
+
+// Add Stat component for consistent styling
+const Stat = ({ label, value }) => (
+  <div className="flex flex-col">
+    <span className="text-xs text-text-muted">{label}</span>
+    <span className="text-sm font-semibold text-text-primary">{value}</span>
+  </div>
+);
 
 export const RunHistory = () => {
   const navigate = useNavigate();
@@ -245,7 +254,7 @@ export const RunHistory = () => {
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to delete run');
       } else {
-        alert('Failed to delete run');
+        appToast.error('Failed to delete run');
       }
     }
     
@@ -309,7 +318,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Successfully posted to Nostr!');
       } else {
-        alert('Successfully posted to Nostr!');
+        appToast.success('Successfully posted to Nostr!');
       }
     } catch (error) {
       console.error('Error posting to Nostr:', error);
@@ -318,7 +327,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to post to Nostr: ' + error.message);
       } else {
-        alert('Failed to post to Nostr: ' + error.message);
+        appToast.error('Failed to post to Nostr: ' + error.message);
       }
     } finally {
       setIsPosting(false);
@@ -334,7 +343,17 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     let publishedWorkoutEventId = null;
     
     try {
-      const workoutEvent = createWorkoutEvent(run, distanceUnit);
+      // Get team and challenge associations
+      const { getWorkoutAssociations } = await import('../utils/teamChallengeHelper');
+      const { teamAssociation, challengeUUIDs, challengeNames, userPubkey } = await getWorkoutAssociations();
+      
+      // Create workout event with team/challenge tags
+      const workoutEvent = createWorkoutEvent(run, distanceUnit, { 
+        teamAssociation, 
+        challengeUUIDs, 
+        challengeNames, 
+        userPubkey 
+      });
       const publishedEvent = await createAndPublishEvent(workoutEvent);
       publishedWorkoutEventId = publishedEvent?.id;
 
@@ -348,7 +367,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         if (window.Android && window.Android.showToast) {
           window.Android.showToast(msg);
         } else {
-          alert(msg);
+          appToast.info(msg);
         }
         // Open the extras modal
         setCurrentRunForExtras(run);
@@ -363,7 +382,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to save main workout record: ' + error.message);
       } else {
-        alert('Failed to save main workout record: ' + error.message);
+        appToast.error('Failed to save main workout record: ' + error.message);
       }
     } finally {
       // We don't set isSavingWorkout to false here if modal is opening
@@ -391,7 +410,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast(errorMsg);
       } else {
-        alert(errorMsg);
+        appToast.error(errorMsg);
       }
     } else {
       let successMsg = 'Workout extras published successfully!';
@@ -403,7 +422,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast(successMsg);
       } else {
-        alert(successMsg);
+        appToast.success(successMsg);
       }
     }
     // The modal itself calls onClose which triggers handleCloseSaveExtrasModal to reset states.
@@ -423,299 +442,263 @@ ${additionalContent ? `\n${additionalContent}` : ''}
 
   return (
     <div className="run-history">
-      <div className="stats-overview">
-        <h2>{getActivityText('history')}</h2>
+      <div className="p-4 space-y-6 bg-bg-primary min-h-screen">
+        <h2 className="page-title">{getActivityText('history')}</h2>
         <div className="my-4">
           <Link 
             to="/nostr-stats" 
-            className="w-full text-center px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-md text-white font-semibold transition-colors duration-150 block md:w-auto md:inline-block"
+            className="w-full text-center px-4 py-3 bg-bg-secondary hover:bg-bg-tertiary border border-border-secondary rounded-lg text-text-primary font-semibold transition-colors duration-150 block md:w-auto md:inline-block"
           >
             Nostr Workout Record
           </Link>
         </div>
-        <button 
-          className="profile-btn" 
-          onClick={() => navigate('/profile')}
-          title="Update your profile for accurate calorie calculations"
-        >
-          Update Profile
-        </button>
-        <div className="stats-grid">
-          <div className="stat-card">
-            <h3>Total Distance</h3>
-            <p>{displayDistance(stats.totalDistance, distanceUnit)}</p>
+        
+        {/* Overall Stats */}
+        <div className="grid grid-cols-2 gap-4 bg-bg-secondary p-4 rounded-lg text-sm border border-border-secondary">
+          <Stat label="Total Distance" value={displayDistance(stats.totalDistance, distanceUnit)} />
+          <Stat label="Total Runs" value={stats.totalRuns} />
+          <Stat 
+            label="Current Streak" 
+            value={`${stats.currentStreak} days`} 
+          />
+          <Stat 
+            label="Average Pace" 
+            value={stats.averagePace === 0 
+              ? '-' 
+              : `${Math.floor(stats.averagePace)}:${Math.round(stats.averagePace % 1 * 60).toString().padStart(2, '0')} min/${distanceUnit}`
+            } 
+          />
+          <Stat 
+            label="Fastest Pace" 
+            value={stats.fastestPace === 0
+              ? '-'
+              : `${Math.floor(stats.fastestPace)}:${Math.round(stats.fastestPace % 1 * 60).toString().padStart(2, '0')} min/${distanceUnit}`
+            } 
+          />
+          <Stat label="Longest Run" value={displayDistance(stats.longestRun, distanceUnit)} />
+        </div>
+
+        {/* Calorie Tracking */}
+        <div className="bg-bg-secondary p-4 rounded-lg border border-border-secondary">
+          <h3 className="subsection-heading mb-3">Calorie Tracking</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <Stat label="Total Calories Burned" value={`${stats.totalCaloriesBurned.toLocaleString()} kcal`} />
+            <Stat label={`Avg. Calories per ${distanceUnit.toUpperCase()}`} value={`${Math.round(stats.averageCaloriesPerKm)} kcal`} />
           </div>
-          <div className="stat-card">
-            <h3>Total Runs</h3>
-            <p>{stats.totalRuns}</p>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="bg-bg-secondary p-4 rounded-lg border border-border-secondary">
+          <h3 className="subsection-heading mb-3">Recent Activity</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <Stat label="This Week" value={displayDistance(stats.thisWeekDistance, distanceUnit)} />
+            <Stat label="This Month" value={displayDistance(stats.thisMonthDistance, distanceUnit)} />
           </div>
-          <div className="stat-card">
-            <h3>Current Streak</h3>
-            <p>{stats.currentStreak} days</p>
-          </div>
-          <div className="stat-card">
-            <h3>Average Pace</h3>
-            <p>
-              {stats.averagePace === 0 
-                ? '-' 
-                : `${Math.floor(stats.averagePace)}:${Math.round(stats.averagePace % 1 * 60).toString().padStart(2, '0')}`}{' '}
-              min/{distanceUnit}
-            </p>
-          </div>
-          <div className="stat-card">
-            <h3>Fastest Pace</h3>
-            <p>
-              {stats.fastestPace === 0
+        </div>
+
+        {/* Personal Bests */}
+        <div className="bg-bg-secondary p-4 rounded-lg border border-border-secondary">
+          <h3 className="subsection-heading mb-3">Personal Bests</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <Stat 
+              label="5K" 
+              value={stats.personalBests['5k'] === 0
                 ? '-'
-                : `${Math.floor(stats.fastestPace)}:${Math.round(stats.fastestPace % 1 * 60).toString().padStart(2, '0')}`}{' '}
-              min/{distanceUnit}
-            </p>
-          </div>
-          <div className="stat-card">
-            <h3>Longest Run</h3>
-            <p>{displayDistance(stats.longestRun, distanceUnit)}</p>
-          </div>
-        </div>
-
-        <div className="calorie-stats">
-          <h3>Calorie Tracking</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <h4>Total Calories Burned</h4>
-              <p>{stats.totalCaloriesBurned.toLocaleString()} kcal</p>
-            </div>
-            <div className="stat-card">
-              <h4>Avg. Calories per {distanceUnit.toUpperCase()}</h4>
-              <p>{Math.round(stats.averageCaloriesPerKm)} kcal</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="recent-stats">
-          <h3>Recent Activity</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <h4>This Week</h4>
-              <p>{displayDistance(stats.thisWeekDistance, distanceUnit)}</p>
-            </div>
-            <div className="stat-card">
-              <h4>This Month</h4>
-              <p>{displayDistance(stats.thisMonthDistance, distanceUnit)}</p>
-            </div>
+                : `${Math.floor(stats.personalBests['5k'])}:${Math.round(stats.personalBests['5k'] % 1 * 60).toString().padStart(2, '0')} min/${distanceUnit}`
+              }
+            />
+            <Stat 
+              label="10K" 
+              value={stats.personalBests['10k'] === 0
+                ? '-'
+                : `${Math.floor(stats.personalBests['10k'])}:${Math.round(stats.personalBests['10k'] % 1 * 60).toString().padStart(2, '0')} min/${distanceUnit}`
+              }
+            />
+            <Stat 
+              label="Half Marathon" 
+              value={stats.personalBests['halfMarathon'] === 0
+                ? '-'
+                : `${Math.floor(stats.personalBests['halfMarathon'])}:${Math.round(stats.personalBests['halfMarathon'] % 1 * 60).toString().padStart(2, '0')} min/${distanceUnit}`
+              }
+            />
+            <Stat 
+              label="Marathon" 
+              value={stats.personalBests['marathon'] === 0
+                ? '-'
+                : `${Math.floor(stats.personalBests['marathon'])}:${Math.round(stats.personalBests['marathon'] % 1 * 60).toString().padStart(2, '0')} min/${distanceUnit}`
+              }
+            />
           </div>
         </div>
 
-        <div className="personal-bests">
-          <h3>Personal Bests</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <h4>5K</h4>
-              <p>
-                {stats.personalBests['5k'] === 0
-                  ? '-'
-                  : `${Math.floor(stats.personalBests['5k'])}:${Math.round(stats.personalBests['5k'] % 1 * 60).toString().padStart(2, '0')}`}{' '}
-                min/{distanceUnit}
-              </p>
-            </div>
-            <div className="stat-card">
-              <h4>10K</h4>
-              <p>
-                {stats.personalBests['10k'] === 0
-                  ? '-'
-                  : `${Math.floor(stats.personalBests['10k'])}:${Math.round(stats.personalBests['10k'] % 1 * 60).toString().padStart(2, '0')}`}{' '}
-                min/{distanceUnit}
-              </p>
-            </div>
-            <div className="stat-card">
-              <h4>Half Marathon</h4>
-              <p>
-                {stats.personalBests['halfMarathon'] === 0
-                  ? '-'
-                  : `${Math.floor(stats.personalBests['halfMarathon'])}:${Math.round(stats.personalBests['halfMarathon'] % 1 * 60).toString().padStart(2, '0')}`}{' '}
-                min/{distanceUnit}
-              </p>
-            </div>
-            <div className="stat-card">
-              <h4>Marathon</h4>
-              <p>
-                {stats.personalBests['marathon'] === 0
-                  ? '-'
-                  : `${Math.floor(stats.personalBests['marathon'])}:${Math.round(stats.personalBests['marathon'] % 1 * 60).toString().padStart(2, '0')}`}{' '}
-                min/{distanceUnit}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="elevation-stats-overview">
-          <h3>Elevation Data</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <h4>Total Elevation Gain</h4>
-              <p>
-                {formatElevation(
-                  runHistory.reduce((sum, run) => sum + (run.elevation?.gain || 0), 0),
-                  distanceUnit
-                )}
-              </p>
-            </div>
-            <div className="stat-card">
-              <h4>Total Elevation Loss</h4>
-              <p>
-                {formatElevation(
-                  runHistory.reduce((sum, run) => sum + (run.elevation?.loss || 0), 0),
-                  distanceUnit
-                )}
-              </p>
-            </div>
+        {/* Elevation Data */}
+        <div className="bg-bg-secondary p-4 rounded-lg border border-border-secondary">
+          <h3 className="subsection-heading mb-3">Elevation Data</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <Stat 
+              label="Total Elevation Gain" 
+              value={formatElevation(
+                runHistory.reduce((sum, run) => sum + (run.elevation?.gain || 0), 0),
+                distanceUnit
+              )}
+            />
+            <Stat 
+              label="Total Elevation Loss" 
+              value={formatElevation(
+                runHistory.reduce((sum, run) => sum + (run.elevation?.loss || 0), 0),
+                distanceUnit
+              )}
+            />
           </div>
         </div>
       </div>
 
-      <h2>Run History</h2>
-      {filteredHistory.length === 0 ? (
-        <p>No runs recorded yet</p>
-      ) : (
-        <ul className="history-list">
-          {filteredHistory.map((run) => {
-            const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration);
-            
-            // Calculate pace with the consistent service method
-            const existingPace = runDataService.calculatePace(run.distance, run.duration, distanceUnit).toFixed(2);
-            
-            // Check if workout has been saved for this run
-            const isWorkoutSaved = workoutSavedRuns.has(run.id);
+      <div className="p-4">
+        <h2 className="section-heading">Run History</h2>
+        {filteredHistory.length === 0 ? (
+          <p>No runs recorded yet</p>
+        ) : (
+          <ul className="history-list">
+            {filteredHistory.map((run) => {
+              const caloriesBurned = calculateCaloriesBurned(run.distance, run.duration);
+              
+              // Calculate pace with the consistent service method
+              const existingPace = runDataService.calculatePace(run.distance, run.duration, distanceUnit).toFixed(2);
+              
+              // Check if workout has been saved for this run
+              const isWorkoutSaved = workoutSavedRuns.has(run.id);
 
-            // Prepare props for RunHistoryCard based on activity type
-            let displayMetricValue;
-            let displayMetricLabel;
-            let displayMetricUnit;
+              // Prepare props for RunHistoryCard based on activity type
+              let displayMetricValue;
+              let displayMetricLabel;
+              let displayMetricUnit;
 
-            const currentActivityType = run.activityType || ACTIVITY_TYPES.RUN; // Default to RUN if not present
+              const currentActivityType = run.activityType || ACTIVITY_TYPES.RUN; // Default to RUN if not present
 
-            if (currentActivityType === ACTIVITY_TYPES.WALK) {
-              // Ensure distance is in meters for step calculation
-              // Assuming run.distance is already in meters as per typical GPS data
-              const distanceInMeters = run.distance; 
-              displayMetricValue = distanceInMeters > 0 ? Math.round(distanceInMeters / getCustomStrideLength()) : 0;
-              displayMetricLabel = 'Steps';
-              displayMetricUnit = ''; // No unit for steps, or could be "steps"
-            } else if (currentActivityType === ACTIVITY_TYPES.CYCLE) {
-              // Ensure distance is in meters and duration in seconds
-              const distanceInMeters = run.distance;
-              const durationInSeconds = run.duration;
-              if (durationInSeconds > 0 && distanceInMeters > 0) {
-                const speedMps = distanceInMeters / durationInSeconds; // m/s
-                if (distanceUnit === 'km') {
-                  displayMetricValue = (speedMps * 3.6).toFixed(1); // km/h
-                  displayMetricUnit = 'km/h';
+              if (currentActivityType === ACTIVITY_TYPES.WALK) {
+                // Ensure distance is in meters for step calculation
+                // Assuming run.distance is already in meters as per typical GPS data
+                const distanceInMeters = run.distance; 
+                displayMetricValue = distanceInMeters > 0 ? Math.round(distanceInMeters / getCustomStrideLength()) : 0;
+                displayMetricLabel = 'Steps';
+                displayMetricUnit = ''; // No unit for steps, or could be "steps"
+              } else if (currentActivityType === ACTIVITY_TYPES.CYCLE) {
+                // Ensure distance is in meters and duration in seconds
+                const distanceInMeters = run.distance;
+                const durationInSeconds = run.duration;
+                if (durationInSeconds > 0 && distanceInMeters > 0) {
+                  const speedMps = distanceInMeters / durationInSeconds; // m/s
+                  if (distanceUnit === 'km') {
+                    displayMetricValue = (speedMps * 3.6).toFixed(1); // km/h
+                    displayMetricUnit = 'km/h';
+                  } else {
+                    displayMetricValue = (speedMps * 2.23694).toFixed(1); // mph
+                    displayMetricUnit = 'mph';
+                  }
+                  displayMetricLabel = 'Speed';
                 } else {
-                  displayMetricValue = (speedMps * 2.23694).toFixed(1); // mph
-                  displayMetricUnit = 'mph';
+                  displayMetricValue = '0.0';
+                  displayMetricLabel = 'Speed';
+                  displayMetricUnit = distanceUnit === 'km' ? 'km/h' : 'mph';
                 }
-                displayMetricLabel = 'Speed';
-              } else {
-                displayMetricValue = '0.0';
-                displayMetricLabel = 'Speed';
-                displayMetricUnit = distanceUnit === 'km' ? 'km/h' : 'mph';
+              } else { // Default to RUN
+                displayMetricValue = existingPace;
+                displayMetricLabel = 'Pace';
+                displayMetricUnit = `min/${distanceUnit}`;
               }
-            } else { // Default to RUN
-              displayMetricValue = existingPace;
-              displayMetricLabel = 'Pace';
-              displayMetricUnit = `min/${distanceUnit}`;
-            }
-            
-            return (
-              <li key={run.id} className="history-item">
-                <RunHistoryCard
-                  run={run}
-                  activityType={currentActivityType}
-                  distanceUnit={distanceUnit}
-                  formatDate={formatDate}
-                  formatTime={formatTime}
-                  displayDistance={displayDistance}
-                  formatElevation={formatElevation}
-                  pace={existingPace}
-                  caloriesBurned={caloriesBurned}
-                  displayMetricValue={displayMetricValue}
-                  displayMetricLabel={displayMetricLabel}
-                  displayMetricUnit={displayMetricUnit}
-                  isWorkoutSaved={isWorkoutSaved}
-                  isSavingWorkout={isSavingWorkout}
-                  savingWorkoutRunId={savingWorkoutRunId}
-                  expandedRuns={expandedRuns}
-                  onPostToNostr={handlePostToNostr}
-                  onSaveWorkout={handleSaveWorkoutRecord}
-                  onDeleteClick={handleDeleteClick}
-                  onToggleSplits={toggleSplitsView}
-                  SplitsTable={SplitsTable}
-                />
-              </li>
-            );
-          })}
-        </ul>
-      )}
+              
+              return (
+                <li key={run.id} className="history-item">
+                  <RunHistoryCard
+                    run={run}
+                    activityType={currentActivityType}
+                    distanceUnit={distanceUnit}
+                    formatDate={formatDate}
+                    formatTime={formatTime}
+                    displayDistance={displayDistance}
+                    formatElevation={formatElevation}
+                    pace={existingPace}
+                    caloriesBurned={caloriesBurned}
+                    displayMetricValue={displayMetricValue}
+                    displayMetricLabel={displayMetricLabel}
+                    displayMetricUnit={displayMetricUnit}
+                    isWorkoutSaved={isWorkoutSaved}
+                    isSavingWorkout={isSavingWorkout}
+                    savingWorkoutRunId={savingWorkoutRunId}
+                    expandedRuns={expandedRuns}
+                    onPostToNostr={handlePostToNostr}
+                    onSaveWorkout={handleSaveWorkoutRecord}
+                    onDeleteClick={handleDeleteClick}
+                    onToggleSplits={toggleSplitsView}
+                    SplitsTable={SplitsTable}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Post Run to Nostr</h3>
-            <textarea
-              value={additionalContent}
-              onChange={(e) => setAdditionalContent(e.target.value)}
-              placeholder="Add any additional comments or hashtags..."
-              rows={4}
-              disabled={isPosting}
-            />
-            <div className="modal-buttons">
-              <button onClick={handlePostSubmit} disabled={isPosting}>
-                {isPosting ? 'Posting...' : 'Post'}
-              </button>
-              <button onClick={() => setShowModal(false)} disabled={isPosting}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDeleteModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Confirm Deletion</h3>
-            <p>Are you sure you want to delete this run?</p>
-            {runToDelete && (
-              <div className="run-summary">
-                <p>Date: {formatDate(runToDelete.timestamp)}</p>
-                <p>Distance: {displayDistance(runToDelete.distance, distanceUnit)}</p>
-                <p>Duration: {formatTime(runToDelete.duration)}</p>
+        {showModal && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3 className="subsection-heading">Post Run to Nostr</h3>
+              <textarea
+                value={additionalContent}
+                onChange={(e) => setAdditionalContent(e.target.value)}
+                placeholder="Add any additional comments or hashtags..."
+                rows={4}
+                disabled={isPosting}
+              />
+              <div className="modal-buttons">
+                <button onClick={handlePostSubmit} disabled={isPosting}>
+                  {isPosting ? 'Posting...' : 'Post'}
+                </button>
+                <button onClick={() => setShowModal(false)} disabled={isPosting}>
+                  Cancel
+                </button>
               </div>
-            )}
-            <div className="modal-buttons">
-              <button 
-                onClick={confirmDelete}
-                className="delete-btn"
-              >
-                Delete
-              </button>
-              <button 
-                onClick={cancelDelete}
-              >
-                Cancel
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {showSaveExtrasModal && currentRunForExtras && currentWorkoutEventId && (
-        <SaveRunExtrasModal 
-          run={currentRunForExtras}
-          workoutEventId={currentWorkoutEventId}
-          onClose={handleCloseSaveExtrasModal}
-          onPublishSuccess={handlePublishExtrasSuccess}
-        />
-      )}
+        {showDeleteModal && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3 className="subsection-heading">Confirm Deletion</h3>
+              <p>Are you sure you want to delete this run?</p>
+              {runToDelete && (
+                <div className="run-summary">
+                  <p>Date: {formatDate(runToDelete.timestamp)}</p>
+                  <p>Distance: {displayDistance(runToDelete.distance, distanceUnit)}</p>
+                  <p>Duration: {formatTime(runToDelete.duration)}</p>
+                </div>
+              )}
+              <div className="modal-buttons">
+                <button 
+                  onClick={confirmDelete}
+                  className="delete-btn"
+                >
+                  Delete
+                </button>
+                <button 
+                  onClick={cancelDelete}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showSaveExtrasModal && currentRunForExtras && currentWorkoutEventId && (
+          <SaveRunExtrasModal 
+            run={currentRunForExtras}
+            workoutEventId={currentWorkoutEventId}
+            onClose={handleCloseSaveExtrasModal}
+            onPublishSuccess={handlePublishExtrasSuccess}
+          />
+        )}
+      </div>
     </div>
   );
 };

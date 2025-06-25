@@ -1,8 +1,10 @@
-import { createContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 // Import the NDK singleton
-import { ndk, ndkReadyPromise } from '../lib/ndkSingleton'; // Corrected import without alias
+import { ndk, ndkReadyPromise } from '../lib/ndkSingleton'; // Consistent import without extension
 import { NDKNip07Signer, NDKPrivateKeySigner } from '@nostr-dev-kit/ndk'; // Keep NDKSigner types
+import AmberAuth from '../services/AmberAuth.js';
+import { Platform } from '../utils/react-native-shim.js';
 
 // Function to attach the appropriate signer TO THE SINGLETON NDK
 const attachSigner = async () => {
@@ -12,7 +14,7 @@ const attachSigner = async () => {
       // --- Priority 1: Check for stored private key ---
       const storedPrivKey = window.localStorage.getItem('runstr_privkey');
       if (storedPrivKey) {
-        console.log('NostrContext: Found private key in localStorage. Using NDKPrivateKeySigner.');
+        console.log('NostrContext: Found private key, using NDKPrivateKeySigner.');
         try {
           // Use the singleton ndk instance
           ndk.signer = new NDKPrivateKeySigner(storedPrivKey);
@@ -26,9 +28,33 @@ const attachSigner = async () => {
         }
       }
 
+      if (Platform.OS === 'android' && await AmberAuth.isAmberInstalled()) {
+        console.log('NostrContext: Amber is installed. Using Amber signer shim.');
+        try {
+          ndk.signer = {
+            _pubkey: null,
+            user: async function() {
+              if (!this._pubkey) this._pubkey = await AmberAuth.getPublicKey();
+              return { pubkey: this._pubkey };
+            },
+            sign: async (event) => {
+              const signedEvent = await AmberAuth.signEvent(event);
+              return signedEvent.sig;
+            }
+          };
+          const user = await ndk.signer.user();
+          console.log('NostrContext: Amber signer attached, user pubkey:', user.pubkey);
+          return user.pubkey;
+        } catch (amberError) {
+          console.error('NostrContext: Error initializing AmberSigner:', amberError);
+          ndk.signer = undefined;
+          return null;
+        }
+      }
+
       // --- Priority 2: Check for NIP-07 (window.nostr) ---
       if (window.nostr) {
-        console.log('NostrContext: No private key found. Using NIP-07 signer (window.nostr).');
+        console.log('NostrContext: Using NIP-07 signer (window.nostr).');
         const nip07signer = new NDKNip07Signer();
         // Use the singleton ndk instance
         ndk.signer = nip07signer;
@@ -47,10 +73,10 @@ const attachSigner = async () => {
             console.error('NostrContext: Error during NIP-07 signer interaction (blockUntilReady/user):', nip07Error);
             if (nip07Error.message && (nip07Error.message.toLowerCase().includes('rejected') || nip07Error.message.toLowerCase().includes('cancelled'))) {
                 console.warn('NostrContext: NIP-07 operation rejected by user.');
-            } else {
-                console.error('NostrContext: Potentially an issue with the NIP-07 extension or its communication.', nip07Error);
             }
-            ndk.signer = undefined;
+            // If blockUntilReady or user fetch fails, the signer isn't fully usable with the NDK instance.
+            ndk.signer = undefined; // Clear the signer on the NDK singleton.
+            return null; // Indicate failure to get a usable pubkey AND signer.
         }
       }
     }
@@ -102,17 +128,31 @@ export const NostrContext = createContext({
   lightningAddress: null,
   setPublicKey: () => console.warn('NostrContext not yet initialized'),
   ndkReady: false,
+  signerAvailable: false,
   isInitialized: false,
   relayCount: 0,
   ndkError: null,
   ndk: ndk, // Provide the singleton NDK instance
+  connectSigner: () => Promise.resolve({ pubkey: null, error: 'Connect signer not implemented via context directly' }), // Placeholder
+  // New properties for Option A implementation
+  canReadData: false, // True when NDK is connected (regardless of signer)
+  needsSigner: false, // True when an operation requires signer but it's not available
+  // Compatibility properties from old NostrProvider
+  defaultZapAmount: 1000,
+  updateDefaultZapAmount: () => console.warn('NostrContext not yet initialized'),
+  isAmberAvailable: false,
+  requestNostrPermissions: () => Promise.resolve(false),
 });
 
 export const NostrProvider = ({ children }) => {
-  const [publicKey, setPublicKey] = useState(null);
+  const [publicKey, setPublicKeyInternal] = useState(null);
   const [ndkReady, setNdkReady] = useState(false);
+  const [signerAvailable, setSignerAvailable] = useState(false);
   const [currentRelayCount, setCurrentRelayCount] = useState(0);
   const [ndkError, setNdkError] = useState(null);
+  // New state for Option A implementation
+  const [canReadData, setCanReadData] = useState(false);
+  const [needsSigner, setNeedsSigner] = useState(false);
   // Lightning address cached from Nostr metadata (lud16/lud06)
   const [lightningAddress, setLightningAddress] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -120,183 +160,240 @@ export const NostrProvider = ({ children }) => {
     }
     return null;
   });
+  
+  // Add missing properties for compatibility with old NostrProvider
+  const [defaultZapAmount, setDefaultZapAmount] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('defaultZapAmount');
+      return stored ? parseInt(stored, 10) : 1000; // Default to 1000 sats if not set
+    }
+    return 1000;
+  });
+  
+  // Check if Amber is available (for compatibility)
+  const [isAmberAvailable, setIsAmberAvailable] = useState(false);
+  
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      AmberAuth.isAmberInstalled().then(installed => {
+        setIsAmberAvailable(installed);
+      });
+    }
+  }, []);
+
+  // Callback to update relay count and NDK readiness
+  const updateNdkStatus = useCallback(() => {
+    const connectedRelays = ndk.pool?.stats()?.connected ?? 0;
+    setCurrentRelayCount(connectedRelays);
+    const isNdkReady = connectedRelays > 0;
+    setNdkReady(isNdkReady);
+    // Option A: canReadData is true when NDK is connected, regardless of signer
+    setCanReadData(isNdkReady);
+    if (connectedRelays === 0 && !ndkError) {
+      // If we were previously connected and now have 0 relays, set an error or warning
+      // This avoids overwriting a more specific initialization error from ndkReadyPromise
+      // setNdkError("Disconnected from all relays."); // Potentially too aggressive
+    }
+  }, [ndkError]); // Add ndkError to prevent stale closure issues
 
   useEffect(() => {
     console.log('>>> NostrProvider useEffect START (using NDK Singleton) <<<');
     let isMounted = true;
 
+    // Setup Amber deep link handler once.
+    AmberAuth.setupDeepLinkHandling();
+
     const initializeNostrSystem = async () => {
-      console.log('>>> NostrProvider: Awaiting ndkReadyPromise <<<');
-      let globalNdkIsReady = false;
+      console.log('>>> NostrProvider: Awaiting ndkReadyPromise (initial connection attempt) <<<');
+      let initialNdkConnectionSuccess = false;
       try {
-        globalNdkIsReady = await ndkReadyPromise; // Await the singleton's promise
+        console.log('[NostrProvider] About to await ndkReadyPromise from ndkSingleton.');
+        initialNdkConnectionSuccess = await ndkReadyPromise;
+        console.log(`[NostrProvider] ndkReadyPromise resolved. Success: ${initialNdkConnectionSuccess}`);
       } catch (err) {
-        // This catch is unlikely if the promise always resolves, but good for safety
         console.error("NostrProvider: Error awaiting ndkReadyPromise:", err);
         if (isMounted) {
-            setNdkReady(false);
-            setPublicKey(null);
-            setNdkError(err.message || 'Error awaiting NDK singleton readiness.');
-            setCurrentRelayCount(0); // Or try to get from ndk.pool.stats() if ndk is defined
+          console.log(`[NostrProvider] Setting ndkError due to ndkReadyPromise rejection: ${err.message || 'Error awaiting NDK singleton readiness.'}`);
+          setNdkError(err.message || 'Error awaiting NDK singleton readiness.');
         }
-        return;
-      }
-      
-      if (!isMounted) {
-        console.log('>>> NostrProvider: Unmounted after NDK readiness check. Aborting signer attachment.');
-        return;
+        // updateNdkStatus will set ndkReady based on current pool count (likely 0)
       }
 
-      if (globalNdkIsReady) {
-        console.log('>>> NostrProvider: NDK Singleton is ready. Proceeding to attach signer. <<<');
-        if (isMounted) setNdkReady(true); // NDK (connections) are ready
+      if (isMounted) {
+        console.log('[NostrProvider] Calling updateNdkStatus after ndkReadyPromise.');
+        updateNdkStatus(); // Set initial ndkReady/relayCount based on promise outcome & pool state
 
-        let signerResult = null;
-        try {
-          signerResult = await ensureSignerAttached(); // Attach signer
-          console.log('>>> NostrProvider: ensureSignerAttached finished. Result:', JSON.stringify(signerResult));
-
-          if (!isMounted) {
-            console.log('>>> NostrProvider: Unmounted before processing signer result. Aborting.');
-            return;
-          }
-
+        if (initialNdkConnectionSuccess) {
+          console.log('>>> NostrProvider: Initial NDK connection reported success. Proceeding to attach signer. <<<');
+          // Some relay implementations may still report 0 connected immediately; ensure readiness flag is set explicitly
+          setNdkReady(true);
+          const relayCnt = ndk.pool?.stats()?.connected ?? 0;
+          setCurrentRelayCount(relayCnt);
+          console.log(`[NostrProvider] Forced ndkReady=true (relayCnt=${relayCnt}).`);
+          setNdkError(null); // Clear any previous generic NDK errors if initial connect was ok
+        } else if (!ndkError) { // Only set error if a more specific one isn't already there
+          console.log('[NostrProvider] initialNdkConnectionSuccess is false and ndkError is not set. Setting NDK error.');
+          setNdkError('NDK Singleton failed to initialize or connect to relays initially.');
+        }
+        
+        // Attempt to attach signer regardless of initial connection, as signer might be local
+        ensureSignerAttached().then(signerResult => {
+          if (!isMounted) return;
           const finalPubkey = signerResult?.pubkey || null;
           const signerError = signerResult?.error || null;
-          
-          // Attempt to get relay count even if signer fails, NDK might be connected.
-          const currentConnectedCount = ndk.pool?.stats()?.connected ?? 0;
-
-
           if (finalPubkey) {
-            console.log(`NostrProvider: Signer attached. Setting state: pubkey=${finalPubkey}. Relay count: ${currentConnectedCount}`);
-            if (isMounted) {
-                setPublicKey(finalPubkey);
-                setNdkError(null); // Clear previous NDK errors if signer is ok
-                // Fetch lightning address from kind 0 metadata
-                try {
-                  const user = ndk.getUser({ pubkey: finalPubkey });
-                  await user.fetchProfile();
-                  const profile = user.profile || {};
-                  const laddr = profile.lud16 || profile.lud06 || null;
-                  if (laddr && isMounted) {
-                    setLightningAddress(laddr);
-                    if (typeof window !== 'undefined') {
-                      window.localStorage.setItem('runstr_lightning_addr', laddr);
-                    }
-                  }
-                } catch (laErr) {
-                  console.warn('NostrProvider: Unable to load lightning address from profile:', laErr);
+            setPublicKeyInternal(finalPubkey);
+            if (!initialNdkConnectionSuccess && !signerError) {
+              // If NDK wasn't ready but signer IS, clear NDK error if it was generic
+              // setNdkError(null); // This might be too optimistic if relays are still down
+            } else if (signerError) {
+                setNdkError(prevError => prevError ? `${prevError} Signer: ${signerError}` : `Signer: ${signerError}`);
+            }
+            // Fetch lightning address
+            try {
+              const user = ndk.getUser({ pubkey: finalPubkey });
+              user.fetchProfile().then(() => {
+                if (!isMounted) return;
+                const profile = user.profile || {};
+                const laddr = profile.lud16 || profile.lud06 || null;
+                if (laddr) {
+                  setLightningAddress(laddr);
+                  if (typeof window !== 'undefined') window.localStorage.setItem('runstr_lightning_addr', laddr);
                 }
+              }).catch(laErr => console.warn('NostrProvider: Error fetching profile for LUD:', laErr));
+            } catch (laErr) {
+              console.warn('NostrProvider: Error constructing user for LUD fetch:', laErr);
             }
-          } else {
-            console.error(`NostrProvider: Failed to attach signer or no signer available. Error: ${signerError}. Relay count: ${currentConnectedCount}`);
-            if (isMounted) {
-                setPublicKey(null);
-                // Preserve NDK readiness (true), but set a signer-specific error if one occurred
-                setNdkError(signerError || 'No signer attached.');
-            }
+          } else if (signerError) {
+            setNdkError(prevError => prevError ? `${prevError} Signer: ${signerError}` : `Signer: ${signerError}`);
           }
-          if (isMounted) setCurrentRelayCount(currentConnectedCount);
 
-        } catch (err) {
-          console.error("NostrProvider: CRITICAL Error during ensureSignerAttached call:", err);
-          if (isMounted) {
-            setPublicKey(null);
-            // NDK itself is ready, but signer attachment had a critical failure
-            setNdkError(err.message || 'Critical error during signer attachment.');
-            setCurrentRelayCount(ndk.pool?.stats()?.connected ?? 0);
-          }
-        }
-      } else {
-        console.error('>>> NostrProvider: NDK Singleton failed to become ready. <<<');
-        if (isMounted) {
-          setNdkReady(false);
-          setPublicKey(null);
-          setNdkError('NDK Singleton failed to initialize or connect to relays.');
-          setCurrentRelayCount(0);
-        }
+          // *** After any signer attachment attempt, update the signerAvailable state ***
+          setSignerAvailable(!!ndk.signer);
+
+        }).catch(err => {
+            if(isMounted) {
+              setNdkError(prevError => prevError ? `${prevError} Signer Attach Exception: ${err.message}` : `Signer Attach Exception: ${err.message}`);
+              setSignerAvailable(false); // Ensure signer is marked as unavailable on error
+            }
+        });
       }
     };
 
     initializeNostrSystem();
 
-    // Listener for relay pool count changes from the singleton NDK
-    const updateRelayCount = () => {
-        const count = ndk.pool?.stats()?.connected ?? 0;
-        if (isMounted) {
-            // console.log('NostrProvider: Relay count updated from singleton NDK pool:', count); // Can be noisy
-            setCurrentRelayCount(count);
-        }
-    };
-    // Ensure ndk.pool exists before attaching listeners
+    // Listeners for relay pool changes to dynamically update status
     if (ndk && ndk.pool) {
-        ndk.pool.on('relay:connect', updateRelayCount);
-        ndk.pool.on('relay:disconnect', updateRelayCount);
+      ndk.pool.on('relay:connect', updateNdkStatus);
+      ndk.pool.on('relay:disconnect', updateNdkStatus);
     }
     
     return () => {
       console.log('NostrProvider: Unmounting...');
       isMounted = false;
       if (ndk && ndk.pool) {
-          ndk.pool.off('relay:connect', updateRelayCount);
-          ndk.pool.off('relay:disconnect', updateRelayCount);
+        ndk.pool.off('relay:connect', updateNdkStatus);
+        ndk.pool.off('relay:disconnect', updateNdkStatus);
       }
+      signerAttachmentPromise = null; // Reset signer promise on unmount
     };
 
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, [updateNdkStatus, ndkError]); // Added ndkError
 
-  // Re-check signer if publicKey changes externally (less common)
-  useEffect(() => {
-    if (ndkReady && ndk.signer && publicKey) {
-      ndk.signer.user().then(user => {
-        if (user.pubkey !== publicKey) {
-          console.warn('NostrContext: Signer pubkey mismatch detected, updating context...');
-          setPublicKey(user.pubkey);
-        }
-      }).catch(err => {
-          console.error("NostrContext: Error getting user from signer", err);
-      });
+  // Function to allow components to trigger signer connection/re-check
+  const connectSigner = useCallback(async () => {
+    console.log("NostrContext: connectSigner called by component.");
+    signerAttachmentPromise = null; // Reset to allow re-attempt
+    const signerResult = await ensureSignerAttached();
+    const finalPubkey = signerResult?.pubkey || null;
+    const signerError = signerResult?.error || null;
+    if (finalPubkey) {
+        setPublicKeyInternal(finalPubkey);
+        setNdkError(prev => prev && prev.includes("Signer:") ? null : prev); // Clear signer part of error if successful
+    } else if (signerError) {
+        setNdkError(prevError => prevError ? `${prevError} Signer: ${signerError}` : `Signer: ${signerError}`);
     }
-  }, [publicKey, ndkReady]);
+    // After connection attempt, update the signer state
+    setSignerAvailable(!!ndk.signer);
+    return signerResult;
+  }, []);
 
-  // Periodically re-attempt signer attachment if no pubkey yet
-  useEffect(() => {
-    if (publicKey) return; // already have pubkey
-    let intervalId = setInterval(async () => {
-      if (publicKey) { clearInterval(intervalId); return; }
-      if (ndk.signer) {
-        try {
-          const user = await ndk.signer.user();
-          if (user?.pubkey) {
-            setPublicKey(user.pubkey);
-            clearInterval(intervalId);
-          }
-        } catch(_err) { void _err; }
-      } else if (window?.nostr) {
-        // Try attaching again
-        try {
-          const result = await ensureSignerAttached();
-          if (result?.pubkey) {
-            setPublicKey(result.pubkey);
-            clearInterval(intervalId);
-          }
-        } catch(_err) { void _err; }
+  const setPublicKey = useCallback((pk) => {
+    // This function is primarily for logout or manual key changes, not initial connection.
+    setPublicKeyInternal(pk);
+    if (!pk && typeof window !== 'undefined') {
+        window.localStorage.removeItem('runstr_privkey');
+        window.localStorage.removeItem('runstr_lightning_addr');
+        ndk.signer = undefined; // Clear signer on explicit logout
+        signerAttachmentPromise = null; // Allow re-attachment
+        setLightningAddress(null);
+        setSignerAvailable(false); // Update signer state on logout
+    }
+  }, []);
+
+  // Add missing functions for compatibility with old NostrProvider
+  const updateDefaultZapAmount = useCallback((amount) => {
+    const numAmount = parseInt(amount, 10);
+    if (!isNaN(numAmount) && numAmount > 0) {
+      setDefaultZapAmount(numAmount);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('defaultZapAmount', numAmount.toString());
       }
-    }, 3000);
-    return () => clearInterval(intervalId);
-  }, [publicKey]);
+    }
+  }, []);
+
+  const requestNostrPermissions = useCallback(async () => {
+    // For Android, use Amber if available
+    if (Platform.OS === 'android' && isAmberAvailable) {
+      try {
+        const result = await AmberAuth.requestAuthentication();
+        // The actual public key will be set by the signer attachment process
+        return result;
+      } catch (error) {
+        console.error('Error requesting Amber authentication:', error);
+        return false;
+      }
+    } 
+    // For web or if Amber is not available, use window.nostr
+    else if (window.nostr) {
+      try {
+        // This will trigger the extension permission dialog
+        const pubkey = await window.nostr.getPublicKey();
+        setPublicKeyInternal(pubkey);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('permissionsGranted', 'true');
+        }
+        return true;
+      } catch (error) {
+        console.error('Error getting Nostr public key:', error);
+        return false;
+      }
+    } else {
+      console.warn('No authentication method available');
+      return false;
+    }
+  }, [isAmberAvailable]);
 
   const value = useMemo(() => ({
     publicKey,
     lightningAddress,
-    setPublicKey, 
-    ndkReady,
-    isInitialized: ndkReady,
+    setPublicKey,
+    ndkReady, // Dynamically updated based on relay connections
+    signerAvailable, // Pass the new state through the context
+    isInitialized: ndkReady, // Maintained for compatibility, reflects current ndkReady
     relayCount: currentRelayCount,
     ndkError,
-    ndk,
-  }), [publicKey, ndkReady, currentRelayCount, ndkError]);
+    ndk, // The singleton NDK instance
+    connectSigner,
+    // Option A: New properties for separated data/signer concerns
+    canReadData, // True when NDK is connected, regardless of signer
+    needsSigner, // True when an operation requires signer but it's not available
+    // Compatibility properties from old NostrProvider
+    defaultZapAmount,
+    updateDefaultZapAmount,
+    isAmberAvailable,
+    requestNostrPermissions,
+  }), [publicKey, lightningAddress, setPublicKey, ndkReady, signerAvailable, currentRelayCount, ndkError, connectSigner, canReadData, needsSigner, defaultZapAmount, updateDefaultZapAmount, isAmberAvailable, requestNostrPermissions]);
 
   return (
     <NostrContext.Provider value={value}>

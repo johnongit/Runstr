@@ -1,0 +1,212 @@
+/* League Map Component Styles */
+.league-map-container {
+  @apply bg-bg-primary border-b border-border-secondary p-4 mb-4;
+}
+
+.league-map-loading {
+  @apply flex flex-col justify-center items-center h-48;
+}
+
+.league-map-error {
+  @apply flex flex-col justify-center items-center h-48;
+}
+
+.league-map-header {
+  @apply text-center mb-4;
+}
+
+.league-map-course {
+  @apply flex justify-center mb-4;
+}
+
+.course-outline-container {
+  @apply w-full max-w-md;
+}
+
+.course-outline {
+  /* No animations */
+}
+
+.course-detail {
+  @apply opacity-80;
+}
+
+.league-map-progress {
+  @apply text-center;
+}
+
+.user-position {
+  @apply drop-shadow-sm;
+}
+
+.bot-position {
+  @apply opacity-70;
+}
+
+.milestone-marker {
+  @apply opacity-60;
+}
+
+.milestone-text {
+  @apply opacity-70;
+}
+
+/* Progress bar styles */
+.league-progress-bar {
+  @apply mb-4;
+}
+
+.progress-bar-container {
+  @apply w-full h-2 bg-bg-tertiary rounded-full relative overflow-hidden;
+}
+
+.progress-bar-fill {
+  @apply h-full bg-primary rounded-full;
+}
+
+.progress-bar-labels {
+  @apply flex justify-between mt-1;
+}
+
+/* Leaderboard styles */
+.league-leaderboard {
+  @apply mt-6 bg-bg-secondary rounded-lg p-4 border border-border-secondary;
+}
+
+.leaderboard-header {
+  @apply text-center border-b border-border-secondary pb-3 mb-4;
+}
+
+.leaderboard-loading {
+  @apply flex flex-col justify-center items-center py-8;
+}
+
+.leaderboard-error {
+  @apply flex flex-col justify-center items-center py-8;
+}
+
+.leaderboard-empty {
+  @apply text-center py-8;
+}
+
+.leaderboard-list {
+  @apply space-y-3;
+}
+
+.leaderboard-item {
+  @apply flex items-center justify-between p-3 bg-bg-tertiary rounded-lg border border-border-secondary;
+}
+
+.leaderboard-rank {
+  @apply flex-shrink-0 mr-3;
+}
+
+/* League Map - Linear Race Track Styles */
+
+/* Loading dots - static version */
+.loading-dots {
+  @apply flex space-x-1;
+}
+
+.loading-dots span {
+  @apply w-2 h-2 bg-text-secondary rounded-full;
+}
+
+/* Race track - static styling */
+.runner-dot {
+  /* No animations */
+}
+
+/* User pulse animation for current user */
+@keyframes user-pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.3);
+  }
+  100% {
+    opacity: 0.3;
+    transform: scale(1.6);
+  }
+}
+
+/* Leaderboard styles matching workout card theme */
+.leaderboard-row.current-user {
+  @apply bg-white/5 border-l-4 border-white;
+}
+
+.rank-badge .medal-1 {
+  @apply bg-yellow-500 text-black;
+}
+
+.rank-badge .medal-2 {
+  @apply bg-gray-400 text-black;
+}
+
+.rank-badge .medal-3 {
+  @apply bg-orange-600 text-white;
+}
+
+.you-badge {
+  @apply px-2 py-1 bg-black border border-white text-white text-xs rounded-full font-bold ml-2;
+}
+
+/* Progress bar - static */
+.mini-progress-fill {
+  /* No animations */
+}
+
+/* Track line styles - static */
+.track-line {
+  /* No animations */
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+  .race-track-svg {
+    @apply h-20;
+  }
+  
+  .leaderboard-row {
+    @apply p-2;
+  }
+  
+  .runner-name {
+    @apply text-xs;
+  }
+  
+  .runner-stats {
+    @apply text-xs;
+  }
+}
+
+/* League container spacing */
+.league-container {
+  @apply space-y-4;
+}
+
+/* Loading states */
+.league-loading, .league-error {
+  @apply flex flex-col justify-center items-center min-h-32 bg-bg-secondary rounded-lg border border-border-secondary;
+}
+
+/* Race header */
+.race-header {
+  @apply text-center mb-4;
+}
+
+.section-heading {
+  @apply text-xl font-bold text-text-primary;
+}
+
+/* Track container */
+.race-track-container {
+  @apply w-full max-w-2xl mx-auto;
+}
+
+.race-track-svg {
+  @apply w-full h-24;
+} 

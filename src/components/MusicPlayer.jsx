@@ -138,23 +138,16 @@ export function MusicPlayer() {
         <p>Selected Playlist: {playlist?.title || 'Unknown'}</p>
       </div>
       <div className={styles.controls}>
-        <button onClick={playPrevious} className={styles.controlButton}>
-          <div className="icon-container">
-            <div className="icon-prev"></div>
-          </div>
+        <button onClick={playPrevious} className={`${styles.controlButton} music-control-button`}>
+          <span className="unicode-icon text-xl font-bold select-none">⏮</span>
         </button>
-        <button onClick={safeTogglePlay} className={styles.controlButton}>
-          <div className="icon-container">
-            {isPlaying ? 
-              <div className="icon-pause"></div> : 
-              <div className="icon-play"></div>
-            }
-          </div>
+        <button onClick={safeTogglePlay} className={`${styles.controlButton} music-control-button`}>
+          <span className="unicode-icon text-xl font-bold select-none">
+            {isPlaying ? '⏸' : '▶'}
+          </span>
         </button>
-        <button onClick={playNext} className={styles.controlButton}>
-          <div className="icon-container">
-            <div className="icon-next"></div>
-          </div>
+        <button onClick={playNext} className={`${styles.controlButton} music-control-button`}>
+          <span className="unicode-icon text-xl font-bold select-none">⏭</span>
         </button>
         <WavlakeZap 
           trackId={currentTrack.id}
@@ -184,7 +177,7 @@ export function MusicPlayer() {
                 <span className={styles.trackTitle}>{track.title}</span>
                 <span className={styles.trackArtist}>{track.artist || 'Unknown Artist'}</span>
                 <span className={styles.playIcon}>
-                  <div className="mini-icon-play"></div>
+                  <span className="unicode-icon text-sm font-bold select-none">▶</span>
                 </span>
               </li>
             ))}

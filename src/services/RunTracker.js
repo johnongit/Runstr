@@ -6,7 +6,7 @@ import { filterLocation } from '../utils/runCalculations';
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
 // Define average stride length for step estimation
-const AVERAGE_STRIDE_LENGTH_METERS = 0.73; // meters (adjusted from 0.762)
+const AVERAGE_STRIDE_LENGTH_METERS = 0.62; // meters (adjusted from 0.73)
 
 // Helper function to estimate stride length based on height
 const estimateStrideLength = (heightCm) => {
@@ -148,6 +148,11 @@ class RunTracker extends EventEmitter {
     });
 
     const currentPositionStd = standardise(newPosition);
+
+    // Keep duration accurate even when JS timers are throttled in background.
+    // Uses GPS timestamp so splits don\'t get 0:00 durations.
+    this.duration = (currentPositionStd.timestamp - this.startTime - this.pausedTime) / 1000;
+    this.emit('durationChange', this.duration);
 
     if (this.positions.length > 0) {
       const lastRawPosition = this.positions[this.positions.length - 1];
@@ -309,7 +314,7 @@ class RunTracker extends EventEmitter {
           foregroundService: true,
           foregroundServiceType: 'location',
           requestPermissions: false, // Don't request here, should already have them
-          distanceFilter: 10,
+          distanceFilter: 5,
           highAccuracy: true,
           staleLocationThreshold: 30000,
           // Additional settings for better compatibility
@@ -318,7 +323,7 @@ class RunTracker extends EventEmitter {
           interval: 5000,
           fastestInterval: 5000,
           activitiesInterval: 10000,
-          locationProvider: 'gps',
+          locationProvider: 3,
           saveBatteryOnBackground: false,
           stopOnTerminate: false,
           startOnBoot: false,

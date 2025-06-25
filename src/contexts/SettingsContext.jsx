@@ -39,6 +39,12 @@ export const useSettings = () => {
       setBlossomEndpoint: () => {},
       skipStartCountdown: false,
       setSkipStartCountdown: () => console.warn('Settings not initialized'),
+      usePedometer: true,
+      setUsePedometer: () => console.warn('Settings not initialized'),
+      autoPostToNostr: false,
+      setAutoPostToNostr: () => console.warn('Settings not initialized'),
+      useLocalStats: false,
+      setUseLocalStats: () => console.warn('Settings not initialized'),
     };
     PUBLISHABLE_METRICS.forEach(metric => {
       const keyName = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
@@ -71,9 +77,11 @@ export const SettingsProvider = ({ children }) => {
   const [healthEncryptionPref, setHealthEncryptionPref] = useState(() => initBooleanState('healthEncryptionPrefIsPlaintext', false) ? 'plaintext' : 'encrypted');
   const [publishMode, setPublishMode] = useState(() => localStorage.getItem('publishMode') || 'public');
   const [privateRelayUrl, setPrivateRelayUrl] = useState(() => localStorage.getItem('privateRelayUrl') || '');
-  const [blossomEndpoint, setBlossomEndpoint] = useState(() => localStorage.getItem('blossomEndpoint') || '');
+  const [blossomEndpoint, setBlossomEndpoint] = useState(() => localStorage.getItem('blossomEndpoint') || 'https://cdn.satellite.earth');
   const [skipStartCountdown, setSkipStartCountdown] = useState(() => initBooleanState('skipStartCountdown', false));
   const [usePedometer, setUsePedometer] = useState(() => initBooleanState('usePedometer', true));
+  const [autoPostToNostr, setAutoPostToNostr] = useState(() => initBooleanState('autoPostToNostr', false));
+  const [useLocalStats, setUseLocalStats] = useState(() => initBooleanState('useLocalStats', false));
 
   const initialMetricPrefs = useMemo(() => PUBLISHABLE_METRICS.reduce((acc, metric) => {
     const key = `publish${metric.key.charAt(0).toUpperCase() + metric.key.slice(1)}`;
@@ -97,6 +105,8 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => localStorage.setItem('blossomEndpoint', blossomEndpoint), [blossomEndpoint]);
   useEffect(() => localStorage.setItem('skipStartCountdown', skipStartCountdown.toString()), [skipStartCountdown]);
   useEffect(() => localStorage.setItem('usePedometer', usePedometer.toString()), [usePedometer]);
+  useEffect(() => localStorage.setItem('autoPostToNostr', autoPostToNostr.toString()), [autoPostToNostr]);
+  useEffect(() => localStorage.setItem('useLocalStats', useLocalStats.toString()), [useLocalStats]);
 
   useEffect(() => {
     try {
@@ -154,6 +164,10 @@ export const SettingsProvider = ({ children }) => {
     setSkipStartCountdown,
     usePedometer,
     setUsePedometer,
+    autoPostToNostr,
+    setAutoPostToNostr,
+    useLocalStats,
+    setUseLocalStats,
     ...metricPublishPrefs,
     ...dynamicMetricSetters
   }), [
@@ -165,6 +179,8 @@ export const SettingsProvider = ({ children }) => {
     blossomEndpoint, setBlossomEndpoint,
     skipStartCountdown, setSkipStartCountdown,
     usePedometer, setUsePedometer,
+    autoPostToNostr, setAutoPostToNostr,
+    useLocalStats, setUseLocalStats,
     metricPublishPrefs,
     dynamicMetricSetters
   ]);

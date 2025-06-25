@@ -25,7 +25,7 @@ const EventCard = ({ event }) => {
       onClick={handleClick}
     >
       <div className="flex items-center mb-2">
-        <h3 className="text-lg font-semibold">{event.title}</h3>
+        <h3 className="component-heading">{event.title}</h3>
         {isRegistered && (
           <span className="ml-auto bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
             Registered

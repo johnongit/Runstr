@@ -43,7 +43,7 @@ select {
 }
 
 .unit-button.active {
-  background-color: #2563eb;
+  background-color: var(--primary);
   color: white;
 }
 
@@ -86,13 +86,13 @@ select {
 }
 
 .save-button {
-  background-color: #2563eb;
+  background-color: var(--primary);
   color: white;
   border: none;
 }
 
 .save-button:hover {
-  background-color: #1d4ed8;
+  background-color: var(--primary-hover);
 }
 
 .cancel-button {

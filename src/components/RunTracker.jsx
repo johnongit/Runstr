@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Button } from "@/components/ui/button";
 import { useRunTracker } from '../contexts/RunTrackerContext';
 import { useActivityMode } from '../contexts/ActivityModeContext';
 import runDataService, { ACTIVITY_TYPES } from '../services/RunDataService';
@@ -13,6 +14,8 @@ import { PostRunWizardModal } from './PostRunWizardModal';
 import { useContext } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { NostrContext } from '../contexts/NostrContext';
+import { publishRun } from '../utils/runPublisher';
+import appToast from '../utils/toast';
 
 export const RunTracker = () => {
   const { 
@@ -33,7 +36,7 @@ export const RunTracker = () => {
   } = useRunTracker();
 
   const { getActivityText, mode } = useActivityMode();
-  const { distanceUnit, skipStartCountdown, skipEndCountdown } = useSettings();
+  const { distanceUnit, skipStartCountdown, skipEndCountdown, autoPostToNostr } = useSettings();
   const { publicKey, lightningAddress } = useContext(NostrContext);
 
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -48,6 +51,7 @@ export const RunTracker = () => {
   const [isSavingWorkout, setIsSavingWorkout] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showPostRunWizard, setShowPostRunWizard] = useState(false);
+  const [autoPublishing, setAutoPublishing] = useState(false);
 
   // Initialize events when the component mounts
   useEffect(() => {
@@ -188,7 +192,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast(successMsg);
       } else {
-        alert(successMsg);
+        appToast.success(successMsg);
       }
     } catch (error) {
       console.error('Error posting to Nostr:', error);
@@ -196,7 +200,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to post to Nostr: ' + error.message);
       } else {
-        alert('Failed to post to Nostr: ' + error.message);
+        appToast.error('Failed to post to Nostr: ' + error.message);
       }
     } finally {
       setIsPosting(false);
@@ -227,7 +231,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       }
     } else {
       // If permissions haven't been granted yet, show a message
-      alert('Location permission is required for tracking. Please restart the app to grant permissions.');
+      appToast.error('Location permission is required for tracking. Please restart the app to grant permissions.');
       // Set the flag to show permission dialog next time the app starts
       localStorage.removeItem('permissionsGranted');
     }
@@ -358,8 +362,17 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     setWorkoutSaved(false);
     
     try {
-      // Create a workout event with kind 1301 format
-      const workoutEvent = createWorkoutEvent(recentRun, distanceUnit);
+      // Get team and challenge associations
+      const { getWorkoutAssociations } = await import('../utils/teamChallengeHelper');
+      const { teamAssociation, challengeUUIDs, challengeNames, userPubkey } = await getWorkoutAssociations();
+      
+      // Create a workout event with kind 1301 format including team/challenge tags
+      const workoutEvent = createWorkoutEvent(recentRun, distanceUnit, { 
+        teamAssociation, 
+        challengeUUIDs, 
+        challengeNames, 
+        userPubkey 
+      });
       
       // Use the existing createAndPublishEvent function
       const publishedEvent = await createAndPublishEvent(workoutEvent);
@@ -380,7 +393,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to save workout record: ' + error.message);
       } else {
-        alert('Failed to save workout record: ' + error.message);
+        appToast.error('Failed to save workout record: ' + error.message);
       }
     } finally {
       setIsSavingWorkout(false);
@@ -410,7 +423,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Run deleted successfully');
       } else {
-        alert('Run deleted successfully');
+        appToast.success('Run deleted successfully');
       }
       
       // If there are other runs, load the next most recent run
@@ -427,96 +440,108 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       if (window.Android && window.Android.showToast) {
         window.Android.showToast('Failed to delete run: ' + error.message);
       } else {
-        alert('Failed to delete run: ' + error.message);
+        appToast.error('Failed to delete run: ' + error.message);
       }
     } finally {
       setIsDeleting(false);
     }
   };
 
-  return (
-    <div className="w-full h-full flex flex-col bg-[#111827] text-white relative">
-      {/* Title Banner */}
-      <div className="bg-gradient-to-r from-indigo-800 to-purple-800 p-4 mb-6 text-center">
-        <h2 className="text-2xl font-bold text-white">{getActivityText('header')}</h2>
-      </div>
+  useEffect(() => {
+    const attemptAutoPost = async () => {
+      if (!autoPostToNostr || !recentRun || recentRun.nostrWorkoutEventId || autoPublishing) return;
+      try {
+        setAutoPublishing(true);
+        await publishRun(recentRun, distanceUnit, {});
+        // publishRun mutates run to set nostrWorkoutEventId; update local storage copy
+        runDataService.updateRun(recentRun.id, { nostrWorkoutEventId: recentRun.nostrWorkoutEventId });
+      } catch (err) {
+        console.error('Auto-post failed', err);
+      } finally {
+        setAutoPublishing(false);
+      }
+    };
+    attemptAutoPost();
+  }, [recentRun, autoPostToNostr, distanceUnit, autoPublishing]);
 
+  return (
+    <div className="w-full h-full flex flex-col bg-bg-primary text-text-primary relative">
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 p-4">
         {/* Distance Card */}
-        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+        <div className="bg-bg-secondary p-4 rounded-xl shadow-lg flex flex-col border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-7 h-7 rounded-full bg-[#10B981]/20 flex items-center justify-center mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#10B981]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-7 h-7 rounded-full bg-success/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-            <span className="text-sm text-gray-400">Distance</span>
+            <span className="text-sm text-text-secondary">Distance</span>
           </div>
-          <div className="text-3xl font-bold">{convertDistance(distance, distanceUnit)}</div>
-          <div className="text-sm text-gray-400">{distanceUnit}</div>
+          <div className="display-text">{convertDistance(distance, distanceUnit)}</div>
+          <div className="text-sm text-text-muted">{distanceUnit}</div>
         </div>
 
         {/* Time Card */}
-        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+        <div className="bg-bg-secondary p-4 rounded-xl shadow-lg flex flex-col border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-7 h-7 rounded-full bg-[#3B82F6]/20 flex items-center justify-center mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#3B82F6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <span className="text-sm text-gray-400">Time</span>
+            <span className="text-sm text-text-secondary">Time</span>
           </div>
-          <div className="text-3xl font-bold">{runDataService.formatTime(duration)}</div>
+          <div className="display-text">{runDataService.formatTime(duration)}</div>
         </div>
 
         {/* Pace Card / Dynamic Metric Card */}
-        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+        <div className="bg-bg-secondary p-4 rounded-xl shadow-lg flex flex-col border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-7 h-7 rounded-full bg-[#F59E0B]/20 flex items-center justify-center mr-2">
+            <div className="w-7 h-7 rounded-full bg-warning/20 flex items-center justify-center mr-2">
               {/* Icon can also be dynamic based on metric type if desired */}
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#F59E0B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
-            <span className="text-sm text-gray-400">{primaryMetricLabel}</span>
+            <span className="text-sm text-text-secondary">{primaryMetricLabel}</span>
           </div>
-          <div className="text-3xl font-bold">{primaryMetricValue}</div>
-          {primaryMetricUnit && <div className="text-sm text-gray-400">{primaryMetricUnit}</div>}
+          <div className="display-text">{primaryMetricValue}</div>
+          {primaryMetricUnit && <div className="text-sm text-text-muted">{primaryMetricUnit}</div>}
         </div>
 
         {/* Elevation Card */}
-        <div className="bg-gradient-to-br from-[#111827] to-[#1a222e] p-4 rounded-xl shadow-lg flex flex-col">
+        <div className="bg-bg-secondary p-4 rounded-xl shadow-lg flex flex-col border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-7 h-7 rounded-full bg-[#F97316]/20 flex items-center justify-center mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#F97316]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-7 h-7 rounded-full bg-info/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
               </svg>
             </div>
-            <span className="text-sm text-gray-400">Elevation</span>
+            <span className="text-sm text-text-secondary">Elevation</span>
           </div>
-          <div className="text-3xl font-bold">{elevation ? formatElevation(elevation.gain, distanceUnit) : '0'}</div>
-          <div className="text-sm text-gray-400">{distanceUnit === 'mi' ? 'ft' : 'm'}</div>
+          <div className="display-text">{elevation ? formatElevation(elevation.gain, distanceUnit) : '0'}</div>
+          <div className="text-sm text-text-muted">{distanceUnit === 'mi' ? 'ft' : 'm'}</div>
         </div>
       </div>
       
       {/* Splits Table - Show only when tracking and splits exist */}
       {isTracking && splits && splits.length > 0 && (
-        <div className="bg-[#1a222e] rounded-xl shadow-lg mt-2 mx-4 p-4 overflow-hidden">
+        <div className="bg-bg-secondary rounded-xl shadow-lg mt-2 mx-4 p-4 overflow-hidden border border-border-secondary">
           <div className="flex items-center mb-2">
-            <div className="w-6 h-6 rounded-full bg-[#8B5CF6]/20 flex items-center justify-center mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-300">Split Times</span>
+            <span className="text-sm font-medium text-text-secondary">Split Times</span>
           </div>
           <div className="mt-2">
             <SplitsTable splits={splits} distanceUnit={distanceUnit} />
           </div>
           {splits.length > 5 && (
-            <p className="text-xs text-gray-400 text-center mt-2">
+            <p className="text-xs text-text-muted text-center mt-2">
               Swipe to see more splits if needed
             </p>
           )}
@@ -525,35 +550,34 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       
       {/* Start Activity Button */}
       {!isTracking ? (
-        <button 
-          className="mx-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-xl shadow-lg flex items-center justify-center text-lg font-semibold my-4"
+        <Button 
           onClick={initiateRun}
+          variant="start-run"
+          size="lg"
+          className="mx-4 my-4 text-lg font-semibold"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
           {getActivityText('start')}
-        </button>
+        </Button>
       ) : (
         <div className="flex justify-between px-4 my-4">
           {isPaused ? (
-            <button 
-              className="bg-green-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold"
+            <Button 
               onClick={resumeRun}
+              variant="success"
+              className="flex-1 mr-2 font-semibold !bg-black border border-white"
             >
               Resume
-            </button>
+            </Button>
           ) : (
-            <button 
-              className="bg-yellow-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 mr-2 font-semibold"
+            <Button 
               onClick={pauseRun}
+              variant="warning"
+              className="flex-1 mr-2 font-semibold !bg-black border border-white"
             >
               Pause
-            </button>
+            </Button>
           )}
-          <button 
-            className="bg-red-600 text-white py-3 px-6 rounded-xl shadow-lg flex-1 ml-2 font-semibold"
+          <Button 
             onClick={() => {
               if (skipEndCountdown) {
                 stopRun();
@@ -561,9 +585,11 @@ ${additionalContent ? `\n${additionalContent}` : ''}
                 startCountdown('stop');
               }
             }}
+            variant="error"
+            className="flex-1 ml-2 font-semibold !bg-black border border-white"
           >
             Stop
-          </button>
+          </Button>
         </div>
       )}
       
@@ -584,8 +610,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {!isTracking && recentRun && (
         <div className="mt-6 mx-4">
           <div className="flex justify-between items-center mb-2">
-            <h3 className="text-lg font-semibold">{getActivityText('recent')}</h3>
-            <span className="text-xs text-gray-400">See All</span>
+            <h3 className="subsection-heading">{getActivityText('recent')}</h3>
           </div>
           
           <DashboardRunCard
@@ -635,8 +660,8 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {isCountingDown && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="flex flex-col items-center">
-            <div className="text-6xl font-bold mb-4">{countdown}</div>
-            <div className="text-xl">
+            <div className="text-6xl font-bold mb-4 text-text-primary">{countdown}</div>
+            <div className="text-xl text-text-secondary">
               {countdownType === 'start' ? 'Starting run...' : 'Stopping run...'}
             </div>
           </div>
@@ -646,31 +671,31 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {/* Post to Nostr modal */}
       {showPostModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="bg-[#1a222e] rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-xl font-semibold mb-4">Post Run to Nostr</h3>
+          <div className="bg-bg-secondary rounded-xl p-6 w-full max-w-md border border-border-primary">
+            <h3 className="text-xl font-semibold mb-4 text-text-primary">Post Run to Nostr</h3>
             <textarea
               value={additionalContent}
               onChange={(e) => setAdditionalContent(e.target.value)}
               placeholder="Add any additional comments or hashtags..."
               rows={4}
-              className="w-full bg-[#111827] border border-gray-700 rounded-lg p-3 mb-4 text-white"
+              className="w-full bg-bg-tertiary border border-border-secondary rounded-lg p-3 mb-4 text-text-primary placeholder-text-muted focus:border-border-focus outline-none"
               disabled={isPosting}
             />
             <div className="flex justify-end space-x-3">
-              <button 
+              <Button 
                 onClick={() => setShowPostModal(false)} 
                 disabled={isPosting}
-                className="px-4 py-2 rounded-lg border border-gray-600 text-gray-300"
+                variant="outline"
               >
                 Cancel
-              </button>
-              <button 
+              </Button>
+              <Button 
                 onClick={handlePostSubmit} 
                 disabled={isPosting}
-                className="px-4 py-2 rounded-lg bg-indigo-600 text-white"
+                variant="default"
               >
                 {isPosting ? 'Posting...' : 'Post'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

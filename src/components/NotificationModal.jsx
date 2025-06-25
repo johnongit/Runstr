@@ -8,7 +8,7 @@ const NotificationModal = ({ title, message, buttonText, onClose, isVisible }) =
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-800 rounded-lg p-6 max-w-sm w-full border border-gray-700 shadow-xl">
-        <h2 className="text-xl font-bold text-white mb-4">{title}</h2>
+        <h2 className="section-heading mb-4">{title}</h2>
         <p className="text-gray-300 mb-6 whitespace-pre-line">{message}</p> {/* whitespace-pre-line to respect newlines */}
         <button 
           onClick={onClose}

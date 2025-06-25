@@ -1,42 +1,41 @@
-// Shim for React Native Platform and Linking APIs
+/**
+ * React Native Shim for Web.
+ * Provides minimal stubs for RN modules that are not available in a web environment.
+ * This allows components to import from 'react-native' without breaking the web build.
+ * The native mobile build (via Metro) will use the real 'react-native' modules.
+ */
 
 // Platform detection
 export const Platform = {
   OS: 'web',
   select: (options) => {
-    if (options.web) return options.web;
-    if (options.default) return options.default;
-    return undefined;
-  }
+    return options.web || options.default;
+  },
 };
 
 // Basic Linking implementation for web
 export const Linking = {
-  canOpenURL: async (url) => {
-    // In a web context, we can't reliably check if a URL scheme is installed
-    // Always return false for special schemes in web mode
-    if (url.startsWith('nostrsigner:')) return false;
-    return true;
-  },
-  
+  canOpenURL: async () => false,
   openURL: async (url) => {
-    // For web, we'll just try to open the URL in a new tab
-    // This won't work for custom schemes but is a fallback
-    window.open(url, '_blank');
-    return true;
+    console.warn(`[Shim] openURL called with: ${url}`);
   },
-  
-  addEventListener: () => {
-    // We can't really listen for deep links in web context
-    // Return a no-op removal function
-    return {
-      remove: () => {}
-    };
-  }
+  addEventListener: () => ({ remove: () => {} }),
+  getInitialURL: async () => null,
 };
 
-// Export a default object for compatibility
-export default {
+// AppState stub for web
+export const AppState = {
+  currentState: 'active',
+  addEventListener: (_event, _handler) => ({
+    remove: () => {},
+  }),
+};
+
+// Default export for convenience, e.g. import RN from '...'
+const RN = {
   Platform,
-  Linking
-}; 
+  Linking,
+  AppState,
+};
+
+export default RN; 
