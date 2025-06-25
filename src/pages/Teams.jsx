@@ -4,6 +4,7 @@ import { useNip101TeamsFeed } from '../hooks/useNip101TeamsFeed';
 import { useNostr } from '../hooks/useNostr';
 import { useTeamRoles } from '../hooks/useTeamRoles';
 import { getDefaultPostingTeamIdentifier, setDefaultPostingTeamIdentifier } from '../utils/settingsManager';
+import { cacheTeamName } from '../services/nameResolver';
 
 export default function Teams() {
   const navigate = useNavigate();
@@ -41,6 +42,9 @@ export default function Teams() {
     const teamId = `${captainPubkey}:${teamUUID}`;
     setDefaultPostingTeamIdentifier(teamId);
     setDefaultPostingTeam(teamId);
+    
+    // Cache the team name for future lookups in workout publishing
+    cacheTeamName(teamUUID, captainPubkey, teamName);
     
     // Show feedback
     if (window.Android && window.Android.showToast) {

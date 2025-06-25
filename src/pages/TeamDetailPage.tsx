@@ -38,6 +38,7 @@ import ManageTeamModal from '../components/teams/ManageTeamModal';
 import TeamStatsWidget from '../components/teams/TeamStatsWidget';
 import { useTeamActivity } from '../hooks/useTeamActivity';
 import { setDefaultPostingTeamIdentifier, getDefaultPostingTeamIdentifier } from '../utils/settingsManager';
+import { cacheTeamName } from '../services/nameResolver';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -105,6 +106,8 @@ const TeamDetailPage: React.FC = () => {
     setDefaultPostingTeam(teamId);
     
     const teamName = team ? getTeamName(team) : 'Team';
+    // Cache the team name for future lookups in workout publishing
+    cacheTeamName(teamUUID, captainPubkey, teamName);
     toast.success(`"${teamName}" set as default posting team`);
   };
 

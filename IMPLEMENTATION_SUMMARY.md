@@ -14,6 +14,7 @@ The default posting team functionality has been successfully implemented across 
   - ✅ "Clear Default" button to remove default
   - ✅ Visual feedback with toast notifications
   - ✅ Default team info banner at top of page
+  - ✅ **FIXED: Team name caching** - Now properly caches team names when setting default
 
 ### **2. Team Selection UI (Team Detail Page)** 
 - **File**: `src/pages/TeamDetailPage.tsx`
@@ -22,6 +23,7 @@ The default posting team functionality has been successfully implemented across 
   - ✅ "✅ Default Posting Team" indicator when current team is default
   - ✅ "Clear Default" button to remove default
   - ✅ Visual feedback with toast notifications
+  - ✅ **FIXED: Team name caching** - Now properly caches team names when setting default
 
 ### **3. Dashboard Run Publishing**
 - **File**: `src/components/RunTracker.jsx`
@@ -102,6 +104,40 @@ The default posting team functionality has been successfully implemented across 
 4. **✅ Works Everywhere** - Any client can read the team info
 5. **✅ Accessible** - Screen readers handle text naturally
 6. **✅ Future-Proof** - Easy to modify format later
+
+## 🔧 **Recent Fix Applied**
+
+### **Problem**: Team IDs showing instead of team names
+- **Issue**: When users published runs, feed showed "Team: 87d30c8b" instead of "Team: RUNSTR" 
+- **Root Cause**: Team names weren't being cached when users set default teams
+- **Solution**: Added `cacheTeamName()` calls to both team selection UI components
+
+### **Files Modified**:
+1. **`src/pages/Teams.jsx`**: Added team name caching in `handleSetDefaultTeam()`
+2. **`src/pages/TeamDetailPage.tsx`**: Added team name caching in `handleSetDefaultTeam()`
+
+## 🧪 **Testing Recommended**
+
+### **Test Flow**:
+1. ✅ Go to Teams page
+2. ✅ Click "Set as Default" on a team you're a member of  
+3. ✅ Complete a run from the dashboard
+4. ✅ Check feed - should show "Team: [Team Name]" instead of "Team: [UUID]"
+
+## 📋 **For Existing Users**
+
+**Users who previously joined teams need to:**
+1. Go to Teams page or Team Detail page
+2. Click "Set as Default" on their desired team
+3. This will both:
+   - Set the team as their default posting team
+   - Cache the team name for future use
+
+**New runs will then include team information with proper names!**
+
+## 🎯 **Next Steps**
+
+The implementation is complete and ready for testing. All team functionality should now work properly with readable team names in the feed instead of cryptic IDs.
 
 ---
 
