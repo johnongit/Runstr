@@ -11,17 +11,19 @@ if (!g.__RUNSTR_NDK_INSTANCE__) {
   g.__RUNSTR_NDK_INSTANCE__ = new NDK({
     explicitRelayUrls: relays,
     // You can add other NDK options here if needed, e.g., signer, cache, etc.
-    // debug: true, // Uncomment for more verbose NDK logging
+    debug: true, // Enable for more verbose NDK logging
   });
 
   g.__RUNSTR_NDK_READY_PROMISE__ = (async () => {
     try {
-      const connectTimeoutMs = 15000; // Increased timeout for the connect call itself
+      const connectTimeoutMs = 30000; // Increased timeout for debugging
       console.log(`[NDK Singleton] Attempting NDK.connect() with timeout: ${connectTimeoutMs}ms`);
+      console.log(`[NDK Singleton] Using relays:`, relays);
       await g.__RUNSTR_NDK_INSTANCE__.connect(connectTimeoutMs); // This blocks until connected or timeout
       
       const connectedCount = g.__RUNSTR_NDK_INSTANCE__.pool?.stats()?.connected || 0;
       console.log(`[NDK Singleton] NDK.connect() completed. Connected relays: ${connectedCount}`);
+      console.log(`[NDK Singleton] Pool stats:`, g.__RUNSTR_NDK_INSTANCE__.pool?.stats());
 
       if (connectedCount > 0) {
         console.log('[NDK Singleton] NDK is ready (at least 1 relay connected).');
