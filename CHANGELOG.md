@@ -1,6 +1,6 @@
-# RUNSTR v0.5.0 - Design Overhaul 🖤🤍
+# RUNSTR v0.5.0 - Design Overhaul
 
-Hey Nostr, v0.5.0 brings a complete redesign and exciting new features!
+v0.5.0 brings a complete redesign and exciting new features!
 
 🎨 **App Re-Design**:
 • Black and White Minimalism - We've embraced a sleek, minimalist aesthetic with a monochrome color scheme for a more focused running experience
