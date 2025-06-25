@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FloatingMusicPlayer } from './FloatingMusicPlayer';
-import { DashboardWalletHeader } from './DashboardWalletHeader';
+// import { DashboardWalletHeader } from './DashboardWalletHeader'; // Temporarily disabled - ecash wallet under development
 import { useActivityMode, ACTIVITY_TYPES } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import rewardsPayoutService from '../services/rewardsPayoutService';
@@ -168,7 +168,7 @@ export const MenuBar = () => {
 
   return (
     <div className="w-full">
-      {/* Header with Wallet and Settings */}
+      {/* Header with Music Player and Settings */}
       <header className="p-4 w-full">
         {/* Music Player (top right) */}
         <div className="flex justify-end mb-3">
@@ -177,12 +177,26 @@ export const MenuBar = () => {
           </div>
         </div>
         
-        {/* Wallet Header with integrated settings */}
+        {/* Wallet Header temporarily hidden - ecash wallet under development */}
+        {/* 
         <div className="relative">
           <DashboardWalletHeader />
-          {/* Settings button positioned in top-right of wallet card */}
           <button 
             className="absolute top-4 right-4 text-text-secondary hover:text-text-primary transition-colors duration-normal z-10" 
+            onClick={toggleSettings}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
+        */}
+        
+        {/* Settings button when wallet header is hidden */}
+        <div className="flex justify-end">
+          <button 
+            className="text-text-secondary hover:text-text-primary transition-colors duration-normal p-2 rounded-lg bg-bg-secondary border border-border-secondary" 
             onClick={toggleSettings}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -500,21 +514,25 @@ export const MenuBar = () => {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 w-full bg-bg-primary bg-opacity-100 py-2 z-40 border-t border-border-secondary">
-        <div className="max-w-[500px] mx-auto px-2">
-          <ul className="flex justify-between">
-            {menuItems.map((item) => (
-              <li key={item.name} className="flex-1">
-                <Link 
-                  to={item.path} 
-                  className={`menu-bar-item flex flex-col items-center justify-center px-1 py-1 rounded-md h-full transition-colors duration-normal ${location.pathname === item.path ? 'menu-bar-item-active' : 'menu-bar-item-inactive'}`}
-                >
-                  {item.icon}
-                  <span className="text-xs font-medium tracking-wider text-center whitespace-nowrap">{item.name}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+      <nav className="fixed bottom-0 left-0 right-0 bg-bg-secondary border-t border-border-secondary shadow-lg h-20 z-40">
+        <div className="grid grid-cols-5 h-full">
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.name}
+                to={item.path}
+                className={`flex flex-col items-center justify-center text-xs transition-colors duration-normal ${
+                  isActive 
+                    ? 'text-primary bg-primary/5' 
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {item.icon}
+                <span className="text-xs">{item.name}</span>
+              </Link>
+            );
+          })}
         </div>
       </nav>
     </div>

@@ -1,183 +1,56 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { NostrContext } from './NostrContext';
-import { Platform } from '../utils/react-native-shim.js';
-import { 
-  findWalletEvents, 
-  createWalletEvents, 
-  queryTokenEvents, 
-  calculateBalance,
-  SUPPORTED_MINTS,
-  getMintInfo 
-} from '../utils/nip60Events';
-
-// Default mint for new users (CoinOS)
-const DEFAULT_MINT_URL = 'https://mint.coinos.io';
+import React, { createContext, useContext } from 'react';
 
 const WalletContext = createContext();
 
+/**
+ * Minimal WalletProvider that provides compatibility interface
+ * without the ecash wallet functionality which is temporarily disabled
+ */
 export const WalletProvider = ({ children }) => {
-  const { ndk, publicKey } = useContext(NostrContext);
-  
-  // Centralized wallet state
-  const [walletState, setWalletState] = useState({
-    walletEvent: null,
-    mintEvent: null,
-    tokenEvents: [],
-    loading: false,
-    error: null,
-    isInitialized: false
-  });
-
-  // Auto-discover wallet on user connection
-  useEffect(() => {
-    if (ndk && publicKey && !walletState.isInitialized) {
-      discoverWallet();
-    }
-  }, [ndk, publicKey, walletState.isInitialized]);
-
-  /**
-   * Auto-discover existing wallet or prepare for creation
-   */
-  const discoverWallet = async () => {
-    if (!publicKey) {
-      console.log('[WalletProvider] No publicKey available, cannot discover wallet');
-      setWalletState(prev => ({
-        ...prev,
-        loading: false,
-        error: 'Please sign in with Amber to access your wallet',
-        isInitialized: true
-      }));
-      return;
-    }
-
-    setWalletState(prev => ({ ...prev, loading: true, error: null }));
-    
-    try {
-      console.log('[WalletProvider] Discovering existing NIP60 wallet for pubkey:', publicKey.substring(0, 8) + '...');
-      const walletData = await findWalletEvents(ndk, publicKey);
-      
-      if (walletData && walletData.hasWallet) {
-        console.log('[WalletProvider] Found existing wallet');
-        
-        // Load token events for balance calculation
-        const tokens = await queryTokenEvents(ndk, publicKey);
-        
-        setWalletState({
-          walletEvent: walletData.walletEvent,
-          mintEvent: walletData.mintEvent,
-          tokenEvents: tokens,
-          loading: false,
-          error: null,
-          isInitialized: true
-        });
-      } else {
-        console.log('[WalletProvider] No existing wallet found - ready for initialization');
-        setWalletState({
-          walletEvent: null,
-          mintEvent: null,
-          tokenEvents: [],
-          loading: false,
-          error: null,
-          isInitialized: true
-        });
-      }
-    } catch (error) {
-      console.error('[WalletProvider] Discovery error:', error);
-      setWalletState(prev => ({
-        ...prev,
-        loading: false,
-        error: error.message,
-        isInitialized: true
-      }));
-    }
+  // Minimal ensureConnected function for compatibility
+  const ensureConnected = async () => {
+    // This is a stub for compatibility with existing components
+    // Lightning wallet connection will be handled separately via NWC
+    console.log('[WalletContext] ensureConnected called - Lightning wallet connection handled separately via NWC');
+    return false; // Return false since ecash wallet is disabled
   };
 
-  /**
-   * Initialize new wallet with default CoinOS mint
-   */
-  const initializeWallet = async (mintUrl = DEFAULT_MINT_URL) => {
-    if (!publicKey) {
-      throw new Error('Please sign in with Amber first to initialize your wallet.');
-    }
-
-    if (!ndk) {
-      throw new Error('NDK not available. Please try again.');
-    }
-
-    // For Amber on Android, check if Amber is available rather than requiring persistent signer
-    if (Platform.OS === 'android') {
-      const AmberAuth = await import('../services/AmberAuth.js').then(m => m.default);
-      const isAmberAvailable = await AmberAuth.isAmberInstalled();
-      
-      if (!isAmberAvailable) {
-        throw new Error('Please install Amber to initialize your wallet.');
-      }
-      
-      // Amber is available - wallet initialization can proceed, signing will happen via deep link when needed
-    } else if (!ndk.signer) {
-      // For web/other platforms, require traditional signer
-      throw new Error('NDK signer not available. Please sign in with Amber to initialize your wallet.');
-    }
-
-    setWalletState(prev => ({ ...prev, loading: true, error: null }));
-
-    try {
-      console.log('[WalletProvider] Initializing new wallet with mint:', mintUrl, 'for pubkey:', publicKey.substring(0, 8) + '...');
-      const result = await createWalletEvents(ndk, mintUrl);
-      
-      if (result && result.walletEvent) {
-        // Refresh wallet data after creation
-        await discoverWallet();
-        return true;
-      } else {
-        throw new Error('Failed to create wallet events');
-      }
-    } catch (error) {
-      console.error('[WalletProvider] Wallet initialization error:', error);
-      setWalletState(prev => ({
-        ...prev,
-        loading: false,
-        error: error.message
-      }));
-      return false;
-    }
+  // Minimal wallet interface for compatibility
+  const wallet = {
+    ensureConnected,
+    isConnected: false,
+    // Add other minimal properties as needed for compatibility
   };
-
-  /**
-   * Refresh wallet data (re-query all events)
-   */
-  const refreshWallet = async () => {
-    if (!walletState.isInitialized || !publicKey) return;
-    
-    console.log('[WalletProvider] Refreshing wallet data for pubkey:', publicKey.substring(0, 8) + '...');
-    setWalletState(prev => ({ ...prev, loading: true, error: null }));
-    await discoverWallet();
-  };
-
-  // Computed values
-  const hasWallet = walletState.walletEvent !== null;
-  const balance = calculateBalance(walletState.tokenEvents);
-  const currentMint = walletState.mintEvent ? getMintInfo(walletState.mintEvent) : null;
 
   const contextValue = {
-    // State
-    loading: walletState.loading,
-    error: walletState.error,
-    isInitialized: walletState.isInitialized,
-    hasWallet,
-    balance,
-    currentMint,
-    tokenEvents: walletState.tokenEvents,
-    walletEvent: walletState.walletEvent,
-    mintEvent: walletState.mintEvent,
+    // Lightning wallet compatibility interface
+    wallet,
+    isConnected: false,
+    ensureConnected,
     
-    // Actions
-    initializeWallet,
-    refreshWallet,
+    // Minimal ecash-style properties for components that might expect them
+    loading: false,
+    error: null,
+    isInitialized: true,
+    hasWallet: false, // Ecash wallet is disabled
+    balance: 0,
+    currentMint: null,
+    tokenEvents: [],
+    walletEvent: null,
+    mintEvent: null,
+    
+    // Stub functions for compatibility
+    initializeWallet: async () => {
+      console.log('[WalletContext] Ecash wallet initialization disabled');
+      return false;
+    },
+    refreshWallet: async () => {
+      console.log('[WalletContext] Ecash wallet refresh disabled');
+    },
     
     // Constants
-    SUPPORTED_MINTS,
-    DEFAULT_MINT_URL
+    SUPPORTED_MINTS: [],
+    DEFAULT_MINT_URL: ''
   };
 
   return (
@@ -187,7 +60,7 @@ export const WalletProvider = ({ children }) => {
   );
 };
 
-// Hook to consume NIP60 wallet context
+// Hook to consume wallet context
 export const useNip60 = () => {
   const context = useContext(WalletContext);
   if (!context) {

@@ -20,12 +20,10 @@ import {
   prepareTeamActivityEvent,
   TeamActivityDetails, 
   KIND_NIP101_TEAM_EVENT,
-  KIND_NIP101_TEAM_CHALLENGE,
   KIND_NIP101_TEAM_CHAT_MESSAGE,
   prepareTeamMembershipEvent,
   fetchTeamMemberships,
   KIND_TEAM_MEMBERSHIP,
-  subscribeToTeamChallenges,
 } from '../services/nostr/NostrTeamsService';
 import { useNostr } from '../hooks/useNostr';
 import { NDKEvent, NDKSubscription, NDKKind } from '@nostr-dev-kit/ndk';
@@ -33,12 +31,10 @@ import { Event as NostrEventBase } from 'nostr-tools';
 import { createAndPublishEvent } from '../utils/nostr';
 import { useAuth } from '../hooks/useAuth';
 import LocalTeamChat from '../components/teams/LocalTeamChat';
-import TeamChallengesTab from '../components/teams/TeamChallengesTab';
 import { DisplayName } from '../components/shared/DisplayName';
 import { useTeamRoles } from '../hooks/useTeamRoles';
 import toast from 'react-hot-toast';
 import ManageTeamModal from '../components/teams/ManageTeamModal';
-import LeaderboardTab from '../components/teams/LeaderboardTab';
 import TeamStatsWidget from '../components/teams/TeamStatsWidget';
 import { useTeamActivity } from '../hooks/useTeamActivity';
 import { setDefaultPostingTeamIdentifier } from '../utils/settingsManager';
@@ -72,7 +68,7 @@ const TeamDetailPage: React.FC = () => {
   const [team, setTeam] = useState<NostrTeamEvent | null>(seededEvent);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'chat' | 'challenges' | 'members' | 'leaderboard'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'members'>('chat');
 
   const [teamFeed, setTeamFeed] = useState<NostrWorkoutEvent[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState<boolean>(false);
@@ -90,19 +86,7 @@ const TeamDetailPage: React.FC = () => {
   const [isLoadingChat, setIsLoadingChat] = useState<boolean>(false);
   const [chatSubscription, setChatSubscription] = useState<NDKSubscription | null>(null);
 
-  // State for NIP-101e Team Activities (Events & Challenges)
-  const [teamChallenges, setTeamChallenges] = useState<NostrEventBase[]>([]);
-  const [isLoadingChallenges, setIsLoadingChallenges] = useState<boolean>(false);
-  const [challengesSubscription, setChallengesSubscription] = useState<NDKSubscription | null>(null);
-  
-  const [challengeForm, setChallengeForm] = useState<{name:string;description:string;goalValue:number;goalUnit:'km'|'mi';startTimeString?:string;endTimeString?:string}>({
-    name:'',description:'',goalValue:0,goalUnit:'km',startTimeString:'',endTimeString:''});
-  const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
-
   const [isProcessingMembership, setIsProcessingMembership] = useState<string | null>(null);
-
-  const [monthlyWorkouts, setMonthlyWorkouts] = useState<NostrWorkoutEvent[]>([]);
-  const [isLoadingMonthlyWorkouts, setIsLoadingMonthlyWorkouts] = useState(false);
 
   const [showManageTeamModal, setShowManageTeamModal] = useState<boolean>(false);
 
@@ -133,27 +117,6 @@ const TeamDetailPage: React.FC = () => {
       if (!forceRefetch) setIsLoading(false);
     }
   }, [captainPubkey, teamUUID, ndk, canReadData]);
-
-  // Fetch workouts for current calendar month when Leaderboard tab is active
-  useEffect(() => {
-    const fetchMonthly = async () => {
-      if (activeTab !== 'leaderboard') return;
-      // Option A: Use canReadData for data fetching operations
-      if (!ndk || !canReadData || !captainPubkey || !teamUUID) return;
-      const now = new Date();
-      const since = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000;
-      setIsLoadingMonthlyWorkouts(true);
-      try {
-        const events = await fetchTeamActivityFeed(ndk, captainPubkey, teamUUID, 100, since);
-        setMonthlyWorkouts(events);
-      } catch (err) {
-        console.error('Error fetching monthly workouts', err);
-      } finally {
-        setIsLoadingMonthlyWorkouts(false);
-      }
-    };
-    fetchMonthly();
-  }, [activeTab, ndk, canReadData, captainPubkey, teamUUID]);
 
   useEffect(() => {
     if (captainPubkey && teamUUID && canReadData && ndk) {
@@ -187,41 +150,6 @@ const TeamDetailPage: React.FC = () => {
       }
     }
   }, [activeTab, teamAIdentifierForChat, ndk, ndkReady]);
-
-  // Effect for Team Activities Subscription
-  useEffect(() => {
-    if (activeTab === 'challenges' && teamAIdentifierForChat && ndk && ndkReady) {
-      setIsLoadingChallenges(true);
-      setTeamChallenges([]);
-      
-      const setupChallengesSubscription = async () => {
-        try {
-          const sub = subscribeToTeamChallenges(ndk, teamAIdentifierForChat, (evt:any)=>{
-              setTeamChallenges(prev=>{
-                 if(prev.find(c=>c.id===evt.id)) return prev;
-                 return [...prev,evt].sort((a,b)=>b.created_at - a.created_at);
-              });
-          });
-          if(sub){setChallengesSubscription(sub);} 
-          setIsLoadingChallenges(false);
-        } catch (error) {
-          console.error('Error setting up challenges subscription:', error);
-          setIsLoadingChallenges(false);
-        }
-      };
-      
-      setupChallengesSubscription();
-      
-      return ()=>{ 
-        if(challengesSubscription) {
-          challengesSubscription.stop(); 
-          setChallengesSubscription(null);
-        }
-      };
-    } else {
-      if(challengesSubscription){challengesSubscription.stop(); setChallengesSubscription(null);} 
-    }
-  },[activeTab,teamAIdentifierForChat,ndk,ndkReady]);
 
   const handleAddMember = async () => {
     if (!ndk || !currentUserPubkey || !team || !newMemberPubkey.trim()) {
@@ -482,9 +410,9 @@ const TeamDetailPage: React.FC = () => {
     return (
       <div className="mb-8 border-b border-border-secondary">
         <nav className="-mb-px flex space-x-6 sm:space-x-8 overflow-x-auto pb-px scrollbar-hide" aria-label="Tabs">
-          {['chat', 'challenges', 'members', 'leaderboard'].map((tabName) => {
+          {['chat', 'members'].map((tabName) => {
             let displayName = tabName;
-            if (tabName === 'challenges') displayName = 'Challenges';
+            if (tabName === 'members') displayName = 'Members';
             else displayName = tabName.charAt(0).toUpperCase() + tabName.slice(1);
 
             return (
@@ -544,23 +472,6 @@ const TeamDetailPage: React.FC = () => {
     return <LocalTeamChat teamId={teamUUID} userPubkey={currentUserPubkey} />;
   };
 
-  const renderChallengesTabContent = () => {
-    if(isLoadingChallenges&&teamChallenges.length===0)return <div className="text-text-muted p-4 text-center">Loading challenges...</div>;
-    if(!teamAIdentifierForChat)return <div className="text-text-muted p-4 bg-bg-secondary rounded-md border border-border-secondary">Challenges not available.</div>;
-
-    return (
-        <TeamChallengesTab 
-           ndk={ndk as any}
-           ndkReady={ndkReady}
-           teamAIdentifier={teamAIdentifierForChat || ''}
-           teamUUID={teamUUID || ''}
-           captainPubkey={actualCaptain}
-           currentUserPubkey={currentUserPubkey}
-           isCaptain={isCurrentUserCaptain}
-        />
-    );
-  };
-
   const renderCurrentTabContent = () => {
     if (!team && !isLoading) return <div className="p-4 text-text-primary text-center">Team data could not be loaded.</div>;
     if (isLoading && !team) return <div className="p-4 text-text-primary text-center">Loading team details...</div>;
@@ -569,8 +480,6 @@ const TeamDetailPage: React.FC = () => {
     switch (activeTab) {
       case 'chat': 
         return renderChatTabContent();
-      case 'challenges': 
-        return renderChallengesTabContent();
       case 'members':
         return (
           <div className="space-y-6">
@@ -633,15 +542,6 @@ const TeamDetailPage: React.FC = () => {
                    Request to Leave Team 
                 </button>
             )}
-          </div>
-        );
-      case 'leaderboard':
-        if (isLoadingMonthlyWorkouts) {
-          return <div className="text-gray-400 p-4 text-center">Loading leaderboard…</div>;
-        }
-        return (
-          <div className="space-y-4">
-            <LeaderboardTab workoutEvents={monthlyWorkouts} />
           </div>
         );
       default:

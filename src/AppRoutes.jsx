@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 
 console.log("AppRoutes.jsx is being executed");
 
@@ -40,7 +40,7 @@ const RunClub = safeLazy(() => import('./pages/RunClub'), 'RunClub');
 const Wallet = safeLazy(() => import('./pages/Wallet'), 'Wallet');
 const Music = safeLazy(() => import('./pages/Music'), 'Music');
 const NWC = safeLazy(() => import('./pages/NWC'), 'NWC');
-const EcashWallet = safeLazy(() => import('./pages/EcashWallet'), 'EcashWallet');
+// const EcashWallet = safeLazy(() => import('./pages/EcashWallet'), 'EcashWallet'); // Temporarily disabled
 const Goals = safeLazy(() => import('./pages/Goals'), 'Goals');
 const Events = safeLazy(() => import('./pages/Events'), 'Events');
 const EventDetail = safeLazy(() => import('./pages/EventDetail'), 'EventDetail');
@@ -84,7 +84,8 @@ const AppRoutes = () => {
         <Route path="/profile" element={<Profile />} />
         <Route path="/club" element={<RunClub />} />
         <Route path="/nwc" element={<NWC />} />
-        <Route path="/ecash" element={<EcashWallet />} />
+        {/* Ecash wallet route temporarily disabled - redirect to wallet page */}
+        <Route path="/ecash" element={<Navigate to="/wallet" replace />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/music" element={<Music />} />
         <Route path="/goals" element={<Goals />} />

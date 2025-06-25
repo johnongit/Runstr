@@ -38,6 +38,8 @@ export const Wallet = () => {
             </button>
           </div>
 
+          {/* Ecash wallet option temporarily hidden - feature under development */}
+          {/* 
           <div className="wallet-option">
             <h3>🔒 Ecash Wallet (NIP-60)</h3>
             <p>Event-based ecash wallet using NIP-60. Automatically discovers existing wallets or creates new ones. Pure Nostr implementation.</p>
@@ -48,6 +50,7 @@ export const Wallet = () => {
               Open Ecash Wallet
             </button>
           </div>
+          */}
         </div>
       </div>
 
