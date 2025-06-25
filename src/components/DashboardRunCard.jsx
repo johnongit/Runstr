@@ -92,10 +92,10 @@ export function DashboardRunCard({
               isLoading={isSaving}
               loadingText="Saving..."
               disabled={isWorkoutSaved}
-              className={`flex-1 font-medium py-2 px-4 rounded-lg border border-border-primary transition-colors ${
+              className={`flex-1 font-medium py-2 px-4 rounded-lg border transition-colors ${
                 isWorkoutSaved 
-                  ? 'bg-success text-text-primary cursor-not-allowed' 
-                  : 'bg-bg-primary hover:bg-bg-tertiary text-text-primary'
+                  ? 'bg-success text-white border-success cursor-not-allowed' 
+                  : 'bg-bg-primary hover:bg-bg-tertiary text-text-primary border-border-primary'
               }`}
             >
               {isWorkoutSaved ? 'Saved ✓' : 'Save'}

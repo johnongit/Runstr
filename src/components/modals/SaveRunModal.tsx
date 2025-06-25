@@ -166,7 +166,7 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50">
       <div className="bg-gray-800 p-5 sm:p-6 rounded-lg shadow-xl w-full max-w-lg text-white transform transition-all">
-        <h2 className="text-xl sm:text-2xl font-bold mb-4 text-purple-300">Save Your {runData.activityType || 'Activity'}</h2>
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 text-white">Save Your {runData.activityType || 'Activity'}</h2>
         
         <div className="mb-4 p-3 bg-gray-700 rounded-md text-sm">
             <p><strong>Distance:</strong> {displayDistance(runData.distance)}</p>
@@ -182,7 +182,7 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:ring-white focus:border-white transition-colors"
             placeholder={`How was your ${runData.activityType || 'activity'}?`}
           ></textarea>
         </div>
@@ -237,7 +237,7 @@ const SaveRunModal: React.FC<SaveRunModalProps> = ({ runData, distanceUnit, onSa
             type="button"
             onClick={handlePublish}
             disabled={!ndkReady || isPublishing || isLoadingTeams}
-            className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
+            className="px-5 py-2 bg-black hover:bg-gray-800 border-2 border-white text-white font-bold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
           >
             {isPublishing ? 'Publishing...' : (isLoadingTeams ? 'Loading Teams...' : 'Save & Publish to Nostr')}
           </button>

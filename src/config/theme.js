@@ -1,24 +1,24 @@
 // RUNSTR Theme Configuration
-// Centralized color constants for consistent purple/black theming
+// Centralized color constants for minimalistic black/white theming
 
 export const THEME_COLORS = {
-  // Primary purple gradient (from dashboard banner: bg-gradient-to-r from-indigo-800 to-purple-800)
-  primaryDark: '#3730a3',    // indigo-800 (keeping as accent)
-  primary: '#6b21a8',       // purple-800 (main purple)
+  // Primary black/white system
+  primaryDark: '#000000',   // Pure black - maximum contrast
+  primary: '#FFFFFF',       // Pure white - primary actions
   
-  // Interactive states - Purple scale
-  accent: '#c084fc',        // purple-400 (for active nav states)
-  accentMed: '#9333ea',     // purple-600 (for buttons)
-  accentDark: '#7c3aed',    // purple-700 (for hover states)
-  accentLight: '#ddd6fe',   // purple-200 (for light accents)
+  // Interactive states - Grayscale system
+  accent: '#E0E0E0',        // Light gray (for active nav states)
+  accentMed: '#A0A0A0',     // Medium gray (for buttons)
+  accentDark: '#606060',    // Dark gray (for hover states)
+  accentLight: '#F5F5F5',   // Very light gray (for light accents)
   
-  // Existing theme colors (maintain consistency)
-  background: '#111827',    // Dark background
-  surface: '#1a222e',      // Card backgrounds  
-  surfaceLight: '#1a1f2b', // Lighter cards
-  text: '#e2e8f0',         // Light text
-  textSecondary: '#a5adcf', // Secondary text
-  textMuted: '#64748b',     // Muted text
+  // Existing theme colors (updated for black/white system)
+  background: '#000000',    // Pure black background
+  surface: '#1A1A1A',      // Dark gray card backgrounds  
+  surfaceLight: '#2A2A2A', // Medium gray lighter cards
+  text: '#FFFFFF',         // Pure white text
+  textSecondary: '#E0E0E0', // Light gray secondary text
+  textMuted: '#A0A0A0',     // Medium gray muted text
   
   // Status colors (keep existing)
   success: '#10b981',       // Emerald
@@ -26,31 +26,31 @@ export const THEME_COLORS = {
   error: '#ef4444',         // Red
   
   // Transparent variants for overlays
-  primaryAlpha: 'rgba(107, 33, 168, 0.1)',     // purple-800 with 10% opacity
-  accentAlpha: 'rgba(192, 132, 252, 0.1)',     // purple-400 with 10% opacity
-  accentMedAlpha: 'rgba(147, 51, 234, 0.2)',   // purple-600 with 20% opacity
+  primaryAlpha: 'rgba(255, 255, 255, 0.1)',    // white with 10% opacity
+  accentAlpha: 'rgba(224, 224, 224, 0.1)',     // light gray with 10% opacity
+  accentMedAlpha: 'rgba(160, 160, 160, 0.2)',  // medium gray with 20% opacity
 };
 
-// Tailwind class mappings for quick reference
+// Tailwind class mappings for black/white minimalistic design
 export const THEME_CLASSES = {
   // Backgrounds
-  bgPrimary: 'bg-purple-800',
-  bgAccent: 'bg-purple-400', 
-  bgAccentMed: 'bg-purple-600',
-  bgAccentDark: 'bg-purple-700',
+  bgPrimary: 'bg-black',
+  bgAccent: 'bg-white', 
+  bgAccentMed: 'bg-gray-800',
+  bgAccentDark: 'bg-gray-900',
   
   // Text colors
-  textPrimary: 'text-purple-800',
-  textAccent: 'text-purple-400',
-  textAccentMed: 'text-purple-600',
+  textPrimary: 'text-white',
+  textAccent: 'text-black',
+  textAccentMed: 'text-gray-300',
   
   // Focus states
-  focusRing: 'focus:ring-purple-500',
-  focusBorder: 'focus:border-purple-500',
+  focusRing: 'focus:ring-white',
+  focusBorder: 'focus:border-white',
   
   // Gradients
-  gradientPrimary: 'bg-gradient-to-r from-indigo-800 to-purple-800',
-  gradientAccent: 'bg-gradient-to-r from-purple-600 to-purple-700',
+  gradientPrimary: 'bg-gradient-to-r from-black to-gray-900',
+  gradientAccent: 'bg-gradient-to-r from-gray-800 to-gray-900',
 };
 
 export default THEME_COLORS; 

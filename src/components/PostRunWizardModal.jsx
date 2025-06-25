@@ -70,11 +70,11 @@ export const PostRunWizardModal = ({ run, onClose }) => {
       <div className="modal-content post-run-wizard w-full max-w-md">
         <div>
           <h3 className="subsection-heading mb-4">Save Workout to Nostr</h3>
-          <p className="mb-4 text-gray-300">
+          <p className="mb-4 text-text-secondary">
             Your workout summary will be published to Nostr as a workout record.
           </p>
           
-          <div className="mb-4 p-3 bg-gray-700 rounded-md text-sm">
+          <div className="mb-4 p-3 bg-bg-secondary rounded-md text-sm">
             <p><strong>Distance:</strong> {run.distance ? `${(run.distance / 1000).toFixed(2)} km` : 'N/A'}</p>
             <p><strong>Duration:</strong> {run.duration ? formatTime(run.duration) : 'N/A'}</p>
             <p><strong>Activity:</strong> {run.activityType || 'Run'}</p>
@@ -83,14 +83,11 @@ export const PostRunWizardModal = ({ run, onClose }) => {
           <div className="status-section mt-3">
             {publishing && <span className="text-text-secondary">🔄 Publishing workout record...</span>}
             {allSuccess && <span className="text-text-primary">✅ Workout record published successfully!</span>}
-            {!allSuccess && (
-              <span className="text-text-primary">❌ Failed to publish workout record. Check console for details.</span>
-            )}
           </div>
 
           <div className="flex justify-end gap-3">
             <button 
-              className="px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 transition-colors" 
+              className="px-4 py-2 border-2 border-white rounded-md text-white hover:bg-white hover:text-black transition-colors" 
               onClick={onClose} 
               disabled={publishing && !publishResults}
             >
@@ -98,7 +95,7 @@ export const PostRunWizardModal = ({ run, onClose }) => {
             </button>
             {!publishResults && (
               <button 
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-5 py-2 bg-black hover:bg-gray-800 text-white border-2 border-white font-bold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 onClick={handlePublish} 
                 disabled={publishing}
               >

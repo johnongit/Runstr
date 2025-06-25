@@ -522,10 +522,10 @@ export const MenuBar = () => {
               <Link
                 key={item.name}
                 to={item.path}
-                className={`flex flex-col items-center justify-center text-xs transition-colors duration-normal ${
+                className={`menu-bar-item flex flex-col items-center justify-center text-xs transition-colors duration-normal ${
                   isActive 
-                    ? 'text-primary bg-primary/5' 
-                    : 'text-text-secondary hover:text-text-primary'
+                    ? 'menu-bar-item-active text-text-primary' 
+                    : 'menu-bar-item-inactive text-text-secondary hover:text-text-primary'
                 }`}
               >
                 {item.icon}

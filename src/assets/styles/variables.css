@@ -3,23 +3,23 @@
   /* Optimized for outdoor mobile running app usage */
   
   /* Core Backgrounds (Dark theme optimized for battery & outdoor visibility) */
-  --bg-primary: #0F1419;      /* Main app background - deep dark for battery efficiency */
-  --bg-secondary: #1A202C;    /* Card backgrounds - readable contrast */
-  --bg-tertiary: #2D3748;     /* Input/form backgrounds - interactive elements */
-  --bg-highlight: rgba(139, 92, 246, 0.1); /* Purple tint for highlights */
+  --bg-primary: #000000;      /* Pure black background - maximum battery efficiency */
+  --bg-secondary: #1A1A1A;    /* Dark gray cards - readable contrast */
+  --bg-tertiary: #2A2A2A;     /* Medium gray inputs - interactive elements */
+  --bg-highlight: rgba(255, 255, 255, 0.05); /* Subtle white tint for highlights */
   
   /* High Contrast Text (WCAG AA compliant for outdoor visibility) */
-  --text-primary: #F7FAFC;    /* Primary text - maximum readability */
-  --text-secondary: #E2E8F0;  /* Secondary text - good contrast */
-  --text-muted: #A0AEC0;      /* Muted text - sufficient contrast */
-  --text-inverse: #1A202C;    /* Dark text for light backgrounds */
+  --text-primary: #FFFFFF;    /* Pure white text - maximum readability */
+  --text-secondary: #E0E0E0;  /* Light gray text - good contrast */
+  --text-muted: #A0A0A0;      /* Medium gray text - sufficient contrast */
+  --text-inverse: #000000;    /* Black text for light backgrounds */
   
-  /* Brand Colors (Purple primary maintains RUNSTR identity) */
-  --primary: #8B5CF6;         /* Brand purple - primary actions */
-  --primary-hover: #7C3AED;   /* Purple hover state - darker for interaction */
-  --primary-light: rgba(139, 92, 246, 0.1); /* Light purple background */
-  --secondary: #3B82F6;       /* Blue - secondary actions */
-  --secondary-hover: #2563EB; /* Blue hover state */
+  /* Brand Colors (Black/White minimalistic system) */
+  --primary: #FFFFFF;         /* White - primary actions */
+  --primary-hover: #E0E0E0;   /* Light gray hover state */
+  --primary-light: rgba(255, 255, 255, 0.1); /* Light white background */
+  --secondary: #808080;       /* Medium gray - secondary actions */
+  --secondary-hover: #606060; /* Darker gray hover state */
   
   /* Status Colors (High contrast for outdoor visibility) */
   --success: #48BB78;         /* Green - achievements, distance completed */
@@ -36,9 +36,9 @@
   --bitcoin-light: rgba(247, 147, 26, 0.1);
   
   /* Border Colors (Subtle but visible) */
-  --border-primary: rgba(160, 174, 192, 0.2);   /* Primary borders */
-  --border-secondary: rgba(160, 174, 192, 0.1); /* Subtle borders */
-  --border-focus: #8B5CF6;    /* Focus state borders */
+  --border-primary: rgba(255, 255, 255, 0.2);   /* Primary borders */
+  --border-secondary: rgba(255, 255, 255, 0.1); /* Subtle borders */
+  --border-focus: #FFFFFF;    /* Focus state borders */
   
   /* Typography Scale (Mobile-optimized for running) */
   --text-xs: 0.75rem;    /* 12px - small labels */
@@ -103,7 +103,7 @@
   --bitcoin-orange: var(--bitcoin);
   --bitcoin-orange-light: var(--bitcoin-light);
   --bg-dark: var(--bg-primary);
-  --bg-darker: #0A0F14; /* Slightly darker than primary */
+  --bg-darker: #000000; /* Pure black - consistent with new system */
   --bg-light: var(--bg-secondary);
   --text-primary: var(--text-primary);
   --text-secondary: var(--text-secondary);

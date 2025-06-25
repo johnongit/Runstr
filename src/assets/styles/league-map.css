@@ -135,7 +135,7 @@
 
 /* Leaderboard styles matching workout card theme */
 .leaderboard-row.current-user {
-  @apply bg-primary/5 border-l-4 border-primary;
+  @apply bg-white/5 border-l-4 border-white;
 }
 
 .rank-badge .medal-1 {
@@ -151,7 +151,7 @@
 }
 
 .you-badge {
-  @apply px-2 py-1 bg-primary text-text-primary text-xs rounded-full font-bold ml-2;
+  @apply px-2 py-1 bg-black border border-white text-white text-xs rounded-full font-bold ml-2;
 }
 
 /* Progress bar - static */
