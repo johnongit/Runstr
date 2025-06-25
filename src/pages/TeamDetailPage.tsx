@@ -37,7 +37,7 @@ import toast from 'react-hot-toast';
 import ManageTeamModal from '../components/teams/ManageTeamModal';
 import TeamStatsWidget from '../components/teams/TeamStatsWidget';
 import { useTeamActivity } from '../hooks/useTeamActivity';
-import { setDefaultPostingTeamIdentifier } from '../utils/settingsManager';
+import { setDefaultPostingTeamIdentifier, getDefaultPostingTeamIdentifier } from '../utils/settingsManager';
 
 // Define a type for the route parameters
 interface TeamDetailParams extends Record<string, string | undefined> {
@@ -89,6 +89,35 @@ const TeamDetailPage: React.FC = () => {
   const [isProcessingMembership, setIsProcessingMembership] = useState<string | null>(null);
 
   const [showManageTeamModal, setShowManageTeamModal] = useState<boolean>(false);
+  const [defaultPostingTeam, setDefaultPostingTeam] = useState<string | null>(null);
+
+  // Load current default posting team
+  useEffect(() => {
+    const defaultTeamId = getDefaultPostingTeamIdentifier();
+    setDefaultPostingTeam(defaultTeamId);
+  }, []);
+
+  const handleSetDefaultTeam = () => {
+    if (!captainPubkey || !teamUUID) return;
+    
+    const teamId = `${captainPubkey}:${teamUUID}`;
+    setDefaultPostingTeamIdentifier(teamId);
+    setDefaultPostingTeam(teamId);
+    
+    const teamName = team ? getTeamName(team) : 'Team';
+    toast.success(`"${teamName}" set as default posting team`);
+  };
+
+  const handleClearDefaultTeam = () => {
+    setDefaultPostingTeamIdentifier(null);
+    setDefaultPostingTeam(null);
+    toast.success('Default posting team cleared');
+  };
+
+  const isCurrentTeamDefault = () => {
+    if (!captainPubkey || !teamUUID || !defaultPostingTeam) return false;
+    return defaultPostingTeam === `${captainPubkey}:${teamUUID}`;
+  };
 
   const loadTeamDetails = useCallback(async (forceRefetch = false) => {
     // Option A: Use canReadData for data fetching operations
@@ -640,6 +669,35 @@ const TeamDetailPage: React.FC = () => {
         </div>
         
         {renderJoinButton()} 
+        
+        {/* Default posting team controls - only show for members */}
+        {isCurrentUserMember && (
+          <div className="mt-4">
+            {isCurrentTeamDefault() ? (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="px-4 py-2 bg-success text-success-foreground rounded-lg text-sm font-medium text-center border border-success">
+                  ✅ Default Posting Team
+                </div>
+                <button
+                  onClick={handleClearDefaultTeam}
+                  className="px-3 py-2 bg-bg-tertiary hover:bg-bg-quaternary text-text-secondary text-sm rounded-lg transition-colors border border-border-secondary"
+                >
+                  Clear Default
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleSetDefaultTeam}
+                className="px-4 py-2 bg-bg-tertiary hover:bg-primary hover:text-white text-text-primary text-sm rounded-lg transition-colors border border-border-secondary"
+              >
+                Set as Default Posting Team
+              </button>
+            )}
+            <p className="text-xs text-text-muted mt-1">
+              Your runs will be automatically tagged with your default team
+            </p>
+          </div>
+        )}
       </div>
 
       {renderTabs()}

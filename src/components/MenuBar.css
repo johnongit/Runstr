@@ -38,26 +38,29 @@
   color: var(--text-primary) !important;
 }
 
-/* Active menu items - white text on darker background */
+/* Active menu items - bold text, no background highlighting */
 .menu-bar-item-active {
-  background-color: var(--bg-secondary) !important;
+  background-color: transparent !important;
   color: var(--text-primary) !important;
+  font-weight: bold !important;
 }
 
 /* Override any focus/active states that might add blue coloring */
 .menu-bar-item-active:focus,
 .menu-bar-item-active:active,
 .menu-bar-item-active:visited {
-  background-color: var(--bg-secondary) !important;
+  background-color: transparent !important;
   color: var(--text-primary) !important;
+  font-weight: bold !important;
   outline: none !important;
   -webkit-tap-highlight-color: transparent !important;
 }
 
 /* Ensure pressed state looks like the active state */
 .menu-bar-item:active {
-  background-color: var(--bg-secondary) !important;
+  background-color: transparent !important;
   color: var(--text-primary) !important;
+  font-weight: bold !important;
   transform: none !important;
 }
 

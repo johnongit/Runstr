@@ -564,7 +564,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             <Button 
               onClick={resumeRun}
               variant="success"
-              className="flex-1 mr-2 font-semibold"
+              className="flex-1 mr-2 font-semibold !bg-black border border-white"
             >
               Resume
             </Button>
@@ -572,7 +572,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             <Button 
               onClick={pauseRun}
               variant="warning"
-              className="flex-1 mr-2 font-semibold"
+              className="flex-1 mr-2 font-semibold !bg-black border border-white"
             >
               Pause
             </Button>
@@ -586,7 +586,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
               }
             }}
             variant="error"
-            className="flex-1 ml-2 font-semibold"
+            className="flex-1 ml-2 font-semibold !bg-black border border-white"
           >
             Stop
           </Button>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Zap, Clock, MapPin, Calendar, TrendingUp, Timer, Users, Trophy } from "lucide-react";
+import { Zap, Clock, MapPin, Calendar, TrendingUp, Timer } from "lucide-react";
 
 interface WorkoutMetric {
   label: string;
@@ -75,8 +75,6 @@ export function WorkoutCard({
     onZap?.();
   };
 
-  const hasTeamsOrChallenges = (workout.teams && workout.teams.length > 0) || (workout.challenges && workout.challenges.length > 0);
-
   return (
     <Card className={cn(
       "w-full max-w-2xl mx-auto overflow-hidden",
@@ -107,36 +105,6 @@ export function WorkoutCard({
       <CardContent className="p-4">
         <h2 className="text-base font-semibold mb-2 text-text-primary">{workout.title}</h2>
         <p className="text-sm text-text-secondary mb-4">{workout.content}</p>
-
-        {/* Team and Challenge Badges */}
-        {hasTeamsOrChallenges && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {workout.teams?.map((team, index) => (
-              <Badge 
-                key={`team-${index}`}
-                variant="outline" 
-                className="flex items-center gap-1 px-2 py-1 bg-success-light border-success text-success"
-              >
-                <Users className="h-3 w-3" />
-                <span className="text-xs font-medium">
-                  {team.teamName || `Team ${team.uuid.slice(0, 8)}`}
-                </span>
-              </Badge>
-            ))}
-            {workout.challenges?.map((challenge, index) => (
-              <Badge 
-                key={`challenge-${index}`}
-                variant="outline" 
-                className="flex items-center gap-1 px-2 py-1 bg-warning-light border-warning text-warning"
-              >
-                <Trophy className="h-3 w-3" />
-                <span className="text-xs font-medium">
-                  {challenge.name}
-                </span>
-              </Badge>
-            ))}
-          </div>
-        )}
 
         {/* Workout details */}
         <div className="flex flex-wrap gap-2 mb-4">
