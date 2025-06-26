@@ -13,7 +13,7 @@ export const RunClub = () => {
   const { wallet } = useContext(WalletContext);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Feed hook
+  // Feed hook with RUNSTR filtering for League tab
   const {
     posts,
     setPosts,
@@ -27,7 +27,7 @@ export const RunClub = () => {
     loadMorePosts,
     fetchRunPostsViaSubscription,
     loadedSupplementaryData
-  } = useRunFeed();
+  } = useRunFeed('RUNSTR'); // Filter for RUNSTR app posts only
   
   // Interaction hook
   const {

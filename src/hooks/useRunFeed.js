@@ -21,7 +21,7 @@ const globalState = {
   activeSubscription: null,
 };
 
-export const useRunFeed = () => {
+export const useRunFeed = (filterSource = null) => {
   // Prefer central manager; hydrate immediately
   const [posts, setPosts] = useState(() => getFeed());
   const [loading, setLoading] = useState(getFeed().length === 0);
@@ -84,7 +84,7 @@ export const useRunFeed = () => {
         
         // Fetch new posts
         const limit = 10; // Fetch just a few new posts
-        const runPostsArray = await fetchRunningPosts(limit, newestPostTime);
+        const runPostsArray = await fetchRunningPosts(limit, newestPostTime, filterSource);
         
         if (runPostsArray.length === 0) {
           console.log('No new posts found in background fetch');
@@ -141,7 +141,7 @@ export const useRunFeed = () => {
         timeoutRef.current = null;
       }
     };
-  }, [displayLimit]);
+  }, [displayLimit, filterSource]);
 
   // Extract user interactions logic to reuse
   const updateUserInteractions = useCallback((supplementaryData) => {
@@ -209,7 +209,7 @@ export const useRunFeed = () => {
       const limit = 21; // Load 21 posts initially (3 pages worth)
 
       // Fetch posts with running hashtags
-      const runPostsArray = await fetchRunningPosts(limit, since);
+      const runPostsArray = await fetchRunningPosts(limit, since, filterSource);
       
       console.log(`Fetched ${runPostsArray.length} running posts`);
       
@@ -298,7 +298,7 @@ export const useRunFeed = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, displayLimit, updateUserInteractions, setupBackgroundFetch]);
+  }, [page, displayLimit, updateUserInteractions, setupBackgroundFetch, filterSource]);
 
   // Load more posts function - increases the display limit
   const loadMorePosts = useCallback(() => {
