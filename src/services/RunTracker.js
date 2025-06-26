@@ -237,7 +237,7 @@ class RunTracker extends EventEmitter {
       );
 
       // Minimum threshold to additionally smooth out micro-jitter.
-      const MOVEMENT_THRESHOLD = 1.5; // metres
+      const MOVEMENT_THRESHOLD = 0.5; // metres - reduced for cycling sensitivity
       if (distanceIncrement >= MOVEMENT_THRESHOLD) {
         this.distance += distanceIncrement;
         this.emit('distanceChange', this.distance); // Emit distance change
@@ -345,16 +345,16 @@ class RunTracker extends EventEmitter {
             if (unit === 'km') {
               speedValue = (this.smoothedSpeedMps * 3.6); // km/h
               speedUnitString = 'km/h';
-              // Apply minimum speed threshold - don't show speeds below 0.5 km/h
-              if (speedValue < 0.5) {
+              // Apply minimum speed threshold - don't show speeds below 0.1 km/h
+              if (speedValue < 0.1) {
                 speedValue = 0.0;
               }
               speedValue = speedValue.toFixed(1);
             } else {
               speedValue = (this.smoothedSpeedMps * 2.23694); // mph
               speedUnitString = 'mph';
-              // Apply minimum speed threshold - don't show speeds below 0.3 mph
-              if (speedValue < 0.3) {
+              // Apply minimum speed threshold - don't show speeds below 0.1 mph
+              if (speedValue < 0.1) {
                 speedValue = 0.0;
               }
               speedValue = speedValue.toFixed(1);

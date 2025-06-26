@@ -15,7 +15,7 @@ export class KalmanFilter {
     // Kalman filter parameters - optimized for running
     this.Q = 0.0001; // Process noise - base value
     this.R_scale = 0.025; // Measurement noise scale
-    this.maxSpeed = 12.5; // Maximum expected speed in m/s (~45 km/h)
+    this.maxSpeed = 18; // Maximum expected speed in m/s (~65 km/h) - increased for cycling
     this.maxAcceleration = 2.5; // Maximum expected acceleration in m/s²
     this.minVariance = 10; // Minimum position variance
   }
