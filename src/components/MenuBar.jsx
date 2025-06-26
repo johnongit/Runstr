@@ -277,6 +277,25 @@ export const MenuBar = () => {
               </div>
             </div>
             
+            {/* Nostr Publishing Section */}
+            <div className="mb-6">
+              <h4 className="subsection-heading mb-3">Nostr Publishing</h4>
+              <div className="bg-bg-tertiary p-3 rounded-lg space-y-3 border border-border-secondary">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-text-secondary mr-3">Auto-publish runs to Nostr</span>
+                  <input 
+                    type="checkbox"
+                    className="form-checkbox h-5 w-5 text-primary bg-bg-tertiary border-border-secondary focus:ring-primary rounded"
+                    checked={autoPostToNostr}
+                    onChange={() => setAutoPostToNostr(!autoPostToNostr)}
+                  />
+                </div>
+                <p className="text-xs text-text-muted">
+                  Automatically publish completed runs to Nostr with your team/challenge associations. You can still manually publish from the dashboard if disabled.
+                </p>
+              </div>
+            </div>
+            
             {/* Distance Unit Section */}
             <div className="mb-6">
               <h4 className="subsection-heading mb-3">Distance Units</h4>

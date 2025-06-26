@@ -450,17 +450,56 @@ ${additionalContent ? `\n${additionalContent}` : ''}
   useEffect(() => {
     const attemptAutoPost = async () => {
       if (!autoPostToNostr || !recentRun || recentRun.nostrWorkoutEventId || autoPublishing) return;
+      
       try {
         setAutoPublishing(true);
-        await publishRun(recentRun, distanceUnit, {});
-        // publishRun mutates run to set nostrWorkoutEventId; update local storage copy
-        runDataService.updateRun(recentRun.id, { nostrWorkoutEventId: recentRun.nostrWorkoutEventId });
+        
+        // Use the same proven pattern as handleSaveWorkoutRecord
+        // Get team and challenge associations
+        const { getWorkoutAssociations } = await import('../utils/teamChallengeHelper');
+        const { teamAssociation, challengeUUIDs, challengeNames, userPubkey } = await getWorkoutAssociations();
+        
+        // Create a workout event with kind 1301 format including team/challenge tags
+        const workoutEvent = createWorkoutEvent(recentRun, distanceUnit, { 
+          teamAssociation, 
+          challengeUUIDs, 
+          challengeNames, 
+          userPubkey 
+        });
+        
+        // Use the existing createAndPublishEvent function
+        const publishedEvent = await createAndPublishEvent(workoutEvent);
+        
+        const publishedEventId = publishedEvent?.id;
+        if (publishedEventId) {
+          // Update the run with the published event ID
+          recentRun.nostrWorkoutEventId = publishedEventId;
+          runDataService.updateRun(recentRun.id, { nostrWorkoutEventId: publishedEventId });
+          
+          // Show success feedback
+          if (window.Android && window.Android.showToast) {
+            window.Android.showToast('Run automatically published to Nostr!');
+          } else {
+            appToast.success('Run automatically published to Nostr!');
+          }
+        } else {
+          throw new Error('Failed to get ID from published workout event.');
+        }
       } catch (err) {
-        console.error('Auto-post failed', err);
+        console.error('Auto-post failed:', err);
+        
+        // Show error feedback
+        const errorMessage = `Auto-post to Nostr failed: ${err.message}`;
+        if (window.Android && window.Android.showToast) {
+          window.Android.showToast(errorMessage);
+        } else {
+          appToast.error(errorMessage);
+        }
       } finally {
         setAutoPublishing(false);
       }
     };
+    
     attemptAutoPost();
   }, [recentRun, autoPostToNostr, distanceUnit, autoPublishing]);
 
@@ -526,29 +565,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         </div>
       </div>
       
-      {/* Splits Table - Show only when tracking and splits exist */}
-      {isTracking && splits && splits.length > 0 && (
-        <div className="bg-bg-secondary rounded-xl shadow-lg mt-2 mx-4 p-4 overflow-hidden border border-border-secondary">
-          <div className="flex items-center mb-2">
-            <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <span className="text-sm font-medium text-text-secondary">Split Times</span>
-          </div>
-          <div className="mt-2">
-            <SplitsTable splits={splits} distanceUnit={distanceUnit} />
-          </div>
-          {splits.length > 5 && (
-            <p className="text-xs text-text-muted text-center mt-2">
-              Swipe to see more splits if needed
-            </p>
-          )}
-        </div>
-      )}
-      
-      {/* Start Activity Button */}
+      {/* Start Activity Button / Control Buttons */}
       {!isTracking ? (
         <Button 
           onClick={initiateRun}
@@ -590,6 +607,28 @@ ${additionalContent ? `\n${additionalContent}` : ''}
           >
             Stop
           </Button>
+        </div>
+      )}
+      
+      {/* Splits Table - Show only when tracking and splits exist */}
+      {isTracking && splits && splits.length > 0 && (
+        <div className="bg-bg-secondary rounded-xl shadow-lg mt-2 mx-4 p-4 overflow-hidden border border-border-secondary">
+          <div className="flex items-center mb-2">
+            <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <span className="text-sm font-medium text-text-secondary">Split Times</span>
+          </div>
+          <div className="mt-2">
+            <SplitsTable splits={splits} distanceUnit={distanceUnit} />
+          </div>
+          {splits.length > 5 && (
+            <p className="text-xs text-text-muted text-center mt-2">
+              Swipe to see more splits if needed
+            </p>
+          )}
         </div>
       )}
       
