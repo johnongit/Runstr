@@ -376,6 +376,41 @@ class RunTracker extends EventEmitter {
     }, 1000); // Update pace/speed every 1 second for more responsive cycling
   }
 
+  /**
+   * Get GPS configuration optimized for the current activity type
+   * @returns {Object} GPS configuration object
+   */
+  getGpsConfig() {
+    const baseConfig = {
+      highAccuracy: true,
+      staleLocationThreshold: 30000,
+      interval: 5000,
+      fastestInterval: 5000,
+      activitiesInterval: 10000,
+      locationProvider: 3,
+      saveBatteryOnBackground: false,
+      stopOnTerminate: false,
+      startOnBoot: false,
+      debug: false
+    };
+
+    // Activity-specific optimizations
+    if (this.activityType === ACTIVITY_TYPES.CYCLE) {
+      return {
+        ...baseConfig,
+        distanceFilter: 2, // More frequent updates for cycling (vs 5m default)
+        interval: 3000,    // More frequent intervals for better cycling tracking
+        fastestInterval: 3000,
+      };
+    } else {
+      // Running and walking use more conservative settings
+      return {
+        ...baseConfig,
+        distanceFilter: 5, // Standard distance filter for running/walking
+      };
+    }
+  }
+
   async startTracking() {
     try {
       // We should have already requested permissions by this point
@@ -392,28 +427,20 @@ class RunTracker extends EventEmitter {
       // Generate a unique ID for this tracking session
       const sessionId = 'tracking_' + Date.now();
       
+      // Get activity-optimized GPS configuration
+      const gpsConfig = this.getGpsConfig();
+      
       this.watchId = await BackgroundGeolocation.addWatcher(
         {
           id: sessionId,
-          backgroundMessage: 'Tracking your run...',
+          backgroundMessage: `Tracking your ${this.activityType === ACTIVITY_TYPES.CYCLE ? 'cycle' : this.activityType === ACTIVITY_TYPES.WALK ? 'walk' : 'run'}...`,
           backgroundTitle: 'Runstr',
           foregroundService: true,
           foregroundServiceType: 'location',
           requestPermissions: false, // Don't request here, should already have them
-          distanceFilter: 5,
-          highAccuracy: true,
-          staleLocationThreshold: 30000,
-          // Additional settings for better compatibility
           notificationTitle: 'Runstr - Tracking Active',
-          notificationText: 'Recording your run',
-          interval: 5000,
-          fastestInterval: 5000,
-          activitiesInterval: 10000,
-          locationProvider: 3,
-          saveBatteryOnBackground: false,
-          stopOnTerminate: false,
-          startOnBoot: false,
-          debug: false // Set to true for debugging
+          notificationText: `Recording your ${this.activityType === ACTIVITY_TYPES.CYCLE ? 'cycle' : this.activityType === ACTIVITY_TYPES.WALK ? 'walk' : 'run'}`,
+          ...gpsConfig // Apply activity-specific GPS settings
         },
         (location, error) => {
           if (error) {
@@ -429,8 +456,13 @@ class RunTracker extends EventEmitter {
               // Try to clean up and stop tracking
               this.cleanupWatchers();
               
-              // Show a user-friendly message
-              alert('Location permission was revoked. Please go to Settings > Apps > Runstr > Permissions and re-enable Location access.');
+              // Show a user-friendly message for GrapheneOS users
+              const isGrapheneOS = navigator.userAgent.includes('GrapheneOS') || localStorage.getItem('isGrapheneOS') === 'true';
+              const message = isGrapheneOS 
+                ? 'Location permission was revoked. On GrapheneOS, please go to Settings > Apps > Runstr > Permissions and ensure Location access is enabled with "Allow all the time" selected.'
+                : 'Location permission was revoked. Please go to Settings > Apps > Runstr > Permissions and re-enable Location access.';
+              
+              alert(message);
               
               // Try to open settings
               BackgroundGeolocation.openSettings().catch(err => {
@@ -445,7 +477,8 @@ class RunTracker extends EventEmitter {
         }
       );
       
-      console.log('Background tracking started with ID:', this.watchId);
+      console.log(`Background tracking started for ${this.activityType} with ID:`, this.watchId);
+      console.log('GPS Config:', gpsConfig);
       
     } catch (error) {
       console.error('Error starting background tracking:', error);
@@ -455,7 +488,13 @@ class RunTracker extends EventEmitter {
         localStorage.setItem('permissionsGranted', 'false');
         this.emit('permissionError', error);
         
-        alert('Location permission is required. Please enable it in Settings > Apps > Runstr > Permissions.');
+        // Enhanced error message for GrapheneOS users
+        const isGrapheneOS = navigator.userAgent.includes('GrapheneOS') || localStorage.getItem('isGrapheneOS') === 'true';
+        const message = isGrapheneOS
+          ? 'Location permission is required. On GrapheneOS, please enable location permission with "Allow all the time" and disable battery optimization for Runstr in Settings > Apps > Runstr.'
+          : 'Location permission is required. Please enable it in Settings > Apps > Runstr > Permissions.';
+        
+        alert(message);
         
         try {
           await BackgroundGeolocation.openSettings();
