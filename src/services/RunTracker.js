@@ -62,6 +62,7 @@ class RunTracker extends EventEmitter {
     this.watchId = null; // For geolocation watch id
     this.timerInterval = null; // For updating duration every second
     this.paceInterval = null; // For calculating pace at regular intervals
+    this.smoothedSpeedMps = 0; // For smoothing speed calculations in cycling mode
   }
 
   // Helper method to get the current distance unit from localStorage
@@ -97,6 +98,69 @@ class RunTracker extends EventEmitter {
     // Use the centralized pace calculation method
     // This already considers distanceUnit for its output format (e.g. time for 1km or 1mi)
     return runDataService.calculatePace(distance, duration, this.getDistanceUnit());
+  }
+
+  /**
+   * Calculate current speed from recent GPS positions using a time window
+   * This provides more accurate instantaneous speed for cycling
+   * @returns {number} Speed in m/s, or 0 if not enough data
+   */
+  calculateCurrentSpeed() {
+    const SPEED_WINDOW = 10; // Use 10-second window for speed calculation
+    
+    if (this.positions.length < 2) {
+      return 0;
+    }
+
+    const now = this.positions[this.positions.length - 1].timestamp;
+    const windowStart = now - SPEED_WINDOW * 1000; // 10 seconds ago
+
+    // Find positions within our time window
+    const recentPositions = this.positions.filter(
+      (pos) => pos.timestamp >= windowStart
+    );
+
+    if (recentPositions.length < 2) {
+      // Fall back to total average if not enough recent data
+      if (this.distance > 0 && this.duration > 0) {
+        return this.distance / this.duration; // m/s
+      }
+      return 0;
+    }
+
+    let recentDistance = 0;
+    let lastValidPosition = null;
+
+    // Calculate distance traveled in the recent window
+    for (const position of recentPositions) {
+      if (lastValidPosition) {
+        const segmentDistance = this.calculateDistance(
+          lastValidPosition.coords.latitude,
+          lastValidPosition.coords.longitude,
+          position.coords.latitude,
+          position.coords.longitude
+        );
+
+        const timeDiff = (position.timestamp - lastValidPosition.timestamp) / 1000;
+        if (timeDiff > 0) {
+          recentDistance += segmentDistance;
+        }
+      }
+      lastValidPosition = position;
+    }
+
+    const recentDuration = (recentPositions[recentPositions.length - 1].timestamp - recentPositions[0].timestamp) / 1000;
+
+    if (recentDuration > 0 && recentDistance > 0) {
+      return recentDistance / recentDuration; // m/s
+    }
+
+    // Fall back to total average if calculation fails
+    if (this.distance > 0 && this.duration > 0) {
+      return this.distance / this.duration; // m/s
+    }
+
+    return 0;
   }
 
   updateElevation(altitude) {
@@ -261,33 +325,55 @@ class RunTracker extends EventEmitter {
     this.paceInterval = setInterval(() => {
       if (this.isTracking && !this.isPaused) {
         if (this.activityType === ACTIVITY_TYPES.CYCLE) {
-          if (this.distance > 0 && this.duration > 0) {
-            const speedMps = this.distance / this.duration; // m/s
-            const unit = this.getDistanceUnit();
-            let speedValue;
-            let speedUnitString;
-            if (unit === 'km') {
-              speedValue = (speedMps * 3.6).toFixed(1); // km/h
-              speedUnitString = 'km/h';
-            } else {
-              speedValue = (speedMps * 2.23694).toFixed(1); // mph
-              speedUnitString = 'mph';
-            }
-            this.currentSpeed = { value: speedValue, unit: speedUnitString };
-            this.emit('speedChange', this.currentSpeed);
+          // Use recent positions for more accurate current speed calculation
+          const rawSpeedMps = this.calculateCurrentSpeed(); // m/s from recent GPS positions
+          
+          // Apply exponential smoothing to reduce GPS noise (similar to runCalculations.js)
+          // Use 70% of previous smoothed speed + 30% of new reading for stability
+          if (rawSpeedMps > 0) {
+            this.smoothedSpeedMps = 0.7 * this.smoothedSpeedMps + 0.3 * rawSpeedMps;
           } else {
-            // Reset speed if no distance/duration
-            const unit = this.getDistanceUnit();
-            this.currentSpeed = { value: '0.0', unit: unit === 'km' ? 'km/h' : 'mph' };
-            this.emit('speedChange', this.currentSpeed);
+            // If no movement detected, gradually decay the smoothed speed
+            this.smoothedSpeedMps = 0.8 * this.smoothedSpeedMps;
           }
+
+          const unit = this.getDistanceUnit();
+          let speedValue;
+          let speedUnitString;
+          
+          if (this.smoothedSpeedMps > 0) {
+            if (unit === 'km') {
+              speedValue = (this.smoothedSpeedMps * 3.6); // km/h
+              speedUnitString = 'km/h';
+              // Apply minimum speed threshold - don't show speeds below 0.5 km/h
+              if (speedValue < 0.5) {
+                speedValue = 0.0;
+              }
+              speedValue = speedValue.toFixed(1);
+            } else {
+              speedValue = (this.smoothedSpeedMps * 2.23694); // mph
+              speedUnitString = 'mph';
+              // Apply minimum speed threshold - don't show speeds below 0.3 mph
+              if (speedValue < 0.3) {
+                speedValue = 0.0;
+              }
+              speedValue = speedValue.toFixed(1);
+            }
+          } else {
+            // Reset speed if no valid calculation possible
+            speedValue = '0.0';
+            speedUnitString = unit === 'km' ? 'km/h' : 'mph';
+          }
+          
+          this.currentSpeed = { value: speedValue, unit: speedUnitString };
+          this.emit('speedChange', this.currentSpeed);
         } else {
           // For non-cycle activities, calculate and emit pace as before
           this.pace = this.calculatePace(this.distance, this.duration);
           this.emit('paceChange', this.pace);
         }
       }
-    }, 5000); // Update pace/speed every 5 seconds
+    }, 1000); // Update pace/speed every 1 second for more responsive cycling
   }
 
   async startTracking() {
@@ -412,6 +498,7 @@ class RunTracker extends EventEmitter {
     this.currentSpeed = { value: 0, unit: this.getDistanceUnit() === 'km' ? 'km/h' : 'mph' };
     this.splits = [];
     this.lastSplitDistance = 0;
+    this.smoothedSpeedMps = 0; // Reset smoothed speed for new session
     
     // Reset elevation data
     this.elevation = {
