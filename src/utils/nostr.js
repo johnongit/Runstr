@@ -95,6 +95,23 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
     );
   };
 
+  // Helper function to check if event is a valid fitness activity
+  const isValidFitnessActivity = (event) => {
+    return event.tags.some(tag => {
+      if (tag[0] === 'exercise') {
+        // RUNSTR uses 'exercise' tags - check for fitness activities
+        const activity = tag[1]?.toLowerCase();
+        return ['running', 'cycling', 'walking', 'jogging'].includes(activity);
+      }
+      if (tag[0] === 'activity_type') {
+        // Other clients might use 'activity_type' - support for compatibility
+        const activity = tag[1]?.toLowerCase();
+        return ['running', 'cycling', 'walking'].includes(activity);
+      }
+      return false;
+    });
+  };
+
   // If caller provided an explicit since timestamp we just run single window with old logic
   const runSingleWindow = async (sinceArg) => {
     try {
@@ -152,12 +169,9 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
           receivedEvents = true;
           uniqueEvents.set(event.id, event);
           
-          // Client-side filter for running activity
-          const isRunningActivity = event.tags.some(tag => tag[0] === 'activity_type' && tag[1] === 'running');
-          
-          // Apply source filtering and running activity filter
+          // Apply source filtering and fitness activity filter
           const validEvents = Array.from(uniqueEvents.values())
-            .filter(e => e.tags.some(t => t[0] === 'activity_type' && t[1] === 'running'))
+            .filter(isValidFitnessActivity)
             .filter(isRunstrEvent);
           
           if (uniqueEvents.size >= limit && validEvents.length >= limit) {
@@ -179,7 +193,7 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
               const eventArray = validEvents
                 .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
                 .slice(0, limit);
-              console.log(`[nostr.js] Resolved early with ${eventArray.length} Kind 1301 running events${filterSource ? ` (RUNSTR filtered)` : ''}`);
+              console.log(`[nostr.js] Resolved early with ${eventArray.length} Kind 1301 fitness events${filterSource ? ` (RUNSTR filtered)` : ''}`);
               sub.stop();
               resolve(eventArray);
             }, 1000);
@@ -187,9 +201,9 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
         });
         
         sub.on('eose', () => {
-          // Filter for running activity and source before resolving
+          // Filter for fitness activity and source before resolving
           let filteredEvents = Array.from(uniqueEvents.values())
-              .filter(e => e.tags.some(t => t[0] === 'activity_type' && t[1] === 'running'));
+              .filter(isValidFitnessActivity);
           
           // Apply source filtering if specified
           if (filterSource) {
@@ -200,7 +214,7 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
 
           if (receivedEvents && filteredEvents.length > 0 && sub.started && (Date.now() - sub.started > 3000)) {
             clearTimeout(maxTimeout);
-            console.log(`[nostr.js] EOSE received with ${filteredEvents.length} Kind 1301 running events collected${filterSource ? ` (RUNSTR filtered)` : ''}`);
+            console.log(`[nostr.js] EOSE received with ${filteredEvents.length} Kind 1301 fitness events collected${filterSource ? ` (RUNSTR filtered)` : ''}`);
             const eventArray = filteredEvents
               .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
               .slice(0, limit);
