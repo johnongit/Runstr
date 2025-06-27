@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback, useContext } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
 import { fetchEvents } from '../utils/nostr';
+import { useActivityMode } from '../contexts/ActivityModeContext';
 
 /**
  * Hook: useLeagueLeaderboard
  * Fetches ALL Kind 1301 workout records from ALL users and creates a comprehensive leaderboard
+ * Filters by current activity mode (run/walk/cycle) for activity-specific leagues
  * Uses localStorage caching (30 min expiry) and lazy loading for better UX
  * 
- * @returns {Object} { leaderboard, isLoading, error, refresh, lastUpdated }
+ * @returns {Object} { leaderboard, isLoading, error, refresh, lastUpdated, activityMode }
  */
 export const useLeagueLeaderboard = () => {
   const { ndk } = useContext(NostrContext);
+  const { mode: activityMode } = useActivityMode();
   const [leaderboard, setLeaderboard] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,7 +22,7 @@ export const useLeagueLeaderboard = () => {
   // Constants
   const COURSE_TOTAL_MILES = 500; // Updated to 500 miles
   const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes cache
-  const CACHE_KEY = 'runstr_league_leaderboard';
+  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}`; // Activity-specific cache
   const MAX_EVENTS = 5000; // Limit to prevent overwhelming queries
 
   /**
@@ -44,7 +47,7 @@ export const useLeagueLeaderboard = () => {
       console.error('[useLeagueLeaderboard] Error loading cache:', err);
     }
     return false; // No valid cache
-  }, []);
+  }, [CACHE_KEY]);
 
   /**
    * Save leaderboard data to cache
@@ -60,7 +63,7 @@ export const useLeagueLeaderboard = () => {
     } catch (err) {
       console.error('[useLeagueLeaderboard] Error saving to cache:', err);
     }
-  }, []);
+  }, [CACHE_KEY]);
 
   /**
    * Calculate distance from event tags
@@ -103,6 +106,13 @@ export const useLeagueLeaderboard = () => {
     // Filter duplicates and process events
     events.forEach(event => {
       if (!event.pubkey || isDuplicateEvent(event, processedEvents)) return;
+      
+      // Filter by current activity mode using exercise tag
+      const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
+      const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+      
+      // Skip events that don't match current activity mode
+      if (!eventActivityType || eventActivityType !== activityMode) return;
       
       const distance = extractDistance(event);
       if (distance <= 0) return;
@@ -147,7 +157,7 @@ export const useLeagueLeaderboard = () => {
       .map((user, index) => ({ ...user, rank: index + 1 }));
 
     return leaderboardData;
-  }, [extractDistance, isDuplicateEvent, COURSE_TOTAL_MILES]);
+  }, [extractDistance, isDuplicateEvent, COURSE_TOTAL_MILES, activityMode]);
 
   /**
    * Fetch comprehensive leaderboard data with lazy loading
@@ -211,7 +221,7 @@ export const useLeagueLeaderboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [ndk, loadCachedData, processEvents, saveToCache]);
+  }, [ndk, loadCachedData, processEvents, saveToCache, CACHE_KEY]);
 
   /**
    * Force refresh leaderboard (bypass cache)
@@ -237,10 +247,10 @@ export const useLeagueLeaderboard = () => {
     }
   }, [loadCachedData, fetchLeaderboard]);
 
-  // Initial load on mount
+  // Initial load on mount and when activity mode changes
   useEffect(() => {
     backgroundRefresh();
-  }, [backgroundRefresh]);
+  }, [backgroundRefresh, activityMode]);
 
   // Auto-refresh every 30 minutes
   useEffect(() => {
@@ -259,5 +269,6 @@ export const useLeagueLeaderboard = () => {
     lastUpdated,          // Timestamp of last successful update
     refresh,              // Force refresh function
     courseTotal: COURSE_TOTAL_MILES, // Total course distance for calculations
+    activityMode,         // Current activity mode for UI display
   };
 }; 
