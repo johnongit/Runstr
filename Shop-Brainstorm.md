@@ -12,22 +12,31 @@ Integration of Nostr-native marketplace functionality into RUNSTR's teams sectio
 
 ### 1. Nostr Marketplace Event Types & NIPs
 
-**Key Questions to Investigate:**
-- What event kinds does plebeian.market use for product listings?
-- Are there established NIPs for marketplace functionality?
-- How are product catalogs structured in Nostr?
-- What event kinds handle:
-  - Product listings
-  - Shop/merchant profiles
-  - Purchase orders
-  - Reviews/ratings
-  - Inventory management
+**✅ CONFIRMED: NIP-15 Nostr Marketplace Standard**
 
-**Potential Event Kinds to Research:**
-- Kind 30017: Product listings (if following emerging marketplace standards)
-- Kind 30018: Shop/merchant profiles
-- Custom kinds used by plebeian.market
-- Community-specific event kinds
+Based on [Shopstr's implementation](https://github.com/shopstr-eng/shopstr) and [NIP-15 specification](https://github.com/nostr-protocol/nips/blob/master/15.md), we now have clarity:
+
+**NIP-15 Event Structure:**
+- **Kind 30017**: Product listings (standardized)
+- **Kind 30018**: Shop/merchant profiles (standardized)  
+- **Kind 0**: User metadata for seller verification
+- **Kind 1**: Reviews and feedback
+- **Kind 4**: Direct messages for order communication
+- **Kind 7**: Reactions to products
+- **Tags**: `d` (identifier), `price`, `currency`, `category`, `image`, `location`, etc.
+
+**Shopstr Reference Implementation:**
+- Supports NIP-15, NIP-99 (Classified Listings), NIP-85 (Reviews)
+- Uses Lightning (NIP-57), Cashu (NIP-60), and Nutzaps (NIP-61)
+- Implements Blossom Media (NIP-B7) for product images
+- Full TypeScript/React implementation we can reference
+
+**Standard Event Kinds Confirmed:**
+- Kind 30017: Product listings with structured data
+- Kind 30018: Shop profiles and metadata
+- Kind 7: Product ratings/reactions
+- Kind 1: Text reviews and feedback
+- Custom tags for pricing, categories, shipping
 
 ### 2. Plebeian Market Technical Analysis
 
@@ -46,37 +55,93 @@ The URL contains: `332401123238ec1318a6ef4497f113db37edcf2d562a34c584060ca1a6f97
 
 ## Technical Implementation Strategies
 
-### Option 1: Direct Event Querying
-```
-Query relays directly for marketplace events using:
-- Filters based on shop pubkey
-- Product listing event kinds
-- Time-based sorting for recent listings
+### Primary Approach: NIP-15 Direct Implementation
+
+**Shop Discovery by Npub:**
+```javascript
+// Query for shop profile (Kind 30018)
+const shopFilter = {
+  kinds: [30018],
+  authors: [shopNpub],
+  limit: 1
+};
+
+// Query for product listings (Kind 30017) 
+const productsFilter = {
+  kinds: [30017],
+  authors: [shopNpub],
+  limit: 20
+};
 ```
 
-### Option 2: Plebeian Market API Integration
-```
-If plebeian.market exposes Nostr-compatible APIs:
-- Fetch shop data via their relay infrastructure
-- Parse and display in native RUNSTR UI
-- Maintain Nostr event authenticity
+**Team Shop Association Storage:**
+```javascript
+// Store team-shop associations in team metadata or custom event
+const teamShopEvent = {
+  kind: 30000, // Custom parameterized replaceable event
+  tags: [
+    ['d', 'associated-shops'],
+    ['shop', shopNpub, 'team-endorsed'],
+    ['shop', anotherShopNpub, 'captain-recommended']
+  ]
+};
 ```
 
-### Option 3: Hybrid Approach
-```
-Combine direct Nostr queries with plebeian.market's 
-infrastructure for optimal data retrieval and user experience
-```
+**Multi-Source Integration:**
+- **Primary**: NIP-15 compliant shops (any relay)
+- **Enhanced**: Shopstr.store integration for UI patterns
+- **Special**: Plebeian.market RUNSTR community shop
+- **Curated**: Team captain approved shops
+
+### Implementation Phases Refined
+
+**Phase 1A: NIP-15 Shop Discovery**
+- Implement npub → shop profile lookup
+- Parse Kind 30018 shop metadata events
+- Display shop verification and product count
+- Add/remove shop associations for team captains
+
+**Phase 1B: Product Listing Display**  
+- Query Kind 30017 events for associated shops
+- Parse product metadata (price, image, description)
+- Create product grid using Shopstr patterns as reference
 
 ## UI/UX Integration Points
 
 ### Teams Section Enhancement
 
-**New Tab Structure:**
+**Updated Tab Structure:**
 - **My Teams** (existing)
 - **Discover Teams** (existing) 
-- **Team Shop** (new) - Shows marketplace listings for current team
-- **Marketplace** (new) - General running gear marketplace
+- **Team Shop** (new) - Shows marketplace listings associated with current team
+- **Find Shops** (new) - Discover and add NIP-15 compliant shops by npub
+
+### Team Captain Shop Management Workflow
+
+**"Find Shop" Feature for Captains:**
+1. **Shop Discovery Interface:**
+   - Input field for pasting npub/nprofile 
+   - "Find Shop" button to query NIP-15 events
+   - Preview of shop profile (Kind 30018) before adding
+   - List of products (Kind 30017) from that shop
+   - Add/Remove shop association with team
+
+2. **Shop Verification Process:**
+   - Query relays for Kind 30018 (shop profile) events by pubkey
+   - Validate shop has active product listings (Kind 30017)
+   - Display shop metadata: name, description, verification status
+   - Show sample products to confirm it's a legitimate shop
+
+3. **Team Shop Association:**
+   - Team captains can associate multiple shops with their team
+   - Shops appear in "Team Shop" tab for all team members
+   - Revenue sharing potential for team-endorsed shops
+   - Shop recommendations based on team category (running gear, etc.)
+
+**Enhanced Shop Tab Features:**
+- Curated shops added by team captains
+- Mix of team-specific recommendations and general marketplace
+- Filter by "Team Endorsed" vs "General Marketplace"
 
 **Shop Tab Features:**
 - Product grid with images, names, prices
@@ -158,30 +223,63 @@ Product Selection → Lightning Invoice → Payment → Confirmation
 ## Technical Requirements
 
 ### New Components Needed
-- `ShopTab.jsx` - Main shop interface
-- `ProductGrid.jsx` - Product listing display
-- `ProductCard.jsx` - Individual product component
-- `ShopHeader.jsx` - Shop metadata display
-- `MarketplaceContext.jsx` - State management
+- `ShopTab.jsx` - Main shop interface with team-curated listings
+- `FindShopModal.jsx` - Npub input and shop discovery interface
+- `ShopPreview.jsx` - Shop verification and preview before adding
+- `ProductGrid.jsx` - NIP-15 product listing display
+- `ProductCard.jsx` - Individual product component with NIP-15 metadata
+- `ShopHeader.jsx` - Shop metadata display from Kind 30018 events
+- `TeamShopManager.jsx` - Captain interface for managing associated shops
+- `MarketplaceContext.jsx` - State management for shops and products
 
 ### New Utility Functions
-- `fetchShopListings()` - Query marketplace events
-- `parseProductEvent()` - Extract product data from Nostr events
-- `generatePurchaseRequest()` - Create Lightning payment requests
-- `verifySellerIdentity()` - Validate seller credentials
+- `fetchShopProfile()` - Query Kind 30018 shop metadata events
+- `fetchShopProducts()` - Query Kind 30017 product listings by author
+- `parseNIP15Product()` - Extract structured data from Kind 30017 events
+- `validateShopNpub()` - Verify npub format and shop existence
+- `associateShopWithTeam()` - Create team-shop association events
+- `generateLightningInvoice()` - Create payment requests via NIP-15 specs
+- `verifyNIP15Compliance()` - Check if shop follows NIP-15 standards
 
 ### Relay Configuration
 - Add plebeian.market relay endpoints
 - Configure marketplace-specific relay priorities
 - Implement relay fallback strategies
 
+## Team Captain Shop Management Permissions
+
+### Permission Structure
+- **Team Captains Only**: Can add/remove shops via "Find Shop" interface
+- **Team Members**: Can view team-curated shops, browse products, make purchases
+- **Shop Association**: Stored in team metadata, signed by team captain's key
+- **Multi-Captain Teams**: Any captain can add shops, requires captain consensus to remove
+
+### Captain Workflow
+1. **Access Shop Management**: Special "Manage Shops" button visible only to captains
+2. **Paste Npub**: Input field accepts npub/nprofile/hex formats
+3. **Shop Verification**: Automatic NIP-15 compliance check and product count
+4. **Preview & Add**: Review shop profile, sample products, then confirm association
+5. **Team Notification**: Optional announcement to team about new shop addition
+
+### User Experience Flow
+```
+Captain clicks "Find Shop" → Paste npub → Verify shop exists → 
+Preview products → Add to team → Shop appears in team's shop tab
+```
+
 ## Development Phases
 
-### Phase 1: Research & Discovery
-- [ ] Analyze plebeian.market's Nostr event structure
-- [ ] Identify marketplace event kinds and relay endpoints
-- [ ] Test event querying and parsing
-- [ ] Create proof-of-concept product display
+### Phase 1A: NIP-15 Foundation
+- [ ] Implement Kind 30018 (shop profile) and Kind 30017 (product) parsing
+- [ ] Create shop discovery by npub functionality  
+- [ ] Build shop verification and compliance checking
+- [ ] Test with existing NIP-15 shops (Shopstr, others)
+
+### Phase 1B: Team Integration  
+- [ ] Add team captain permissions for shop management
+- [ ] Create shop association storage mechanism
+- [ ] Build "Find Shop" modal interface
+- [ ] Implement team shop tab with curated listings
 
 ### Phase 2: Basic Integration
 - [ ] Add shop tab to teams section
@@ -245,16 +343,30 @@ Product Selection → Lightning Invoice → Payment → Confirmation
 
 ## Questions for Further Research
 
-1. What specific event kinds and relay endpoints does plebeian.market use?
-2. How are product images and media handled (IPFS, direct URLs, etc.)?
-3. What payment methods are supported beyond Lightning?
-4. How does seller verification and reputation work?
-5. Are there existing Nostr marketplace libraries or SDKs we can leverage?
-6. How do we handle inventory updates and product availability?
-7. What are the legal/regulatory considerations for marketplace integration?
+### NIP-15 Implementation Questions
+1. **Event Querying**: Which relays should we prioritize for Kind 30017/30018 events?
+2. **Image Handling**: How does NIP-B7 (Blossom Media) integration work for product images?
+3. **Payment Integration**: How to implement NIP-57 (Lightning Zaps) for direct purchases?
+4. **Inventory Management**: How do shops handle real-time inventory updates via Nostr?
+5. **Shop Discovery**: Are there any NIP-15 shop directory services we can leverage?
+
+### Technical Integration Questions  
+6. **Team Association Storage**: Best practice for storing team-shop relationships?
+7. **Captain Permissions**: How to verify team captain authority for shop management?
+8. **Multi-Relay Strategy**: How to ensure shop data availability across relay networks?
+9. **Offline Commerce**: How to handle order processing when shops are offline?
+10. **Shopstr Integration**: Can we use their components/libraries as reference?
+
+### Business & Legal Questions
+11. **Revenue Sharing**: How to implement team commissions from shop sales?
+12. **Dispute Resolution**: What mechanisms exist for purchase disputes in NIP-15?
+13. **Compliance**: Legal considerations for facilitating marketplace transactions?
+14. **Content Moderation**: How to handle inappropriate products in team shops?
 
 ## Related Documentation
 
 - [Teams Implementation](./Teams_Implementation.md) - Existing team functionality
 - [README-RUN-CLUB.md](./README-RUN-CLUB.md) - Current Nostr group integration
-- [NIP60-Implementation-Plan.md](./NIP60-Implementation-Plan.md) - Wallet integration patterns 
+- [NIP60-Implementation-Plan.md](./NIP60-Implementation-Plan.md) - Wallet integration patterns
+- [Shopstr Repository](https://github.com/shopstr-eng/shopstr) - Reference NIP-15 implementation
+- [NIP-15 Specification](https://github.com/nostr-protocol/nips/blob/master/15.md) - Official marketplace standard 

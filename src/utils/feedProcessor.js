@@ -8,15 +8,105 @@
  * Lightweight post processor for initial fast display
  * Creates minimal post objects with placeholders for supplementary data
  * @param {Array} posts - Raw post events from Nostr
+ * @param {string} filterSource - Optional filter for specific app source ('RUNSTR' for RUNSTR-only posts)
  * @returns {Array} Minimally processed posts ready for display
  */
-export const lightweightProcessPosts = (posts) => {
+export const lightweightProcessPosts = (posts, filterSource = null) => {
   if (!posts || !Array.isArray(posts) || posts.length === 0) {
     return [];
   }
+
+  // Apply RUNSTR filtering if specified
+  let filteredPosts = posts;
+  if (filterSource && filterSource.toUpperCase() === 'RUNSTR') {
+    filteredPosts = posts.filter(event => {
+      // RUNSTR signature requirements based on createWorkoutEvent
+      const hasRequiredTags = {
+        source: false,
+        client: false,
+        workoutId: false,
+        title: false,
+        exercise: false,
+        distance: false,
+        duration: false
+      };
+      
+      // Check each tag for RUNSTR's signature
+      for (const tag of event.tags || []) {
+        switch (tag[0]) {
+          case 'source':
+            if (tag[1]?.toUpperCase() === 'RUNSTR') {
+              hasRequiredTags.source = true;
+            }
+            break;
+          case 'client':
+            if (tag[1]?.toLowerCase() === 'runstr') {
+              hasRequiredTags.client = true;
+            }
+            break;
+          case 'd':
+            if (tag[1] && typeof tag[1] === 'string' && tag[1].length > 0) {
+              hasRequiredTags.workoutId = true;
+            }
+            break;
+          case 'title':
+            if (tag[1] && typeof tag[1] === 'string' && tag[1].length > 0) {
+              hasRequiredTags.title = true;
+            }
+            break;
+          case 'exercise':
+            if (tag[1]) {
+              const activity = tag[1].toLowerCase();
+              if (['running', 'cycling', 'walking', 'jogging'].includes(activity)) {
+                hasRequiredTags.exercise = true;
+              }
+            }
+            break;
+          case 'distance':
+            if (tag[1] && tag[2]) {
+              hasRequiredTags.distance = true;
+            }
+            break;
+          case 'duration':
+            if (tag[1] && typeof tag[1] === 'string' && tag[1].length > 0) {
+              hasRequiredTags.duration = true;
+            }
+            break;
+        }
+      }
+      
+      // Must have RUNSTR source identification (source OR client)
+      const hasRunstrIdentification = hasRequiredTags.source || hasRequiredTags.client;
+      
+      // Must have core RUNSTR workout structure
+      const hasRunstrStructure = hasRequiredTags.workoutId && 
+                                hasRequiredTags.title && 
+                                hasRequiredTags.exercise && 
+                                hasRequiredTags.distance && 
+                                hasRequiredTags.duration;
+      
+      const isRunstrWorkout = hasRunstrIdentification && hasRunstrStructure;
+      
+      // Debug logging for rejected events in lightweight processor
+      if (!isRunstrWorkout && (hasRequiredTags.source || hasRequiredTags.client)) {
+        console.log('[feedProcessor] Event has RUNSTR tags but missing signature:', {
+          eventId: event.id,
+          hasRunstrIdentification,
+          hasRunstrStructure,
+          missing: Object.entries(hasRequiredTags).filter(([key, value]) => !value).map(([key]) => key)
+        });
+      }
+      
+      return isRunstrWorkout;
+    });
+    
+    if (filteredPosts.length !== posts.length) {
+      console.log(`[feedProcessor] Filtered posts in lightweight processor: ${posts.length} → ${filteredPosts.length} posts`);
+    }
+  }
   
   // Extract just the essential data for display
-  return posts.map(post => {
+  return filteredPosts.map(post => {
     const workoutTitleTag = post.tags?.find(tag => tag[0] === 'title');
     const workoutTitle = workoutTitleTag ? workoutTitleTag[1] : 'Workout Record';
 
