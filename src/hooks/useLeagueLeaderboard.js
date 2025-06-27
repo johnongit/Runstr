@@ -82,18 +82,45 @@ export const useLeagueLeaderboard = () => {
   }, []);
 
   /**
-   * Check for duplicate events (same user, same distance, within 5 minutes)
+   * Check for duplicate events with enhanced detection
    */
   const isDuplicateEvent = useCallback((event, existingEvents) => {
     const eventTime = event.created_at;
     const eventDistance = extractDistance(event);
     const eventAuthor = event.pubkey;
+    const eventId = event.id;
 
-    return existingEvents.some(existing => 
-      existing.pubkey === eventAuthor &&
-      Math.abs(existing.created_at - eventTime) < 300 && // 5 minutes
-      Math.abs(extractDistance(existing) - eventDistance) < 0.1 // 0.1 mile tolerance
-    );
+    return existingEvents.some(existing => {
+      // Skip if different user
+      if (existing.pubkey !== eventAuthor) return false;
+
+      // Check for exact same event ID (most reliable duplicate check)
+      if (existing.id === eventId) return true;
+
+      // Check for time-based duplicates with same distance
+      const timeDiff = Math.abs(existing.created_at - eventTime);
+      const distanceDiff = Math.abs(extractDistance(existing) - eventDistance);
+      
+      // Same user, same distance (within 0.05 miles), within 10 minutes = likely duplicate
+      if (timeDiff < 600 && distanceDiff < 0.05) return true;
+
+      // Check for identical workout data (distance, duration if available)
+      const eventDuration = event.tags?.find(tag => tag[0] === 'duration')?.[1];
+      const existingDuration = existing.tags?.find(tag => tag[0] === 'duration')?.[1];
+      
+      // If both have duration and they match exactly with same distance = duplicate
+      if (eventDuration && existingDuration && 
+          eventDuration === existingDuration && 
+          distanceDiff < 0.01) return true;
+
+      // Check for content-based duplicates (same workout description)
+      if (event.content && existing.content && 
+          event.content.trim() === existing.content.trim() && 
+          distanceDiff < 0.1 && 
+          timeDiff < 3600) return true; // Within 1 hour
+
+      return false;
+    });
   }, [extractDistance]);
 
   /**
@@ -124,23 +151,24 @@ export const useLeagueLeaderboard = () => {
         userStats[event.pubkey] = {
           pubkey: event.pubkey,
           totalMiles: 0,
-          runCount: 0,
+          runCount: 0, // Keep as runCount for backward compatibility but it represents activity count
           lastActivity: 0,
-          runs: []
+          runs: [] // Keep as runs for backward compatibility but it represents activities
         };
       }
 
-      // Add run data
+      // Add activity data
       userStats[event.pubkey].totalMiles += distance;
-      userStats[event.pubkey].runCount++;
+      userStats[event.pubkey].runCount++; // Actually activity count
       userStats[event.pubkey].lastActivity = Math.max(
         userStats[event.pubkey].lastActivity, 
         event.created_at
       );
-      userStats[event.pubkey].runs.push({
+      userStats[event.pubkey].runs.push({ // Actually activities
         distance,
         timestamp: event.created_at,
-        eventId: event.id
+        eventId: event.id,
+        activityType: eventActivityType // Store the activity type for reference
       });
     });
 

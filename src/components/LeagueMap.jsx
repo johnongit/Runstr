@@ -61,6 +61,22 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     }
   };
 
+  // Generate dynamic activity text based on activity mode
+  const getActivityText = (count) => {
+    if (!activityMode) return `${count} run${count !== 1 ? 's' : ''}`; // Fallback
+    
+    switch (activityMode) {
+      case 'run':
+        return `${count} run${count !== 1 ? 's' : ''}`;
+      case 'walk':
+        return `${count} walk${count !== 1 ? 's' : ''}`;
+      case 'cycle':
+        return `${count} ride${count !== 1 ? 's' : ''}`;
+      default:
+        return `${count} run${count !== 1 ? 's' : ''}`;
+    }
+  };
+
   // Calculate position along race track (0-100%)
   const calculateTrackPosition = (totalMiles) => {
     return Math.min(100, (totalMiles / courseTotal) * 100);
@@ -303,7 +319,9 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
         
         {enhancedLeaderboard.length === 0 ? (
           <div className="p-4 text-center">
-            <p className="text-text-secondary">No runners found yet. Be the first to start!</p>
+            <p className="text-text-secondary">
+              No {activityMode === 'run' ? 'runners' : activityMode === 'walk' ? 'walkers' : 'cyclists'} found yet. Be the first to start!
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-border-secondary">
@@ -339,7 +357,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
                       )}
                     </div>
                     <div className="text-xs text-text-secondary">
-                      {user.runCount} run{user.runCount !== 1 ? 's' : ''}
+                      {getActivityText(user.runCount)}
                     </div>
                   </div>
                 </div>
