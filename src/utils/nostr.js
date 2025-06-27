@@ -83,33 +83,94 @@ export const getProfile = async (pubkey) => {
  * @returns {Promise<Array<NDKEvent>>} Array of running posts
  */
 export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWindows = [2 * 3600, 24 * 3600, 14 * 24 * 3600], filterSource = null) => {
-  // Helper function to check if event is from RUNSTR app
-  const isRunstrEvent = (event) => {
+  // Helper function to check if event matches RUNSTR's exact publishing signature
+  const isDefinitelyRunstrWorkout = (event) => {
     if (!filterSource || filterSource.toUpperCase() !== 'RUNSTR') {
       return true; // No filtering applied
     }
     
-    return event.tags.some(tag => 
-      (tag[0] === 'source' && tag[1]?.toUpperCase() === 'RUNSTR') ||
-      (tag[0] === 'client' && tag[1]?.toLowerCase() === 'runstr')
-    );
-  };
-
-  // Helper function to check if event is a valid fitness activity
-  const isValidFitnessActivity = (event) => {
-    return event.tags.some(tag => {
-      if (tag[0] === 'exercise') {
-        // RUNSTR uses 'exercise' tags - check for fitness activities
-        const activity = tag[1]?.toLowerCase();
-        return ['running', 'cycling', 'walking', 'jogging'].includes(activity);
+    // RUNSTR signature requirements based on createWorkoutEvent
+    const hasRequiredTags = {
+      source: false,
+      client: false,
+      workoutId: false,
+      title: false,
+      exercise: false,
+      distance: false,
+      duration: false
+    };
+    
+    // Check each tag for RUNSTR's signature
+    for (const tag of event.tags || []) {
+      switch (tag[0]) {
+        case 'source':
+          if (tag[1]?.toUpperCase() === 'RUNSTR') {
+            hasRequiredTags.source = true;
+          }
+          break;
+        case 'client':
+          if (tag[1]?.toLowerCase() === 'runstr') {
+            hasRequiredTags.client = true;
+          }
+          break;
+        case 'd':
+          // RUNSTR uses workout UUIDs in d tag
+          if (tag[1] && typeof tag[1] === 'string' && tag[1].length > 0) {
+            hasRequiredTags.workoutId = true;
+          }
+          break;
+        case 'title':
+          // RUNSTR always includes title tag
+          if (tag[1] && typeof tag[1] === 'string' && tag[1].length > 0) {
+            hasRequiredTags.title = true;
+          }
+          break;
+        case 'exercise':
+          // RUNSTR uses 'exercise' tag (not 'activity_type') for running/cycling/walking
+          if (tag[1]) {
+            const activity = tag[1].toLowerCase();
+            if (['running', 'cycling', 'walking', 'jogging'].includes(activity)) {
+              hasRequiredTags.exercise = true;
+            }
+          }
+          break;
+        case 'distance':
+          // RUNSTR always includes distance with value and unit
+          if (tag[1] && tag[2]) {
+            hasRequiredTags.distance = true;
+          }
+          break;
+        case 'duration':
+          // RUNSTR always includes duration
+          if (tag[1] && typeof tag[1] === 'string' && tag[1].length > 0) {
+            hasRequiredTags.duration = true;
+          }
+          break;
       }
-      if (tag[0] === 'activity_type') {
-        // Other clients might use 'activity_type' - support for compatibility
-        const activity = tag[1]?.toLowerCase();
-        return ['running', 'cycling', 'walking'].includes(activity);
-      }
-      return false;
-    });
+    }
+    
+    // Must have RUNSTR source identification (source OR client)
+    const hasRunstrIdentification = hasRequiredTags.source || hasRequiredTags.client;
+    
+    // Must have core RUNSTR workout structure
+    const hasRunstrStructure = hasRequiredTags.workoutId && 
+                              hasRequiredTags.title && 
+                              hasRequiredTags.exercise && 
+                              hasRequiredTags.distance && 
+                              hasRequiredTags.duration;
+    
+    const isRunstrWorkout = hasRunstrIdentification && hasRunstrStructure;
+    
+    // Debug logging for rejected events
+    if (!isRunstrWorkout && (hasRequiredTags.source || hasRequiredTags.client)) {
+      console.log('[nostr.js] Event has RUNSTR tags but missing signature:', {
+        hasRunstrIdentification,
+        hasRunstrStructure,
+        missing: Object.entries(hasRequiredTags).filter(([key, value]) => !value).map(([key]) => key)
+      });
+    }
+    
+    return isRunstrWorkout;
   };
 
   // If caller provided an explicit since timestamp we just run single window with old logic
@@ -127,11 +188,11 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
           console.log(`[nostr.js] Timeout (6s) reached with ${uniqueEvents.size} Kind 1301 events collected`);
           let eventArray = Array.from(uniqueEvents.values());
           
-          // Apply source filtering if specified
+          // Apply RUNSTR signature filtering (includes both source and structure validation)
           if (filterSource) {
             const beforeFilter = eventArray.length;
-            eventArray = eventArray.filter(isRunstrEvent);
-            console.log(`[nostr.js] RUNSTR filtering: ${beforeFilter} → ${eventArray.length} events`);
+            eventArray = eventArray.filter(isDefinitelyRunstrWorkout);
+            console.log(`[nostr.js] RUNSTR signature filtering: ${beforeFilter} → ${eventArray.length} events`);
           }
           
           eventArray = eventArray
@@ -169,10 +230,9 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
           receivedEvents = true;
           uniqueEvents.set(event.id, event);
           
-          // Apply source filtering and fitness activity filter
+          // Apply comprehensive RUNSTR signature filtering
           const validEvents = Array.from(uniqueEvents.values())
-            .filter(isValidFitnessActivity)
-            .filter(isRunstrEvent);
+            .filter(isDefinitelyRunstrWorkout);
           
           if (uniqueEvents.size >= limit && validEvents.length >= limit) {
             setTimeout(() => {
@@ -193,7 +253,7 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
               const eventArray = validEvents
                 .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
                 .slice(0, limit);
-              console.log(`[nostr.js] Resolved early with ${eventArray.length} Kind 1301 fitness events${filterSource ? ` (RUNSTR filtered)` : ''}`);
+              console.log(`[nostr.js] Resolved early with ${eventArray.length} RUNSTR workout events`);
               sub.stop();
               resolve(eventArray);
             }, 1000);
@@ -201,20 +261,13 @@ export const fetchRunningPosts = async (limit = 7, since = undefined, fallbackWi
         });
         
         sub.on('eose', () => {
-          // Filter for fitness activity and source before resolving
+          // Apply comprehensive RUNSTR signature filtering
           let filteredEvents = Array.from(uniqueEvents.values())
-              .filter(isValidFitnessActivity);
-          
-          // Apply source filtering if specified
-          if (filterSource) {
-            const beforeFilter = filteredEvents.length;
-            filteredEvents = filteredEvents.filter(isRunstrEvent);
-            console.log(`[nostr.js] EOSE RUNSTR filtering: ${beforeFilter} → ${filteredEvents.length} events`);
-          }
+              .filter(isDefinitelyRunstrWorkout);
 
           if (receivedEvents && filteredEvents.length > 0 && sub.started && (Date.now() - sub.started > 3000)) {
             clearTimeout(maxTimeout);
-            console.log(`[nostr.js] EOSE received with ${filteredEvents.length} Kind 1301 fitness events collected${filterSource ? ` (RUNSTR filtered)` : ''}`);
+            console.log(`[nostr.js] EOSE received with ${filteredEvents.length} RUNSTR workout events collected`);
             const eventArray = filteredEvents
               .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
               .slice(0, limit);
