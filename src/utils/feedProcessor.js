@@ -57,7 +57,7 @@ export const lightweightProcessPosts = (posts, filterSource = null) => {
           case 'exercise':
             if (tag[1]) {
               const activity = tag[1].toLowerCase();
-              if (['running', 'cycling', 'walking', 'jogging'].includes(activity)) {
+              if (['run', 'walk', 'cycle', 'running', 'cycling', 'walking', 'jogging'].includes(activity)) {
                 hasRequiredTags.exercise = true;
               }
             }

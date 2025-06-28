@@ -12,6 +12,7 @@ import { startFeed, subscribeFeed, getFeed } from '../lib/feedManager';
 import { getEventTargetId } from '../utils/eventHelpers';
 import { useProfileCache } from '../hooks/useProfileCache.js';
 import { ensureRelays } from '../utils/relays.js';
+import { useActivityMode } from '../contexts/ActivityModeContext';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -20,9 +21,11 @@ const globalState = {
   isInitialized: false,
   activeSubscription: null,
   lastFilterSource: null, // Track what filter was used for cache
+  lastActivityMode: null, // Track activity mode for cache invalidation
 };
 
 export const useRunFeed = (filterSource = null) => {
+  const { mode: activityMode } = useActivityMode();
   // Prefer central manager; hydrate immediately
   const [posts, setPosts] = useState(() => getFeed());
   const [loading, setLoading] = useState(getFeed().length === 0);
@@ -219,10 +222,10 @@ export const useRunFeed = (filterSource = null) => {
             }
             break;
           case 'exercise':
-            // RUNSTR uses 'exercise' tag for running/cycling/walking
+            // RUNSTR uses 'exercise' tag with values: 'run', 'walk', 'cycle'
             if (tag[1]) {
               const activity = tag[1].toLowerCase();
-              if (['running', 'cycling', 'walking', 'jogging'].includes(activity)) {
+              if (['run', 'walk', 'cycle', 'running', 'cycling', 'walking', 'jogging'].includes(activity)) {
                 hasRequiredTags.exercise = true;
               }
             }
@@ -254,6 +257,32 @@ export const useRunFeed = (filterSource = null) => {
       
       const isRunstrWorkout = hasRunstrIdentification && hasRunstrStructure;
       
+      // Add activity mode filter (same logic as useLeagueLeaderboard) - WITH FALLBACK
+      if (isRunstrWorkout && activityMode) {
+        const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
+        const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+        
+        // More lenient activity matching - include variations
+        const activityMatches = {
+          'run': ['run', 'running', 'jog', 'jogging'],     // Handle both 'run' and 'running'
+          'cycle': ['cycle', 'cycling', 'bike', 'biking'], // Handle both 'cycle' and 'cycling'  
+          'walk': ['walk', 'walking', 'hike', 'hiking']    // Handle both 'walk' and 'walking'
+        };
+        
+        const acceptedActivities = activityMatches[activityMode] || [activityMode];
+        
+        // Skip events that don't match current activity mode
+        if (eventActivityType && !acceptedActivities.includes(eventActivityType)) {
+          console.log(`[useRunFeed] Filtering out ${eventActivityType} activity (mode: ${activityMode})`);
+          return false;
+        }
+        
+        // If no exercise tag but is RUNSTR workout, allow it through (fallback)
+        if (!eventActivityType) {
+          console.log(`[useRunFeed] RUNSTR workout with no exercise tag - allowing through`);
+        }
+      }
+      
       // Debug logging for rejected events
       if (!isRunstrWorkout && (hasRequiredTags.source || hasRequiredTags.client)) {
         console.log('[useRunFeed] Event has RUNSTR tags but missing signature:', {
@@ -266,19 +295,25 @@ export const useRunFeed = (filterSource = null) => {
       
       return isRunstrWorkout;
     });
-  }, []);
+  }, [activityMode]);
 
-  // Clear cache if filter source has changed
+  // Clear cache if filter source or activity mode has changed
   useEffect(() => {
-    if (globalState.lastFilterSource !== null && globalState.lastFilterSource !== filterSource) {
-      console.log(`[useRunFeed] Filter source changed from '${globalState.lastFilterSource}' to '${filterSource}', clearing cache`);
+    const needsCacheReset = (
+      (globalState.lastFilterSource !== null && globalState.lastFilterSource !== filterSource) ||
+      (globalState.lastActivityMode !== null && globalState.lastActivityMode !== activityMode)
+    );
+    
+    if (needsCacheReset) {
+      console.log(`[useRunFeed] Filter/ActivityMode changed from '${globalState.lastFilterSource}/${globalState.lastActivityMode}' to '${filterSource}/${activityMode}', clearing cache`);
       globalState.allPosts = [];
       globalState.lastFetchTime = 0;
       setAllPosts([]);
       setPosts([]);
     }
     globalState.lastFilterSource = filterSource;
-  }, [filterSource]);
+    globalState.lastActivityMode = activityMode;
+  }, [filterSource, activityMode]);
 
   // Main function to fetch run posts
   const fetchRunPostsViaSubscription = useCallback(async () => {
