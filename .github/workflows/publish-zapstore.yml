@@ -89,9 +89,9 @@ jobs:
           # Use '|| true' to prevent workflow failure if no release is needed.
           npx semantic-release --debug || true
 
-          # Check if a release was published by looking for a new tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 || echo "none")
-          echo "Latest tag found: $LATEST_TAG"
+          # Check if a release was published by looking for a new semantic-release tag (v* format only)
+          LATEST_TAG=$(git tag -l "v*" --sort=-version:refname | head -n 1 || echo "none")
+          echo "Latest semantic-release tag found: $LATEST_TAG"
 
           # Check if package.json was updated (another indicator)
           # This might be fragile if other changes happen concurrently
