@@ -1,5 +1,3 @@
-# RUNSTR v0.5.2 - Precision Cycling, League Upgrade, Auto-Post Workout Record🚴‍♂️🏆🔄 
-
 ## 🚴‍♂️ **Enhanced Cycling Experience**:
 
 • Faster Update Frequency - Tracking precision improved from 5 seconds to 1 second for real-time feedback
