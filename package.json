@@ -1,7 +1,7 @@
 {
   "name": "nostr-run-club",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.2",
   "type": "module",
   "description": "Nostr-powered running app for Android",
   "scripts": {
