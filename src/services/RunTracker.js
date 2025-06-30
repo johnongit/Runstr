@@ -62,6 +62,7 @@ class RunTracker extends EventEmitter {
     this.watchId = null; // For geolocation watch id
     this.timerInterval = null; // For updating duration every second
     this.paceInterval = null; // For calculating pace at regular intervals
+    this.smoothedSpeedMps = 0; // For smoothing speed calculations in cycling mode
   }
 
   // Helper method to get the current distance unit from localStorage
@@ -97,6 +98,69 @@ class RunTracker extends EventEmitter {
     // Use the centralized pace calculation method
     // This already considers distanceUnit for its output format (e.g. time for 1km or 1mi)
     return runDataService.calculatePace(distance, duration, this.getDistanceUnit());
+  }
+
+  /**
+   * Calculate current speed from recent GPS positions using a time window
+   * This provides more accurate instantaneous speed for cycling
+   * @returns {number} Speed in m/s, or 0 if not enough data
+   */
+  calculateCurrentSpeed() {
+    const SPEED_WINDOW = 10; // Use 10-second window for speed calculation
+    
+    if (this.positions.length < 2) {
+      return 0;
+    }
+
+    const now = this.positions[this.positions.length - 1].timestamp;
+    const windowStart = now - SPEED_WINDOW * 1000; // 10 seconds ago
+
+    // Find positions within our time window
+    const recentPositions = this.positions.filter(
+      (pos) => pos.timestamp >= windowStart
+    );
+
+    if (recentPositions.length < 2) {
+      // Fall back to total average if not enough recent data
+      if (this.distance > 0 && this.duration > 0) {
+        return this.distance / this.duration; // m/s
+      }
+      return 0;
+    }
+
+    let recentDistance = 0;
+    let lastValidPosition = null;
+
+    // Calculate distance traveled in the recent window
+    for (const position of recentPositions) {
+      if (lastValidPosition) {
+        const segmentDistance = this.calculateDistance(
+          lastValidPosition.coords.latitude,
+          lastValidPosition.coords.longitude,
+          position.coords.latitude,
+          position.coords.longitude
+        );
+
+        const timeDiff = (position.timestamp - lastValidPosition.timestamp) / 1000;
+        if (timeDiff > 0) {
+          recentDistance += segmentDistance;
+        }
+      }
+      lastValidPosition = position;
+    }
+
+    const recentDuration = (recentPositions[recentPositions.length - 1].timestamp - recentPositions[0].timestamp) / 1000;
+
+    if (recentDuration > 0 && recentDistance > 0) {
+      return recentDistance / recentDuration; // m/s
+    }
+
+    // Fall back to total average if calculation fails
+    if (this.distance > 0 && this.duration > 0) {
+      return this.distance / this.duration; // m/s
+    }
+
+    return 0;
   }
 
   updateElevation(altitude) {
@@ -173,7 +237,7 @@ class RunTracker extends EventEmitter {
       );
 
       // Minimum threshold to additionally smooth out micro-jitter.
-      const MOVEMENT_THRESHOLD = 1.5; // metres
+      const MOVEMENT_THRESHOLD = 0.5; // metres - reduced for cycling sensitivity
       if (distanceIncrement >= MOVEMENT_THRESHOLD) {
         this.distance += distanceIncrement;
         this.emit('distanceChange', this.distance); // Emit distance change
@@ -261,33 +325,90 @@ class RunTracker extends EventEmitter {
     this.paceInterval = setInterval(() => {
       if (this.isTracking && !this.isPaused) {
         if (this.activityType === ACTIVITY_TYPES.CYCLE) {
-          if (this.distance > 0 && this.duration > 0) {
-            const speedMps = this.distance / this.duration; // m/s
-            const unit = this.getDistanceUnit();
-            let speedValue;
-            let speedUnitString;
-            if (unit === 'km') {
-              speedValue = (speedMps * 3.6).toFixed(1); // km/h
-              speedUnitString = 'km/h';
-            } else {
-              speedValue = (speedMps * 2.23694).toFixed(1); // mph
-              speedUnitString = 'mph';
-            }
-            this.currentSpeed = { value: speedValue, unit: speedUnitString };
-            this.emit('speedChange', this.currentSpeed);
+          // Use recent positions for more accurate current speed calculation
+          const rawSpeedMps = this.calculateCurrentSpeed(); // m/s from recent GPS positions
+          
+          // Apply exponential smoothing to reduce GPS noise (similar to runCalculations.js)
+          // Use 70% of previous smoothed speed + 30% of new reading for stability
+          if (rawSpeedMps > 0) {
+            this.smoothedSpeedMps = 0.7 * this.smoothedSpeedMps + 0.3 * rawSpeedMps;
           } else {
-            // Reset speed if no distance/duration
-            const unit = this.getDistanceUnit();
-            this.currentSpeed = { value: '0.0', unit: unit === 'km' ? 'km/h' : 'mph' };
-            this.emit('speedChange', this.currentSpeed);
+            // If no movement detected, gradually decay the smoothed speed
+            this.smoothedSpeedMps = 0.8 * this.smoothedSpeedMps;
           }
+
+          const unit = this.getDistanceUnit();
+          let speedValue;
+          let speedUnitString;
+          
+          if (this.smoothedSpeedMps > 0) {
+            if (unit === 'km') {
+              speedValue = (this.smoothedSpeedMps * 3.6); // km/h
+              speedUnitString = 'km/h';
+              // Apply minimum speed threshold - don't show speeds below 0.1 km/h
+              if (speedValue < 0.1) {
+                speedValue = 0.0;
+              }
+              speedValue = speedValue.toFixed(1);
+            } else {
+              speedValue = (this.smoothedSpeedMps * 2.23694); // mph
+              speedUnitString = 'mph';
+              // Apply minimum speed threshold - don't show speeds below 0.1 mph
+              if (speedValue < 0.1) {
+                speedValue = 0.0;
+              }
+              speedValue = speedValue.toFixed(1);
+            }
+          } else {
+            // Reset speed if no valid calculation possible
+            speedValue = '0.0';
+            speedUnitString = unit === 'km' ? 'km/h' : 'mph';
+          }
+          
+          this.currentSpeed = { value: speedValue, unit: speedUnitString };
+          this.emit('speedChange', this.currentSpeed);
         } else {
           // For non-cycle activities, calculate and emit pace as before
           this.pace = this.calculatePace(this.distance, this.duration);
           this.emit('paceChange', this.pace);
         }
       }
-    }, 5000); // Update pace/speed every 5 seconds
+    }, 1000); // Update pace/speed every 1 second for more responsive cycling
+  }
+
+  /**
+   * Get GPS configuration optimized for the current activity type
+   * @returns {Object} GPS configuration object
+   */
+  getGpsConfig() {
+    const baseConfig = {
+      highAccuracy: true,
+      staleLocationThreshold: 30000,
+      interval: 5000,
+      fastestInterval: 5000,
+      activitiesInterval: 10000,
+      locationProvider: 3,
+      saveBatteryOnBackground: false,
+      stopOnTerminate: false,
+      startOnBoot: false,
+      debug: false
+    };
+
+    // Activity-specific optimizations
+    if (this.activityType === ACTIVITY_TYPES.CYCLE) {
+      return {
+        ...baseConfig,
+        distanceFilter: 2, // More frequent updates for cycling (vs 5m default)
+        interval: 3000,    // More frequent intervals for better cycling tracking
+        fastestInterval: 3000,
+      };
+    } else {
+      // Running and walking use more conservative settings
+      return {
+        ...baseConfig,
+        distanceFilter: 5, // Standard distance filter for running/walking
+      };
+    }
   }
 
   async startTracking() {
@@ -306,28 +427,20 @@ class RunTracker extends EventEmitter {
       // Generate a unique ID for this tracking session
       const sessionId = 'tracking_' + Date.now();
       
+      // Get activity-optimized GPS configuration
+      const gpsConfig = this.getGpsConfig();
+      
       this.watchId = await BackgroundGeolocation.addWatcher(
         {
           id: sessionId,
-          backgroundMessage: 'Tracking your run...',
+          backgroundMessage: `Tracking your ${this.activityType === ACTIVITY_TYPES.CYCLE ? 'cycle' : this.activityType === ACTIVITY_TYPES.WALK ? 'walk' : 'run'}...`,
           backgroundTitle: 'Runstr',
           foregroundService: true,
           foregroundServiceType: 'location',
           requestPermissions: false, // Don't request here, should already have them
-          distanceFilter: 5,
-          highAccuracy: true,
-          staleLocationThreshold: 30000,
-          // Additional settings for better compatibility
           notificationTitle: 'Runstr - Tracking Active',
-          notificationText: 'Recording your run',
-          interval: 5000,
-          fastestInterval: 5000,
-          activitiesInterval: 10000,
-          locationProvider: 3,
-          saveBatteryOnBackground: false,
-          stopOnTerminate: false,
-          startOnBoot: false,
-          debug: false // Set to true for debugging
+          notificationText: `Recording your ${this.activityType === ACTIVITY_TYPES.CYCLE ? 'cycle' : this.activityType === ACTIVITY_TYPES.WALK ? 'walk' : 'run'}`,
+          ...gpsConfig // Apply activity-specific GPS settings
         },
         (location, error) => {
           if (error) {
@@ -343,8 +456,13 @@ class RunTracker extends EventEmitter {
               // Try to clean up and stop tracking
               this.cleanupWatchers();
               
-              // Show a user-friendly message
-              alert('Location permission was revoked. Please go to Settings > Apps > Runstr > Permissions and re-enable Location access.');
+              // Show a user-friendly message for GrapheneOS users
+              const isGrapheneOS = navigator.userAgent.includes('GrapheneOS') || localStorage.getItem('isGrapheneOS') === 'true';
+              const message = isGrapheneOS 
+                ? 'Location permission was revoked. On GrapheneOS, please go to Settings > Apps > Runstr > Permissions and ensure Location access is enabled with "Allow all the time" selected.'
+                : 'Location permission was revoked. Please go to Settings > Apps > Runstr > Permissions and re-enable Location access.';
+              
+              alert(message);
               
               // Try to open settings
               BackgroundGeolocation.openSettings().catch(err => {
@@ -359,7 +477,8 @@ class RunTracker extends EventEmitter {
         }
       );
       
-      console.log('Background tracking started with ID:', this.watchId);
+      console.log(`Background tracking started for ${this.activityType} with ID:`, this.watchId);
+      console.log('GPS Config:', gpsConfig);
       
     } catch (error) {
       console.error('Error starting background tracking:', error);
@@ -369,7 +488,13 @@ class RunTracker extends EventEmitter {
         localStorage.setItem('permissionsGranted', 'false');
         this.emit('permissionError', error);
         
-        alert('Location permission is required. Please enable it in Settings > Apps > Runstr > Permissions.');
+        // Enhanced error message for GrapheneOS users
+        const isGrapheneOS = navigator.userAgent.includes('GrapheneOS') || localStorage.getItem('isGrapheneOS') === 'true';
+        const message = isGrapheneOS
+          ? 'Location permission is required. On GrapheneOS, please enable location permission with "Allow all the time" and disable battery optimization for Runstr in Settings > Apps > Runstr.'
+          : 'Location permission is required. Please enable it in Settings > Apps > Runstr > Permissions.';
+        
+        alert(message);
         
         try {
           await BackgroundGeolocation.openSettings();
@@ -412,6 +537,7 @@ class RunTracker extends EventEmitter {
     this.currentSpeed = { value: 0, unit: this.getDistanceUnit() === 'km' ? 'km/h' : 'mph' };
     this.splits = [];
     this.lastSplitDistance = 0;
+    this.smoothedSpeedMps = 0; // Reset smoothed speed for new session
     
     // Reset elevation data
     this.elevation = {

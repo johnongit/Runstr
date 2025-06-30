@@ -13,7 +13,7 @@ export const RunClub = () => {
   const { wallet } = useContext(WalletContext);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Feed hook
+  // Feed hook with RUNSTR filtering for League tab
   const {
     posts,
     setPosts,
@@ -26,8 +26,9 @@ export const RunClub = () => {
     loadSupplementaryData,
     loadMorePosts,
     fetchRunPostsViaSubscription,
-    loadedSupplementaryData
-  } = useRunFeed();
+    loadedSupplementaryData,
+    clearCacheAndRefresh
+  } = useRunFeed('RUNSTR'); // Filter for RUNSTR app posts only
   
   // Interaction hook
   const {
@@ -62,38 +63,60 @@ export const RunClub = () => {
     fetchRunPostsViaSubscription().finally(() => setTimeout(() => setIsRefreshing(false), 500));
   };
 
+  // Hard refresh with cache clearing (for debugging RUNSTR filtering)
+  const hardRefresh = () => {
+    if (loading || isRefreshing) return;
+    setIsRefreshing(true);
+    clearCacheAndRefresh();
+    setTimeout(() => setIsRefreshing(false), 1000);
+  };
+
   return (
-    <div className="league-page">
-      {/* League Map at the top - pass feed data for leaderboard */}
-      <LeagueMap feedPosts={posts} feedLoading={loading} feedError={error} />
+    <div className="runclub-container">
+      {/* Add debug button for development builds */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ position: 'fixed', top: '80px', right: '10px', zIndex: 1000 }}>
+          <button 
+            onClick={hardRefresh}
+            style={{
+              background: '#ff4444',
+              color: 'white',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+            disabled={loading || isRefreshing}
+          >
+            🗑️ Clear Cache
+          </button>
+        </div>
+      )}
       
-      {/* League Feed - existing 1301 feed below */}
-      <div className="league-feed">
-        {loading && posts.length === 0 ? (
-          <div className="loading-indicator"><p>Loading posts...</p></div>
-        ) : error ? null : posts.length === 0 ? (
-          <div className="no-posts-message">
-            <p>No running posts found</p>
-            <button className="retry-button" onClick={refreshFeed}>Refresh</button>
-          </div>
-        ) : (
-          <PostList
-            posts={posts}
-            loading={loading}
-            page={1}
-            userLikes={userLikes}
-            userReposts={userReposts}
-            handleLike={handleLike}
-            handleRepost={handleRepost}
-            handleZap={(post) => handleZap(post, wallet)}
-            handleCommentClick={handleCommentClick}
-            handleComment={handleComment}
-            commentText={commentText}
-            setCommentText={setCommentText}
-            wallet={wallet}
-          />
-        )}
-      </div>
+      {/* League Map Component */}
+      <LeagueMap />
+      
+      {/* PostList Component for workout feed */}
+      <PostList
+        posts={posts}
+        loading={loading}
+        error={error}
+        userLikes={userLikes}
+        userReposts={userReposts}
+        onLike={handleLike}
+        onRepost={handleRepost}
+        onZap={handleZap}
+        onComment={handleComment}
+        onCommentClick={handleCommentClick}
+        onLoadMore={loadMorePosts}
+        commentText={commentText}
+        setCommentText={setCommentText}
+        onRefresh={refreshFeed}
+        isRefreshing={isRefreshing}
+        defaultZapAmount={defaultZapAmount}
+        wallet={wallet}
+      />
     </div>
   );
 };

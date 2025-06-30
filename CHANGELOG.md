@@ -1,38 +1,26 @@
-# RUNSTR v0.5.0 - Design Overhaul
+# RUNSTR v0.5.2 - Precision Cycling, League Upgrade, Auto-Post Workout Record🚴‍♂️🏆🔄 
 
-v0.5.0 brings a complete redesign and exciting new features!
+## 🚴‍♂️ **Enhanced Cycling Experience**:
 
-🎨 **App Re-Design**:
-• Black and White Minimalism - We've embraced a sleek, minimalist aesthetic with a monochrome color scheme for a more focused running experience
+• Faster Update Frequency - Tracking precision improved from 5 seconds to 1 second for real-time feedback
 
-👤 **Profile Tab**:
-• Stats Evolution - Formerly the "Stats" tab, now a comprehensive profile experience
-• Dual Stat Tracking - Choose between viewing your Nostr workout stats or local storage stats
-• Experience System - Gain XP for each workout record over 1 mile long, level up your running journey
+• Intelligent Stationary Detection - Smart pausing at low speeds (below 0.5 km/h or 0.3 mph)
 
-🏆 **League Tab**:
-• Feed Transformation - Previously "Feed," now showcasing competitive elements
-• Interactive Leaderboard Map - See where you stand against other runners geographically
-• RUNSTR League Rankings - Track your position on the RUNSTR league leaderboard
-• Enhanced Workout Feed - Browse through community workout records for inspiration
+• Recent Position Analysis - More accurate speed calculation using 10-second position windows
 
-🤝 **Teams**:
-• Restructured Approach - Completely revamped team system for better community building
-• NIP101e Integration - Exercise teams now based on NIP101e protocol for better Nostr integration
-• Team Identity - Your team affiliation proudly displayed on all your workout records
+• Speed Smoothing Algorithm - 70/30 exponential smoothing for more stable speed readings
 
-🎵 **Blossom Integration**:
-• Music Streaming - Listen to your favorite tracks from Blossom servers while tracking your runs
-• Seamless Experience - Music controls integrated directly into your workout interface
+---
+## 🏆 **League Improvement**:
 
-🔧 **Small Bug Fixes and Improvements**:
-• Various performance enhancements and minor bug fixes throughout the app
+• Activity-specific leaderboards that automatically filter based on the user's current activity mode.
 
-Feel free to DM for feature requests or bug reports.
 
-Let's Go! 🏃‍♂️💪
-Manual release created on Tue Jan 21 23:00:00 UTC 2025
+---
+## 🔄 **Auto-Posting Feature**:
 
-# Release vv0.4.7
+• Seamless Sharing - Option to automatically post workouts as kind 1301 records
 
-Manual release created on Fri May 30 14:48:16 UTC 2025
+• User Control - Enable/disable auto-posting through settings menu
+
+Let's Go! 🏃‍♂️🚴‍♂️🚶‍♀️

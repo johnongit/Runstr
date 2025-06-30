@@ -12,6 +12,7 @@ import { startFeed, subscribeFeed, getFeed } from '../lib/feedManager';
 import { getEventTargetId } from '../utils/eventHelpers';
 import { useProfileCache } from '../hooks/useProfileCache.js';
 import { ensureRelays } from '../utils/relays.js';
+import { useActivityMode } from '../contexts/ActivityModeContext';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -19,9 +20,12 @@ const globalState = {
   lastFetchTime: 0,
   isInitialized: false,
   activeSubscription: null,
+  lastFilterSource: null, // Track what filter was used for cache
+  lastActivityMode: null, // Track activity mode for cache invalidation
 };
 
-export const useRunFeed = () => {
+export const useRunFeed = (filterSource = null) => {
+  const { mode: activityMode } = useActivityMode();
   // Prefer central manager; hydrate immediately
   const [posts, setPosts] = useState(() => getFeed());
   const [loading, setLoading] = useState(getFeed().length === 0);
@@ -84,7 +88,7 @@ export const useRunFeed = () => {
         
         // Fetch new posts
         const limit = 10; // Fetch just a few new posts
-        const runPostsArray = await fetchRunningPosts(limit, newestPostTime);
+        const runPostsArray = await fetchRunningPosts(limit, newestPostTime, filterSource);
         
         if (runPostsArray.length === 0) {
           console.log('No new posts found in background fetch');
@@ -141,7 +145,7 @@ export const useRunFeed = () => {
         timeoutRef.current = null;
       }
     };
-  }, [displayLimit]);
+  }, [displayLimit, filterSource]);
 
   // Extract user interactions logic to reuse
   const updateUserInteractions = useCallback((supplementaryData) => {
@@ -174,6 +178,143 @@ export const useRunFeed = () => {
     setUserReposts(newUserReposts);
   }, [userLikes, userReposts]);
 
+  // Helper function to apply RUNSTR filtering to posts (same logic as in nostr.js)
+  const applyRunstrFilter = useCallback((posts, filterSourceToUse) => {
+    if (!filterSourceToUse || filterSourceToUse.toUpperCase() !== 'RUNSTR') {
+      return posts; // No filtering applied
+    }
+
+    return posts.filter(event => {
+      // RUNSTR signature requirements based on createWorkoutEvent
+      const hasRequiredTags = {
+        source: false,
+        client: false,
+        workoutId: false,
+        title: false,
+        exercise: false,
+        distance: false,
+        duration: false
+      };
+      
+      // Check each tag for RUNSTR's signature
+      for (const tag of event.tags || []) {
+        switch (tag[0]) {
+          case 'source':
+            if (tag[1]?.toUpperCase() === 'RUNSTR') {
+              hasRequiredTags.source = true;
+            }
+            break;
+          case 'client':
+            if (tag[1]?.toLowerCase() === 'runstr') {
+              hasRequiredTags.client = true;
+            }
+            break;
+          case 'd':
+            // RUNSTR uses workout UUIDs in d tag
+            if (tag[1] && typeof tag[1] === 'string' && tag[1].length > 0) {
+              hasRequiredTags.workoutId = true;
+            }
+            break;
+          case 'title':
+            // RUNSTR always includes title tag
+            if (tag[1] && typeof tag[1] === 'string' && tag[1].length > 0) {
+              hasRequiredTags.title = true;
+            }
+            break;
+          case 'exercise':
+            // RUNSTR uses 'exercise' tag with values: 'run', 'walk', 'cycle'
+            if (tag[1]) {
+              const activity = tag[1].toLowerCase();
+              if (['run', 'walk', 'cycle', 'running', 'cycling', 'walking', 'jogging'].includes(activity)) {
+                hasRequiredTags.exercise = true;
+              }
+            }
+            break;
+          case 'distance':
+            // RUNSTR always includes distance with value and unit
+            if (tag[1] && tag[2]) {
+              hasRequiredTags.distance = true;
+            }
+            break;
+          case 'duration':
+            // RUNSTR always includes duration
+            if (tag[1] && typeof tag[1] === 'string' && tag[1].length > 0) {
+              hasRequiredTags.duration = true;
+            }
+            break;
+        }
+      }
+      
+      // Must have RUNSTR source identification (source OR client)
+      const hasRunstrIdentification = hasRequiredTags.source || hasRequiredTags.client;
+      
+      // Must have core RUNSTR workout structure
+      const hasRunstrStructure = hasRequiredTags.workoutId && 
+                                hasRequiredTags.title && 
+                                hasRequiredTags.exercise && 
+                                hasRequiredTags.distance && 
+                                hasRequiredTags.duration;
+      
+      const isRunstrWorkout = hasRunstrIdentification && hasRunstrStructure;
+      
+      // Add activity mode filter (same logic as useLeagueLeaderboard) - WITH FALLBACK
+      if (isRunstrWorkout && activityMode) {
+        const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
+        const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+        
+        // More lenient activity matching - include variations
+        const activityMatches = {
+          'run': ['run', 'running', 'jog', 'jogging'],     // Handle both 'run' and 'running'
+          'cycle': ['cycle', 'cycling', 'bike', 'biking'], // Handle both 'cycle' and 'cycling'  
+          'walk': ['walk', 'walking', 'hike', 'hiking']    // Handle both 'walk' and 'walking'
+        };
+        
+        const acceptedActivities = activityMatches[activityMode] || [activityMode];
+        
+        // Skip events that don't match current activity mode
+        if (eventActivityType && !acceptedActivities.includes(eventActivityType)) {
+          console.log(`[useRunFeed] Filtering out ${eventActivityType} activity (mode: ${activityMode})`);
+          return false;
+        }
+        
+        // If no exercise tag but is RUNSTR workout, allow it through (fallback)
+        if (!eventActivityType) {
+          console.log(`[useRunFeed] RUNSTR workout with no exercise tag - allowing through`);
+        }
+      }
+      
+      // Debug logging for rejected events
+      if (!isRunstrWorkout && (hasRequiredTags.source || hasRequiredTags.client)) {
+        console.log('[useRunFeed] Event has RUNSTR tags but missing signature:', {
+          eventId: event.id,
+          hasRunstrIdentification,
+          hasRunstrStructure,
+          missing: Object.entries(hasRequiredTags).filter(([key, value]) => !value).map(([key]) => key)
+        });
+      }
+      
+      return isRunstrWorkout;
+    });
+  }, [activityMode]);
+
+  // Clear cache if filter source or activity mode has changed
+  useEffect(() => {
+    const needsCacheReset = (
+      (globalState.lastFilterSource !== null && globalState.lastFilterSource !== filterSource) ||
+      (globalState.lastActivityMode !== null && globalState.lastActivityMode !== activityMode)
+    );
+    
+    if (needsCacheReset) {
+      console.log(`[useRunFeed] Filter/ActivityMode changed from '${globalState.lastFilterSource}/${globalState.lastActivityMode}' to '${filterSource}/${activityMode}', clearing cache`);
+      globalState.allPosts = [];
+      globalState.lastFetchTime = 0;
+      setAllPosts([]);
+      setPosts([]);
+    }
+    globalState.lastFilterSource = filterSource;
+    globalState.lastActivityMode = activityMode;
+  }, [filterSource, activityMode]);
+
   // Main function to fetch run posts
   const fetchRunPostsViaSubscription = useCallback(async () => {
     try {
@@ -191,12 +332,23 @@ export const useRunFeed = () => {
       // Check if we have cached posts that are recent enough (less than 5 minutes old)
       const now = Date.now();
       const isCacheValid = globalState.allPosts.length > 0 && 
-                        (now - globalState.lastFetchTime < 5 * 60 * 1000);
+                        (now - globalState.lastFetchTime < 5 * 60 * 1000) &&
+                        globalState.lastFilterSource === filterSource; // Ensure cache matches current filter
                         
       if (isCacheValid) {
-        console.log('Using cached posts from global state');
-        setAllPosts(globalState.allPosts);
-        setPosts(globalState.allPosts.slice(0, displayLimit));
+        console.log('[useRunFeed] Using cached posts from global state');
+        
+        // Apply filtering to cached data as safety measure
+        const filteredCachedPosts = applyRunstrFilter(globalState.allPosts, filterSource);
+        
+        if (filteredCachedPosts.length !== globalState.allPosts.length) {
+          console.log(`[useRunFeed] Filtered cached data: ${globalState.allPosts.length} → ${filteredCachedPosts.length} posts`);
+          // Update cache with filtered data
+          globalState.allPosts = filteredCachedPosts;
+        }
+        
+        setAllPosts(filteredCachedPosts);
+        setPosts(filteredCachedPosts.slice(0, displayLimit));
         setLoading(false);
         
         // Still update in the background for freshness
@@ -209,14 +361,14 @@ export const useRunFeed = () => {
       const limit = 21; // Load 21 posts initially (3 pages worth)
 
       // Fetch posts with running hashtags
-      const runPostsArray = await fetchRunningPosts(limit, since);
+      const runPostsArray = await fetchRunningPosts(limit, since, filterSource);
       
-      console.log(`Fetched ${runPostsArray.length} running posts`);
+      console.log(`[useRunFeed] Fetched ${runPostsArray.length} running posts (filterSource: ${filterSource})`);
       
       // QUICK-DISPLAY PHASE ─────────────────────────────────────────
-      // Show minimally processed posts immediately
+      // Show minimally processed posts immediately (with filtering applied)
       if (runPostsArray.length > 0 && allPosts.length === 0) {
-        const quickPosts = lightweightProcessPosts(runPostsArray);
+        const quickPosts = lightweightProcessPosts(runPostsArray, filterSource);
         setAllPosts(quickPosts);
         setPosts(quickPosts.slice(0, displayLimit));
         setLoading(false);
@@ -244,12 +396,23 @@ export const useRunFeed = () => {
       // Process posts with all the data
       const processedPosts = await processPostsWithData(runPostsArray, supplementaryData);
       
+      // Apply final filtering to processed posts
+      const finalFilteredPosts = applyRunstrFilter(processedPosts, filterSource);
+      
+      if (finalFilteredPosts.length !== processedPosts.length) {
+        console.log(`[useRunFeed] Filtered processed posts: ${processedPosts.length} → ${finalFilteredPosts.length} posts`);
+      }
+      
       // Merge with quick posts (if any) so we keep order
-      const finalPosts = mergeProcessedPosts(allPosts.length ? allPosts : lightweightProcessPosts(runPostsArray), processedPosts);
+      const finalPosts = mergeProcessedPosts(
+        allPosts.length ? allPosts : lightweightProcessPosts(runPostsArray, filterSource), 
+        finalFilteredPosts
+      );
       
       // Update global cache
       globalState.allPosts = finalPosts;
       globalState.lastFetchTime = now;
+      globalState.lastFilterSource = filterSource;
       
       // Update state with processed posts
       if (page === 1) {
@@ -262,10 +425,13 @@ export const useRunFeed = () => {
           const newPosts = finalPosts.filter(p => !existingIds.has(p.id));
           const mergedPosts = [...prevPosts, ...newPosts];
           
-          // Update global cache
-          globalState.allPosts = mergedPosts;
+          // Apply filtering to merged posts
+          const filteredMergedPosts = applyRunstrFilter(mergedPosts, filterSource);
           
-          return mergedPosts;
+          // Update global cache
+          globalState.allPosts = filteredMergedPosts;
+          
+          return filteredMergedPosts;
         });
         // Update displayed posts
         setPosts(prevPosts => {
@@ -281,7 +447,10 @@ export const useRunFeed = () => {
             }
           });
           
-          return uniquePosts.slice(0, displayLimit); // Only display up to the limit
+          // Apply filtering to unique posts
+          const filteredUniquePosts = applyRunstrFilter(uniquePosts, filterSource);
+          
+          return filteredUniquePosts.slice(0, displayLimit); // Only display up to the limit
         });
       }
       
@@ -298,7 +467,7 @@ export const useRunFeed = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, displayLimit, updateUserInteractions, setupBackgroundFetch]);
+  }, [page, displayLimit, updateUserInteractions, setupBackgroundFetch, filterSource, applyRunstrFilter]);
 
   // Load more posts function - increases the display limit
   const loadMorePosts = useCallback(() => {
@@ -316,6 +485,20 @@ export const useRunFeed = () => {
       setPage(prevPage => prevPage + 1);
     }
   }, [loading, hasMore]);
+
+  // Force clear cache and refresh - useful for debugging or manual refresh
+  const clearCacheAndRefresh = useCallback(() => {
+    console.log('[useRunFeed] Manually clearing cache and forcing refresh');
+    globalState.allPosts = [];
+    globalState.lastFetchTime = 0;
+    globalState.lastFilterSource = null;
+    setAllPosts([]);
+    setPosts([]);
+    setPage(1);
+    setDisplayLimit(7);
+    setLoading(true);
+    fetchRunPostsViaSubscription();
+  }, [fetchRunPostsViaSubscription]);
 
   // Initial load / remount logic
   useEffect(() => {
@@ -582,7 +765,8 @@ export const useRunFeed = () => {
     fetchRunPostsViaSubscription,
     loadedSupplementaryData,
     canLoadMore,
-    handleCommentClick
+    handleCommentClick,
+    clearCacheAndRefresh
   };
 };
 

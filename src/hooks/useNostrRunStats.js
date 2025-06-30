@@ -16,7 +16,8 @@ export const useNostrRunStats = () => {
 
   // Level system utility functions
   const calculateWorkoutXP = useCallback((distanceInMiles) => {
-    if (distanceInMiles < 1) return 0; // Below qualifying threshold
+    // Removed minimum distance threshold - all movements count for competitions
+    // if (distanceInMiles < 1) return 0; // Below qualifying threshold
     const baseXP = 10;
     const distanceBonus = Math.floor(distanceInMiles - 1) * 5;
     return baseXP + distanceBonus;

@@ -589,10 +589,20 @@ ${additionalContent ? `\n${additionalContent}` : ''}
                 if (durationInSeconds > 0 && distanceInMeters > 0) {
                   const speedMps = distanceInMeters / durationInSeconds; // m/s
                   if (distanceUnit === 'km') {
-                    displayMetricValue = (speedMps * 3.6).toFixed(1); // km/h
+                    let speedKmh = speedMps * 3.6; // km/h
+                    // Apply minimum speed threshold - don't show speeds below 0.1 km/h
+                    if (speedKmh < 0.1) {
+                      speedKmh = 0.0;
+                    }
+                    displayMetricValue = speedKmh.toFixed(1);
                     displayMetricUnit = 'km/h';
                   } else {
-                    displayMetricValue = (speedMps * 2.23694).toFixed(1); // mph
+                    let speedMph = speedMps * 2.23694; // mph
+                    // Apply minimum speed threshold - don't show speeds below 0.1 mph
+                    if (speedMph < 0.1) {
+                      speedMph = 0.0;
+                    }
+                    displayMetricValue = speedMph.toFixed(1);
                     displayMetricUnit = 'mph';
                   }
                   displayMetricLabel = 'Speed';

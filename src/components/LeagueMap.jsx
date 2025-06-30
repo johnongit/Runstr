@@ -16,7 +16,8 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     error: leaderboardError,
     lastUpdated,
     refresh: refreshLeaderboard,
-    courseTotal
+    courseTotal,
+    activityMode
   } = useLeagueLeaderboard();
 
   // Get profiles for leaderboard users
@@ -43,6 +44,38 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     const timer = setTimeout(() => setIsInitialLoad(false), 500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Generate dynamic league title based on activity mode
+  const getLeagueTitle = () => {
+    if (!activityMode) return 'THE RUNSTR 500'; // Fallback for loading state
+    
+    switch (activityMode) {
+      case 'run':
+        return 'THE RUNSTR 500';
+      case 'walk':
+        return 'THE WALKSTR 500';
+      case 'cycle':
+        return 'THE CYCLESTR 500';
+      default:
+        return 'THE RUNSTR 500';
+    }
+  };
+
+  // Generate dynamic activity text based on activity mode
+  const getActivityText = (count) => {
+    if (!activityMode) return `${count} run${count !== 1 ? 's' : ''}`; // Fallback
+    
+    switch (activityMode) {
+      case 'run':
+        return `${count} run${count !== 1 ? 's' : ''}`;
+      case 'walk':
+        return `${count} walk${count !== 1 ? 's' : ''}`;
+      case 'cycle':
+        return `${count} ride${count !== 1 ? 's' : ''}`;
+      default:
+        return `${count} run${count !== 1 ? 's' : ''}`;
+    }
+  };
 
   // Calculate position along race track (0-100%)
   const calculateTrackPosition = (totalMiles) => {
@@ -169,7 +202,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
       {/* Linear Race Track */}
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-4">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-lg font-semibold text-text-primary">THE RUNSTR 500</h3>
+          <h3 className="text-lg font-semibold text-text-primary">{getLeagueTitle()}</h3>
           <div className="text-xs text-text-secondary">
             {lastUpdated && `Updated ${new Date(lastUpdated).toLocaleTimeString()}`}
           </div>
@@ -286,7 +319,9 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
         
         {enhancedLeaderboard.length === 0 ? (
           <div className="p-4 text-center">
-            <p className="text-text-secondary">No runners found yet. Be the first to start!</p>
+            <p className="text-text-secondary">
+              No {activityMode === 'run' ? 'runners' : activityMode === 'walk' ? 'walkers' : 'cyclists'} found yet. Be the first to start!
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-border-secondary">
@@ -322,7 +357,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
                       )}
                     </div>
                     <div className="text-xs text-text-secondary">
-                      {user.runCount} run{user.runCount !== 1 ? 's' : ''}
+                      {getActivityText(user.runCount)}
                     </div>
                   </div>
                 </div>
