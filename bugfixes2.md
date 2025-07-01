@@ -105,7 +105,7 @@ The RUNSTR Season 1 implementation has several critical payment flow issues prev
 
 ### **✅ FIXES COMPLETED - PAYMENT FLOW DEBUGGING:**
 
-**Phase 5 Results:** ✅ **10 CRITICAL ISSUES FIXED**
+**Phase 5 Results:** ✅ **12 CRITICAL ISSUES FIXED**
 
 1. ✅ **Import Path Error** - Fixed TypeScript compilation issue
 2. ✅ **Modal Close Button** - Users can now close modal during errors
@@ -117,6 +117,36 @@ The RUNSTR Season 1 implementation has several critical payment flow issues prev
 8. ✅ **Updated NWC URI** - Using new wallet connection with correct secret/lud16
 9. ✅ **Added makeInvoice Method** - Proper wallet abstraction instead of direct provider calls
 10. ✅ **UI Debug Panel** - Real-time debugging info visible in mobile app modal
+11. ✅ **Enhanced Response Parsing** - Handles multiple invoice response formats (invoice, pr, paymentRequest)
+12. ✅ **Direct NWC Fallback** - Full NIP-47 implementation bypassing Alby SDK if needed
+
+### **🔍 NEXT TESTING PHASE:**
+
+**What the Enhanced Debugging Will Show:**
+
+The debug panel will now capture detailed information about:
+- Alby SDK provider state and capabilities
+- Raw response from wallet provider with full analysis
+- Multiple response format detection (invoice/pr/paymentRequest)
+- Automatic fallback to direct NWC if Alby SDK fails
+- WebSocket connection status for direct NWC
+- Complete error chain from connection → request → response
+
+**Expected Debug Output:**
+```
+🔄 Starting invoice generation...
+👤 User pubkey: 30ceb64e73197a05...
+💰 Calling seasonPassPaymentService...
+[NWCWallet] Making invoice with params: {amount: 10000, defaultMemo: "..."}
+[NWCWallet] Provider state: {hasProvider: true, hasMakeInvoice: true, providerType: "NostrWebLNProvider"}
+[NWCWallet] Raw invoice response: {...}
+[NWCWallet] Invoice response analysis: {responseType: "object", hasInvoice: false, hasPr: true, responseKeys: ["pr"], fullResponse: "..."}
+```
+
+**Possible Outcomes:**
+1. **Alby SDK Success** - Will show exactly what response format is returned
+2. **Alby SDK Failure → Direct NWC Success** - Fallback mechanism will activate
+3. **Complete Failure** - Will show exact failure point and error details
 
 ### **🧪 TESTING STATUS:**
 
@@ -126,6 +156,8 @@ The RUNSTR Season 1 implementation has several critical payment flow issues prev
 - Payment flow should provide better error messages
 - Titles should display as "RUNSTR SEASON 1", "WALKSTR SEASON 1", "CYCLESTR SEASON 1"
 - **NEW: Real-time debug panel** shows exactly what's happening during payment flow
+- **NEW: Automatic fallback** to direct NWC if Alby SDK fails
+- **NEW: Multiple response format handling** for different wallet implementations
 
 **Expected Behavior:**
 1. **Button Visibility** - Season Pass button appears for all activity modes when user doesn't have pass
@@ -133,11 +165,13 @@ The RUNSTR Season 1 implementation has several critical payment flow issues prev
 3. **Invoice Generation** - Updated NWC URI + debug panel will help identify exact failure point
 4. **User Experience** - Cleaner titles, consistent branding across modes
 5. **🔍 Debug Panel** - Click "Debug Info" in payment modal to see real-time logs
+6. **🔄 Automatic Fallback** - If Alby SDK fails, direct NWC implementation will attempt invoice generation
 
 **Mobile Debugging:**
 - Debug panel shows timestamped events during payment flow
 - Copy debug log button to share diagnostics
 - No need for console access - everything visible in UI
+- Enhanced logging shows exact response structures and failure points
 
 ### **🔜 REMAINING WORK (Next Phases):**
 
@@ -146,7 +180,7 @@ The RUNSTR Season 1 implementation has several critical payment flow issues prev
 **Phase 3: Fix League Standings Filtering** ⏭️ **NEXT**
 **Phase 4: Replace Map with Prize Pool Info** ⏭️ **PENDING**
 
-**Next Priority:** Test the payment flow and verify the remaining leaderboard filtering issues.
+**Next Priority:** Test the enhanced payment flow and verify the remaining leaderboard filtering issues. The comprehensive debugging should identify the exact invoice generation issue.
 
 ---
 

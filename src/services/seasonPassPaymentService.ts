@@ -115,13 +115,24 @@ class SeasonPassPaymentService {
         defaultMemo: memo
       });
 
-      console.log('[SeasonPassPayment] Invoice result received:', {
+      console.log('[SeasonPassPayment] Invoice result received:', invoiceResult);
+      console.log('[SeasonPassPayment] Invoice result analysis:', {
+        hasResult: !!invoiceResult,
+        resultType: typeof invoiceResult,
         hasInvoice: !!invoiceResult?.invoice,
-        invoicePreview: invoiceResult?.invoice?.substring(0, 50) + '...'
+        invoiceType: typeof invoiceResult?.invoice,
+        invoicePreview: invoiceResult?.invoice?.substring(0, 50) + '...',
+        resultKeys: invoiceResult ? Object.keys(invoiceResult) : 'no result',
+        fullResult: JSON.stringify(invoiceResult)
       });
 
       if (!invoiceResult || !invoiceResult.invoice) {
-        throw new Error('Failed to generate invoice - no invoice returned from wallet provider');
+        const errorDetails = {
+          hasResult: !!invoiceResult,
+          resultKeys: invoiceResult ? Object.keys(invoiceResult) : [],
+          fullResult: JSON.stringify(invoiceResult)
+        };
+        throw new Error(`Failed to generate invoice - no invoice returned from wallet provider. Details: ${JSON.stringify(errorDetails)}`);
       }
 
       console.log('[SeasonPassPayment] Successfully generated season pass invoice');
