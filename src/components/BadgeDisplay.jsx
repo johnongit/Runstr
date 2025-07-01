@@ -9,23 +9,14 @@ const UnclaimedBadge = ({ badge }) => {
   return (
     <div className="unclaimed-badge-item">
       <div className="badge-icon">
-        {badge.type === 'level' ? (
-          <div className="level-badge-preview">
-            {badge.levelNumber}
-          </div>
-        ) : (
-          <div className="award-badge-preview">
-            🏆
-          </div>
-        )}
+        <div className="level-badge-preview">
+          {badge.levelNumber}
+        </div>
       </div>
       <div className="badge-info">
         <h4 className="badge-name">{badge.name}</h4>
         <p className="badge-description">
-          {badge.type === 'level' 
-            ? `Level ${badge.levelNumber} Achievement` 
-            : 'Special Award'
-          }
+          Level {badge.levelNumber} Achievement
         </p>
         <span className="badge-date">
           Awarded {new Date(badge.timestamp * 1000).toLocaleDateString()}
@@ -44,10 +35,8 @@ const BadgeClaimModal = ({ unclaimedBadges, onClaim, onClose, isOpen = false }) 
 
   if (!isOpen) return null;
 
-  const allUnclaimedBadges = [
-    ...Object.values(unclaimedBadges.levelBadges || {}),
-    ...(unclaimedBadges.awards || [])
-  ];
+  // Only show level badges, no awards
+  const allUnclaimedBadges = Object.values(unclaimedBadges.levelBadges || {});
 
   if (allUnclaimedBadges.length === 0) {
     return null;
@@ -80,8 +69,7 @@ const BadgeClaimModal = ({ unclaimedBadges, onClaim, onClose, isOpen = false }) 
     <div className="badge-claim-modal-overlay">
       <div className="badge-claim-modal">
         <div className="modal-header">
-          <div className="celebration-stars">✨ 🎉 ✨</div>
-          <h2 className="modal-title">New Badges Earned!</h2>
+          <h2 className="modal-title">New Badges Earned</h2>
           <p className="modal-subtitle">
             You have {allUnclaimedBadges.length} new badge{allUnclaimedBadges.length !== 1 ? 's' : ''} to claim
           </p>
@@ -112,7 +100,7 @@ const BadgeClaimModal = ({ unclaimedBadges, onClaim, onClose, isOpen = false }) 
             size="default"
             className="claim-all-btn"
           >
-            {isClaimingAll ? 'Claiming All...' : `Claim All ${allUnclaimedBadges.length} Badges`}
+            {isClaimingAll ? 'Claiming...' : 'Claim Badges'}
           </Button>
           
           <Button
@@ -157,21 +145,8 @@ const BadgeSlot = ({ badge, levelNumber, isEmpty = false }) => {
 };
 
 /**
- * Award badge component (for special achievements)
- */
-const AwardBadge = ({ award }) => {
-  return (
-    <div className="award-badge" title={award.name}>
-      <div className="award-content">
-        🏆
-      </div>
-    </div>
-  );
-};
-
-/**
  * Main BadgeDisplay component
- * Shows level badges (1-21 in 3 rows of 7) and awards section
+ * Shows level badges (1-21 in 3 rows of 7) - RUNSTR Level 1-21 only
  * Includes notification system for unclaimed badges
  */
 const BadgeDisplay = () => {
@@ -192,7 +167,7 @@ const BadgeDisplay = () => {
     return null;
   }
 
-  const { levelBadges, awards } = badges;
+  const { levelBadges } = badges; // Remove awards from destructuring
 
   // Create array of 21 level slots
   const levelSlots = [];
@@ -218,15 +193,18 @@ const BadgeDisplay = () => {
     }
   };
 
+  // Check if we have any unclaimed level badges (no awards)
+  const hasUnclaimedLevelBadges = Object.keys(unclaimedBadges?.levelBadges || {}).length > 0;
+
   return (
     <div className="badge-display">
       {/* Notification Banner for Unclaimed Badges */}
-      {hasUnclaimedBadges && (
+      {hasUnclaimedLevelBadges && (
         <div 
           className="badge-notification-banner"
           onClick={() => setShowClaimModal(true)}
         >
-          🎉 You have new badges to claim! Click here to view them.
+          You have new badges to claim!
         </div>
       )}
 
@@ -236,20 +214,6 @@ const BadgeDisplay = () => {
           {levelSlots}
         </div>
       </div>
-
-      {/* Awards Section - Only show if user has awards */}
-      {awards && awards.length > 0 && (
-        <div className="awards-section">
-          <div className="awards-header">
-            <span className="awards-title">🏆 AWARDS</span>
-          </div>
-          <div className="awards-grid">
-            {awards.map((award, index) => (
-              <AwardBadge key={award.id || index} award={award} />
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Badge Claim Modal */}
       <BadgeClaimModal
