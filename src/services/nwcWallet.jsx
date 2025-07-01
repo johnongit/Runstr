@@ -1,4 +1,4 @@
-import { getPublicKey, getEventHash, signEvent, nip19 } from 'nostr-tools';
+import { getPublicKey, finalizeEvent, nip19 } from 'nostr-tools';
 import * as secp256k1 from '@noble/secp256k1';
 import { webln } from '@getalby/sdk';
 
@@ -238,20 +238,19 @@ export class NWCWallet {
           pubkey: getPublicKey(this.secretKey)
         };
 
-        // Sign the event
-        requestEvent.id = getEventHash(requestEvent);
-        requestEvent.sig = signEvent(requestEvent, this.secretKey);
+        // Sign the event using finalizeEvent (handles both hash and signature)
+        const finalizedEvent = finalizeEvent(requestEvent, this.secretKey);
 
         console.log('[NWCWallet] Direct NWC request event:', {
-          kind: requestEvent.kind,
-          pubkey: requestEvent.pubkey,
-          walletPubkeyInTags: requestEvent.tags[0][1],
+          kind: finalizedEvent.kind,
+          pubkey: finalizedEvent.pubkey,
+          walletPubkeyInTags: finalizedEvent.tags[0][1],
           relay: this.relayUrl,
           variantNumber: index + 1
         });
 
         // Send via WebSocket
-        const result = await this.sendDirectNWCRequest(requestEvent);
+        const result = await this.sendDirectNWCRequest(finalizedEvent);
         console.log(`[NWCWallet] Direct NWC variant ${index + 1} succeeded!`);
         return result;
 
@@ -269,15 +268,15 @@ export class NWCWallet {
   /**
    * Send direct NWC request via WebSocket
    */
-  async sendDirectNWCRequest(requestEvent) {
+  async sendDirectNWCRequest(finalizedEvent) {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.relayUrl);
       let timeout;
 
       ws.onopen = () => {
         console.log('[NWCWallet] Direct NWC WebSocket connected');
-        ws.send(JSON.stringify(['REQ', 'nwc-response', { kinds: [23195], '#p': [requestEvent.pubkey] }]));
-        ws.send(JSON.stringify(['EVENT', requestEvent]));
+        ws.send(JSON.stringify(['REQ', 'nwc-response', { kinds: [23195], '#p': [finalizedEvent.pubkey] }]));
+        ws.send(JSON.stringify(['EVENT', finalizedEvent]));
         
         timeout = setTimeout(() => {
           ws.close();
