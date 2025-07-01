@@ -13,7 +13,7 @@ Successfully implemented **Phase 1: Activity Mode-Driven Display** for the Leagu
 - Cycle mode → shows only cycling activities
 
 ### 2. **Dynamic League Titles**
-- **Run Mode**: "THE RUNSTR 500"
+- **Run Mode**: "THE RUNSTR SEASON 1"
 - **Walk Mode**: "THE WALKSTR 500" 
 - **Cycle Mode**: "THE CYCLESTR 500"
 
@@ -42,7 +42,7 @@ Successfully implemented **Phase 1: Activity Mode-Driven Display** for the Leagu
 #### `src/components/LeagueMap.jsx`
 - ✅ Added `activityMode` to destructured hook return
 - ✅ Created `getLeagueTitle()` function for dynamic titles
-- ✅ Updated hardcoded "THE RUNSTR 500" to use dynamic title
+- ✅ Updated hardcoded "THE RUNSTR SEASON 1" to use dynamic title
 - ✅ Added fallback handling for undefined activity mode
 
 ## 🧪 How to Test
@@ -52,7 +52,7 @@ Successfully implemented **Phase 1: Activity Mode-Driven Display** for the Leagu
 2. **Navigate to League tab** (bottom navigation)
 3. **Switch activity modes** using the activity toggle in the app
 4. **Observe the changes**:
-   - League title changes ("RUNSTR 500" → "WALKSTR 500" → "CYCLESTR 500")
+   - League title changes ("RUNSTR SEASON 1" → "WALKSTR 500" → "CYCLESTR 500")
    - Leaderboard shows only activities matching the current mode
    - Race track positions update accordingly
 

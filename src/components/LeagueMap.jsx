@@ -47,17 +47,17 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
 
   // Generate dynamic league title based on activity mode
   const getLeagueTitle = () => {
-    if (!activityMode) return 'THE RUNSTR 500'; // Fallback for loading state
+    if (!activityMode) return 'THE RUNSTR SEASON 1'; // Fallback for loading state
     
     switch (activityMode) {
       case 'run':
-        return 'THE RUNSTR 500';
+        return 'THE RUNSTR SEASON 1';
       case 'walk':
         return 'THE WALKSTR 500';
       case 'cycle':
         return 'THE CYCLESTR 500';
       default:
-        return 'THE RUNSTR 500';
+        return 'THE RUNSTR SEASON 1';
     }
   };
 
@@ -368,14 +368,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
                     {formatDistance(user.totalMiles)} mi
                   </div>
                   <div className="text-xs text-text-secondary">
-                    {user.progressPercentage.toFixed(1)}% complete
-                  </div>
-                  {/* Mini progress bar */}
-                  <div className="w-16 h-1 bg-bg-tertiary rounded-full mt-1">
-                    <div 
-                      className="h-full bg-primary rounded-full"
-                      style={{ width: `${Math.min(100, user.progressPercentage)}%` }}
-                    />
+                    Rank #{user.rank}
                   </div>
                 </div>
               </div>

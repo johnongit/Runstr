@@ -191,7 +191,6 @@ export const useLeagueLeaderboard = () => {
       .map(user => ({
         ...user,
         totalMiles: Math.round(user.totalMiles * 100) / 100, // Round to 2 decimals
-        progressPercentage: Math.min(100, (user.totalMiles / COURSE_TOTAL_MILES) * 100),
         isComplete: user.totalMiles >= COURSE_TOTAL_MILES
       }))
       .sort((a, b) => b.totalMiles - a.totalMiles) // Sort by distance descending

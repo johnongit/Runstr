@@ -29,12 +29,12 @@ Successfully implemented **Activity Mode-Driven Display** with **Dynamic Activit
 ## 🎯 **Current Behavior**
 
 ### **Activity Filtering**
-- **RUNSTR 500**: Only running activities (`exercise: "run"`)
+- **RUNSTR SEASON 1**: Only running activities (`exercise: "run"`)
 - **WALKSTR 500**: Only walking activities (`exercise: "walk"`)  
 - **CYCLESTR 500**: Only cycling activities (`exercise: "cycle"`)
 
 ### **Dynamic UI Text**
-- **Titles**: "THE RUNSTR 500" / "THE WALKSTR 500" / "THE CYCLESTR 500"
+- **Titles**: "THE RUNSTR SEASON 1" / "THE WALKSTR 500" / "THE CYCLESTR 500"
 - **Activity Counts**: "2 runs" / "2 walks" / "2 rides"
 - **Empty States**: "No runners found" / "No walkers found" / "No cyclists found"
 
