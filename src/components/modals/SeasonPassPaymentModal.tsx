@@ -51,9 +51,11 @@ const SeasonPassPaymentModal: React.FC<Props> = ({ open, onClose, onPaymentSucce
         setStep('payment');
       } else {
         setError(result.error || 'Failed to generate payment invoice');
+        setStep('payment'); // Allow retry and modal close
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate payment invoice');
+      setStep('payment'); // Allow retry and modal close
     } finally {
       setIsGenerating(false);
     }
@@ -229,7 +231,7 @@ const SeasonPassPaymentModal: React.FC<Props> = ({ open, onClose, onPaymentSucce
             <button 
               onClick={onClose}
               className="text-text-secondary hover:text-text-primary"
-              disabled={step === 'verifying' || step === 'generating'}
+              disabled={step === 'verifying'}
             >
               ✕
             </button>

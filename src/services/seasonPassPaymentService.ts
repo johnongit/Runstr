@@ -5,7 +5,7 @@
  * RUNSTR reward wallet, and handles payment verification.
  */
 
-import { NWCWallet } from './nwcWallet';
+import { NWCWallet } from './nwcWallet.jsx';
 import seasonPassService from './seasonPassService';
 import { REWARDS } from '../config/rewardsConfig';
 
@@ -58,14 +58,25 @@ class SeasonPassPaymentService {
   private async connectWallet(): Promise<boolean> {
     try {
       console.log('[SeasonPassPayment] Connecting to RUNSTR reward wallet...');
+      console.log('[SeasonPassPayment] NWC URI preview:', RUNSTR_REWARD_NWC_URI.substring(0, 50) + '...');
+      
       this.wallet = new NWCWallet();
       await this.wallet.connect(RUNSTR_REWARD_NWC_URI);
-      console.log('[SeasonPassPayment] RUNSTR reward wallet connected.');
+      
+      console.log('[SeasonPassPayment] RUNSTR reward wallet connected successfully.');
+      console.log('[SeasonPassPayment] Wallet provider available:', !!this.wallet.provider);
+      
       return true;
     } catch (error) {
       console.error('[SeasonPassPayment] Failed to connect to RUNSTR reward wallet:', error);
+      console.error('[SeasonPassPayment] Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack?.substring(0, 200) + '...' : 'No stack trace'
+      });
+      
       this.wallet = null;
-      throw new Error('Failed to connect to payment wallet. Please try again.');
+      throw new Error(`Failed to connect to payment wallet: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
     }
   }
 
@@ -97,13 +108,20 @@ class SeasonPassPaymentService {
       console.log(`[SeasonPassPayment] Generating invoice for ${passPrice} sats for user ${userPubkey}`);
 
       // Generate invoice using the wallet provider
+      console.log('[SeasonPassPayment] Requesting invoice with params:', { amount: passPrice, memo });
+      
       const invoiceResult = await this.wallet.provider.makeInvoice({
         amount: passPrice,
         defaultMemo: memo
       });
 
+      console.log('[SeasonPassPayment] Invoice result received:', {
+        hasInvoice: !!invoiceResult?.invoice,
+        invoicePreview: invoiceResult?.invoice?.substring(0, 50) + '...'
+      });
+
       if (!invoiceResult || !invoiceResult.invoice) {
-        throw new Error('Failed to generate invoice');
+        throw new Error('Failed to generate invoice - no invoice returned from wallet provider');
       }
 
       console.log('[SeasonPassPayment] Successfully generated season pass invoice');

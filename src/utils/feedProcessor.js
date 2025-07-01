@@ -89,19 +89,17 @@ export const lightweightProcessPosts = (posts, filterSource = null) => {
       
       const isRunstrWorkout = hasRunstrIdentification && hasRunstrStructure;
       
-      // Phase 4: Season Pass Participant Filter for running mode only
+      // Phase 4: Season Pass Participant Filter for all activity modes
       if (isRunstrWorkout) {
-        // Get current activity mode from exercise tag
+        // Get current activity mode from exercise tag  
         const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
-        const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+        const eventActivityType = exerciseTag?.[1]?.toLowerCase() || 'unknown';
         
-        // Only apply Season Pass filtering for running activities
-        if (eventActivityType && ['run', 'running', 'jog', 'jogging'].includes(eventActivityType)) {
-          const isParticipant = seasonPassService.isParticipant(event.pubkey);
-          if (!isParticipant) {
-            console.log(`[feedProcessor] Filtering out non-participant post from ${event.pubkey}`);
-            return false;
-          }
+        // Apply Season Pass filtering for all activity types
+        const isParticipant = seasonPassService.isParticipant(event.pubkey);
+        if (!isParticipant) {
+          console.log(`[feedProcessor] Filtering out non-participant post from ${event.pubkey} (${eventActivityType} activity)`);
+          return false;
         }
       }
       

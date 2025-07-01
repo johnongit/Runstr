@@ -38,16 +38,14 @@ export const saveLeaderboardParticipation = (participate) => {
 
 /**
  * Apply Season Pass participant filtering to users
- * Only applies to running mode (allows all participants for walk/cycle modes)
+ * Applies consistently across all activity modes (run/walk/cycle) for RUNSTR Season 1
  * @param {Array} users - Array of user objects
  * @param {string} activityMode - Current activity mode ('run', 'walk', 'cycle')
  * @returns {Array} Filtered array of users
  */
 export const applySeasonPassFilter = (users, activityMode = null) => {
-  // Only apply Season Pass filtering for running mode
-  if (activityMode !== 'run') {
-    return users;
-  }
+  // Apply Season Pass filtering consistently across ALL activity modes
+  // This is a PAID competition - only Season Pass participants should appear
   
   return users.filter(user => {
     const pubkey = user.pubkey || user.publicKey;
@@ -58,7 +56,7 @@ export const applySeasonPassFilter = (users, activityMode = null) => {
     
     const isParticipant = seasonPassService.isParticipant(pubkey);
     if (!isParticipant) {
-      console.log(`[LeaderboardUtils] Filtering out non-participant ${pubkey} from leaderboard`);
+      console.log(`[LeaderboardUtils] Filtering out non-participant ${pubkey} from ${activityMode || 'unknown'} leaderboard`);
       return false;
     }
     
@@ -276,14 +274,11 @@ export const createImprovementLeaderboard = (users, activityMode = null) => {
 export const computeDailyWinners = (runs = [], optInPubkeys = new Set(), maxWinners = 3, activityMode = null) => {
   if (!runs.length) return [];
 
-  // Phase 4: Apply Season Pass participant filtering (for running mode only)
-  let filteredRuns = runs;
-  if (activityMode === 'run') {
-    filteredRuns = runs.filter(run => {
-      const userPubkey = run.pubkey || run.publicKey || 'unknown';
-      return seasonPassService.isParticipant(userPubkey);
-    });
-  }
+  // Phase 4: Apply Season Pass participant filtering (for all activity modes)
+  const filteredRuns = runs.filter(run => {
+    const userPubkey = run.pubkey || run.publicKey || 'unknown';
+    return seasonPassService.isParticipant(userPubkey);
+  });
 
   // Aggregate distance per pubkey
   const distanceByUser = new Map();

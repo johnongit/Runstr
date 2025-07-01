@@ -2,6 +2,144 @@
 
 This document tracks the progress and solutions for the identified issues. Solutions should prioritize simplicity and leverage existing application components and patterns, avoiding unnecessary complexity or code duplication.
 
+## Bug Fix #5: RUNSTR Season 1 Payment Flow Issues
+
+**Date:** 2025-01-16  
+**Reporter:** User  
+**Severity:** High  
+**Status:** 🔍 **DEBUGGING IN PROGRESS**  
+
+### Problem Description
+
+The RUNSTR Season 1 implementation has several critical payment flow issues preventing users from purchasing season passes:
+
+1. **Invoice Generation Fails** - Season Pass button fails to generate a payment invoice when clicked
+2. **Modal X Button Not Working** - The close button on the Season Pass payment modal is non-functional  
+3. **League Standings Filter** - Still showing RUNSTR 500 rankings instead of filtering to only Season Pass participants
+4. **Missing Season Pass Buttons** - Season Pass button not appearing on all activity mode screens
+5. **UI Layout Issues** - Season Pass button conflicts with timestamp notification display
+
+### **Current Investigation Status:**
+
+**🔍 Phase 5 - Payment Flow Debugging:**
+- ✅ **CRITICAL ISSUES IDENTIFIED** - Multiple blocking problems found
+- Investigating invoice generation failure in `seasonPassPaymentService.ts`
+- Checking NWC wallet connection and configuration
+- Verifying participant storage in `seasonPassService.ts`
+- Testing end-to-end payment → participant addition → leaderboard filtering
+
+### **🚨 CRITICAL ISSUES FOUND:**
+
+**Issue #1: Import Path Error in seasonPassPaymentService.ts** ✅ **FIXED**
+- **Problem**: `import { NWCWallet } from './nwcWallet';` - TypeScript importing JSX file
+- **File**: `src/services/seasonPassPaymentService.ts` line 8
+- **Actual File**: `src/services/nwcWallet.jsx` (not `.js`)
+- **Impact**: TypeScript compilation error, service fails to load
+- **Fix**: ✅ Updated import path to `'./nwcWallet.jsx'`
+
+**Issue #2: Modal Close Button Disabled During Errors** ✅ **FIXED**
+- **Problem**: X button disabled when `step === 'generating'` - if generation fails and step doesn't advance, button stays disabled
+- **File**: `src/components/modals/SeasonPassPaymentModal.tsx` line 224
+- **Impact**: Users can't close modal if invoice generation fails
+- **Fix**: ✅ Removed `step === 'generating'` from disabled condition, only disabled during 'verifying'
+
+**Issue #3: Missing Error State Transition** ✅ **FIXED**
+- **Problem**: If invoice generation fails, modal may stay in 'generating' state
+- **File**: `src/components/modals/SeasonPassPaymentModal.tsx` line 41-53
+- **Impact**: Modal stuck with spinner, X button disabled
+- **Fix**: ✅ Added `setStep('payment')` in error handlers to allow retry and modal close
+
+**Issue #4: Potential NWC Wallet Connection Issues** ✅ **IMPROVED**
+- **Problem**: WebLN provider may not be available in mobile environment
+- **File**: `src/services/nwcWallet.jsx` uses `@getalby/sdk`
+- **Impact**: Invoice generation fails silently
+- **Fix**: ✅ Added comprehensive error logging and detailed error messages
+
+**Issue #5: Missing Development Logging** ✅ **FIXED**
+- **Problem**: Limited debugging info for payment flow failures
+- **Impact**: Hard to diagnose production issues
+- **Fix**: ✅ Added detailed logging throughout payment service for debugging
+
+**Issue #6: Season Pass Button Only for Run Mode** ✅ **FIXED**
+- **Problem**: Season Pass button only showed for `activityMode === 'run'`
+- **File**: `src/components/LeagueMap.jsx` line 301
+- **Impact**: Users couldn't purchase season pass from walk/cycle modes
+- **Fix**: ✅ Removed activity mode restriction - button now shows for all modes
+
+**Issue #7: Incorrect Title Format** ✅ **FIXED**
+- **Problem**: Titles showed "THE RUNSTR SEASON 1" instead of "RUNSTR SEASON 1"
+- **File**: `src/components/LeagueMap.jsx` getLeagueTitle function
+- **Impact**: UI inconsistency with requested branding
+- **Fix**: ✅ Removed "THE" from all activity mode titles
+
+### **Files Under Investigation:**
+
+1. **`src/services/seasonPassPaymentService.ts`** - Payment generation and processing
+2. **`src/components/modals/SeasonPassPaymentModal.tsx`** - Payment modal UI and close functionality
+3. **`src/services/seasonPassService.ts`** - Participant management and storage
+4. **`src/components/LeagueMap.jsx`** - Season Pass button integration
+5. **`src/hooks/useLeaderboard.js`** - Leaderboard filtering logic
+
+### **Technical Requirements:**
+
+**Payment Flow Steps:**
+1. User clicks Season Pass button → Modal opens
+2. Modal generates 10k sats Lightning invoice via NWC wallet
+3. User pays invoice → Payment verification
+4. Payment success → User added to participants list
+5. Participant filtering → User appears in leaderboards immediately
+
+**Critical Dependencies:**
+- NWC wallet connection (RUNSTR_REWARD_NWC_URI)
+- Season pass pricing (10k sats from rewardsConfig.ts)
+- Participant storage (localStorage 'seasonPassParticipants')
+- Leaderboard filtering (all activity modes: run, walk, cycle)
+
+### **Expected Results After Fixes:**
+
+1. ✅ **Invoice Generation** - Season Pass button generates valid Lightning invoices
+2. ✅ **Modal Functionality** - X button properly closes payment modal
+3. ✅ **Participant Addition** - Successful payments add users to participants list
+4. ✅ **Leaderboard Filtering** - Only season pass participants appear in standings
+5. ✅ **Multi-Mode Support** - Season Pass available for all activity modes
+
+### **✅ FIXES COMPLETED - PAYMENT FLOW DEBUGGING:**
+
+**Phase 5 Results:** ✅ **7 CRITICAL ISSUES FIXED**
+
+1. ✅ **Import Path Error** - Fixed TypeScript compilation issue
+2. ✅ **Modal Close Button** - Users can now close modal during errors
+3. ✅ **Error State Transitions** - Modal no longer gets stuck in loading state
+4. ✅ **Error Logging** - Added comprehensive debugging information
+5. ✅ **Season Pass Button** - Now available for all activity modes (run, walk, cycle)
+6. ✅ **Title Format** - Removed "THE" from titles per branding requirements
+7. ✅ **Enhanced Error Handling** - Better error messages and recovery
+
+### **🧪 TESTING STATUS:**
+
+**Ready for Testing:**
+- Season Pass button should now appear on all activity mode screens
+- Modal X button should work even if invoice generation fails
+- Payment flow should provide better error messages
+- Titles should display as "RUNSTR SEASON 1", "WALKSTR SEASON 1", "CYCLESTR SEASON 1"
+
+**Expected Behavior:**
+1. **Button Visibility** - Season Pass button appears for all activity modes when user doesn't have pass
+2. **Modal Functionality** - X button works, errors display properly, users can retry
+3. **Invoice Generation** - Better error logging will help diagnose remaining connection issues
+4. **User Experience** - Cleaner titles, consistent branding across modes
+
+### **🔜 REMAINING WORK (Next Phases):**
+
+**Phase 1: Easy Text & UI Fixes** ✅ **COMPLETED**
+**Phase 2: Expand Season Pass to All Activity Modes** ✅ **COMPLETED**  
+**Phase 3: Fix League Standings Filtering** ⏭️ **NEXT**
+**Phase 4: Replace Map with Prize Pool Info** ⏭️ **PENDING**
+
+**Next Priority:** Test the payment flow and verify the remaining leaderboard filtering issues.
+
+---
+
 ## Bug Fix #4: LeagueMap Stuck in Loading State After RUNSTR 500 → SEASON 1 Transition
 
 **Date:** 2025-01-16  
