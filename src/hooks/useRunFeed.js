@@ -13,6 +13,7 @@ import { getEventTargetId } from '../utils/eventHelpers';
 import { useProfileCache } from '../hooks/useProfileCache.js';
 import { ensureRelays } from '../utils/relays.js';
 import { useActivityMode } from '../contexts/ActivityModeContext';
+import seasonPassService from '../services/seasonPassService';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -178,7 +179,7 @@ export const useRunFeed = (filterSource = null) => {
     setUserReposts(newUserReposts);
   }, [userLikes, userReposts]);
 
-  // Helper function to apply RUNSTR filtering to posts (same logic as in nostr.js)
+  // Helper function to apply RUNSTR filtering and Season Pass participant filtering to posts
   const applyRunstrFilter = useCallback((posts, filterSourceToUse) => {
     if (!filterSourceToUse || filterSourceToUse.toUpperCase() !== 'RUNSTR') {
       return posts; // No filtering applied
@@ -256,6 +257,16 @@ export const useRunFeed = (filterSource = null) => {
                                 hasRequiredTags.duration;
       
       const isRunstrWorkout = hasRunstrIdentification && hasRunstrStructure;
+      
+      // Phase 4: Season Pass Participant Filter
+      // Only show posts from Season Pass participants (for running mode only)
+      if (isRunstrWorkout && activityMode === 'run') {
+        const isParticipant = seasonPassService.isParticipant(event.pubkey);
+        if (!isParticipant) {
+          console.log(`[useRunFeed] Filtering out non-participant post from ${event.pubkey}`);
+          return false;
+        }
+      }
       
       // Add activity mode filter (same logic as useLeagueLeaderboard) - WITH FALLBACK
       if (isRunstrWorkout && activityMode) {

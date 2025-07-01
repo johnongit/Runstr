@@ -164,7 +164,8 @@ const checkLeaderboardRewards = async () => {
   const optInPubkeys = getOptedInUsers(); // Get the set of users who opted in
 
   if (runsYesterday.length > 0 && optInPubkeys.size > 0) {
-    const winners = computeDailyWinners(runsYesterday, optInPubkeys);
+    // Phase 4: Pass activity mode for Season Pass filtering (assume 'run' for daily rewards)
+    const winners = computeDailyWinners(runsYesterday, optInPubkeys, 3, 'run');
     if (winners.length > 0) {
       console.log(`[Scheduler] Found winners for ${yesterday}:`, winners);
       // Trigger payouts (this function is in useLeaderboard hook, ideally should be callable from here)
