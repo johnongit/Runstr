@@ -11,7 +11,7 @@ import { NDKEvent } from '@nostr-dev-kit/ndk';
  * - Provides claiming functionality
  */
 export const useBadges = () => {
-  const { publicKey: userPubkey, ndk } = useContext(NostrContext);
+  const { publicKey: userPubkey, ndk, canReadData } = useContext(NostrContext);
   const [badges, setBadges] = useState({
     levelBadges: {}, // { 1: badgeData, 5: badgeData, etc. } - CLAIMED badges
     awards: [] // Array of special badge objects - CLAIMED badges
@@ -20,7 +20,7 @@ export const useBadges = () => {
     levelBadges: {},
     awards: []
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start with loading true for initial render
   const [error, setError] = useState(null);
 
   // Parse NIP-58 Profile Badges event (kind 30008) - these are CLAIMED badges
@@ -186,19 +186,26 @@ export const useBadges = () => {
 
   // Load badge events from Nostr
   const loadBadges = useCallback(async () => {
+    // Always set proper loading state first
+    setIsLoading(true);
+    setError(null);
+
+    // If no user is authenticated, show empty badge grid (for guest users)
     if (!userPubkey) {
       setBadges({ levelBadges: {}, awards: [] });
       setUnclaimedBadges({ levelBadges: {}, awards: [] });
+      setIsLoading(false);
       return;
     }
 
-    if (!ndk) {
-      console.warn('useBadges: NDK not ready, skipping badge load');
+    // Check if we can read data from Nostr (NDK ready)
+    if (!canReadData || !ndk) {
+      console.warn('useBadges: NDK not ready, will show empty badges');
+      setBadges({ levelBadges: {}, awards: [] });
+      setUnclaimedBadges({ levelBadges: {}, awards: [] });
+      setIsLoading(false);
       return;
     }
-
-    setIsLoading(true);
-    setError(null);
 
     try {
       // 1. Fetch user's Profile Badges event (kind 30008) - CLAIMED badges
@@ -239,7 +246,7 @@ export const useBadges = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [userPubkey, ndk, parseProfileBadgesEvent, parseBadgeAwardEvents]);
+  }, [userPubkey, ndk, canReadData, parseProfileBadgesEvent, parseBadgeAwardEvents]);
 
   // Auto-reload badges periodically to catch new awards
   useEffect(() => {

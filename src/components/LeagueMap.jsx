@@ -56,9 +56,9 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
       case 'run':
         return 'THE RUNSTR SEASON 1';
       case 'walk':
-        return 'THE WALKSTR 500';
+        return 'THE WALKSTR SEASON 1';
       case 'cycle':
-        return 'THE CYCLESTR 500';
+        return 'THE CYCLESTR SEASON 1';
       default:
         return 'THE RUNSTR SEASON 1';
     }
@@ -82,6 +82,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
 
   // Calculate position along race track (0-100%)
   const calculateTrackPosition = (totalMiles) => {
+    if (!courseTotal || courseTotal <= 0) return 0; // Safety check
     return Math.min(100, (totalMiles / courseTotal) * 100);
   };
 
@@ -277,11 +278,11 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
               strokeLinecap="round"
               className="text-text-primary"
             />
-            <text x="325" y="45" fontSize="10" fill="currentColor" className="text-text-secondary">500mi</text>
+            <text x="325" y="45" fontSize="10" fill="currentColor" className="text-text-secondary">{courseTotal || 500}mi</text>
             
             {/* Mile markers */}
             {[100, 200, 300, 400].map(mile => {
-              const x = 40 + ((mile / 500) * 320);
+              const x = 40 + ((mile / (courseTotal || 500)) * 320);
               return (
                 <g key={mile}>
                   <line 
