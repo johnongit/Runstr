@@ -83,6 +83,35 @@ export class NWCWallet {
     }
   }
 
+  async makeInvoice(params) {
+    try {
+      if (!this.provider) {
+        throw new Error('Wallet not connected');
+      }
+
+      console.log('[NWCWallet] Making invoice with params:', params);
+      console.log('[NWCWallet] Provider state:', {
+        hasProvider: !!this.provider,
+        hasEnable: typeof this.provider.enable === 'function',
+        hasMakeInvoice: typeof this.provider.makeInvoice === 'function'
+      });
+
+      const response = await this.provider.makeInvoice(params);
+      
+      console.log('[NWCWallet] Invoice response:', {
+        hasResponse: !!response,
+        hasInvoice: !!response?.invoice,
+        responseKeys: response ? Object.keys(response) : 'no response',
+        invoicePreview: response?.invoice ? response.invoice.substring(0, 50) + '...' : 'no invoice'
+      });
+
+      return response;
+    } catch (error) {
+      console.error('[NWCWallet] Make invoice error:', error);
+      throw error;
+    }
+  }
+
   async generateZapInvoice(pubkey, amount = null, content = '') {
     try {
       if (!this.provider) {

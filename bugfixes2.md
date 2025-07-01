@@ -105,7 +105,7 @@ The RUNSTR Season 1 implementation has several critical payment flow issues prev
 
 ### **✅ FIXES COMPLETED - PAYMENT FLOW DEBUGGING:**
 
-**Phase 5 Results:** ✅ **7 CRITICAL ISSUES FIXED**
+**Phase 5 Results:** ✅ **10 CRITICAL ISSUES FIXED**
 
 1. ✅ **Import Path Error** - Fixed TypeScript compilation issue
 2. ✅ **Modal Close Button** - Users can now close modal during errors
@@ -114,6 +114,9 @@ The RUNSTR Season 1 implementation has several critical payment flow issues prev
 5. ✅ **Season Pass Button** - Now available for all activity modes (run, walk, cycle)
 6. ✅ **Title Format** - Removed "THE" from titles per branding requirements
 7. ✅ **Enhanced Error Handling** - Better error messages and recovery
+8. ✅ **Updated NWC URI** - Using new wallet connection with correct secret/lud16
+9. ✅ **Added makeInvoice Method** - Proper wallet abstraction instead of direct provider calls
+10. ✅ **UI Debug Panel** - Real-time debugging info visible in mobile app modal
 
 ### **🧪 TESTING STATUS:**
 
@@ -122,12 +125,19 @@ The RUNSTR Season 1 implementation has several critical payment flow issues prev
 - Modal X button should work even if invoice generation fails
 - Payment flow should provide better error messages
 - Titles should display as "RUNSTR SEASON 1", "WALKSTR SEASON 1", "CYCLESTR SEASON 1"
+- **NEW: Real-time debug panel** shows exactly what's happening during payment flow
 
 **Expected Behavior:**
 1. **Button Visibility** - Season Pass button appears for all activity modes when user doesn't have pass
 2. **Modal Functionality** - X button works, errors display properly, users can retry
-3. **Invoice Generation** - Better error logging will help diagnose remaining connection issues
+3. **Invoice Generation** - Updated NWC URI + debug panel will help identify exact failure point
 4. **User Experience** - Cleaner titles, consistent branding across modes
+5. **🔍 Debug Panel** - Click "Debug Info" in payment modal to see real-time logs
+
+**Mobile Debugging:**
+- Debug panel shows timestamped events during payment flow
+- Copy debug log button to share diagnostics
+- No need for console access - everything visible in UI
 
 ### **🔜 REMAINING WORK (Next Phases):**
 

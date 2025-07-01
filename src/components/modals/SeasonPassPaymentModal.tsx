@@ -17,6 +17,8 @@ const SeasonPassPaymentModal: React.FC<Props> = ({ open, onClose, onPaymentSucce
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'generating' | 'payment' | 'verifying' | 'success'>('generating');
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
 
   const seasonDetails = seasonPassPaymentService.getSeasonDetails();
   const participantCount = seasonPassPaymentService.getParticipantCount();
@@ -33,31 +35,54 @@ const SeasonPassPaymentModal: React.FC<Props> = ({ open, onClose, onPaymentSucce
     }
   }, [open, publicKey]);
 
+  const addDebugInfo = (info: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugInfo(prev => [...prev, `${timestamp}: ${info}`]);
+  };
+
   const generateInvoice = async () => {
     if (!publicKey) {
       setError('No public key available. Please connect your Nostr account.');
+      addDebugInfo('❌ No public key available');
       return;
     }
 
     setIsGenerating(true);
     setError(null);
     setStep('generating');
+    setDebugInfo([]); // Clear previous debug info
+    
+    addDebugInfo('🔄 Starting invoice generation...');
+    addDebugInfo(`👤 User pubkey: ${publicKey.substring(0, 16)}...`);
 
     try {
+      addDebugInfo('💰 Calling seasonPassPaymentService...');
       const result = await seasonPassPaymentService.generateSeasonPassInvoice(publicKey);
       
+      addDebugInfo(`📋 Service result: ${JSON.stringify({
+        success: result.success,
+        hasInvoice: !!result.invoice,
+        errorPreview: result.error?.substring(0, 100)
+      })}`);
+      
       if (result.success && result.invoice) {
+        addDebugInfo('✅ Invoice generated successfully');
+        addDebugInfo(`🧾 Invoice preview: ${result.invoice.substring(0, 50)}...`);
         setInvoice(result.invoice);
         setStep('payment');
       } else {
+        addDebugInfo(`❌ Invoice generation failed: ${result.error}`);
         setError(result.error || 'Failed to generate payment invoice');
         setStep('payment'); // Allow retry and modal close
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate payment invoice');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to generate payment invoice';
+      addDebugInfo(`💥 Exception thrown: ${errorMsg}`);
+      setError(errorMsg);
       setStep('payment'); // Allow retry and modal close
     } finally {
       setIsGenerating(false);
+      addDebugInfo('🏁 Invoice generation completed');
     }
   };
 
@@ -249,6 +274,39 @@ const SeasonPassPaymentModal: React.FC<Props> = ({ open, onClose, onPaymentSucce
                 >
                   Try again
                 </button>
+              )}
+            </div>
+          )}
+
+          {/* Debug Panel */}
+          {debugInfo.length > 0 && (
+            <div className="border-t border-border-secondary pt-4">
+              <button 
+                onClick={() => setShowDebug(!showDebug)}
+                className="text-xs text-text-secondary hover:text-text-primary flex items-center gap-2 mb-2"
+              >
+                <span>🔍 Debug Info ({debugInfo.length} events)</span>
+                <span className={`transform transition-transform ${showDebug ? 'rotate-180' : ''}`}>
+                  ▼
+                </span>
+              </button>
+              
+              {showDebug && (
+                <div className="bg-bg-tertiary border border-border-secondary rounded-md p-3 max-h-40 overflow-y-auto">
+                  <div className="text-xs font-mono space-y-1">
+                    {debugInfo.map((info, index) => (
+                      <div key={index} className="text-text-secondary break-all">
+                        {info}
+                      </div>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => navigator.clipboard?.writeText(debugInfo.join('\n'))}
+                    className="text-xs text-primary hover:text-primary/80 mt-2"
+                  >
+                    📋 Copy Debug Log
+                  </button>
+                </div>
               )}
             </div>
           )}
