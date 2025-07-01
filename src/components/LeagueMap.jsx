@@ -3,9 +3,12 @@ import { useLeaguePosition } from '../hooks/useLeaguePosition';
 import { useLeagueLeaderboard } from '../hooks/useLeagueLeaderboard';
 import { useProfiles } from '../hooks/useProfiles';
 import { useNostr } from '../hooks/useNostr';
+import SeasonPassPaymentModal from './modals/SeasonPassPaymentModal';
+import seasonPassPaymentService from '../services/seasonPassPaymentService';
 
 export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = null }) => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [showSeasonPassModal, setShowSeasonPassModal] = useState(false);
   
   const { publicKey } = useNostr();
   
@@ -85,6 +88,24 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   // Format distance to 1 decimal place
   const formatDistance = (distance) => {
     return Number(distance || 0).toFixed(1);
+  };
+
+  // Season Pass helpers
+  const hasSeasonPass = useMemo(() => {
+    return publicKey ? seasonPassPaymentService.hasSeasonPass(publicKey) : false;
+  }, [publicKey]);
+
+  const handleSeasonPassClick = () => {
+    if (!publicKey) {
+      alert('Please connect your Nostr account first');
+      return;
+    }
+    setShowSeasonPassModal(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    // Refresh the leaderboard to show updated content
+    refreshLeaderboard();
   };
 
   // Calculate distributed positions to prevent overlapping
@@ -202,7 +223,22 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
       {/* Linear Race Track */}
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-4">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-lg font-semibold text-text-primary">{getLeagueTitle()}</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-text-primary">{getLeagueTitle()}</h3>
+            {activityMode === 'run' && !hasSeasonPass && (
+              <button
+                onClick={handleSeasonPassClick}
+                className="px-3 py-1 bg-primary text-text-primary text-sm rounded-md font-semibold hover:bg-primary/80 transition-colors"
+              >
+                🎫 Season Pass
+              </button>
+            )}
+            {activityMode === 'run' && hasSeasonPass && (
+              <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm rounded-md font-semibold border border-green-500/30">
+                ✅ Season Member
+              </span>
+            )}
+          </div>
           <div className="text-xs text-text-secondary">
             {lastUpdated && `Updated ${new Date(lastUpdated).toLocaleTimeString()}`}
           </div>
@@ -376,6 +412,13 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
           </div>
         )}
       </div>
+
+      {/* Season Pass Payment Modal */}
+      <SeasonPassPaymentModal
+        open={showSeasonPassModal}
+        onClose={() => setShowSeasonPassModal(false)}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
     </div>
   );
 };

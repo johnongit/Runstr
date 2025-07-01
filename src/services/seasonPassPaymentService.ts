@@ -1,0 +1,201 @@
+/**
+ * Season Pass Payment Service - Handles payment generation and processing for RUNSTR Season 1
+ * 
+ * This service generates Lightning invoices for season pass purchases using the
+ * RUNSTR reward wallet, and handles payment verification.
+ */
+
+import { NWCWallet } from './nwcWallet';
+import seasonPassService from './seasonPassService';
+import { REWARDS } from '../config/rewardsConfig';
+
+// RUNSTR Reward NWC URI - same as used in rewardService.js
+const RUNSTR_REWARD_NWC_URI = "nostr+walletconnect://ba80990666ef0b6f4ba5059347beb13242921e54669e680064ca755256a1e3a6?relay=wss%3A%2F%2Frelay.coinos.io&secret=3eae13051dbc253974c03221699075010de242c76ae2aa7a9672eca0f2cb3114&lud16=TheWildHustle@coinos.io";
+
+export interface SeasonPassPaymentResult {
+  success: boolean;
+  invoice?: string;
+  error?: string;
+}
+
+export interface PaymentVerificationResult {
+  success: boolean;
+  error?: string;
+  alreadyParticipant?: boolean;
+}
+
+class SeasonPassPaymentService {
+  private wallet: NWCWallet | null = null;
+  private isConnecting = false;
+  private connectionPromise: Promise<boolean> | null = null;
+
+  /**
+   * Ensure the RUNSTR reward wallet is connected
+   */
+  private async ensureWalletConnected(): Promise<boolean> {
+    if (this.wallet?.provider) {
+      return true;
+    }
+
+    if (this.isConnecting && this.connectionPromise) {
+      return this.connectionPromise;
+    }
+
+    this.isConnecting = true;
+    this.connectionPromise = this.connectWallet();
+    
+    try {
+      const result = await this.connectionPromise;
+      return result;
+    } finally {
+      this.isConnecting = false;
+    }
+  }
+
+  /**
+   * Connect to the RUNSTR reward wallet
+   */
+  private async connectWallet(): Promise<boolean> {
+    try {
+      console.log('[SeasonPassPayment] Connecting to RUNSTR reward wallet...');
+      this.wallet = new NWCWallet();
+      await this.wallet.connect(RUNSTR_REWARD_NWC_URI);
+      console.log('[SeasonPassPayment] RUNSTR reward wallet connected.');
+      return true;
+    } catch (error) {
+      console.error('[SeasonPassPayment] Failed to connect to RUNSTR reward wallet:', error);
+      this.wallet = null;
+      throw new Error('Failed to connect to payment wallet. Please try again.');
+    }
+  }
+
+  /**
+   * Generate a Lightning invoice for season pass purchase
+   * @param userPubkey The user's public key (for tracking)
+   * @returns Payment result with invoice or error
+   */
+  async generateSeasonPassInvoice(userPubkey: string): Promise<SeasonPassPaymentResult> {
+    try {
+      // Check if user is already a participant
+      if (seasonPassService.isParticipant(userPubkey)) {
+        return {
+          success: false,
+          error: 'You already have a Season Pass!'
+        };
+      }
+
+      // Ensure wallet is connected
+      await this.ensureWalletConnected();
+
+      if (!this.wallet?.provider) {
+        throw new Error('Wallet connection failed');
+      }
+
+      const { passPrice, title } = REWARDS.SEASON_1;
+      const memo = `${title} Season Pass - ${passPrice} sats`;
+
+      console.log(`[SeasonPassPayment] Generating invoice for ${passPrice} sats for user ${userPubkey}`);
+
+      // Generate invoice using the wallet provider
+      const invoiceResult = await this.wallet.provider.makeInvoice({
+        amount: passPrice,
+        defaultMemo: memo
+      });
+
+      if (!invoiceResult || !invoiceResult.invoice) {
+        throw new Error('Failed to generate invoice');
+      }
+
+      console.log('[SeasonPassPayment] Successfully generated season pass invoice');
+
+      return {
+        success: true,
+        invoice: invoiceResult.invoice
+      };
+
+    } catch (error) {
+      console.error('[SeasonPassPayment] Error generating season pass invoice:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate payment invoice'
+      };
+    }
+  }
+
+  /**
+   * Verify payment and add user to participants list
+   * @param userPubkey The user's public key
+   * @param paymentHash Optional payment hash for verification (if available)
+   * @returns Verification result
+   */
+  async verifyPaymentAndAddParticipant(userPubkey: string, paymentHash?: string): Promise<PaymentVerificationResult> {
+    try {
+      // Check if user is already a participant
+      if (seasonPassService.isParticipant(userPubkey)) {
+        return {
+          success: true,
+          alreadyParticipant: true
+        };
+      }
+
+      // Add user to participants list
+      // Note: In a production system, you'd verify the payment hash against the Lightning network
+      // For now, we trust that the user clicked "I have paid" after actually paying
+      seasonPassService.addParticipant(userPubkey);
+
+      console.log(`[SeasonPassPayment] Added user ${userPubkey} to Season Pass participants`);
+
+      return {
+        success: true
+      };
+
+    } catch (error) {
+      console.error('[SeasonPassPayment] Error verifying payment:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to verify payment'
+      };
+    }
+  }
+
+  /**
+   * Check if a user already has a season pass
+   * @param userPubkey The user's public key
+   * @returns true if user has season pass, false otherwise
+   */
+  hasSeasonPass(userPubkey: string): boolean {
+    return seasonPassService.isParticipant(userPubkey);
+  }
+
+  /**
+   * Get current season pass details
+   */
+  getSeasonDetails() {
+    return REWARDS.SEASON_1;
+  }
+
+  /**
+   * Get participant count for display
+   */
+  getParticipantCount(): number {
+    return seasonPassService.getParticipantCount();
+  }
+
+  /**
+   * Cleanup wallet connection
+   */
+  async disconnect(): Promise<void> {
+    try {
+      if (this.wallet) {
+        await this.wallet.disconnect();
+        this.wallet = null;
+      }
+    } catch (error) {
+      console.error('[SeasonPassPayment] Error disconnecting wallet:', error);
+    }
+  }
+}
+
+// Export singleton instance
+const seasonPassPaymentService = new SeasonPassPaymentService();
+export default seasonPassPaymentService; 
