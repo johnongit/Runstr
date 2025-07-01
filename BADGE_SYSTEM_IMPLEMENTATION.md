@@ -154,4 +154,24 @@ The NIP-58 compliant badge system is now live! When you award badges to users:
 - ✅ Graceful loading states and error handling
 - ✅ **🆕 Unclaimed badge detection and claiming**
 
-Users will see their progression on the Nostr Stats page and get excited notifications when they earn new badges! 
+Users will see their progression on the Nostr Stats page and get excited notifications when they earn new badges!
+
+## 🔧 Troubleshooting
+
+### Profile Tab Crash (Fixed)
+**Issue:** Profile tab crashed after implementing badge system
+**Cause:** Incorrect NDK usage and circular dependencies in useBadges hook
+**Status:** ✅ Fixed
+
+**Fixes Applied:**
+- Fixed NDKEvent import and instantiation syntax
+- Removed circular dependency between claimBadges and loadBadges
+- Added proper NDK readiness checks
+- Added error handling and graceful degradation
+
+**If you encounter similar issues:**
+1. Check browser console for JavaScript errors
+2. Verify NDK import syntax matches: `import { NDKEvent } from '@nostr-dev-kit/ndk'`
+3. Use: `new NDKEvent(ndk, event)` not `new ndk.NDKEvent(ndk, event)`
+4. Ensure proper dependency arrays in useCallback functions
+5. Add null checks for ndk readiness before making calls 

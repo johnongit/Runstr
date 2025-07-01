@@ -4,6 +4,8 @@
  * without sacrificing existing rich functionality
  */
 
+import seasonPassService from '../services/seasonPassService';
+
 /**
  * Lightweight post processor for initial fast display
  * Creates minimal post objects with placeholders for supplementary data
@@ -86,6 +88,22 @@ export const lightweightProcessPosts = (posts, filterSource = null) => {
                                 hasRequiredTags.duration;
       
       const isRunstrWorkout = hasRunstrIdentification && hasRunstrStructure;
+      
+      // Phase 4: Season Pass Participant Filter for running mode only
+      if (isRunstrWorkout) {
+        // Get current activity mode from exercise tag
+        const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
+        const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+        
+        // Only apply Season Pass filtering for running activities
+        if (eventActivityType && ['run', 'running', 'jog', 'jogging'].includes(eventActivityType)) {
+          const isParticipant = seasonPassService.isParticipant(event.pubkey);
+          if (!isParticipant) {
+            console.log(`[feedProcessor] Filtering out non-participant post from ${event.pubkey}`);
+            return false;
+          }
+        }
+      }
       
       // Debug logging for rejected events in lightweight processor
       if (!isRunstrWorkout && (hasRequiredTags.source || hasRequiredTags.client)) {

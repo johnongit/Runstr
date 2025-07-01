@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
 import { fetchEvents } from '../utils/nostr';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 
 /**
  * Hook: useBadges (NIP-58 Compliant)
@@ -170,23 +171,29 @@ export const useBadges = () => {
       };
 
       // Use NDK to publish the event
-      const ndkEvent = new ndk.NDKEvent(ndk, event);
+      const ndkEvent = new NDKEvent(ndk, event);
       await ndkEvent.publish();
 
-      // Reload badges to reflect the changes
-      await loadBadges();
+      // Wait a moment for event to propagate, then reload will happen automatically
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       return true;
     } catch (err) {
       console.error('Error claiming badges:', err);
       throw err;
     }
-  }, [userPubkey, ndk, badges, loadBadges]);
+  }, [userPubkey, ndk, badges]);
 
   // Load badge events from Nostr
   const loadBadges = useCallback(async () => {
     if (!userPubkey) {
-      setError('No user pubkey');
+      setBadges({ levelBadges: {}, awards: [] });
+      setUnclaimedBadges({ levelBadges: {}, awards: [] });
+      return;
+    }
+
+    if (!ndk) {
+      console.warn('useBadges: NDK not ready, skipping badge load');
       return;
     }
 
@@ -232,10 +239,16 @@ export const useBadges = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [userPubkey, parseProfileBadgesEvent, parseBadgeAwardEvents]);
+  }, [userPubkey, ndk, parseProfileBadgesEvent, parseBadgeAwardEvents]);
 
+  // Auto-reload badges periodically to catch new awards
   useEffect(() => {
     loadBadges();
+    
+    // Set up periodic reload to catch new badge awards
+    const interval = setInterval(loadBadges, 60000); // Check every minute
+    
+    return () => clearInterval(interval);
   }, [loadBadges]);
 
   return { 

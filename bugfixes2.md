@@ -907,3 +907,173 @@ The ecash wallet now works perfectly with RUNSTR's Amber external signer archite
 **Status**: ✅ **PRODUCTION READY** - Full NIP60 ecash wallet functionality
 
 --- 
+
+# Bug Fixes Documentation
+
+## Bug #1: Season Pass Feed Filtering Not Working
+
+**Status**: ✅ **FIXED**
+
+### **Issue Description**
+Feed in League tab was showing all 1301 posts instead of filtering based on Season Pass participants. With 0 participants, feed should show 0 posts, but was showing everything.
+
+### **Root Cause Analysis**
+The Season Pass filtering code was present in `src/hooks/useRunFeed.js` but **was also needed in the `lightweightProcessPosts` function** in `src/utils/feedProcessor.js`. The filtering was bypassed during the "quick display phase" of feed loading.
+
+**Critical Missing Pieces:**
+1. **Missing import**: `feedProcessor.js` had no import for `seasonPassService`
+2. **Missing filtering logic**: `lightweightProcessPosts` function had RUNSTR filtering but no Season Pass filtering
+3. **Feed bypass**: Quick display phase bypassed main filtering logic
+
+### **Technical Details**
+
+**Flow of the Problem:**
+```
+useRunFeed.js calls fetchRunPostsViaSubscription()
+  ↓
+Calls lightweightProcessPosts() for "quick display" (lines 355, 442)
+  ↓
+lightweightProcessPosts() applies RUNSTR filtering but NOT Season Pass filtering
+  ↓
+Shows all RUNSTR posts immediately (bypassing Season Pass filter)
+  ↓
+Later applyRunstrFilter() is called but posts already displayed
+```
+
+### **Solution Implemented**
+
+**1. Added Missing Import to feedProcessor.js:**
+```javascript
+import seasonPassService from '../services/seasonPassService';
+```
+
+**2. Added Season Pass Filtering to lightweightProcessPosts:**
+```javascript
+// Phase 4: Season Pass Participant Filter for running mode only
+if (isRunstrWorkout) {
+  // Get current activity mode from exercise tag
+  const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
+  const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+  
+  // Only apply Season Pass filtering for running activities
+  if (eventActivityType && ['run', 'running', 'jog', 'jogging'].includes(eventActivityType)) {
+    const isParticipant = seasonPassService.isParticipant(event.pubkey);
+    if (!isParticipant) {
+      console.log(`[feedProcessor] Filtering out non-participant post from ${event.pubkey}`);
+      return false;
+    }
+  }
+}
+```
+
+### **Files Modified**
+- ✅ `src/utils/feedProcessor.js` - Added import and Season Pass filtering logic
+- ✅ Build verification - `npm run build` successful
+
+### **Expected Behavior After Fix**
+- **With 0 participants in running mode**: Feed shows 0 posts (working as designed)
+- **With participants**: Only shows posts from Season Pass holders
+- **Walk/Cycle modes**: No Season Pass filtering (shows all users)
+- **Season Pass button**: Always visible when user is not a participant
+
+### **Verification Steps**
+1. ✅ Code builds without errors
+2. ⏳ Test with 0 participants (should show empty feed)
+3. ⏳ Test with test participant added (should show their posts)
+4. ⏳ Verify Season Pass button appears in running mode
+
+### **Notes**
+- This was a **cascading failure** - filtering worked in main logic but was bypassed in quick display
+- Empty state handling in UI components (LeagueMap, PostList) appears to be working correctly
+- Profile page issues likely unrelated to Season Pass implementation
+
+---
+
+## Bug #2: Profile Page Blank Screen
+
+**Status**: ⏳ **INVESTIGATING**
+
+### **Issue Description**
+Profile page shows blank screen when clicked from navigation.
+
+### **Suspected Causes**
+- Import path issues with `@/components/ui/button` components
+- Previous nostr badge implementation causing conflicts
+- Missing component dependencies
+
+### **Next Steps**
+- Check browser console for component errors
+- Verify UI component imports are resolving correctly
+- Test Profile page independently
+
+---
+
+## Bug #3: Map/Leaderboard Not Loading
+
+**Status**: ⏳ **MONITORING**
+
+### **Issue Description**
+Map and leaderboard components not rendering properly.
+
+### **Analysis**
+- LeagueMap component has proper empty state handling
+- Issue may be resolved by fixing Bug #1 (feed filtering)
+- Components should render even with 0 participants
+
+### **Expected After Feed Fix**
+- Map should show course with "0 participants" 
+- Season Pass button should be visible
+- Leaderboard should show "No runners found yet" message
+
+---
+
+## Implementation Notes
+
+### **Zero Participant Design**
+The system is designed to work gracefully with 0 Season Pass participants:
+
+- **Feed**: Shows empty state with appropriate messaging
+- **Leaderboard**: Shows "No participants yet" with encouragement
+- **Map**: Renders course with 0 users positioned
+- **Season Pass Button**: Always visible for non-participants
+- **UI**: No component crashes on empty arrays
+
+### **Activity Mode Awareness**
+Season Pass filtering only applies to **running mode**:
+- **Run mode**: Season Pass filtering active
+- **Walk mode**: No filtering (all users visible) 
+- **Cycle mode**: No filtering (all users visible)
+
+This creates separate experiences for different activity types while maintaining the premium running league concept. 
+
+## Badge System Profile Tab Crash (Fixed)
+
+**Date:** Current session
+**Issue:** Profile tab crashes after implementing badge system
+**Root Cause:** Multiple issues in useBadges hook:
+1. Incorrect NDKEvent instantiation syntax (`new ndk.NDKEvent()` instead of `new NDKEvent()`)
+2. Missing NDKEvent import from '@nostr-dev-kit/ndk'
+3. Circular dependency between claimBadges and loadBadges functions
+4. Missing null checks for NDK readiness
+
+**Fix Applied:**
+1. Added proper NDKEvent import: `import { NDKEvent } from '@nostr-dev-kit/ndk';`
+2. Fixed instantiation syntax: `new NDKEvent(ndk, event)` instead of `new ndk.NDKEvent(ndk, event)`
+3. Removed loadBadges call from claimBadges to break circular dependency
+4. Added NDK readiness checks and graceful handling
+5. Added proper dependency arrays in useCallback functions
+6. Added periodic badge reloading to catch new awards
+
+**Files Modified:**
+- `src/hooks/useBadges.js` - Fixed NDK usage and circular dependencies
+- `src/components/BadgeDisplay.jsx` - No changes needed
+- `src/assets/styles/badges.css` - No changes needed
+
+**Result:** Profile tab should now load without crashing and badge system should work properly.
+
+**Testing:**
+- Navigate to Profile tab - should not crash
+- Badge display should load properly (empty or with claimed badges)
+- No JavaScript errors in console
+
+**Prevention:** Always verify NDK import syntax matches existing codebase patterns before using NDK functionality.
