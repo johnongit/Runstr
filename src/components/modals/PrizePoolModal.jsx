@@ -12,9 +12,14 @@ const PrizePoolModal = ({ open, onClose }) => {
   const prizeStructure = [
     { place: '1st Place', amount: '30,000', badge: '🥇 1st Place Badge' },
     { place: '2nd Place', amount: '20,000', badge: '🥈 2nd Place Badge' },
-    { place: '3rd Place', amount: '15,000', badge: '🥉 3rd Place Badge' },
-    { place: 'Honorable Mention', amount: '5,000', badge: '🎖️ Honorable Mention Badge' }
+    { place: '3rd Place', amount: '15,000', badge: '🥉 3rd Place Badge' }
   ];
+
+  const honorableMention = {
+    place: 'Honorable Mention',
+    amount: '5,000',
+    badge: '🎖️ Honorable Mention Badge'
+  };
 
   const fundAllocation = [
     { description: 'OpenSats Donation (per participant)', amount: '2,000', icon: '💝' },
@@ -70,15 +75,27 @@ const PrizePoolModal = ({ open, onClose }) => {
                   </div>
                 </div>
               ))}
+              
+              {/* Honorable Mention - Single Award */}
+              <div className="flex items-center justify-between p-4 bg-bg-tertiary rounded-lg border border-border-secondary border-dashed">
+                <div className="flex items-center gap-3">
+                  <div className="font-medium text-text-primary">{honorableMention.place}</div>
+                  <div className="text-text-secondary text-sm">{honorableMention.badge}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-text-primary">{honorableMention.amount} sats</div>
+                  <div className="text-xs text-text-secondary">single award (all modes)</div>
+                </div>
+              </div>
             </div>
 
             {/* Total Prize Pool */}
             <div className="mt-4 p-4 bg-primary/10 rounded-lg border border-primary/30">
               <div className="flex items-center justify-between">
                 <div className="font-semibold text-text-primary">Total Prize Pool</div>
-                <div className="font-bold text-xl text-primary">210,000 sats</div>
+                <div className="font-bold text-xl text-primary">200,000 sats</div>
               </div>
-              <div className="text-xs text-text-secondary mt-1">70,000 sats × 3 activity modes</div>
+              <div className="text-xs text-text-secondary mt-1">65,000 sats × 3 activity modes + 5,000 honorable mention</div>
             </div>
           </div>
 

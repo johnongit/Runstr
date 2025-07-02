@@ -14,8 +14,7 @@ const PrizePoolModal: React.FC<Props> = ({ open, onClose }) => {
       prizes: [
         { place: '1st', amount: '30,000', color: 'text-amber-400' },
         { place: '2nd', amount: '20,000', color: 'text-gray-300' },
-        { place: '3rd', amount: '15,000', color: 'text-orange-400' },
-        { place: 'Hon.', amount: '5,000', color: 'text-blue-400' }
+        { place: '3rd', amount: '15,000', color: 'text-orange-400' }
       ]
     },
     {
@@ -24,8 +23,7 @@ const PrizePoolModal: React.FC<Props> = ({ open, onClose }) => {
       prizes: [
         { place: '1st', amount: '30,000', color: 'text-amber-400' },
         { place: '2nd', amount: '20,000', color: 'text-gray-300' },
-        { place: '3rd', amount: '15,000', color: 'text-orange-400' },
-        { place: 'Hon.', amount: '5,000', color: 'text-blue-400' }
+        { place: '3rd', amount: '15,000', color: 'text-orange-400' }
       ]
     },
     {
@@ -34,8 +32,7 @@ const PrizePoolModal: React.FC<Props> = ({ open, onClose }) => {
       prizes: [
         { place: '1st', amount: '30,000', color: 'text-amber-400' },
         { place: '2nd', amount: '20,000', color: 'text-gray-300' },
-        { place: '3rd', amount: '15,000', color: 'text-orange-400' },
-        { place: 'Hon.', amount: '5,000', color: 'text-blue-400' }
+        { place: '3rd', amount: '15,000', color: 'text-orange-400' }
       ]
     }
   ];
@@ -67,7 +64,7 @@ const PrizePoolModal: React.FC<Props> = ({ open, onClose }) => {
             </div>
             <div className="text-amber-300 font-semibold">TOTAL SATS</div>
             <div className="text-xs text-text-secondary mt-2">
-              Distributed across all activity modes
+              195k across activity modes + 5k honorable mention
             </div>
           </div>
 
@@ -93,7 +90,7 @@ const PrizePoolModal: React.FC<Props> = ({ open, onClose }) => {
                   <span className="font-semibold text-text-primary">{activity.mode}</span>
                 </div>
                 
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   {activity.prizes.map((prize) => (
                     <div key={prize.place} className="text-center">
                       <div className={`font-semibold ${prize.color} text-sm`}>
@@ -107,12 +104,32 @@ const PrizePoolModal: React.FC<Props> = ({ open, onClose }) => {
                 </div>
               </div>
             ))}
+
+            {/* Special Award - Honorable Mention */}
+            <div className="bg-bg-tertiary rounded-lg p-4 border border-border-secondary border-dashed">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">🎖️</span>
+                <span className="font-semibold text-text-primary">Special Award</span>
+              </div>
+              
+              <div className="text-center">
+                <div className="font-semibold text-blue-400 text-sm">
+                  Honorable Mention
+                </div>
+                <div className="text-xs text-text-secondary">
+                  5,000 sats
+                </div>
+                <div className="text-xs text-text-secondary mt-1">
+                  Single award across all modes
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Additional Info */}
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
             <div className="text-sm text-blue-400">
-              <strong>💡 Pro Tip:</strong> Honorable mention prizes are awarded to participants who show exceptional improvement or consistency, as determined by the RUNSTR team.
+              <strong>💡 Pro Tip:</strong> The honorable mention prize is awarded to one participant across all activity modes who shows exceptional improvement or consistency, as determined by the RUNSTR team.
             </div>
           </div>
 

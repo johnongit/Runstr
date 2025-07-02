@@ -89,6 +89,15 @@ class RunDataService {
       // Notify listeners
       this.notifyListeners(updatedRuns);
       
+      // Dispatch a custom event for components that don't use the listener pattern
+      const event = new CustomEvent('runCompleted', { 
+        detail: { 
+          run: newRun,
+          allRuns: updatedRuns
+        } 
+      });
+      document.dispatchEvent(event);
+      
       // --- STREAK / REWARD UPDATE -------------------------------------------------
       try {
         const minDistance = newRun.unit === 'km' ? MIN_STREAK_DISTANCE.km : MIN_STREAK_DISTANCE.mi;
@@ -128,6 +137,16 @@ class RunDataService {
       
       // Notify listeners
       this.notifyListeners(runs);
+      
+      // Dispatch a custom event for components that don't use the listener pattern
+      const event = new CustomEvent('runHistoryUpdated', { 
+        detail: { 
+          runId,
+          updatedRun: runs[index],
+          allRuns: runs
+        } 
+      });
+      document.dispatchEvent(event);
       
       return true;
     } catch (error) {

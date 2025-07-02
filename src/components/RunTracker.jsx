@@ -105,10 +105,33 @@ export const RunTracker = () => {
       loadRecentRun();
     };
     
+    // Listen for run history updated events
+    const handleRunHistoryUpdate = () => {
+      console.log("Run history update event received");
+      loadRecentRun();
+    };
+    
+    // Listen for run deleted events
+    const handleRunDeleted = (event) => {
+      console.log("Run deleted event received", event.detail);
+      // If we have the updated runs in the event detail, use them directly
+      if (event.detail && event.detail.remainingRuns) {
+        const sortedRuns = [...event.detail.remainingRuns].sort((a, b) => new Date(b.date) - new Date(a.date));
+        setRecentRun(sortedRuns.length > 0 ? sortedRuns[0] : null);
+      } else {
+        // Otherwise reload from storage
+        loadRecentRun();
+      }
+    };
+    
     document.addEventListener('runCompleted', handleRunCompleted);
+    document.addEventListener('runHistoryUpdated', handleRunHistoryUpdate);
+    document.addEventListener('runDeleted', handleRunDeleted);
     
     return () => {
       document.removeEventListener('runCompleted', handleRunCompleted);
+      document.removeEventListener('runHistoryUpdated', handleRunHistoryUpdate);
+      document.removeEventListener('runDeleted', handleRunDeleted);
     };
   }, []);
 

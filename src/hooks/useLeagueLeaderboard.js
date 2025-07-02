@@ -3,11 +3,13 @@ import { NostrContext } from '../contexts/NostrContext';
 import { fetchEvents } from '../utils/nostr';
 import { useActivityMode } from '../contexts/ActivityModeContext';
 import seasonPassService from '../services/seasonPassService';
+import { REWARDS } from '../config/rewardsConfig';
 
 /**
  * Hook: useLeagueLeaderboard
  * Fetches Kind 1301 workout records from Season Pass participants only and creates a comprehensive leaderboard
  * Filters by current activity mode (run/walk/cycle) for activity-specific leagues
+ * Only counts runs during the competition period (July 11 - October 11, 2025)
  * Uses localStorage caching (30 min expiry) and lazy loading for better UX
  * 
  * @returns {Object} { leaderboard, isLoading, error, refresh, lastUpdated, activityMode, courseTotal }
@@ -23,8 +25,12 @@ export const useLeagueLeaderboard = () => {
   // Constants
   const COURSE_TOTAL_MILES = 500; // Updated to 500 miles
   const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes cache
-  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}`; // Activity-specific cache
+  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v2`; // Activity-specific cache with competition dates
   const MAX_EVENTS = 5000; // Limit to prevent overwhelming queries
+  
+  // Competition date range
+  const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
 
   /**
    * Load cached leaderboard data
@@ -126,6 +132,7 @@ export const useLeagueLeaderboard = () => {
 
   /**
    * Process events into user statistics
+   * Only counts runs during the competition period
    */
   const processEvents = useCallback((events) => {
     const userStats = {};
@@ -134,6 +141,12 @@ export const useLeagueLeaderboard = () => {
     // Filter duplicates and process events
     events.forEach(event => {
       if (!event.pubkey || isDuplicateEvent(event, processedEvents)) return;
+      
+      // Filter by competition date range - only count runs during the competition
+      if (event.created_at < COMPETITION_START || event.created_at > COMPETITION_END) {
+        console.log(`[useLeagueLeaderboard] Skipping event outside competition period: ${new Date(event.created_at * 1000).toISOString()}`);
+        return; // Skip events outside competition period
+      }
       
       // Filter by current activity mode using exercise tag
       const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
@@ -199,7 +212,7 @@ export const useLeagueLeaderboard = () => {
       .map((user, index) => ({ ...user, rank: index + 1 }));
 
     return leaderboardData;
-  }, [extractDistance, isDuplicateEvent, COURSE_TOTAL_MILES, activityMode]);
+  }, [extractDistance, isDuplicateEvent, COURSE_TOTAL_MILES, activityMode, COMPETITION_START, COMPETITION_END]);
 
   /**
    * Fetch fresh leaderboard data from Season Pass participants only
@@ -228,14 +241,15 @@ export const useLeagueLeaderboard = () => {
         return;
       }
 
-      // **Only fetch events from Season Pass participants**
-      console.log(`[useLeagueLeaderboard] Fetching events from ${participants.length} participants for ${activityMode} mode`);
+      // **Only fetch events from Season Pass participants during competition period**
+      console.log(`[useLeagueLeaderboard] Fetching events from ${participants.length} participants for ${activityMode} mode during competition period`);
       
       const events = await fetchEvents(ndk, {
         kinds: [1301],
         authors: participants, // Only query Season Pass participants
         limit: MAX_EVENTS,
-        since: Math.floor(Date.now() / 1000) - (90 * 24 * 60 * 60) // Last 90 days
+        since: COMPETITION_START, // Competition start date
+        until: COMPETITION_END   // Competition end date
       });
 
       console.log(`[useLeagueLeaderboard] Fetched ${events.length} events from ${participants.length} participants`);
