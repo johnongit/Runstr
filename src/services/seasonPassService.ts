@@ -6,25 +6,32 @@
  * will appear in feeds and leaderboards.
  * 
  * Storage: Uses localStorage with key 'seasonPassParticipants'
- * Data Format: Array of pubkey strings
+ * Data Format: Array of {pubkey: string, paymentDate: string} objects
  */
 
 const STORAGE_KEY = 'seasonPassParticipants';
 
+export interface SeasonPassParticipant {
+  pubkey: string;
+  paymentDate: string; // ISO 8601 date string
+}
+
 export interface SeasonPassService {
   isParticipant(pubkey: string): boolean;
-  addParticipant(pubkey: string): void;
+  addParticipant(pubkey: string, paymentDate?: string): void;
   getParticipants(): string[];
+  getParticipantsWithDates(): SeasonPassParticipant[];
+  getParticipantPaymentDate(pubkey: string): string | null;
   removeParticipant(pubkey: string): void;
   clearAllParticipants(): void;
   getParticipantCount(): number;
 }
 
 /**
- * Get the current list of participants from localStorage
- * @returns Array of pubkey strings
+ * Get the current list of participants from localStorage with backward compatibility
+ * @returns Array of SeasonPassParticipant objects
  */
-const getStoredParticipants = (): string[] => {
+const getStoredParticipants = (): SeasonPassParticipant[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
@@ -33,14 +40,34 @@ const getStoredParticipants = (): string[] => {
     
     const parsed = JSON.parse(stored);
     
-    // Validate that it's an array of strings
+    // Validate that it's an array
     if (!Array.isArray(parsed)) {
       console.warn('Season pass participants data is corrupted, resetting to empty array');
       return [];
     }
     
-    // Filter out any non-string values
-    return parsed.filter(item => typeof item === 'string' && item.trim().length > 0);
+    // Handle backward compatibility - convert old string format to new object format
+    const participants: SeasonPassParticipant[] = [];
+    
+    for (const item of parsed) {
+      if (typeof item === 'string' && item.trim().length > 0) {
+        // Old format: just pubkey string, use default date
+        participants.push({
+          pubkey: item.trim(),
+          paymentDate: '2025-07-01T00:00:00Z' // Default date for existing participants
+        });
+      } else if (typeof item === 'object' && item !== null && 
+                 typeof item.pubkey === 'string' && 
+                 typeof item.paymentDate === 'string') {
+        // New format: object with pubkey and paymentDate
+        participants.push({
+          pubkey: item.pubkey.trim(),
+          paymentDate: item.paymentDate
+        });
+      }
+    }
+    
+    return participants;
   } catch (error) {
     console.error('Error reading season pass participants from localStorage:', error);
     return [];
@@ -49,13 +76,21 @@ const getStoredParticipants = (): string[] => {
 
 /**
  * Save the participants list to localStorage
- * @param participants Array of pubkey strings
+ * @param participants Array of SeasonPassParticipant objects
  */
-const saveParticipants = (participants: string[]): void => {
+const saveParticipants = (participants: SeasonPassParticipant[]): void => {
   try {
-    // Remove duplicates and filter out empty strings
-    const cleanParticipants = [...new Set(participants)]
-      .filter(pubkey => typeof pubkey === 'string' && pubkey.trim().length > 0);
+    // Remove duplicates by pubkey and filter out invalid entries
+    const cleanParticipants = participants
+      .filter(p => p.pubkey && typeof p.pubkey === 'string' && p.pubkey.trim().length > 0)
+      .filter(p => p.paymentDate && typeof p.paymentDate === 'string')
+      .reduce((acc, current) => {
+        const existing = acc.find(p => p.pubkey === current.pubkey);
+        if (!existing) {
+          acc.push(current);
+        }
+        return acc;
+      }, [] as SeasonPassParticipant[]);
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanParticipants));
   } catch (error) {
@@ -75,14 +110,15 @@ const isParticipant = (pubkey: string): boolean => {
   }
   
   const participants = getStoredParticipants();
-  return participants.includes(pubkey.trim());
+  return participants.some(p => p.pubkey === pubkey.trim());
 };
 
 /**
  * Add a pubkey to the participants list
  * @param pubkey The public key to add
+ * @param paymentDate Optional payment date (ISO 8601 string), defaults to current date
  */
-const addParticipant = (pubkey: string): void => {
+const addParticipant = (pubkey: string, paymentDate?: string): void => {
   if (!pubkey || typeof pubkey !== 'string') {
     throw new Error('Invalid pubkey: must be a non-empty string');
   }
@@ -95,15 +131,20 @@ const addParticipant = (pubkey: string): void => {
   const participants = getStoredParticipants();
   
   // Don't add if already exists
-  if (participants.includes(trimmedPubkey)) {
+  if (participants.some(p => p.pubkey === trimmedPubkey)) {
     console.log(`Pubkey ${trimmedPubkey} is already a season pass participant`);
     return;
   }
   
-  participants.push(trimmedPubkey);
+  const newParticipant: SeasonPassParticipant = {
+    pubkey: trimmedPubkey,
+    paymentDate: paymentDate || new Date().toISOString()
+  };
+  
+  participants.push(newParticipant);
   saveParticipants(participants);
   
-  console.log(`Added new season pass participant: ${trimmedPubkey}`);
+  console.log(`Added new season pass participant: ${trimmedPubkey} (payment date: ${newParticipant.paymentDate})`);
 };
 
 /**
@@ -118,7 +159,7 @@ const removeParticipant = (pubkey: string): void => {
   
   const trimmedPubkey = pubkey.trim();
   const participants = getStoredParticipants();
-  const filteredParticipants = participants.filter(p => p !== trimmedPubkey);
+  const filteredParticipants = participants.filter(p => p.pubkey !== trimmedPubkey);
   
   if (participants.length === filteredParticipants.length) {
     console.log(`Pubkey ${trimmedPubkey} was not in the participants list`);
@@ -130,11 +171,35 @@ const removeParticipant = (pubkey: string): void => {
 };
 
 /**
- * Get the full list of participants
+ * Get the full list of participants (pubkeys only for backward compatibility)
  * @returns Array of pubkey strings
  */
 const getParticipants = (): string[] => {
+  return getStoredParticipants().map(p => p.pubkey);
+};
+
+/**
+ * Get the full list of participants with payment dates
+ * @returns Array of SeasonPassParticipant objects
+ */
+const getParticipantsWithDates = (): SeasonPassParticipant[] => {
   return getStoredParticipants();
+};
+
+/**
+ * Get the payment date for a specific participant
+ * @param pubkey The public key to look up
+ * @returns Payment date string or null if not found
+ */
+const getParticipantPaymentDate = (pubkey: string): string | null => {
+  if (!pubkey || typeof pubkey !== 'string') {
+    return null;
+  }
+  
+  const participants = getStoredParticipants();
+  const participant = participants.find(p => p.pubkey === pubkey.trim());
+  
+  return participant ? participant.paymentDate : null;
 };
 
 /**
@@ -163,6 +228,8 @@ const seasonPassService: SeasonPassService = {
   isParticipant,
   addParticipant,
   getParticipants,
+  getParticipantsWithDates,
+  getParticipantPaymentDate,
   removeParticipant,
   clearAllParticipants,
   getParticipantCount
@@ -175,6 +242,8 @@ export {
   isParticipant,
   addParticipant,
   getParticipants,
+  getParticipantsWithDates,
+  getParticipantPaymentDate,
   removeParticipant,
   clearAllParticipants,
   getParticipantCount,
