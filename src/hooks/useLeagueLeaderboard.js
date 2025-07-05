@@ -9,7 +9,7 @@ import { REWARDS } from '../config/rewardsConfig';
  * Hook: useLeagueLeaderboard
  * Fetches Kind 1301 workout records from Season Pass participants only and creates a comprehensive leaderboard
  * Filters by current activity mode (run/walk/cycle) for activity-specific leagues
- * Only counts runs during the competition period (July 11 - October 9, 2025)
+ * Only counts runs during the competition period (July 11 - October 11, 2025)
  * Uses localStorage caching (30 min expiry) and lazy loading for better UX
  * 
  * @returns {Object} { leaderboard, isLoading, error, refresh, lastUpdated, activityMode, courseTotal }
@@ -28,9 +28,9 @@ export const useLeagueLeaderboard = () => {
   const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v2`; // Activity-specific cache with competition dates
   const MAX_EVENTS = 5000; // Limit to prevent overwhelming queries
   
-  // Competition period: July 11, 2025 to October 9, 2025 (90 days)
-  const COMPETITION_START = Math.floor(new Date('2025-07-11T00:00:00Z').getTime() / 1000);
-  const COMPETITION_END = Math.floor(new Date('2025-10-09T23:59:59Z').getTime() / 1000);
+  // Competition date range
+  const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
 
   /**
    * Load cached leaderboard data
@@ -132,39 +132,15 @@ export const useLeagueLeaderboard = () => {
 
   /**
    * Process events into user statistics
-   * PARTICIPANT-DRIVEN: Shows ALL Season Pass participants, even those with 0 runs
-   * Only counts runs during the competition period (July 11 - October 9, 2025)
+   * Only counts runs during the competition period
    */
   const processEvents = useCallback((events) => {
-    // **Step 1: Initialize ALL Season Pass participants with 0 stats**
-    const participants = seasonPassService.getParticipants();
     const userStats = {};
-    
-    // Initialize all participants with default stats
-    participants.forEach(pubkey => {
-      userStats[pubkey] = {
-        pubkey: pubkey,
-        totalMiles: 0,
-        runCount: 0,
-        lastActivity: 0,
-        runs: []
-      };
-    });
-
-    console.log(`[useLeagueLeaderboard] Initialized ${participants.length} participants with 0 stats`);
-
-    // **Step 2: Process events and overlay actual run data**
     const processedEvents = [];
 
     // Filter duplicates and process events
     events.forEach(event => {
       if (!event.pubkey || isDuplicateEvent(event, processedEvents)) return;
-      
-      // Skip if not a participant (safety check, should already be filtered)
-      if (!userStats[event.pubkey]) {
-        console.log(`[useLeagueLeaderboard] Event from non-participant ${event.pubkey}, skipping`);
-        return;
-      }
       
       // Filter by competition date range - only count runs during the competition
       if (event.created_at < COMPETITION_START || event.created_at > COMPETITION_END) {
@@ -198,14 +174,25 @@ export const useLeagueLeaderboard = () => {
 
       processedEvents.push(event);
 
-      // **Step 3: Update participant stats with actual run data**
+      // Initialize user if not exists
+      if (!userStats[event.pubkey]) {
+        userStats[event.pubkey] = {
+          pubkey: event.pubkey,
+          totalMiles: 0,
+          runCount: 0, // Keep as runCount for backward compatibility but it represents activity count
+          lastActivity: 0,
+          runs: [] // Keep as runs for backward compatibility but it represents activities
+        };
+      }
+
+      // Add activity data
       userStats[event.pubkey].totalMiles += distance;
-      userStats[event.pubkey].runCount++;
+      userStats[event.pubkey].runCount++; // Actually activity count
       userStats[event.pubkey].lastActivity = Math.max(
         userStats[event.pubkey].lastActivity, 
         event.created_at
       );
-      userStats[event.pubkey].runs.push({
+      userStats[event.pubkey].runs.push({ // Actually activities
         distance,
         timestamp: event.created_at,
         eventId: event.id,
@@ -213,7 +200,7 @@ export const useLeagueLeaderboard = () => {
       });
     });
 
-    // **Step 4: Convert ALL participants to leaderboard format and sort**
+    // Convert to leaderboard format and sort
     const leaderboardData = Object.values(userStats)
       .map(user => ({
         ...user,
@@ -224,10 +211,8 @@ export const useLeagueLeaderboard = () => {
       .slice(0, 10) // Top 10 only
       .map((user, index) => ({ ...user, rank: index + 1 }));
 
-    console.log(`[useLeagueLeaderboard] Processed ${participants.length} participants -> ${leaderboardData.length} leaderboard entries`);
-    
     return leaderboardData;
-  }, [activityMode, extractDistance, isDuplicateEvent, COMPETITION_START, COMPETITION_END, COURSE_TOTAL_MILES]);
+  }, [extractDistance, isDuplicateEvent, COURSE_TOTAL_MILES, activityMode, COMPETITION_START, COMPETITION_END]);
 
   /**
    * Fetch fresh leaderboard data from Season Pass participants only

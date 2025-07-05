@@ -5,7 +5,6 @@ import { useNostr } from '../hooks/useNostr';
 import SeasonPassPaymentModal from './modals/SeasonPassPaymentModal';
 import PrizePoolModal from './modals/PrizePoolModal';
 import seasonPassPaymentService from '../services/seasonPassPaymentService';
-import seasonPassService from '../services/seasonPassService';
 
 export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = null }) => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -13,14 +12,6 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   const [showPrizePoolModal, setShowPrizePoolModal] = useState(false);
   
   const { publicKey } = useNostr();
-  
-  // Check if there are any Season Pass participants
-  const participantCount = seasonPassService.getParticipantCount();
-  const hasParticipants = participantCount > 0;
-  
-  // Debug logging
-  console.log('[LeagueMap] Participant count:', participantCount);
-  console.log('[LeagueMap] Has participants:', hasParticipants);
   
   // Get comprehensive leaderboard data with caching
   const {
@@ -56,24 +47,6 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   useEffect(() => {
     const timer = setTimeout(() => setIsInitialLoad(false), 500);
     return () => clearTimeout(timer);
-  }, []);
-
-  // TEMPORARY DEBUG: Add test participants if none exist
-  useEffect(() => {
-    const currentCount = seasonPassService.getParticipantCount();
-    console.log('[LeagueMap] DEBUG: Current participant count on mount:', currentCount);
-    
-    if (currentCount === 0) {
-      console.log('[LeagueMap] DEBUG: No participants found, adding test participants...');
-      try {
-        seasonPassService.addParticipant('npub1testuser1234567890abcdef1234567890abcdef1234567890abcdef');
-        seasonPassService.addParticipant('npub1testuser2345678901bcdef1234567890abcdef1234567890abcdef');
-        seasonPassService.addParticipant('npub1testuser3456789012cdef1234567890abcdef1234567890abcdef');
-        console.log('[LeagueMap] DEBUG: Added test participants, new count:', seasonPassService.getParticipantCount());
-      } catch (error) {
-        console.error('[LeagueMap] DEBUG: Error adding test participants:', error);
-      }
-    }
   }, []);
 
   // Generate dynamic league title based on activity mode
@@ -133,7 +106,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
 
   // Loading state with lazy loading support
   const isLoading = isInitialLoad || (leaderboardLoading && leaderboard.length === 0);
-
+  
   if (isLoading) {
     return (
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-6 mb-4">
