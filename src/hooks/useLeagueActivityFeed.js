@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
 import { fetchEvents } from '../utils/nostr';
 import { useActivityMode } from '../contexts/ActivityModeContext';
+import { useProfiles } from './useProfiles';
+import { useNostr } from './useNostr';
 import seasonPassService from '../services/seasonPassService';
 import { REWARDS } from '../config/rewardsConfig';
 
@@ -10,12 +12,13 @@ import { REWARDS } from '../config/rewardsConfig';
  * Fetches Kind 1301 workout records from Season Pass participants only for feed display
  * Filters by current activity mode (run/walk/cycle) for activity-specific leagues
  * Only shows activities during the competition period (July 11 - September 11, 2025)
- * Uses localStorage caching (15 min expiry) and returns chronological feed data
+ * Uses localStorage caching (15 min expiry) and returns chronological feed data with profile metadata
  * 
- * @returns {Object} { feedEvents, isLoading, error, refresh, lastUpdated, activityMode, loadingProgress }
+ * @returns {Object} { feedEvents, enhancedFeedEvents, isLoading, error, refresh, lastUpdated, activityMode, loadingProgress, profilesLoading }
  */
 export const useLeagueActivityFeed = () => {
   const { ndk } = useContext(NostrContext);
+  const { publicKey } = useNostr();
   const { mode: activityMode } = useActivityMode();
   const [feedEvents, setFeedEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,6 +56,33 @@ export const useLeagueActivityFeed = () => {
       return [];
     }
   }, []);
+
+  // Extract pubkeys for profile loading (Phase 4)
+  const feedEventPubkeys = useMemo(() => {
+    return Array.from(new Set(feedEvents.map(event => event.pubkey).filter(Boolean)));
+  }, [feedEvents]);
+
+  // Get profiles for feed events (Phase 4)
+  const { profiles, isLoading: profilesLoading } = useProfiles(feedEventPubkeys);
+
+  // Enhanced feed events with profile data (Phase 4)
+  const enhancedFeedEvents = useMemo(() => {
+    if (!feedEvents.length) return [];
+    
+    return feedEvents.map(event => {
+      const profile = profiles?.[event.pubkey] || {};
+      return {
+        ...event,
+        // Add profile metadata
+        displayName: profile.display_name || profile.name || `Runner ${event.pubkey.slice(0, 8)}`,
+        picture: profile.picture,
+        about: profile.about,
+        isCurrentUser: event.pubkey === publicKey,
+        // Keep original profile data for advanced use cases
+        profile
+      };
+    });
+  }, [feedEvents, profiles, publicKey]);
 
   // Separate participant cache management
   const loadCachedParticipants = useCallback(() => {
@@ -482,8 +512,10 @@ export const useLeagueActivityFeed = () => {
   }, [refresh, FEED_CACHE_DURATION_MS]);
 
   return {
-    feedEvents,
+    feedEvents, // Raw feed events without profile data
+    enhancedFeedEvents, // Feed events with profile metadata attached (Phase 4)
     isLoading,
+    profilesLoading, // Separate loading state for profiles (Phase 4)
     error,
     refresh,
     lastUpdated,
