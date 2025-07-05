@@ -166,23 +166,75 @@ export const useLeagueActivityFeed = () => {
   }, []);
 
   /**
+   * Check if event is duplicate with comprehensive validation (reused from leaderboard)
+   */
+  const isDuplicateEvent = useCallback((event, processedEvents) => {
+    try {
+      return processedEvents.some(existing => {
+        // Primary check: exact same event ID
+        if (existing.id === event.id) return true;
+        
+        // Secondary checks for same user
+        if (existing.pubkey !== event.pubkey) return false;
+        
+        const existingDistance = extractDistance(existing);
+        const currentDistance = extractDistance(event);
+        const timeDiff = Math.abs(existing.created_at - event.created_at);
+        
+        // Same distance within 0.05 miles and within 10 minutes
+        if (Math.abs(existingDistance - currentDistance) < 0.05 && timeDiff < 600) return true;
+        
+        // Check duration matching
+        const existingDuration = existing.tags?.find(tag => tag[0] === 'duration')?.[1];
+        const currentDuration = event.tags?.find(tag => tag[0] === 'duration')?.[1];
+        if (existingDuration && currentDuration && existingDuration === currentDuration && 
+            Math.abs(existingDistance - currentDistance) < 0.1) return true;
+        
+        // Check content similarity
+        if (existing.content && event.content && existing.content === event.content && 
+            Math.abs(existingDistance - currentDistance) < 0.1 && timeDiff < 3600) return true;
+        
+        return false;
+      });
+    } catch (err) {
+      console.error('Error checking duplicate event:', err);
+      return false;
+    }
+  }, [extractDistance]);
+
+  /**
    * Process events for feed display (chronological, not aggregated)
+   * Enhanced with deduplication and robust error handling
    */
   const processEventsForFeed = useCallback((events, participantPaymentDates) => {
     try {
       const processedEvents = [];
+      let duplicateCount = 0;
+      let filteredCount = 0;
       
       events.forEach(event => {
-        if (!event.pubkey) return;
+        if (!event.pubkey) {
+          filteredCount++;
+          return;
+        }
         
         // Filter by individual participant payment date
         const participantPaymentDate = participantPaymentDates.get(event.pubkey);
-        if (!participantPaymentDate) return;
+        if (!participantPaymentDate) {
+          filteredCount++;
+          return;
+        }
         
-        if (event.created_at < participantPaymentDate) return;
+        if (event.created_at < participantPaymentDate) {
+          filteredCount++;
+          return;
+        }
         
         // Filter by global competition end date
-        if (event.created_at > COMPETITION_END) return;
+        if (event.created_at > COMPETITION_END) {
+          filteredCount++;
+          return;
+        }
         
         // Filter by current activity mode using exercise tag
         const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
@@ -196,10 +248,22 @@ export const useLeagueActivityFeed = () => {
         
         const acceptedActivities = activityMatches[activityMode] || [activityMode];
         
-        if (eventActivityType && !acceptedActivities.includes(eventActivityType)) return;
+        if (eventActivityType && !acceptedActivities.includes(eventActivityType)) {
+          filteredCount++;
+          return;
+        }
         
         const distance = extractDistance(event);
-        if (distance <= 0) return;
+        if (distance <= 0) {
+          filteredCount++;
+          return;
+        }
+
+        // Check for duplicates using comprehensive validation
+        if (isDuplicateEvent(event, processedEvents)) {
+          duplicateCount++;
+          return;
+        }
 
         // Create feed-specific event object
         const feedEvent = {
@@ -210,26 +274,42 @@ export const useLeagueActivityFeed = () => {
           tags: event.tags,
           distance: distance,
           activityType: eventActivityType,
-          // Extract common feed display data
+          // Extract common feed display data for better UX
           title: event.tags?.find(tag => tag[0] === 'title')?.[1] || '',
           duration: event.tags?.find(tag => tag[0] === 'duration')?.[1] || '',
-          // Raw event for compatibility
+          // Add feed-specific metadata
+          displayDistance: `${distance.toFixed(1)} mi`,
+          displayActivity: eventActivityType || 'activity',
+          // Raw event for compatibility with existing PostList
           rawEvent: event
         };
 
         processedEvents.push(feedEvent);
       });
       
+      // Log processing statistics for debugging
+      console.log(`[useLeagueActivityFeed] Event processing complete:`, {
+        total: events.length,
+        processed: processedEvents.length,
+        duplicates: duplicateCount,
+        filtered: filteredCount,
+        activityMode
+      });
+      
       // Sort by timestamp (newest first for feed)
       processedEvents.sort((a, b) => b.created_at - a.created_at);
       
-      // Limit to feed size
-      return processedEvents.slice(0, FEED_LIMIT);
+      // Limit to feed size for optimal performance
+      const limitedEvents = processedEvents.slice(0, FEED_LIMIT);
+      
+      console.log(`[useLeagueActivityFeed] Returning ${limitedEvents.length} feed events (${activityMode} mode)`);
+      
+      return limitedEvents;
     } catch (err) {
       console.error('Error processing events for feed:', err);
       return [];
     }
-  }, [extractDistance, activityMode, COMPETITION_END, FEED_LIMIT]);
+  }, [extractDistance, activityMode, COMPETITION_END, FEED_LIMIT, isDuplicateEvent]);
 
   /**
    * Fetch fresh feed data from Season Pass participants only
