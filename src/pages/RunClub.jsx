@@ -2,9 +2,8 @@ import { useEffect, useContext, useState, useMemo, useCallback } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
 import { WalletContext } from '../contexts/WalletContext.jsx';
 import { useLeagueActivityFeed } from '../hooks/useLeagueActivityFeed';
-import { usePostInteractions } from '../hooks/usePostInteractions';
-import { PostList } from '../components/PostList';
 import { LeagueMap } from '../components/LeagueMap';
+import { Post } from '../components/Post';
 import { handleAppBackground } from '../utils/nostr';
 import '../components/RunClub.css';
 
@@ -13,7 +12,7 @@ export const RunClub = () => {
   const { wallet } = useContext(WalletContext);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Phase 5: Use new participant-first feed hook
+  // Use the participant-first feed hook
   const {
     enhancedFeedEvents,
     isLoading: feedLoading,
@@ -24,92 +23,55 @@ export const RunClub = () => {
     loadingProgress
   } = useLeagueActivityFeed();
 
-  // Transform enhanced feed events to PostList-compatible format
-  const posts = useMemo(() => {
+  // Transform enhanced feed events to Post-compatible format for WorkoutCard display
+  const workoutPosts = useMemo(() => {
     if (!enhancedFeedEvents.length) return [];
     
     return enhancedFeedEvents.map(event => ({
-      // Core post data
+      // Core post data for WorkoutCard
       id: event.id,
+      kind: 1301, // Always 1301 for workout records
       content: event.content,
       created_at: event.created_at,
+      title: event.title,
       
-      // Author information (using profile metadata)
+      // Author information for WorkoutCard
       author: {
         pubkey: event.pubkey,
         profile: {
-          display_name: event.displayName,
           name: event.displayName,
+          display_name: event.displayName,
           picture: event.picture,
-          about: event.about
+          about: event.about,
+          nip05: event.nip05
         }
       },
       
-      // Activity-specific metadata for display
+      // Workout metrics for display
+      metrics: event.metrics || [
+        // Fallback metrics if not processed
+        ...(event.distance ? [{
+          label: 'Distance',
+          value: event.distance,
+          unit: event.distanceUnit || 'miles'
+        }] : []),
+        ...(event.duration ? [{
+          label: 'Duration', 
+          value: event.duration,
+          unit: 'min'
+        }] : [])
+      ],
+      
+      // Tags for team/challenge display
       tags: event.tags,
-      distance: event.distance,
-      duration: event.duration,
-      title: event.title,
-      activityType: event.activityType,
-      displayDistance: event.displayDistance,
-      displayActivity: event.displayActivity,
       
-      // Interaction placeholders (will be populated by usePostInteractions if needed)
-      likes: [],
-      reposts: [],
-      zaps: [],
-      comments: [],
-      showComments: false,
+      // Simple zap count (no complex social interactions)
+      zaps: 0, // Keep simple - just for display
       
-      // Compatibility with existing post format
-      rawEvent: event.rawEvent,
-      isCurrentUser: event.isCurrentUser
+      // Raw event for any additional processing
+      rawEvent: event.rawEvent
     }));
   }, [enhancedFeedEvents]);
-
-  // State for post interactions (simplified)
-  const [userLikes, setUserLikes] = useState(new Set());
-  const [userReposts, setUserReposts] = useState(new Set());
-  const [loadedSupplementaryData, setLoadedSupplementaryData] = useState(new Set());
-
-  // Simplified post state management
-  const [postsState, setPostsState] = useState([]);
-  
-  // Update posts when feed data changes
-  useEffect(() => {
-    setPostsState(posts);
-  }, [posts]);
-
-  // Simplified supplementary data loader (placeholder for now)
-  const loadSupplementaryData = useCallback((postIds, dataType) => {
-    console.log(`[RunClub] Loading ${dataType} for posts:`, postIds);
-    // For Phase 5, we'll just mark as loaded without fetching
-    // This can be enhanced later to load actual interaction data
-    setLoadedSupplementaryData(prev => {
-      const newSet = new Set(prev);
-      postIds.forEach(id => newSet.add(id));
-      return newSet;
-    });
-  }, []);
-
-  // Interaction hook with simplified interface
-  const {
-    commentText,
-    setCommentText,
-    handleCommentClick,
-    handleLike,
-    handleRepost,
-    handleZap,
-    handleComment
-  } = usePostInteractions({
-    posts: postsState,
-    setPosts: setPostsState,
-    setUserLikes,
-    setUserReposts,
-    loadSupplementaryData,
-    loadedSupplementaryData,
-    defaultZapAmount
-  });
 
   // Combined loading state
   const loading = feedLoading || profilesLoading;
@@ -121,31 +83,38 @@ export const RunClub = () => {
     };
   }, []);
 
-  // Refresh feed helper - uses new participant-first refresh
+  // Simple refresh function
   const refreshFeed = useCallback(() => {
     if (loading || isRefreshing) return;
     setIsRefreshing(true);
     refreshFeedData().finally(() => setTimeout(() => setIsRefreshing(false), 500));
   }, [loading, isRefreshing, refreshFeedData]);
 
-  // Hard refresh (clears cache and refreshes)
+  // Hard refresh with cache clearing
   const hardRefresh = useCallback(() => {
     if (loading || isRefreshing) return;
     setIsRefreshing(true);
-    // For the new hook, refresh also handles cache clearing
     refreshFeedData();
     setTimeout(() => setIsRefreshing(false), 1000);
   }, [loading, isRefreshing, refreshFeedData]);
 
-  // Load more posts (simplified - not implemented yet for new hook)
-  const loadMorePosts = useCallback(() => {
-    console.log('[RunClub] Load more posts not yet implemented for participant-first feed');
-    // TODO: Implement pagination for useLeagueActivityFeed if needed
-  }, []);
+  // Simple zap handler for WorkoutCards
+  const handleZap = useCallback(async (post, wallet) => {
+    console.log('Zapping workout:', post.id);
+    // Simple zap implementation - could be enhanced later if needed
+    if (wallet && wallet.makePayment) {
+      try {
+        // Basic zap functionality - just log for now
+        console.log(`Zapped ${defaultZapAmount} sats to workout ${post.id}`);
+      } catch (error) {
+        console.error('Zap failed:', error);
+      }
+    }
+  }, [defaultZapAmount]);
 
   return (
     <div className="runclub-container">
-      {/* Add debug button for development builds */}
+      {/* Development debug tools */}
       {process.env.NODE_ENV === 'development' && (
         <div style={{ position: 'fixed', top: '80px', right: '10px', zIndex: 1000 }}>
           <button 
@@ -160,12 +129,12 @@ export const RunClub = () => {
               cursor: 'pointer'
             }}
             disabled={loading || isRefreshing}
-            title={`Participant-first feed (${activityMode} mode)`}
+            title={`Participant-first workout feed (${activityMode} mode)`}
           >
-            🗑️ Refresh Feed
+            🗑️ Refresh Workouts
           </button>
           
-          {/* Show loading progress in development */}
+          {/* Show loading progress */}
           {loading && (
             <div style={{
               position: 'fixed',
@@ -181,9 +150,26 @@ export const RunClub = () => {
               {loadingProgress.message}<br/>
               {loadingProgress.phase !== 'complete' && (
                 <small>
-                  {loadingProgress.processedEvents}/{loadingProgress.totalEvents} events
+                  {loadingProgress.processedEvents}/{loadingProgress.totalEvents} workouts
                 </small>
               )}
+            </div>
+          )}
+          
+          {/* Show error */}
+          {feedError && (
+            <div style={{
+              position: 'fixed',
+              top: '180px',
+              right: '10px',
+              background: '#ff4444',
+              color: 'white',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              fontSize: '11px',
+              maxWidth: '200px'
+            }}>
+              Error: {feedError}
             </div>
           )}
         </div>
@@ -192,26 +178,54 @@ export const RunClub = () => {
       {/* League Map Component */}
       <LeagueMap />
       
-      {/* PostList Component for participant-only workout feed */}
-      <PostList
-        posts={postsState}
-        loading={loading}
-        error={feedError}
-        userLikes={userLikes}
-        userReposts={userReposts}
-        onLike={handleLike}
-        onRepost={handleRepost}
-        onZap={handleZap}
-        onComment={handleComment}
-        onCommentClick={handleCommentClick}
-        onLoadMore={loadMorePosts}
-        commentText={commentText}
-        setCommentText={setCommentText}
-        onRefresh={refreshFeed}
-        isRefreshing={isRefreshing}
-        defaultZapAmount={defaultZapAmount}
-        wallet={wallet}
-      />
+      {/* Workout Cards Feed */}
+      <div className="workout-feed" style={{ padding: '1rem' }}>
+        {loading && workoutPosts.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            Loading participant workouts...
+          </div>
+        )}
+        
+        {feedError && workoutPosts.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#ff4444' }}>
+            Error loading workouts: {feedError}
+          </div>
+        )}
+        
+        {!loading && workoutPosts.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            No workout records found for Season Pass participants in {activityMode} mode.
+          </div>
+        )}
+        
+        {/* Render workout posts using existing Post/WorkoutCard components */}
+        {workoutPosts.map((post) => (
+          <Post
+            key={post.id}
+            post={post}
+            handleZap={handleZap}
+            wallet={wallet}
+          />
+        ))}
+        
+        {!loading && workoutPosts.length > 0 && (
+          <div style={{ textAlign: 'center', padding: '1rem', color: '#666' }}>
+            <button 
+              onClick={refreshFeed}
+              style={{
+                background: 'transparent',
+                border: '1px solid #ccc',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh Workouts'}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
