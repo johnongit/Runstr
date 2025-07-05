@@ -30,69 +30,24 @@ export interface SeasonPassService {
 }
 
 /**
- * Convert npub to hex format
+ * Helper function to convert npub to hex format
  */
 const convertNpubToHex = (npub: string): string => {
   try {
-    const { data } = nip19.decode(npub);
-    return data as string;
-  } catch (error) {
-    console.error('[SeasonPassService] Error converting npub to hex:', error);
-    return npub; // Return original if conversion fails
-  }
-};
-
-/**
- * Mock participants for testing Phase 2
- */
-const MOCK_PARTICIPANTS_NPUB = [
-  {
-    npub: 'npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum',
-    paymentDate: '2025-07-01T00:00:00Z'
-  },
-  {
-    npub: 'npub1jdvvva54m8nchh3t708pav99qk24x6rkx2sh0e7jthh0l8efzt7q9y7jlj',
-    paymentDate: '2025-07-01T00:00:00Z'
-  }
-];
-
-// Convert to hex format for Nostr compatibility
-const MOCK_PARTICIPANTS: SeasonPassParticipant[] = MOCK_PARTICIPANTS_NPUB.map(participant => ({
-  pubkey: convertNpubToHex(participant.npub),
-  paymentDate: participant.paymentDate
-}));
-
-/**
- * Initialize mock participants if no participants exist
- * This is for testing Phase 2 - can be removed later
- */
-const initializeMockParticipants = (): void => {
-  try {
-    const existingParticipants = getStoredParticipants();
-    
-    // Only add mock participants if storage is empty
-    if (existingParticipants.length === 0) {
-      console.log('[SeasonPassService] Initializing mock participants for testing');
-      console.log('[SeasonPassService] Converting npub to hex format for Nostr compatibility');
-      
-      // Add mock participants using the existing mechanism
-      MOCK_PARTICIPANTS.forEach(participant => {
-        console.log(`[SeasonPassService] Adding participant: ${participant.pubkey.substring(0, 8)}... (hex format)`);
-        addParticipant(participant.pubkey, participant.paymentDate);
-      });
-      
-      console.log(`[SeasonPassService] Added ${MOCK_PARTICIPANTS.length} mock participants`);
-    } else {
-      console.log(`[SeasonPassService] Found ${existingParticipants.length} existing participants, skipping mock initialization`);
+    const decoded = nip19.decode(npub);
+    if (decoded.type === 'npub') {
+      return decoded.data;
     }
-  } catch (error) {
-    console.error('[SeasonPassService] Error initializing mock participants:', error);
+    throw new Error('Invalid npub format');
+  } catch (err) {
+    console.error('Error converting npub to hex:', err);
+    throw err;
   }
 };
 
 /**
- * Get the current list of participants from localStorage with backward compatibility
- * @returns Array of SeasonPassParticipant objects
+ * Get stored participants from localStorage with backward compatibility
+ * Handles both old format (string[]) and new format (SeasonPassParticipant[])
  */
 const getStoredParticipants = (): SeasonPassParticipant[] => {
   try {
@@ -103,69 +58,46 @@ const getStoredParticipants = (): SeasonPassParticipant[] => {
     
     const parsed = JSON.parse(stored);
     
-    // Validate that it's an array
-    if (!Array.isArray(parsed)) {
-      console.warn('Season pass participants data is corrupted, resetting to empty array');
-      return [];
-    }
-    
-    // Handle backward compatibility - convert old string format to new object format
-    const participants: SeasonPassParticipant[] = [];
-    
-    for (const item of parsed) {
-      if (typeof item === 'string' && item.trim().length > 0) {
-        // Old format: just pubkey string, use default date
-        participants.push({
-          pubkey: item.trim(),
-          paymentDate: '2025-07-01T00:00:00Z' // Default date for existing participants
-        });
-      } else if (typeof item === 'object' && item !== null && 
-                 typeof item.pubkey === 'string' && 
-                 typeof item.paymentDate === 'string') {
-        // New format: object with pubkey and paymentDate
-        participants.push({
-          pubkey: item.pubkey.trim(),
-          paymentDate: item.paymentDate
-        });
+    // Handle backward compatibility: if stored data is string array, convert to new format
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      if (typeof parsed[0] === 'string') {
+        // Old format: convert string[] to SeasonPassParticipant[]
+        const converted = parsed.map((pubkey: string) => ({
+          pubkey,
+          paymentDate: new Date().toISOString() // Default to current date for existing participants
+        }));
+        
+        // Save in new format
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(converted));
+        return converted;
       }
+      
+      // Already in new format
+      return parsed as SeasonPassParticipant[];
     }
     
-    return participants;
-  } catch (error) {
-    console.error('Error reading season pass participants from localStorage:', error);
+    return [];
+  } catch (err) {
+    console.error('Error loading participants from storage:', err);
     return [];
   }
 };
 
 /**
- * Save the participants list to localStorage
- * @param participants Array of SeasonPassParticipant objects
+ * Save participants to localStorage
  */
 const saveParticipants = (participants: SeasonPassParticipant[]): void => {
   try {
-    // Remove duplicates by pubkey and filter out invalid entries
-    const cleanParticipants = participants
-      .filter(p => p.pubkey && typeof p.pubkey === 'string' && p.pubkey.trim().length > 0)
-      .filter(p => p.paymentDate && typeof p.paymentDate === 'string')
-      .reduce((acc, current) => {
-        const existing = acc.find(p => p.pubkey === current.pubkey);
-        if (!existing) {
-          acc.push(current);
-        }
-        return acc;
-      }, [] as SeasonPassParticipant[]);
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanParticipants));
-  } catch (error) {
-    console.error('Error saving season pass participants to localStorage:', error);
-    throw new Error('Failed to save participant data');
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(participants));
+  } catch (err) {
+    console.error('Error saving participants to storage:', err);
   }
 };
 
 /**
- * Check if a pubkey is in the participants list
- * @param pubkey The public key to check
- * @returns true if the pubkey is a participant, false otherwise
+ * Check if a pubkey is a Season Pass participant
+ * @param pubkey The public key to check (hex format)
+ * @returns True if the pubkey is a participant
  */
 const isParticipant = (pubkey: string): boolean => {
   if (!pubkey || typeof pubkey !== 'string') {
@@ -173,32 +105,29 @@ const isParticipant = (pubkey: string): boolean => {
   }
   
   const participants = getStoredParticipants();
-  return participants.some(p => p.pubkey === pubkey.trim());
+  return participants.some(participant => participant.pubkey === pubkey.trim());
 };
 
 /**
- * Add a pubkey to the participants list
- * @param pubkey The public key to add
- * @param paymentDate Optional payment date (ISO 8601 string), defaults to current date
+ * Add a participant to the Season Pass list
+ * @param pubkey The public key to add (hex format)
+ * @param paymentDate Optional payment date (ISO 8601 string). Defaults to current time.
  */
 const addParticipant = (pubkey: string, paymentDate?: string): void => {
   if (!pubkey || typeof pubkey !== 'string') {
-    throw new Error('Invalid pubkey: must be a non-empty string');
+    throw new Error('Invalid pubkey provided');
   }
   
   const trimmedPubkey = pubkey.trim();
-  if (trimmedPubkey.length === 0) {
-    throw new Error('Invalid pubkey: cannot be empty');
-  }
-  
   const participants = getStoredParticipants();
   
-  // Don't add if already exists
+  // Check if already exists
   if (participants.some(p => p.pubkey === trimmedPubkey)) {
-    console.log(`Pubkey ${trimmedPubkey} is already a season pass participant`);
+    console.warn('Participant already exists:', trimmedPubkey);
     return;
   }
   
+  // Add new participant
   const newParticipant: SeasonPassParticipant = {
     pubkey: trimmedPubkey,
     paymentDate: paymentDate || new Date().toISOString()
@@ -206,43 +135,19 @@ const addParticipant = (pubkey: string, paymentDate?: string): void => {
   
   participants.push(newParticipant);
   saveParticipants(participants);
-  
-  console.log(`Added new season pass participant: ${trimmedPubkey} (payment date: ${newParticipant.paymentDate})`);
 };
 
 /**
- * Remove a pubkey from the participants list
- * @param pubkey The public key to remove
- */
-const removeParticipant = (pubkey: string): void => {
-  if (!pubkey || typeof pubkey !== 'string') {
-    console.warn('Invalid pubkey provided to removeParticipant');
-    return;
-  }
-  
-  const trimmedPubkey = pubkey.trim();
-  const participants = getStoredParticipants();
-  const filteredParticipants = participants.filter(p => p.pubkey !== trimmedPubkey);
-  
-  if (participants.length === filteredParticipants.length) {
-    console.log(`Pubkey ${trimmedPubkey} was not in the participants list`);
-    return;
-  }
-  
-  saveParticipants(filteredParticipants);
-  console.log(`Removed season pass participant: ${trimmedPubkey}`);
-};
-
-/**
- * Get the full list of participants (pubkeys only for backward compatibility)
- * @returns Array of pubkey strings
+ * Get all participants (pubkeys only for backward compatibility)
+ * @returns Array of participant pubkeys
  */
 const getParticipants = (): string[] => {
-  return getStoredParticipants().map(p => p.pubkey);
+  const participants = getStoredParticipants();
+  return participants.map(p => p.pubkey);
 };
 
 /**
- * Get the full list of participants with payment dates
+ * Get all participants with their payment dates
  * @returns Array of SeasonPassParticipant objects
  */
 const getParticipantsWithDates = (): SeasonPassParticipant[] => {
@@ -266,24 +171,36 @@ const getParticipantPaymentDate = (pubkey: string): string | null => {
 };
 
 /**
- * Clear all participants (admin/testing function)
+ * Remove a participant from the Season Pass list
+ * @param pubkey The public key to remove
  */
-const clearAllParticipants = (): void => {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    console.log('Cleared all season pass participants');
-  } catch (error) {
-    console.error('Error clearing season pass participants:', error);
-    throw new Error('Failed to clear participant data');
+const removeParticipant = (pubkey: string): void => {
+  if (!pubkey || typeof pubkey !== 'string') {
+    return;
+  }
+  
+  const participants = getStoredParticipants();
+  const filtered = participants.filter(p => p.pubkey !== pubkey.trim());
+  
+  if (filtered.length !== participants.length) {
+    saveParticipants(filtered);
   }
 };
 
 /**
- * Get the current number of participants
- * @returns Number of participants
+ * Clear all participants (admin function)
+ */
+const clearAllParticipants = (): void => {
+  localStorage.removeItem(STORAGE_KEY);
+};
+
+/**
+ * Get the total number of participants
+ * @returns Number of Season Pass participants
  */
 const getParticipantCount = (): number => {
-  return getStoredParticipants().length;
+  const participants = getStoredParticipants();
+  return participants.length;
 };
 
 // Export the service object
@@ -312,7 +229,3 @@ export {
   getParticipantCount,
   STORAGE_KEY
 }; 
-
-// Initialize mock participants when the service is loaded (Phase 2 testing)
-// This can be removed in later phases
-initializeMockParticipants(); 
