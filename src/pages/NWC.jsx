@@ -1,4 +1,5 @@
 import { NWCWalletConnector } from '../components/NWCWalletConnector';
+import { NWCWalletDebugger } from '../components/NWCWalletDebugger';
 
 export const NWC = () => {
   return (
@@ -26,6 +27,9 @@ export const NWC = () => {
           <li>🔒 Non-custodial wallet connection</li>
         </ul>
       </div>
+
+      {/* Debug Component */}
+      <NWCWalletDebugger />
     </div>
   );
 };
