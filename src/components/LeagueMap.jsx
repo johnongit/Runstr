@@ -5,6 +5,7 @@ import { useNostr } from '../hooks/useNostr';
 import SeasonPassPaymentModal from './modals/SeasonPassPaymentModal';
 import PrizePoolModal from './modals/PrizePoolModal';
 import seasonPassPaymentService from '../services/seasonPassPaymentService';
+import seasonPassService from '../services/seasonPassService';
 
 export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = null }) => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -12,6 +13,10 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   const [showPrizePoolModal, setShowPrizePoolModal] = useState(false);
   
   const { publicKey } = useNostr();
+  
+  // Check if there are any Season Pass participants
+  const participantCount = seasonPassService.getParticipantCount();
+  const hasParticipants = participantCount > 0;
   
   // Get comprehensive leaderboard data with caching
   const {
@@ -107,6 +112,59 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   // Loading state with lazy loading support
   const isLoading = isInitialLoad || (leaderboardLoading && leaderboard.length === 0);
   
+  // If no participants, show empty state
+  if (!hasParticipants) {
+    return (
+      <div className="league-map-container">
+        <div className="banner-container">
+          <div className="season-banner">
+            <h2>🏃‍♂️ RUNSTR SEASON 1</h2>
+            <p>Join the ultimate 90-day running challenge!</p>
+            <div className="banner-buttons">
+              <button 
+                className="season-pass-button"
+                onClick={() => setShowSeasonPassModal(true)}
+              >
+                Get Season Pass
+              </button>
+              <button 
+                className="prize-pool-button"
+                onClick={() => setShowPrizePoolModal(true)}
+              >
+                Prize Pool
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="league-content">
+          <div className="no-participants-state">
+            <div className="empty-state-icon">🏃‍♂️</div>
+            <h3>No Season Pass Participants Yet</h3>
+            <p>Be the first to join RUNSTR Season 1!</p>
+            <p>Purchase a Season Pass to compete in the 90-day running challenge and appear in the leaderboard and feed.</p>
+            <button 
+              className="get-season-pass-button"
+              onClick={() => setShowSeasonPassModal(true)}
+            >
+              Get Season Pass
+            </button>
+          </div>
+        </div>
+
+        {/* Modals */}
+        <SeasonPassPaymentModal 
+          isOpen={showSeasonPassModal} 
+          onClose={() => setShowSeasonPassModal(false)} 
+        />
+        <PrizePoolModal 
+          isOpen={showPrizePoolModal} 
+          onClose={() => setShowPrizePoolModal(false)} 
+        />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-6 mb-4">
