@@ -87,3 +87,21 @@
   -webkit-touch-callout: none !important;
   -webkit-user-select: none !important;
 } 
+
+/* Activity Mode Banner Styles */
+.action-button.active {
+  font-weight: 600;
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+}
+
+.action-button:hover {
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+.distance-unit-button {
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 35px;
+}
