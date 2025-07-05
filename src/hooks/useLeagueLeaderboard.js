@@ -216,7 +216,7 @@ export const useLeagueLeaderboard = () => {
 
   /**
    * Fetch fresh leaderboard data from Season Pass participants only
-   * Phase 4: Participant-first approach - start with participants, then add distance data
+   * Phase 5: Individual distance calculation based on each participant's payment date
    */
   const fetchLeaderboardData = useCallback(async () => {
     if (!ndk) {
@@ -227,7 +227,7 @@ export const useLeagueLeaderboard = () => {
     try {
       setError(null);
       
-      // **Phase 4: Start with Season Pass participants (participant-first approach)**
+      // **Phase 5: Start with Season Pass participants (participant-first approach)**
       const participantsWithDates = seasonPassService.getParticipantsWithDates();
       console.log(`[useLeagueLeaderboard] Season Pass participants: ${participantsWithDates.length}`);
       
@@ -242,7 +242,14 @@ export const useLeagueLeaderboard = () => {
         return;
       }
 
-      // **Phase 4: Create initial leaderboard structure from participants**
+      // **Phase 5: Create participant payment date lookup map**
+      const participantPaymentDates = new Map();
+      participantsWithDates.forEach(participant => {
+        const paymentTimestamp = Math.floor(new Date(participant.paymentDate).getTime() / 1000);
+        participantPaymentDates.set(participant.pubkey, paymentTimestamp);
+      });
+
+      // **Phase 5: Create initial leaderboard structure from participants**
       const initialLeaderboard = participantsWithDates.map(participant => ({
         pubkey: participant.pubkey,
         totalMiles: 0,
@@ -255,21 +262,25 @@ export const useLeagueLeaderboard = () => {
 
       console.log(`[useLeagueLeaderboard] Created initial leaderboard with ${initialLeaderboard.length} participants`);
 
-      // **Only fetch events from Season Pass participants during competition period**
-      console.log(`[useLeagueLeaderboard] Fetching events from ${participantsWithDates.length} participants for ${activityMode} mode during competition period`);
+      // **Phase 5: Fetch events from Season Pass participants (broader date range for individual filtering)**
+      console.log(`[useLeagueLeaderboard] Fetching events from ${participantsWithDates.length} participants for ${activityMode} mode`);
       
       const participantPubkeys = participantsWithDates.map(p => p.pubkey);
+      
+      // Use broader date range since we'll filter by individual payment dates
+      const earliestPaymentDate = Math.min(...Array.from(participantPaymentDates.values()));
+      
       const events = await fetchEvents({
         kinds: [1301],
         authors: participantPubkeys, // Only query Season Pass participants
         limit: MAX_EVENTS,
-        since: COMPETITION_START, // Competition start date
+        since: earliestPaymentDate, // Use earliest payment date
         until: COMPETITION_END   // Competition end date
       });
 
       console.log(`[useLeagueLeaderboard] Fetched ${events.length} events from ${participantsWithDates.length} participants`);
 
-      // **Phase 4: Process events and update participant entries**
+      // **Phase 5: Process events with individual payment date filtering**
       const processedEvents = [];
       const leaderboardMap = new Map();
       
@@ -282,10 +293,22 @@ export const useLeagueLeaderboard = () => {
       events.forEach(event => {
         if (!event.pubkey || isDuplicateEvent(event, processedEvents)) return;
         
-        // Filter by competition date range - only count runs during the competition
-        if (event.created_at < COMPETITION_START || event.created_at > COMPETITION_END) {
-          console.log(`[useLeagueLeaderboard] Skipping event outside competition period: ${new Date(event.created_at * 1000).toISOString()}`);
-          return; // Skip events outside competition period
+        // **Phase 5: Filter by individual participant payment date**
+        const participantPaymentDate = participantPaymentDates.get(event.pubkey);
+        if (!participantPaymentDate) {
+          // Event from non-participant (shouldn't happen with authors filter, but safety check)
+          return;
+        }
+        
+        if (event.created_at < participantPaymentDate) {
+          console.log(`[useLeagueLeaderboard] Skipping event before payment date for ${event.pubkey.substring(0, 8)}: ${new Date(event.created_at * 1000).toISOString()}`);
+          return; // Skip events before individual payment date
+        }
+        
+        // Filter by global competition end date
+        if (event.created_at > COMPETITION_END) {
+          console.log(`[useLeagueLeaderboard] Skipping event after competition end: ${new Date(event.created_at * 1000).toISOString()}`);
+          return;
         }
         
         // Filter by current activity mode using exercise tag
@@ -326,10 +349,12 @@ export const useLeagueLeaderboard = () => {
             eventId: event.id,
             activityType: eventActivityType
           });
+          
+          console.log(`[useLeagueLeaderboard] Updated ${event.pubkey.substring(0, 8)}: +${distance.toFixed(2)} miles (total: ${participant.totalMiles.toFixed(2)})`);
         }
       });
 
-      // **Phase 4: Convert to final leaderboard format and sort**
+      // **Phase 5: Convert to final leaderboard format and sort**
       const leaderboardData = Array.from(leaderboardMap.values())
         .map(participant => ({
           ...participant,
@@ -339,7 +364,9 @@ export const useLeagueLeaderboard = () => {
         .sort((a, b) => b.totalMiles - a.totalMiles) // Sort by distance descending
         .map((participant, index) => ({ ...participant, rank: index + 1 }));
 
-      console.log(`[useLeagueLeaderboard] Phase 4: Final leaderboard with ${leaderboardData.length} participants`);
+      console.log(`[useLeagueLeaderboard] Phase 5: Final leaderboard with ${leaderboardData.length} participants`);
+      console.log(`[useLeagueLeaderboard] Phase 5: Distance summary:`, 
+        leaderboardData.map(p => `${p.pubkey.substring(0, 8)}: ${p.totalMiles} miles`));
 
       // Update state and cache
       setLeaderboard(leaderboardData);
@@ -352,7 +379,7 @@ export const useLeagueLeaderboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [ndk, extractDistance, isDuplicateEvent, saveCachedData, activityMode, COMPETITION_START, COMPETITION_END, COURSE_TOTAL_MILES]);
+  }, [ndk, extractDistance, isDuplicateEvent, saveCachedData, activityMode, COMPETITION_END, COURSE_TOTAL_MILES]);
 
   /**
    * Refresh leaderboard data
