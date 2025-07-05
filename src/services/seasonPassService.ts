@@ -28,6 +28,46 @@ export interface SeasonPassService {
 }
 
 /**
+ * Mock participants for testing Phase 2
+ */
+const MOCK_PARTICIPANTS: SeasonPassParticipant[] = [
+  {
+    pubkey: 'npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum',
+    paymentDate: '2025-07-01T00:00:00Z'
+  },
+  {
+    pubkey: 'npub1jdvvva54m8nchh3t708pav99qk24x6rkx2sh0e7jthh0l8efzt7q9y7jlj',
+    paymentDate: '2025-07-01T00:00:00Z'
+  }
+];
+
+/**
+ * Initialize mock participants if no participants exist
+ * This is for testing Phase 2 - can be removed later
+ */
+const initializeMockParticipants = (): void => {
+  try {
+    const existingParticipants = getStoredParticipants();
+    
+    // Only add mock participants if storage is empty
+    if (existingParticipants.length === 0) {
+      console.log('[SeasonPassService] Initializing mock participants for testing');
+      
+      // Add mock participants using the existing mechanism
+      MOCK_PARTICIPANTS.forEach(participant => {
+        addParticipant(participant.pubkey, participant.paymentDate);
+      });
+      
+      console.log(`[SeasonPassService] Added ${MOCK_PARTICIPANTS.length} mock participants`);
+    } else {
+      console.log(`[SeasonPassService] Found ${existingParticipants.length} existing participants, skipping mock initialization`);
+    }
+  } catch (error) {
+    console.error('[SeasonPassService] Error initializing mock participants:', error);
+  }
+};
+
+/**
  * Get the current list of participants from localStorage with backward compatibility
  * @returns Array of SeasonPassParticipant objects
  */
@@ -249,3 +289,7 @@ export {
   getParticipantCount,
   STORAGE_KEY
 }; 
+
+// Initialize mock participants when the service is loaded (Phase 2 testing)
+// This can be removed in later phases
+initializeMockParticipants(); 
