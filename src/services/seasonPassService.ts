@@ -9,6 +9,8 @@
  * Data Format: Array of {pubkey: string, paymentDate: string} objects
  */
 
+import * as nip19 from 'nostr-tools/nip19';
+
 const STORAGE_KEY = 'seasonPassParticipants';
 
 export interface SeasonPassParticipant {
@@ -28,18 +30,37 @@ export interface SeasonPassService {
 }
 
 /**
+ * Convert npub to hex format
+ */
+const convertNpubToHex = (npub: string): string => {
+  try {
+    const { data } = nip19.decode(npub);
+    return data as string;
+  } catch (error) {
+    console.error('[SeasonPassService] Error converting npub to hex:', error);
+    return npub; // Return original if conversion fails
+  }
+};
+
+/**
  * Mock participants for testing Phase 2
  */
-const MOCK_PARTICIPANTS: SeasonPassParticipant[] = [
+const MOCK_PARTICIPANTS_NPUB = [
   {
-    pubkey: 'npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum',
+    npub: 'npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum',
     paymentDate: '2025-07-01T00:00:00Z'
   },
   {
-    pubkey: 'npub1jdvvva54m8nchh3t708pav99qk24x6rkx2sh0e7jthh0l8efzt7q9y7jlj',
+    npub: 'npub1jdvvva54m8nchh3t708pav99qk24x6rkx2sh0e7jthh0l8efzt7q9y7jlj',
     paymentDate: '2025-07-01T00:00:00Z'
   }
 ];
+
+// Convert to hex format for Nostr compatibility
+const MOCK_PARTICIPANTS: SeasonPassParticipant[] = MOCK_PARTICIPANTS_NPUB.map(participant => ({
+  pubkey: convertNpubToHex(participant.npub),
+  paymentDate: participant.paymentDate
+}));
 
 /**
  * Initialize mock participants if no participants exist
@@ -52,9 +73,11 @@ const initializeMockParticipants = (): void => {
     // Only add mock participants if storage is empty
     if (existingParticipants.length === 0) {
       console.log('[SeasonPassService] Initializing mock participants for testing');
+      console.log('[SeasonPassService] Converting npub to hex format for Nostr compatibility');
       
       // Add mock participants using the existing mechanism
       MOCK_PARTICIPANTS.forEach(participant => {
+        console.log(`[SeasonPassService] Adding participant: ${participant.pubkey.substring(0, 8)}... (hex format)`);
         addParticipant(participant.pubkey, participant.paymentDate);
       });
       

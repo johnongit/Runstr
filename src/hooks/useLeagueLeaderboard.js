@@ -259,7 +259,7 @@ export const useLeagueLeaderboard = () => {
       console.log(`[useLeagueLeaderboard] Fetching events from ${participantsWithDates.length} participants for ${activityMode} mode during competition period`);
       
       const participantPubkeys = participantsWithDates.map(p => p.pubkey);
-      const events = await fetchEvents(ndk, {
+      const events = await fetchEvents({
         kinds: [1301],
         authors: participantPubkeys, // Only query Season Pass participants
         limit: MAX_EVENTS,
