@@ -131,92 +131,8 @@ export const useLeagueLeaderboard = () => {
   }, [extractDistance]);
 
   /**
-   * Process events into user statistics
-   * Only counts runs during the competition period
-   */
-  const processEvents = useCallback((events) => {
-    const userStats = {};
-    const processedEvents = [];
-
-    // Filter duplicates and process events
-    events.forEach(event => {
-      if (!event.pubkey || isDuplicateEvent(event, processedEvents)) return;
-      
-      // Filter by competition date range - only count runs during the competition
-      if (event.created_at < COMPETITION_START || event.created_at > COMPETITION_END) {
-        console.log(`[useLeagueLeaderboard] Skipping event outside competition period: ${new Date(event.created_at * 1000).toISOString()}`);
-        return; // Skip events outside competition period
-      }
-      
-      // Filter by current activity mode using exercise tag
-      const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
-      const eventActivityType = exerciseTag?.[1]?.toLowerCase();
-      
-      // Map activity mode to possible exercise tag values (RUNSTR uses 'run', others might use 'running')
-      const activityMatches = {
-        'run': ['run', 'running', 'jog', 'jogging'],
-        'cycle': ['cycle', 'cycling', 'bike', 'biking'],  
-        'walk': ['walk', 'walking', 'hike', 'hiking']
-      };
-      
-      const acceptedActivities = activityMatches[activityMode] || [activityMode];
-      
-      // Skip events that don't match current activity mode
-      if (eventActivityType && !acceptedActivities.includes(eventActivityType)) return;
-      
-      // If no exercise tag but is valid event, allow it through (fallback)
-      if (!eventActivityType) {
-        console.log(`[useLeagueLeaderboard] Event with no exercise tag - allowing through`);
-      }
-      
-      const distance = extractDistance(event);
-      if (distance <= 0) return;
-
-      processedEvents.push(event);
-
-      // Initialize user if not exists
-      if (!userStats[event.pubkey]) {
-        userStats[event.pubkey] = {
-          pubkey: event.pubkey,
-          totalMiles: 0,
-          runCount: 0, // Keep as runCount for backward compatibility but it represents activity count
-          lastActivity: 0,
-          runs: [] // Keep as runs for backward compatibility but it represents activities
-        };
-      }
-
-      // Add activity data
-      userStats[event.pubkey].totalMiles += distance;
-      userStats[event.pubkey].runCount++; // Actually activity count
-      userStats[event.pubkey].lastActivity = Math.max(
-        userStats[event.pubkey].lastActivity, 
-        event.created_at
-      );
-      userStats[event.pubkey].runs.push({ // Actually activities
-        distance,
-        timestamp: event.created_at,
-        eventId: event.id,
-        activityType: eventActivityType // Store the activity type for reference
-      });
-    });
-
-    // Convert to leaderboard format and sort
-    const leaderboardData = Object.values(userStats)
-      .map(user => ({
-        ...user,
-        totalMiles: Math.round(user.totalMiles * 100) / 100, // Round to 2 decimals
-        isComplete: user.totalMiles >= COURSE_TOTAL_MILES
-      }))
-      .sort((a, b) => b.totalMiles - a.totalMiles) // Sort by distance descending
-      .slice(0, 10) // Top 10 only
-      .map((user, index) => ({ ...user, rank: index + 1 }));
-
-    return leaderboardData;
-  }, [extractDistance, isDuplicateEvent, COURSE_TOTAL_MILES, activityMode, COMPETITION_START, COMPETITION_END]);
-
-  /**
    * Fetch fresh leaderboard data from Season Pass participants only
-   * Phase 5: Individual distance calculation based on each participant's payment date
+   * Phase 6: Ensure all participants display with proper tie-breaking
    */
   const fetchLeaderboardData = useCallback(async () => {
     if (!ndk) {
@@ -227,7 +143,7 @@ export const useLeagueLeaderboard = () => {
     try {
       setError(null);
       
-      // **Phase 5: Start with Season Pass participants (participant-first approach)**
+      // **Phase 6: Start with Season Pass participants (participant-first approach)**
       const participantsWithDates = seasonPassService.getParticipantsWithDates();
       console.log(`[useLeagueLeaderboard] Season Pass participants: ${participantsWithDates.length}`);
       
@@ -242,14 +158,14 @@ export const useLeagueLeaderboard = () => {
         return;
       }
 
-      // **Phase 5: Create participant payment date lookup map**
+      // **Phase 6: Create participant payment date lookup map**
       const participantPaymentDates = new Map();
       participantsWithDates.forEach(participant => {
         const paymentTimestamp = Math.floor(new Date(participant.paymentDate).getTime() / 1000);
         participantPaymentDates.set(participant.pubkey, paymentTimestamp);
       });
 
-      // **Phase 5: Create initial leaderboard structure from participants**
+      // **Phase 6: Create initial leaderboard structure from ALL participants**
       const initialLeaderboard = participantsWithDates.map(participant => ({
         pubkey: participant.pubkey,
         totalMiles: 0,
@@ -260,9 +176,9 @@ export const useLeagueLeaderboard = () => {
         paymentDate: participant.paymentDate
       }));
 
-      console.log(`[useLeagueLeaderboard] Created initial leaderboard with ${initialLeaderboard.length} participants`);
+      console.log(`[useLeagueLeaderboard] Phase 6: Created initial leaderboard with ALL ${initialLeaderboard.length} participants`);
 
-      // **Phase 5: Fetch events from Season Pass participants (broader date range for individual filtering)**
+      // **Phase 6: Fetch events from Season Pass participants (broader date range for individual filtering)**
       console.log(`[useLeagueLeaderboard] Fetching events from ${participantsWithDates.length} participants for ${activityMode} mode`);
       
       const participantPubkeys = participantsWithDates.map(p => p.pubkey);
@@ -280,11 +196,11 @@ export const useLeagueLeaderboard = () => {
 
       console.log(`[useLeagueLeaderboard] Fetched ${events.length} events from ${participantsWithDates.length} participants`);
 
-      // **Phase 5: Process events with individual payment date filtering**
+      // **Phase 6: Process events with individual payment date filtering**
       const processedEvents = [];
       const leaderboardMap = new Map();
       
-      // Initialize map with participant data
+      // Initialize map with ALL participant data
       initialLeaderboard.forEach(participant => {
         leaderboardMap.set(participant.pubkey, participant);
       });
@@ -293,7 +209,7 @@ export const useLeagueLeaderboard = () => {
       events.forEach(event => {
         if (!event.pubkey || isDuplicateEvent(event, processedEvents)) return;
         
-        // **Phase 5: Filter by individual participant payment date**
+        // **Phase 6: Filter by individual participant payment date**
         const participantPaymentDate = participantPaymentDates.get(event.pubkey);
         if (!participantPaymentDate) {
           // Event from non-participant (shouldn't happen with authors filter, but safety check)
@@ -354,19 +270,48 @@ export const useLeagueLeaderboard = () => {
         }
       });
 
-      // **Phase 5: Convert to final leaderboard format and sort**
+      // **Phase 6: Convert to final leaderboard format with ALL participants and proper tie-breaking**
       const leaderboardData = Array.from(leaderboardMap.values())
         .map(participant => ({
           ...participant,
           totalMiles: Math.round(participant.totalMiles * 100) / 100, // Round to 2 decimals
           isComplete: participant.totalMiles >= COURSE_TOTAL_MILES
         }))
-        .sort((a, b) => b.totalMiles - a.totalMiles) // Sort by distance descending
-        .map((participant, index) => ({ ...participant, rank: index + 1 }));
+        .sort((a, b) => {
+          // Primary sort: by distance descending
+          if (b.totalMiles !== a.totalMiles) {
+            return b.totalMiles - a.totalMiles;
+          }
+          
+          // Tie-breaker 1: by activity count descending (more activities wins)
+          if (b.runCount !== a.runCount) {
+            return b.runCount - a.runCount;
+          }
+          
+          // Tie-breaker 2: by most recent activity (more recent wins)
+          if (b.lastActivity !== a.lastActivity) {
+            return b.lastActivity - a.lastActivity;
+          }
+          
+          // Final tie-breaker: by pubkey (alphabetical for consistency)
+          return a.pubkey.localeCompare(b.pubkey);
+        })
+        .map((participant, index) => {
+          // **Phase 6: Assign ranks with proper tie handling**
+          let rank = index + 1;
+          
+          // If this participant has the same distance as the previous one, give them the same rank
+          if (index > 0 && participant.totalMiles === leaderboardData[index - 1].totalMiles) {
+            rank = leaderboardData[index - 1].rank;
+          }
+          
+          return { ...participant, rank };
+        });
 
-      console.log(`[useLeagueLeaderboard] Phase 5: Final leaderboard with ${leaderboardData.length} participants`);
-      console.log(`[useLeagueLeaderboard] Phase 5: Distance summary:`, 
-        leaderboardData.map(p => `${p.pubkey.substring(0, 8)}: ${p.totalMiles} miles`));
+      console.log(`[useLeagueLeaderboard] Phase 6: Final leaderboard with ALL ${leaderboardData.length} participants`);
+      console.log(`[useLeagueLeaderboard] Phase 6: Participants with 0 distance: ${leaderboardData.filter(p => p.totalMiles === 0).length}`);
+      console.log(`[useLeagueLeaderboard] Phase 6: Distance summary:`, 
+        leaderboardData.map(p => `Rank ${p.rank}: ${p.pubkey.substring(0, 8)} - ${p.totalMiles} miles`));
 
       // Update state and cache
       setLeaderboard(leaderboardData);
