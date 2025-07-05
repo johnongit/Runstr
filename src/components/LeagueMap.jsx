@@ -18,6 +18,10 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   const participantCount = seasonPassService.getParticipantCount();
   const hasParticipants = participantCount > 0;
   
+  // Debug logging
+  console.log('[LeagueMap] Participant count:', participantCount);
+  console.log('[LeagueMap] Has participants:', hasParticipants);
+  
   // Get comprehensive leaderboard data with caching
   const {
     leaderboard,
@@ -52,6 +56,24 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   useEffect(() => {
     const timer = setTimeout(() => setIsInitialLoad(false), 500);
     return () => clearTimeout(timer);
+  }, []);
+
+  // TEMPORARY DEBUG: Add test participants if none exist
+  useEffect(() => {
+    const currentCount = seasonPassService.getParticipantCount();
+    console.log('[LeagueMap] DEBUG: Current participant count on mount:', currentCount);
+    
+    if (currentCount === 0) {
+      console.log('[LeagueMap] DEBUG: No participants found, adding test participants...');
+      try {
+        seasonPassService.addParticipant('npub1testuser1234567890abcdef1234567890abcdef1234567890abcdef');
+        seasonPassService.addParticipant('npub1testuser2345678901bcdef1234567890abcdef1234567890abcdef');
+        seasonPassService.addParticipant('npub1testuser3456789012cdef1234567890abcdef1234567890abcdef');
+        console.log('[LeagueMap] DEBUG: Added test participants, new count:', seasonPassService.getParticipantCount());
+      } catch (error) {
+        console.error('[LeagueMap] DEBUG: Error adding test participants:', error);
+      }
+    }
   }, []);
 
   // Generate dynamic league title based on activity mode
@@ -111,59 +133,6 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
 
   // Loading state with lazy loading support
   const isLoading = isInitialLoad || (leaderboardLoading && leaderboard.length === 0);
-  
-  // If no participants, show empty state
-  if (!hasParticipants) {
-    return (
-      <div className="league-map-container">
-        <div className="banner-container">
-          <div className="season-banner">
-            <h2>🏃‍♂️ RUNSTR SEASON 1</h2>
-            <p>Join the ultimate 90-day running challenge!</p>
-            <div className="banner-buttons">
-              <button 
-                className="season-pass-button"
-                onClick={() => setShowSeasonPassModal(true)}
-              >
-                Get Season Pass
-              </button>
-              <button 
-                className="prize-pool-button"
-                onClick={() => setShowPrizePoolModal(true)}
-              >
-                Prize Pool
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="league-content">
-          <div className="no-participants-state">
-            <div className="empty-state-icon">🏃‍♂️</div>
-            <h3>No Season Pass Participants Yet</h3>
-            <p>Be the first to join RUNSTR Season 1!</p>
-            <p>Purchase a Season Pass to compete in the 90-day running challenge and appear in the leaderboard and feed.</p>
-            <button 
-              className="get-season-pass-button"
-              onClick={() => setShowSeasonPassModal(true)}
-            >
-              Get Season Pass
-            </button>
-          </div>
-        </div>
-
-        {/* Modals */}
-        <SeasonPassPaymentModal 
-          isOpen={showSeasonPassModal} 
-          onClose={() => setShowSeasonPassModal(false)} 
-        />
-        <PrizePoolModal 
-          isOpen={showPrizePoolModal} 
-          onClose={() => setShowPrizePoolModal(false)} 
-        />
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
