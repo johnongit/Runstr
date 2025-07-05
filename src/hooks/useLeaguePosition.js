@@ -14,7 +14,7 @@ import { REWARDS } from '../config/rewardsConfig';
  * @returns {Object} { competitionPosition, totalDistance, activities, isLoading, error, competitionStats }
  */
 export const useLeaguePosition = () => {
-  const { publicKey: userPubkey } = useContext(NostrContext);
+  const { publicKey: userPubkey, ndk } = useContext(NostrContext);
   const { mode: activityMode } = useActivityMode();
   const [totalDistance, setTotalDistance] = useState(0); // in miles
   const [activities, setActivities] = useState([]);
@@ -114,8 +114,8 @@ export const useLeaguePosition = () => {
    * Fetch user's league position and activities
    */
   const fetchLeaguePosition = useCallback(async () => {
-    if (!userPubkey) {
-      console.log('[useLeaguePosition] No user pubkey available');
+    if (!userPubkey || !ndk) {
+      console.log('[useLeaguePosition] No user pubkey or NDK available');
       return;
     }
 
@@ -145,20 +145,14 @@ export const useLeaguePosition = () => {
     try {
       console.log(`[useLeaguePosition] Fetching position for ${userPubkey} in ${activityMode} mode`);
       
-      // Fetch user's workout events during competition period
-      const events = await fetchEvents(
-        { fetchEvents: async (filter) => {
-          // This is a simplified implementation - in practice, we'd use the NDK instance
-          return [];
-        }},
-        {
-          kinds: [1301],
-          authors: [userPubkey],
-          since: COMPETITION_START,
-          until: COMPETITION_END,
-          limit: 1000
-        }
-      );
+      // Fetch user's workout events during competition period using proper fetchEvents
+      const events = await fetchEvents(ndk, {
+        kinds: [1301],
+        authors: [userPubkey],
+        since: COMPETITION_START,
+        until: COMPETITION_END,
+        limit: 1000
+      });
 
       console.log(`[useLeaguePosition] Fetched ${events.length} events`);
 
@@ -230,7 +224,7 @@ export const useLeaguePosition = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [userPubkey, activityMode, extractDistance, calculateCompetitionPosition, CACHE_KEY, lastFetchTime]);
+  }, [userPubkey, ndk, activityMode, extractDistance, calculateCompetitionPosition, CACHE_KEY, lastFetchTime, COMPETITION_START, COMPETITION_END]);
 
   /**
    * Manual refresh - bypass cache

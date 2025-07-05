@@ -35,31 +35,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     refresh: refreshPosition
   } = useLeaguePosition();
 
-  // Get profiles for leaderboard users
-  const leaderboardPubkeys = useMemo(() => 
-    leaderboard.map(user => user.pubkey), [leaderboard]
-  );
-  const { profiles } = useProfiles(leaderboardPubkeys);
-
-  // Enhanced leaderboard with profile data
-  const enhancedLeaderboard = useMemo(() => {
-    return leaderboard.map(user => {
-      // Fix: useProfiles returns an object, not a Map
-      const profile = profiles?.[user.pubkey] || profiles?.get?.(user.pubkey) || {};
-      return {
-        ...user,
-        displayName: profile.display_name || profile.name || `${getActivityDisplayName()} ${user.pubkey.slice(0, 8)}`,
-        picture: profile.picture,
-        isCurrentUser: user.pubkey === publicKey
-      };
-    });
-  }, [leaderboard, profiles, publicKey]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsInitialLoad(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
+  // Helper functions defined early to avoid reference errors
   // Generate dynamic league title based on activity mode
   const getLeagueTitle = () => {
     if (!activityMode) return 'RUNSTR SEASON 1'; // Fallback for loading state
@@ -112,6 +88,31 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   const formatDistance = (distance) => {
     return Number(distance || 0).toFixed(1);
   };
+
+  // Get profiles for leaderboard users
+  const leaderboardPubkeys = useMemo(() => 
+    leaderboard.map(user => user.pubkey), [leaderboard]
+  );
+  const { profiles } = useProfiles(leaderboardPubkeys);
+
+  // Enhanced leaderboard with profile data
+  const enhancedLeaderboard = useMemo(() => {
+    return leaderboard.map(user => {
+      // Fix: useProfiles returns an object, not a Map
+      const profile = profiles?.[user.pubkey] || profiles?.get?.(user.pubkey) || {};
+      return {
+        ...user,
+        displayName: profile.display_name || profile.name || `${getActivityDisplayName()} ${user.pubkey.slice(0, 8)}`,
+        picture: profile.picture,
+        isCurrentUser: user.pubkey === publicKey
+      };
+    });
+  }, [leaderboard, profiles, publicKey, getActivityDisplayName]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsInitialLoad(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Get competition status message
   const getCompetitionStatus = () => {
@@ -229,20 +230,22 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
           </div>
         </div>
         
-        {/* Competition Status */}
-        <div className="text-center mb-4">
-          <p className="text-text-secondary text-sm">
-            3-Month Distance Competition
-          </p>
-          <p className="text-primary text-sm font-medium">
-            {getCompetitionStatus()}
-          </p>
-          {lastUpdated && (
-            <p className="text-text-tertiary text-xs mt-1">
-              Updated {lastUpdated.toLocaleTimeString()}
+        {/* Competition Status - Only show if competition has started */}
+        {leaderboardStats?.hasStarted && (
+          <div className="text-center mb-4">
+            <p className="text-text-secondary text-sm">
+              3-Month Distance Competition
             </p>
-          )}
-        </div>
+            <p className="text-primary text-sm font-medium">
+              {getCompetitionStatus()}
+            </p>
+            {lastUpdated && (
+              <p className="text-text-tertiary text-xs mt-1">
+                Updated {lastUpdated.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Prize Pool - Keep existing prize pool display */}
@@ -293,8 +296,8 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
         </div>
       </div>
 
-      {/* User Competition Stats */}
-      {publicKey && userStats && (
+      {/* User Competition Stats - Only show if competition has started and user has activities */}
+      {publicKey && userStats?.hasStarted && userActivities.length > 0 && (
         <div className="bg-bg-tertiary rounded-lg p-4 mb-4 border border-border-secondary">
           <h3 className="font-semibold text-text-primary mb-3">Your Competition Stats</h3>
           <div className="grid grid-cols-2 gap-4">
