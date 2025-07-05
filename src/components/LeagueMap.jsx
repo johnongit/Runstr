@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLeagueLeaderboard } from '../hooks/useLeagueLeaderboard';
-import { useLeaguePosition } from '../hooks/useLeaguePosition';
 import { useProfiles } from '../hooks/useProfiles';
 import { useNostr } from '../hooks/useNostr';
 import SeasonPassPaymentModal from './modals/SeasonPassPaymentModal';
@@ -21,21 +20,35 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     error: leaderboardError,
     lastUpdated,
     refresh: refreshLeaderboard,
-    activityMode,
-    competitionStats: leaderboardStats
+    courseTotal,
+    activityMode
   } = useLeagueLeaderboard();
 
-  // Get user's position and competition stats
-  const {
-    totalDistance: userTotalDistance,
-    activities: userActivities,
-    competitionPosition,
-    competitionStats: userStats,
-    isLoading: positionLoading,
-    refresh: refreshPosition
-  } = useLeaguePosition();
+  // Get profiles for leaderboard users
+  const leaderboardPubkeys = useMemo(() => 
+    leaderboard.map(user => user.pubkey), [leaderboard]
+  );
+  const { profiles } = useProfiles(leaderboardPubkeys);
 
-  // Helper functions defined early to avoid reference errors
+  // Enhanced leaderboard with profile data
+  const enhancedLeaderboard = useMemo(() => {
+    return leaderboard.map(user => {
+      // Fix: useProfiles returns an object, not a Map
+      const profile = profiles?.[user.pubkey] || profiles?.get?.(user.pubkey) || {};
+      return {
+        ...user,
+        displayName: profile.display_name || profile.name || `Runner ${user.pubkey.slice(0, 8)}`,
+        picture: profile.picture,
+        isCurrentUser: user.pubkey === publicKey
+      };
+    });
+  }, [leaderboard, profiles, publicKey]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsInitialLoad(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Generate dynamic league title based on activity mode
   const getLeagueTitle = () => {
     if (!activityMode) return 'RUNSTR SEASON 1'; // Fallback for loading state
@@ -52,25 +65,9 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     }
   };
 
-  // Generate dynamic activity display name
-  const getActivityDisplayName = () => {
-    if (!activityMode) return 'Runner';
-    
-    switch (activityMode) {
-      case 'run':
-        return 'Runner';
-      case 'walk':
-        return 'Walker';
-      case 'cycle':
-        return 'Cyclist';
-      default:
-        return 'Runner';
-    }
-  };
-
   // Generate dynamic activity text based on activity mode
   const getActivityText = (count) => {
-    if (!activityMode) return `${count} activity${count !== 1 ? 's' : ''}`; // Fallback
+    if (!activityMode) return `${count} run${count !== 1 ? 's' : ''}`; // Fallback
     
     switch (activityMode) {
       case 'run':
@@ -80,71 +77,13 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
       case 'cycle':
         return `${count} ride${count !== 1 ? 's' : ''}`;
       default:
-        return `${count} activity${count !== 1 ? 's' : ''}`;
+        return `${count} run${count !== 1 ? 's' : ''}`;
     }
   };
 
   // Format distance to 1 decimal place
   const formatDistance = (distance) => {
     return Number(distance || 0).toFixed(1);
-  };
-
-  // Get profiles for leaderboard users
-  const leaderboardPubkeys = useMemo(() => 
-    leaderboard.map(user => user.pubkey), [leaderboard]
-  );
-  const { profiles } = useProfiles(leaderboardPubkeys);
-
-  // Enhanced leaderboard with profile data
-  const enhancedLeaderboard = useMemo(() => {
-    return leaderboard.map(user => {
-      // Fix: useProfiles returns an object, not a Map
-      const profile = profiles?.[user.pubkey] || profiles?.get?.(user.pubkey) || {};
-      return {
-        ...user,
-        displayName: profile.display_name || profile.name || `${getActivityDisplayName()} ${user.pubkey.slice(0, 8)}`,
-        picture: profile.picture,
-        isCurrentUser: user.pubkey === publicKey
-      };
-    });
-  }, [leaderboard, profiles, publicKey, getActivityDisplayName]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsInitialLoad(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Get competition status message
-  const getCompetitionStatus = () => {
-    const stats = leaderboardStats || userStats;
-    if (!stats) return 'Loading competition info...';
-    
-    if (!stats.hasStarted) {
-      return `Competition starts in ${stats.daysRemaining} days`;
-    }
-    
-    if (stats.hasEnded) {
-      return 'Competition has ended';
-    }
-    
-    return `${stats.daysRemaining} days remaining`;
-  };
-
-  // Get empty state message
-  const getEmptyStateMessage = () => {
-    const stats = leaderboardStats || userStats;
-    if (!stats) return 'Loading...';
-    
-    if (!stats.hasStarted) {
-      return `Competition starts ${stats.startDate.toLocaleDateString()}. Get ready to compete!`;
-    }
-    
-    if (stats.hasEnded) {
-      return 'Competition has ended. Check back for Season 2!';
-    }
-    
-    const activityName = getActivityDisplayName().toLowerCase();
-    return `Be the first ${activityName} to start competing! Log your activities to climb the leaderboard.`;
   };
 
   // Season Pass helpers
@@ -163,13 +102,6 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   const handlePaymentSuccess = () => {
     // Refresh the leaderboard to show updated content
     refreshLeaderboard();
-    refreshPosition();
-  };
-
-  // Refresh both leaderboard and position
-  const handleRefresh = () => {
-    refreshLeaderboard();
-    refreshPosition();
   };
 
   // Loading state with lazy loading support
@@ -184,7 +116,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
             <span className="w-2 h-2 bg-text-secondary rounded-full"></span>
             <span className="w-2 h-2 bg-text-secondary rounded-full"></span>
           </div>
-          <p className="text-text-secondary">Loading League Competition...</p>
+          <p className="text-text-secondary">Loading League Race...</p>
         </div>
       </div>
     );
@@ -196,7 +128,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
         <div className="flex flex-col justify-center items-center h-32">
           <p className="text-red-400 text-sm mb-2">Error loading league data: {leaderboardError}</p>
           <button 
-            onClick={handleRefresh}
+            onClick={refreshLeaderboard}
             className="px-3 py-1 bg-primary text-text-primary text-sm rounded-md"
           >
             Retry
@@ -207,190 +139,154 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   }
 
   return (
-    <div className="league-map-container">
-      {/* Competition Header */}
-      <div className="league-map-header">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-bold text-text-primary">
-            {getLeagueTitle()}
-          </h2>
-          <div className="flex items-center space-x-2">
+    <div className="space-y-4 mb-4">
+      {/* Prize Pool Display */}
+      <div className="bg-bg-secondary rounded-lg border border-border-secondary p-4">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-text-primary">{getLeagueTitle()}</h3>
+            {!hasSeasonPass && (
+              <button
+                onClick={handleSeasonPassClick}
+                className="px-3 py-1 bg-primary text-text-primary text-sm rounded-md font-semibold hover:bg-primary/80 transition-colors"
+              >
+                🎫 Season Pass
+              </button>
+            )}
             {hasSeasonPass && (
-              <span className="text-xs bg-primary text-text-primary px-2 py-1 rounded-full">
-                Season Pass
+              <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm rounded-md font-semibold border border-green-500/30">
+                ✅ Season Member
               </span>
             )}
-            <button
-              onClick={handleRefresh}
-              className="text-text-secondary hover:text-text-primary text-sm"
-              disabled={leaderboardLoading}
-            >
-              🔄
-            </button>
+          </div>
+          <div className="text-xs text-text-secondary">
+            {lastUpdated && `Updated ${new Date(lastUpdated).toLocaleTimeString()}`}
           </div>
         </div>
         
-        {/* Competition Status - Only show if competition has started */}
-        {leaderboardStats?.hasStarted && (
-          <div className="text-center mb-4">
-            <p className="text-text-secondary text-sm">
-              3-Month Distance Competition
-            </p>
-            <p className="text-primary text-sm font-medium">
-              {getCompetitionStatus()}
-            </p>
-            {lastUpdated && (
-              <p className="text-text-tertiary text-xs mt-1">
-                Updated {lastUpdated.toLocaleTimeString()}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Prize Pool - Keep existing prize pool display */}
-      <div className="mb-4">
+        {/* Prize Pool Section */}
         <div 
-          className="bg-gradient-to-r from-yellow-600 to-orange-600 rounded-lg p-4 cursor-pointer hover:from-yellow-500 hover:to-orange-500 transition-all duration-200"
           onClick={() => setShowPrizePoolModal(true)}
+          className="relative bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-2 border-amber-500/30 rounded-xl p-6 cursor-pointer hover:border-amber-500/50 hover:shadow-lg transition-all duration-300 group"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-2xl">🏆</span>
-                <div>
-                  <h3 className="text-white font-bold text-lg">Total Prize Pool</h3>
-                  <p className="text-yellow-100 text-sm">Click to view breakdown & rules</p>
-                </div>
+          {/* Background decoration */}
+          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-orange-500/5 rounded-xl group-hover:from-amber-500/10 group-hover:to-orange-500/10 transition-all duration-300"></div>
+          
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-4xl">🏆</div>
+              <div>
+                <div className="text-xl font-bold text-text-primary mb-1">Total Prize Pool</div>
+                <div className="text-text-secondary text-sm">Click to view breakdown & rules</div>
               </div>
             </div>
+            
             <div className="text-right">
-              <p className="text-white text-2xl font-bold">200,000</p>
-              <p className="text-yellow-100 text-sm">SATS</p>
-            </div>
-            <div className="text-white text-xl">→</div>
-          </div>
-          
-          <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-            <div className="bg-black bg-opacity-20 rounded p-2">
-              <p className="text-yellow-200 text-xs">1st</p>
-              <p className="text-white font-semibold">30k</p>
-            </div>
-            <div className="bg-black bg-opacity-20 rounded p-2">
-              <p className="text-yellow-200 text-xs">2nd</p>
-              <p className="text-white font-semibold">20k</p>
-            </div>
-            <div className="bg-black bg-opacity-20 rounded p-2">
-              <p className="text-yellow-200 text-xs">3rd</p>
-              <p className="text-white font-semibold">15k</p>
-            </div>
-            <div className="bg-black bg-opacity-20 rounded p-2">
-              <p className="text-yellow-200 text-xs">Hon.</p>
-              <p className="text-white font-semibold">5k</p>
+              <div className="text-3xl font-bold text-amber-400 mb-1">200,000</div>
+              <div className="text-amber-300 font-semibold">SATS</div>
             </div>
           </div>
           
-          <p className="text-yellow-100 text-xs text-center mt-2">
-            Per activity mode (Running, Walking, Cycling)
-          </p>
+          {/* Prize distribution preview */}
+          <div className="mt-4 pt-4 border-t border-amber-500/20">
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div className="text-xs">
+                <div className="text-amber-300 font-semibold">1st</div>
+                <div className="text-text-secondary">30k</div>
+              </div>
+              <div className="text-xs">
+                <div className="text-gray-300 font-semibold">2nd</div>
+                <div className="text-text-secondary">20k</div>
+              </div>
+              <div className="text-xs">
+                <div className="text-orange-300 font-semibold">3rd</div>
+                <div className="text-text-secondary">15k</div>
+              </div>
+              <div className="text-xs">
+                <div className="text-blue-300 font-semibold">Hon.</div>
+                <div className="text-text-secondary">5k</div>
+              </div>
+            </div>
+            <div className="text-xs text-text-muted text-center mt-2">Per activity mode (Running, Walking, Cycling)</div>
+          </div>
+          
+          {/* Click indicator */}
+          <div className="absolute top-4 right-4 text-text-muted group-hover:text-text-secondary transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </div>
         </div>
       </div>
 
-      {/* User Competition Stats - Only show if competition has started and user has activities */}
-      {publicKey && userStats?.hasStarted && userActivities.length > 0 && (
-        <div className="bg-bg-tertiary rounded-lg p-4 mb-4 border border-border-secondary">
-          <h3 className="font-semibold text-text-primary mb-3">Your Competition Stats</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center">
-              <p className="text-text-secondary text-sm">Total Distance</p>
-              <p className="text-primary text-lg font-bold">{formatDistance(userTotalDistance)} mi</p>
-            </div>
-            <div className="text-center">
-              <p className="text-text-secondary text-sm">Activities</p>
-              <p className="text-primary text-lg font-bold">{userActivities.length}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-text-secondary text-sm">Daily Average</p>
-              <p className="text-primary text-lg font-bold">{formatDistance(userStats.dailyAverage)} mi</p>
-            </div>
-            <div className="text-center">
-              <p className="text-text-secondary text-sm">Projected Total</p>
-              <p className="text-primary text-lg font-bold">{formatDistance(userStats.projectedTotal)} mi</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Leaderboard */}
-      <div className="league-leaderboard">
-        <div className="leaderboard-header">
-          <h3 className="font-bold text-text-primary mb-2">🏆 League Standings</h3>
-          <p className="text-text-secondary text-sm">
-            Top 10 {getActivityDisplayName()}s by Total Distance
-          </p>
-        </div>
-
-        {leaderboard.length === 0 ? (
-          <div className="leaderboard-empty">
-            <p className="text-text-secondary text-center py-8">
-              {getEmptyStateMessage()}
-            </p>
-            {!hasSeasonPass && publicKey && (
-              <div className="text-center mt-4">
-                <button
-                  onClick={handleSeasonPassClick}
-                  className="bg-primary text-text-primary px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-hover transition-colors"
-                >
-                  Get Season Pass to Compete
-                </button>
+      {/* Workout-Card-Styled Leaderboard */}
+      <div className="bg-bg-secondary rounded-lg border border-border-secondary overflow-hidden">
+        <div className="flex justify-between items-center p-4 border-b border-border-secondary bg-bg-tertiary">
+          <h3 className="text-lg font-semibold text-text-primary">🏆 League Standings</h3>
+          {leaderboardLoading && (
+            <div className="flex items-center">
+              <div className="flex space-x-1">
+                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
+                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
+                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
               </div>
-            )}
+            </div>
+          )}
+        </div>
+        
+        {enhancedLeaderboard.length === 0 ? (
+          <div className="p-4 text-center">
+            <p className="text-text-secondary">
+              No {activityMode === 'run' ? 'runners' : activityMode === 'walk' ? 'walkers' : 'cyclists'} found yet. Be the first to start!
+            </p>
           </div>
         ) : (
-          <div className="leaderboard-list">
-            {enhancedLeaderboard.map((user, index) => (
-              <div
-                key={user.pubkey}
-                className={`leaderboard-item ${user.isCurrentUser ? 'bg-primary bg-opacity-10 border-primary' : ''}`}
+          <div className="divide-y divide-border-secondary">
+            {enhancedLeaderboard.slice(0, 10).map((user) => (
+              <div 
+                key={user.pubkey} 
+                className={`flex items-center justify-between p-4 ${
+                  user.isCurrentUser ? 'bg-primary/5 border-l-4 border-primary' : ''
+                }`}
               >
-                <div className="leaderboard-rank">
-                  <span className="font-bold text-text-primary">
-                    {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${user.rank}`}
-                  </span>
-                </div>
-
-                <div className="flex items-center space-x-3 flex-1 min-w-0">
-                  {user.picture && (
-                    <img
-                      src={user.picture}
-                      alt={user.displayName}
-                      className="w-8 h-8 rounded-full flex-shrink-0"
-                    />
-                  )}
+                <div className="flex items-center space-x-3">
+                  {/* Rank Badge */}
+                  <div className={`
+                    flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold
+                    ${user.rank === 1 ? 'bg-yellow-500 text-black' : ''}
+                    ${user.rank === 2 ? 'bg-gray-400 text-black' : ''}
+                    ${user.rank === 3 ? 'bg-orange-600 text-white' : ''}
+                    ${user.rank > 3 ? 'bg-bg-tertiary text-text-secondary border border-border-secondary' : ''}
+                  `}>
+                    {user.rank}
+                  </div>
+                  
+                  {/* User Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <p className="font-medium text-text-primary truncate">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-text-primary truncate">
                         {user.displayName}
-                      </p>
+                      </span>
                       {user.isCurrentUser && (
-                        <span className="text-xs bg-primary text-text-primary px-2 py-1 rounded-full">
+                        <span className="px-2 py-1 bg-primary text-text-primary text-xs rounded-full font-bold">
                           YOU
                         </span>
                       )}
                     </div>
-                    <p className="text-text-secondary text-sm">
-                      {getActivityText(user.activityCount)}
-                    </p>
+                    <div className="text-xs text-text-secondary">
+                      {getActivityText(user.runCount)}
+                    </div>
                   </div>
                 </div>
-
+                
+                {/* Stats */}
                 <div className="text-right">
-                  <p className="font-bold text-text-primary">
+                  <div className="font-semibold text-text-primary">
                     {formatDistance(user.totalMiles)} mi
-                  </p>
-                  <p className="text-text-secondary text-sm">
-                    {formatDistance(user.averageDistance)} avg
-                  </p>
+                  </div>
+                  <div className="text-xs text-text-secondary">
+                    Rank #{user.rank}
+                  </div>
                 </div>
               </div>
             ))}
@@ -398,19 +294,18 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
         )}
       </div>
 
-      {/* Modals */}
-      {showSeasonPassModal && (
-        <SeasonPassPaymentModal
-          onClose={() => setShowSeasonPassModal(false)}
-          onPaymentSuccess={handlePaymentSuccess}
-        />
-      )}
-      
-      {showPrizePoolModal && (
-        <PrizePoolModal
-          onClose={() => setShowPrizePoolModal(false)}
-        />
-      )}
+      {/* Season Pass Payment Modal */}
+      <SeasonPassPaymentModal
+        open={showSeasonPassModal}
+        onClose={() => setShowSeasonPassModal(false)}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
+
+      {/* Prize Pool Modal */}
+      <PrizePoolModal
+        open={showPrizePoolModal}
+        onClose={() => setShowPrizePoolModal(false)}
+      />
     </div>
   );
 };
