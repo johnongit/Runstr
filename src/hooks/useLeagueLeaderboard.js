@@ -25,7 +25,7 @@ export const useLeagueLeaderboard = () => {
   // Constants
   const COURSE_TOTAL_MILES = 500; // Updated to 500 miles
   const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes cache
-  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v2`; // Activity-specific cache with competition dates
+  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v3`; // Activity-specific cache with participant-first logic
   const MAX_EVENTS = 5000; // Limit to prevent overwhelming queries
   
   // Competition date range
