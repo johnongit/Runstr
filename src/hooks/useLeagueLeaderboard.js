@@ -271,7 +271,7 @@ export const useLeagueLeaderboard = () => {
       });
 
       // **Phase 6: Convert to final leaderboard format with ALL participants and proper tie-breaking**
-      const leaderboardData = Array.from(leaderboardMap.values())
+      const sortedParticipants = Array.from(leaderboardMap.values())
         .map(participant => ({
           ...participant,
           totalMiles: Math.round(participant.totalMiles * 100) / 100, // Round to 2 decimals
@@ -295,18 +295,19 @@ export const useLeagueLeaderboard = () => {
           
           // Final tie-breaker: by pubkey (alphabetical for consistency)
           return a.pubkey.localeCompare(b.pubkey);
-        })
-        .map((participant, index) => {
-          // **Phase 6: Assign ranks with proper tie handling**
-          let rank = index + 1;
-          
-          // If this participant has the same distance as the previous one, give them the same rank
-          if (index > 0 && participant.totalMiles === leaderboardData[index - 1].totalMiles) {
-            rank = leaderboardData[index - 1].rank;
-          }
-          
-          return { ...participant, rank };
         });
+
+      // **Phase 6: Assign ranks with proper tie handling**
+      const leaderboardData = sortedParticipants.map((participant, index) => {
+        let rank = index + 1;
+        
+        // If this participant has the same distance as the previous one, give them the same rank
+        if (index > 0 && participant.totalMiles === sortedParticipants[index - 1].totalMiles) {
+          rank = sortedParticipants[index - 1].rank;
+        }
+        
+        return { ...participant, rank };
+      });
 
       console.log(`[useLeagueLeaderboard] Phase 6: Final leaderboard with ALL ${leaderboardData.length} participants`);
       console.log(`[useLeagueLeaderboard] Phase 6: Participants with 0 distance: ${leaderboardData.filter(p => p.totalMiles === 0).length}`);
