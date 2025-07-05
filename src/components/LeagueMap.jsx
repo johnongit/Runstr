@@ -5,6 +5,7 @@ import { useNostr } from '../hooks/useNostr';
 import SeasonPassPaymentModal from './modals/SeasonPassPaymentModal';
 import PrizePoolModal from './modals/PrizePoolModal';
 import seasonPassPaymentService from '../services/seasonPassPaymentService';
+import seasonPassService from '../services/seasonPassService';
 
 export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = null }) => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -29,6 +30,11 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     leaderboard.map(user => user.pubkey), [leaderboard]
   );
   const { profiles } = useProfiles(leaderboardPubkeys);
+
+  // Phase 7: Get participant count
+  const participantCount = useMemo(() => 
+    seasonPassService.getParticipantCount(), []
+  );
 
   // Enhanced leaderboard with profile data
   const enhancedLeaderboard = useMemo(() => {
@@ -63,6 +69,13 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
       default:
         return 'RUNSTR SEASON 1';
     }
+  };
+
+  // Phase 7: Get participant count text
+  const getParticipantCountText = () => {
+    if (participantCount === 0) return 'No season pass holders yet';
+    if (participantCount === 1) return '1 Season Pass Holder';
+    return `${participantCount} Season Pass Holders`;
   };
 
   // Generate dynamic activity text based on activity mode
@@ -144,7 +157,11 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-4">
         <div className="flex justify-between items-center mb-3">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-text-primary">{getLeagueTitle()}</h3>
+            <div>
+              <h3 className="text-lg font-semibold text-text-primary">{getLeagueTitle()}</h3>
+              {/* Phase 7: Participant count display */}
+              <p className="text-sm text-text-secondary mt-1">{getParticipantCountText()}</p>
+            </div>
             {!hasSeasonPass && (
               <button
                 onClick={handleSeasonPassClick}
