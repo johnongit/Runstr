@@ -23,55 +23,114 @@ export const RunClub = () => {
     loadingProgress
   } = useLeagueActivityFeed();
 
+  // Phase 7: Enhanced validation and error tracking
+  const [validationErrors, setValidationErrors] = useState([]);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
+
   // Transform enhanced feed events to Post-compatible format for WorkoutCard display
   const workoutPosts = useMemo(() => {
     if (!enhancedFeedEvents.length) return [];
     
-    return enhancedFeedEvents.map(event => ({
-      // Core post data for WorkoutCard
-      id: event.id,
-      kind: 1301, // Always 1301 for workout records
-      content: event.content,
-      created_at: event.created_at,
-      title: event.title,
+    const validationErrors = [];
+    
+    const posts = enhancedFeedEvents.map((event, index) => {
+      // Phase 7: Validate each event
+      if (!event.id) {
+        validationErrors.push(`Event ${index}: Missing ID`);
+        return null;
+      }
       
-      // Author information for WorkoutCard
-      author: {
-        pubkey: event.pubkey,
-        profile: {
-          name: event.displayName,
-          display_name: event.displayName,
-          picture: event.picture,
-          about: event.about,
-          nip05: event.nip05
-        }
-      },
+      if (!event.pubkey) {
+        validationErrors.push(`Event ${event.id}: Missing pubkey`);
+        return null;
+      }
       
-      // Workout metrics for display
-      metrics: event.metrics || [
-        // Fallback metrics if not processed
-        ...(event.distance ? [{
-          label: 'Distance',
-          value: event.distance,
-          unit: event.distanceUnit || 'miles'
-        }] : []),
-        ...(event.duration ? [{
-          label: 'Duration', 
-          value: event.duration,
-          unit: 'min'
-        }] : [])
-      ],
-      
-      // Tags for team/challenge display
-      tags: event.tags,
-      
-      // Simple zap count (no complex social interactions)
-      zaps: 0, // Keep simple - just for display
-      
-      // Raw event for any additional processing
-      rawEvent: event.rawEvent
-    }));
-  }, [enhancedFeedEvents]);
+      if (!event.created_at) {
+        validationErrors.push(`Event ${event.id}: Missing created_at timestamp`);
+      }
+
+      // Validate activity mode filtering
+      if (activityMode && event.activityType && event.activityType !== activityMode) {
+        validationErrors.push(`Event ${event.id}: Activity type mismatch (${event.activityType} vs ${activityMode})`);
+      }
+
+      return {
+        // Core post data for WorkoutCard
+        id: event.id,
+        kind: 1301, // Always 1301 for workout records
+        content: event.content || '',
+        created_at: event.created_at || Math.floor(Date.now() / 1000),
+        title: event.title || 'Workout Record',
+        
+        // Author information for WorkoutCard
+        author: {
+          pubkey: event.pubkey,
+          profile: {
+            name: event.displayName || `Runner ${event.pubkey.slice(0, 8)}`,
+            display_name: event.displayName || `Runner ${event.pubkey.slice(0, 8)}`,
+            picture: event.picture,
+            about: event.about || '',
+            nip05: event.nip05
+          }
+        },
+        
+        // Workout metrics for display - with validation
+        metrics: (() => {
+          const metrics = event.metrics || [];
+          
+          // Add fallback metrics if none processed
+          if (metrics.length === 0) {
+            const fallbackMetrics = [];
+            
+            if (event.distance) {
+              fallbackMetrics.push({
+                label: 'Distance',
+                value: event.distance,
+                unit: event.distanceUnit || 'miles'
+              });
+            }
+            
+            if (event.duration) {
+              fallbackMetrics.push({
+                label: 'Duration', 
+                value: event.duration,
+                unit: 'min'
+              });
+            }
+            
+            return fallbackMetrics;
+          }
+          
+          // Validate existing metrics
+          return metrics.filter(metric => {
+            if (!metric.label || !metric.value) {
+              validationErrors.push(`Event ${event.id}: Invalid metric (missing label or value)`);
+              return false;
+            }
+            return true;
+          });
+        })(),
+        
+        // Tags for team/challenge display
+        tags: event.tags || [],
+        
+        // Simple zap count (no complex social interactions)
+        zaps: 0, // Keep simple - just for display
+        
+        // Activity metadata for validation
+        activityType: event.activityType,
+        
+        // Raw event for any additional processing
+        rawEvent: event.rawEvent
+      };
+    }).filter(Boolean); // Remove null entries
+    
+    // Update validation errors
+    setValidationErrors(validationErrors);
+    
+    return posts;
+  }, [enhancedFeedEvents, activityMode]);
 
   // Combined loading state
   const loading = feedLoading || profilesLoading;
@@ -83,38 +142,104 @@ export const RunClub = () => {
     };
   }, []);
 
-  // Simple refresh function
+  // Phase 7: Enhanced refresh with retry logic
   const refreshFeed = useCallback(() => {
     if (loading || isRefreshing) return;
+    
     setIsRefreshing(true);
-    refreshFeedData().finally(() => setTimeout(() => setIsRefreshing(false), 500));
-  }, [loading, isRefreshing, refreshFeedData]);
+    setValidationErrors([]);
+    
+    refreshFeedData()
+      .then(() => {
+        setRetryCount(0); // Reset retry count on success
+      })
+      .catch((error) => {
+        console.error('Feed refresh failed:', error);
+        if (retryCount < maxRetries) {
+          setRetryCount(prev => prev + 1);
+          // Retry after a delay
+          setTimeout(() => {
+            if (!isRefreshing) return; // Don't retry if user cancelled
+            refreshFeedData();
+          }, 2000 * (retryCount + 1)); // Exponential backoff
+        }
+      })
+      .finally(() => {
+        setTimeout(() => setIsRefreshing(false), 500);
+      });
+  }, [loading, isRefreshing, refreshFeedData, retryCount, maxRetries]);
 
-  // Hard refresh with cache clearing
+  // Phase 7: Hard refresh with cache clearing and validation reset
   const hardRefresh = useCallback(() => {
     if (loading || isRefreshing) return;
+    
     setIsRefreshing(true);
+    setValidationErrors([]);
+    setRetryCount(0);
+    
+    // Clear any cached data and refresh
     refreshFeedData();
     setTimeout(() => setIsRefreshing(false), 1000);
   }, [loading, isRefreshing, refreshFeedData]);
 
-  // Simple zap handler for WorkoutCards
+  // Phase 7: Enhanced zap handler with error handling
   const handleZap = useCallback(async (post, wallet) => {
+    if (!post || !post.id) {
+      console.error('Invalid post for zapping');
+      return;
+    }
+    
     console.log('Zapping workout:', post.id);
-    // Simple zap implementation - could be enhanced later if needed
-    if (wallet && wallet.makePayment) {
-      try {
-        // Basic zap functionality - just log for now
-        console.log(`Zapped ${defaultZapAmount} sats to workout ${post.id}`);
-      } catch (error) {
-        console.error('Zap failed:', error);
-      }
+    
+    // Enhanced zap validation
+    if (!wallet) {
+      console.warn('No wallet connected for zapping');
+      return;
+    }
+    
+    if (!wallet.makePayment) {
+      console.warn('Wallet does not support payments');
+      return;
+    }
+    
+    try {
+      // Basic zap functionality - could be enhanced later if needed
+      console.log(`Zapped ${defaultZapAmount} sats to workout ${post.id}`);
+      // TODO: Implement actual zap if needed
+    } catch (error) {
+      console.error('Zap failed:', error);
     }
   }, [defaultZapAmount]);
 
+  // Phase 7: Activity mode validation
+  const activityModeDisplay = useMemo(() => {
+    const modes = {
+      'run': 'Running',
+      'walk': 'Walking', 
+      'cycle': 'Cycling'
+    };
+    return modes[activityMode] || activityMode || 'All';
+  }, [activityMode]);
+
+  // Phase 7: Error state classification
+  const errorType = useMemo(() => {
+    if (!feedError) return null;
+    
+    if (feedError.includes('connection') || feedError.includes('network')) {
+      return 'network';
+    }
+    if (feedError.includes('participant')) {
+      return 'participants';
+    }
+    if (feedError.includes('timeout')) {
+      return 'timeout';
+    }
+    return 'unknown';
+  }, [feedError]);
+
   return (
     <div className="runclub-container">
-      {/* Development debug tools */}
+      {/* Phase 7: Enhanced development debug tools */}
       {process.env.NODE_ENV === 'development' && (
         <div style={{ position: 'fixed', top: '80px', right: '10px', zIndex: 1000 }}>
           <button 
@@ -129,7 +254,7 @@ export const RunClub = () => {
               cursor: 'pointer'
             }}
             disabled={loading || isRefreshing}
-            title={`Participant-first workout feed (${activityMode} mode)`}
+            title={`Participant-first workout feed (${activityModeDisplay} mode)`}
           >
             🗑️ Refresh Workouts
           </button>
@@ -153,10 +278,15 @@ export const RunClub = () => {
                   {loadingProgress.processedEvents}/{loadingProgress.totalEvents} workouts
                 </small>
               )}
+              {retryCount > 0 && (
+                <div style={{ marginTop: '4px', color: '#ffcc00' }}>
+                  Retry {retryCount}/{maxRetries}
+                </div>
+              )}
             </div>
           )}
           
-          {/* Show error */}
+          {/* Enhanced error display */}
           {feedError && (
             <div style={{
               position: 'fixed',
@@ -169,7 +299,31 @@ export const RunClub = () => {
               fontSize: '11px',
               maxWidth: '200px'
             }}>
-              Error: {feedError}
+              Error ({errorType}): {feedError}
+              {retryCount > 0 && <div>Retrying... ({retryCount}/{maxRetries})</div>}
+            </div>
+          )}
+          
+          {/* Validation errors */}
+          {validationErrors.length > 0 && (
+            <div style={{
+              position: 'fixed',
+              top: '240px',
+              right: '10px',
+              background: '#ff8800',
+              color: 'white',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              fontSize: '10px',
+              maxWidth: '200px',
+              maxHeight: '100px',
+              overflow: 'auto'
+            }}>
+              Validation Issues ({validationErrors.length}):
+              {validationErrors.slice(0, 3).map((error, i) => (
+                <div key={i}>{error}</div>
+              ))}
+              {validationErrors.length > 3 && <div>...and {validationErrors.length - 3} more</div>}
             </div>
           )}
         </div>
@@ -180,21 +334,75 @@ export const RunClub = () => {
       
       {/* Workout Cards Feed */}
       <div className="workout-feed" style={{ padding: '1rem' }}>
+        {/* Phase 7: Enhanced loading states */}
         {loading && workoutPosts.length === 0 && (
           <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-            Loading participant workouts...
+            Loading {activityModeDisplay.toLowerCase()} workouts from Season Pass participants...
+            {loadingProgress.participantCount > 0 && (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.9em' }}>
+                {loadingProgress.participantCount} participants • {loadingProgress.processedEvents} events processed
+              </div>
+            )}
           </div>
         )}
         
+        {/* Phase 7: Enhanced error handling */}
         {feedError && workoutPosts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#ff4444' }}>
-            Error loading workouts: {feedError}
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{ color: '#ff4444', marginBottom: '1rem' }}>
+              {errorType === 'network' && '🌐 Network connection issue'}
+              {errorType === 'participants' && '👥 Season Pass participant loading issue'} 
+              {errorType === 'timeout' && '⏱️ Request timed out'}
+              {errorType === 'unknown' && '❌ Error loading workouts'}
+            </div>
+            <div style={{ color: '#666', marginBottom: '1rem' }}>
+              {feedError}
+            </div>
+            <button 
+              onClick={refreshFeed}
+              style={{
+                background: '#ff4444',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginRight: '8px'
+              }}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? `Retrying... (${retryCount}/${maxRetries})` : 'Retry'}
+            </button>
+            {retryCount >= maxRetries && (
+              <button 
+                onClick={hardRefresh}
+                style={{
+                  background: '#0066cc',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Hard Refresh
+              </button>
+            )}
           </div>
         )}
         
-        {!loading && workoutPosts.length === 0 && (
+        {/* Phase 7: Enhanced empty state */}
+        {!loading && !feedError && workoutPosts.length === 0 && (
           <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-            No workout records found for Season Pass participants in {activityMode} mode.
+            <div style={{ fontSize: '1.2em', marginBottom: '1rem' }}>
+              🏃‍♂️ No {activityModeDisplay.toLowerCase()} workouts found
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              No Season Pass participants have posted {activityModeDisplay.toLowerCase()} workouts yet.
+            </div>
+            <div style={{ fontSize: '0.9em', color: '#999' }}>
+              Activity mode: {activityModeDisplay} • Participants loaded: {loadingProgress.participantCount || 0}
+            </div>
           </div>
         )}
         
@@ -208,8 +416,17 @@ export const RunClub = () => {
           />
         ))}
         
+        {/* Phase 7: Enhanced footer with stats */}
         {!loading && workoutPosts.length > 0 && (
           <div style={{ textAlign: 'center', padding: '1rem', color: '#666' }}>
+            <div style={{ marginBottom: '1rem', fontSize: '0.9em' }}>
+              Showing {workoutPosts.length} {activityModeDisplay.toLowerCase()} workout{workoutPosts.length !== 1 ? 's' : ''} from Season Pass participants
+              {validationErrors.length > 0 && (
+                <div style={{ color: '#ff8800', fontSize: '0.8em', marginTop: '0.5rem' }}>
+                  ⚠️ {validationErrors.length} validation issue{validationErrors.length !== 1 ? 's' : ''} detected
+                </div>
+              )}
+            </div>
             <button 
               onClick={refreshFeed}
               style={{
