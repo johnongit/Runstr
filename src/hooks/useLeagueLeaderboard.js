@@ -9,7 +9,7 @@ import { REWARDS } from '../config/rewardsConfig';
  * Hook: useLeagueLeaderboard
  * Fetches Kind 1301 workout records from Season Pass participants only and creates a comprehensive leaderboard
  * Filters by current activity mode (run/walk/cycle) for activity-specific leagues
- * Only counts runs during the competition period (July 11 - September 11, 2025)
+ * Only counts runs during the competition period (July 1 - October 11, 2025)
  * Uses localStorage caching (30 min expiry) and progressive loading for optimal UX
  * 
  * @returns {Object} { leaderboard, isLoading, error, refresh, lastUpdated, activityMode, courseTotal, loadingProgress }
@@ -35,15 +35,15 @@ export const useLeagueLeaderboard = () => {
   const COURSE_TOTAL_MILES = 500;
   const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes cache
   const PARTICIPANT_CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes for participant cache
-  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v3`;
+  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v4`;
   const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v1`;
   const MAX_EVENTS = 5000; // Limit to prevent overwhelming queries
   const BATCH_SIZE = 100; // Process events in batches
   const UPDATE_DEBOUNCE_MS = 500; // Debounce UI updates
   
-  // Competition date range
-  const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
-  const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
+  // Competition date range - FIXED: Use July 1st as actual start for participants
+  const COMPETITION_START = Math.floor(new Date('2025-07-01T00:00:00Z').getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date('2025-10-11T23:59:59Z').getTime() / 1000);
 
   // Memoized participant data for performance
   const participantsWithDates = useMemo(() => {
@@ -132,6 +132,7 @@ export const useLeagueLeaderboard = () => {
 
   /**
    * Extract distance from event tags with proper error handling and validation
+   * FIXED: Now properly returns miles for leaderboard consistency
    */
   const extractDistance = useCallback((event) => {
     try {
@@ -174,8 +175,8 @@ export const useLeagueLeaderboard = () => {
         return 0;
       }
       
-      // Return in km for internal consistency (like Profile/Stats)
-      return distanceInKm;
+      // FIXED: Return in miles for leaderboard consistency (convert km to miles)
+      return distanceInKm * 0.621371;
     } catch (err) {
       console.error('Error extracting distance:', err);
       return 0;
