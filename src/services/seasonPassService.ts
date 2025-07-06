@@ -46,45 +46,76 @@ const convertNpubToHex = (npub: string): string => {
 };
 
 /**
+ * Default Season Pass participants
+ * These are the founding participants who purchased season passes
+ */
+const DEFAULT_PARTICIPANTS: SeasonPassParticipant[] = [
+  {
+    // npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum
+    pubkey: '30ceb64e73197a05958c8bd92ab079c815bb44fbfbb3eb5d9766c5207f08bdf5',
+    paymentDate: '2025-07-01T00:00:00.000Z'
+  },
+  {
+    // npub1jdvvva54m8nchh3t708pav99qk24x6rkx2sh0e7jthh0l8efzt7q9y7jlj
+    pubkey: '9358c67695d9e78bde2bf3ce1eb0a5059553687632a177e7d25deeff9f2912fc',
+    paymentDate: '2025-07-01T00:00:00.000Z'
+  }
+];
+
+/**
  * Get stored participants from localStorage with backward compatibility
  * Handles both old format (string[]) and new format (SeasonPassParticipant[])
+ * Ensures default participants are always included
  */
 const getStoredParticipants = (): SeasonPassParticipant[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      return [];
-    }
+    let participants: SeasonPassParticipant[] = [];
     
-    const parsed = JSON.parse(stored);
-    
-    // Handle backward compatibility: if stored data is string array, convert to new format
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      if (typeof parsed[0] === 'string') {
-        // Old format: convert string[] to SeasonPassParticipant[]
-        const converted = parsed.map((pubkey: string) => ({
-          pubkey,
-          paymentDate: new Date().toISOString() // Default to current date for existing participants
-        }));
-        
-        // Save in new format
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(converted));
-        return converted;
-      }
+    if (stored) {
+      const parsed = JSON.parse(stored);
       
-      // Already in new format
-      return parsed as SeasonPassParticipant[];
+      // Handle backward compatibility: if stored data is string array, convert to new format
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        if (typeof parsed[0] === 'string') {
+          // Old format: convert string[] to SeasonPassParticipant[]
+          participants = parsed.map((pubkey: string) => ({
+            pubkey,
+            paymentDate: new Date().toISOString() // Default to current date for existing participants
+          }));
+        } else {
+          // Already in new format
+          participants = parsed as SeasonPassParticipant[];
+        }
+      }
     }
     
-    return [];
+    // Ensure default participants are always included
+    let needsUpdate = false;
+    DEFAULT_PARTICIPANTS.forEach(defaultParticipant => {
+      const exists = participants.some(p => p.pubkey === defaultParticipant.pubkey);
+      if (!exists) {
+        participants.push(defaultParticipant);
+        needsUpdate = true;
+      }
+    });
+    
+    // Save if we added default participants
+    if (needsUpdate) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(participants));
+    }
+    
+    return participants;
   } catch (err) {
     console.error('Error loading participants from storage:', err);
-    return [];
+    // Return default participants if localStorage fails
+    return [...DEFAULT_PARTICIPANTS];
   }
 };
 
 /**
  * Save participants to localStorage
+ * @param participants Array of participants to save
  */
 const saveParticipants = (participants: SeasonPassParticipant[]): void => {
   try {
@@ -148,7 +179,7 @@ const getParticipants = (): string[] => {
 
 /**
  * Get all participants with their payment dates
- * @returns Array of SeasonPassParticipant objects
+ * @returns Array of participant objects with pubkey and paymentDate
  */
 const getParticipantsWithDates = (): SeasonPassParticipant[] => {
   return getStoredParticipants();
@@ -188,22 +219,21 @@ const removeParticipant = (pubkey: string): void => {
 };
 
 /**
- * Clear all participants (admin function)
+ * Clear all participants except default ones
  */
 const clearAllParticipants = (): void => {
-  localStorage.removeItem(STORAGE_KEY);
+  saveParticipants([...DEFAULT_PARTICIPANTS]);
 };
 
 /**
  * Get the total number of participants
- * @returns Number of Season Pass participants
+ * @returns Number of participants
  */
 const getParticipantCount = (): number => {
-  const participants = getStoredParticipants();
-  return participants.length;
+  return getStoredParticipants().length;
 };
 
-// Export the service object
+// Export the service
 const seasonPassService: SeasonPassService = {
   isParticipant,
   addParticipant,
