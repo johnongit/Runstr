@@ -35,17 +35,17 @@ export const useLeagueActivityFeed = () => {
   });
 
   // Constants
-  const FEED_CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes cache for feed
-  const PARTICIPANT_CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes for participant cache
-  const CACHE_KEY = `runstr_league_activity_feed_${activityMode}_v1`;
-  const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v1`;
+  const FEED_CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
+  const PARTICIPANT_CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
+  const CACHE_KEY = `runstr_league_activity_feed_${activityMode}_v3_simplified`; // Force refresh
+  const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v4_simplified`; // Force refresh
   const MAX_EVENTS = 2000; // Limit for feed queries
   const FEED_LIMIT = 50; // Maximum number of feed events to return
   const BATCH_SIZE = 100; // Process events in batches
   
-  // Competition date range
-  const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
-  const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
+  // Competition date range - SIMPLIFIED: Use fixed date range for testing (July 1-30)
+  const COMPETITION_START = Math.floor(new Date('2025-07-01T00:00:00Z').getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date('2025-07-30T23:59:59Z').getTime() / 1000); // July 30 for testing
 
   // Memoized participant data for performance
   const participantsWithDates = useMemo(() => {
@@ -250,13 +250,19 @@ export const useLeagueActivityFeed = () => {
 
   /**
    * Process events for feed display (chronological, not aggregated)
-   * Enhanced with deduplication and robust error handling
+   * SIMPLIFIED: Use only competition date range and participant set
    */
-  const processEventsForFeed = useCallback((events, participantPaymentDates) => {
+  const processEventsForFeed = useCallback((events, participantSet) => {
     try {
       const processedEvents = [];
       let duplicateCount = 0;
       let filteredCount = 0;
+      
+      console.log('[LeagueActivityFeed] Processing events with simplified approach:', {
+        totalEvents: events.length,
+        competitionStart: new Date(COMPETITION_START * 1000).toISOString(),
+        competitionEnd: new Date(COMPETITION_END * 1000).toISOString()
+      });
       
       events.forEach(event => {
         if (!event.pubkey) {
@@ -264,19 +270,18 @@ export const useLeagueActivityFeed = () => {
           return;
         }
         
-        // Filter by individual participant payment date
-        const participantPaymentDate = participantPaymentDates.get(event.pubkey);
-        if (!participantPaymentDate) {
+        // SIMPLIFIED: Only check if user is a participant
+        if (!participantSet.has(event.pubkey)) {
           filteredCount++;
           return;
         }
         
-        if (event.created_at < participantPaymentDate) {
+        // SIMPLIFIED: Only filter by competition date range
+        if (event.created_at < COMPETITION_START) {
           filteredCount++;
           return;
         }
         
-        // Filter by global competition end date
         if (event.created_at > COMPETITION_END) {
           filteredCount++;
           return;
@@ -355,7 +360,7 @@ export const useLeagueActivityFeed = () => {
       console.error('Error processing events for feed:', err);
       return [];
     }
-  }, [extractDistance, activityMode, COMPETITION_END, FEED_LIMIT, isDuplicateEvent]);
+  }, [extractDistance, activityMode, COMPETITION_START, COMPETITION_END, FEED_LIMIT, isDuplicateEvent]);
 
   /**
    * Fetch fresh feed data from Season Pass participants only
@@ -451,7 +456,7 @@ export const useLeagueActivityFeed = () => {
       });
 
       // Process events for feed display
-      const feedData = processEventsForFeed(events, participantPaymentDates);
+      const feedData = processEventsForFeed(events, new Set(participantPubkeys));
 
       // Final update
       setFeedEvents(feedData);
@@ -517,15 +522,16 @@ export const useLeagueActivityFeed = () => {
     fetchFeedData();
   }, [activityMode, fetchFeedData]);
 
-  // Auto-refresh every 15 minutes
+  // Auto-refresh every 15 minutes (use reasonable interval even when cache disabled)
   useEffect(() => {
+    const refreshInterval = 15 * 60 * 1000; // 15 minutes
     const interval = setInterval(() => {
       console.log('[useLeagueActivityFeed] Auto-refreshing feed data');
       refresh();
-    }, FEED_CACHE_DURATION_MS);
+    }, refreshInterval);
 
     return () => clearInterval(interval);
-  }, [refresh, FEED_CACHE_DURATION_MS]);
+  }, [refresh]);
 
   return {
     feedEvents, // Raw feed events without profile data

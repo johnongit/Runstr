@@ -33,17 +33,17 @@ export const useLeagueLeaderboard = () => {
 
   // Constants
   const COURSE_TOTAL_MILES = 500;
-  const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes cache
-  const PARTICIPANT_CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes for participant cache
-  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v4`;
-  const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v1`;
+  const CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
+  const PARTICIPANT_CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
+  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v6_simplified`; // Force refresh with simplified approach
+  const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v3`; // Incremented for mobile
   const MAX_EVENTS = 5000; // Limit to prevent overwhelming queries
   const BATCH_SIZE = 100; // Process events in batches
   const UPDATE_DEBOUNCE_MS = 500; // Debounce UI updates
   
-  // Competition date range - FIXED: Use July 1st as actual start for participants
+  // Competition date range - SIMPLIFIED: Use fixed date range for testing
   const COMPETITION_START = Math.floor(new Date('2025-07-01T00:00:00Z').getTime() / 1000);
-  const COMPETITION_END = Math.floor(new Date('2025-10-11T23:59:59Z').getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date('2025-07-30T23:59:59Z').getTime() / 1000); // July 30 for testing
 
   // Memoized participant data for performance
   const participantsWithDates = useMemo(() => {
@@ -223,22 +223,41 @@ export const useLeagueLeaderboard = () => {
   /**
    * Process events in batches to avoid blocking UI
    */
-  const processEventsBatch = useCallback((events, leaderboardMap, participantPaymentDates, batchStart, batchEnd) => {
+  const processEventsBatch = useCallback((events, leaderboardMap, participantSet, batchStart, batchEnd) => {
     try {
       const batch = events.slice(batchStart, batchEnd);
       const processedEvents = [];
       
+      console.log(`[LeagueLeaderboard] Processing batch ${batchStart}-${batchEnd}, ${batch.length} events`);
+      
       batch.forEach(event => {
-        if (!event.pubkey) return;
+        if (!event.pubkey) {
+          console.log(`[LeagueLeaderboard] Skipping event - no pubkey:`, event.id);
+          return;
+        }
         
-        // Filter by individual participant payment date
-        const participantPaymentDate = participantPaymentDates.get(event.pubkey);
-        if (!participantPaymentDate) return;
+        // SIMPLIFIED: Only check if user is a participant (no individual payment dates)
+        if (!participantSet.has(event.pubkey)) {
+          console.log(`[LeagueLeaderboard] Skipping event - not a participant:`, event.pubkey);
+          return;
+        }
         
-        if (event.created_at < participantPaymentDate) return;
+        // SIMPLIFIED: Only filter by competition date range (use event's created_at)
+        if (event.created_at < COMPETITION_START) {
+          console.log(`[LeagueLeaderboard] Skipping event - before competition start:`, {
+            eventDate: new Date(event.created_at * 1000).toISOString(),
+            competitionStart: new Date(COMPETITION_START * 1000).toISOString()
+          });
+          return;
+        }
         
-        // Filter by global competition end date
-        if (event.created_at > COMPETITION_END) return;
+        if (event.created_at > COMPETITION_END) {
+          console.log(`[LeagueLeaderboard] Skipping event - after competition end:`, {
+            eventDate: new Date(event.created_at * 1000).toISOString(),
+            competitionEnd: new Date(COMPETITION_END * 1000).toISOString()
+          });
+          return;
+        }
         
         // Filter by current activity mode using exercise tag
         const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
@@ -252,12 +271,28 @@ export const useLeagueLeaderboard = () => {
         
         const acceptedActivities = activityMatches[activityMode] || [activityMode];
         
-        if (eventActivityType && !acceptedActivities.includes(eventActivityType)) return;
+        if (eventActivityType && !acceptedActivities.includes(eventActivityType)) {
+          console.log(`[LeagueLeaderboard] Skipping event - activity mismatch:`, {
+            eventType: eventActivityType,
+            acceptedTypes: acceptedActivities
+          });
+          return;
+        }
         
         const distance = extractDistance(event);
-        if (distance <= 0) return;
+        if (distance <= 0) {
+          console.log(`[LeagueLeaderboard] Skipping event - invalid distance:`, distance);
+          return;
+        }
 
         processedEvents.push(event);
+        console.log(`[LeagueLeaderboard] ✅ Processing event:`, {
+          eventId: event.id,
+          pubkey: event.pubkey,
+          distance: distance,
+          activityType: eventActivityType,
+          eventDate: new Date(event.created_at * 1000).toISOString()
+        });
 
         // Update participant data
         const participant = leaderboardMap.get(event.pubkey);
@@ -271,15 +306,24 @@ export const useLeagueLeaderboard = () => {
             eventId: event.id,
             activityType: eventActivityType
           });
+          
+          console.log(`[LeagueLeaderboard] Updated participant:`, {
+            pubkey: event.pubkey,
+            totalMiles: participant.totalMiles,
+            runCount: participant.runCount
+          });
+        } else {
+          console.log(`[LeagueLeaderboard] ⚠️ Participant not found in leaderboard map:`, event.pubkey);
         }
       });
       
+      console.log(`[LeagueLeaderboard] Batch complete: ${processedEvents.length}/${batch.length} events processed`);
       return processedEvents;
     } catch (err) {
       console.error('Error processing events batch:', err);
       return [];
     }
-  }, [extractDistance, activityMode, COMPETITION_END]);
+  }, [extractDistance, activityMode, COMPETITION_START, COMPETITION_END]);
 
   /**
    * Fetch fresh leaderboard data from Season Pass participants only
@@ -335,15 +379,15 @@ export const useLeagueLeaderboard = () => {
         message: `Found ${cachedParticipants.length} participants` 
       });
 
-      // Create participant payment date lookup map
-      const participantPaymentDates = new Map();
-      cachedParticipants.forEach(participant => {
-        try {
-          const paymentTimestamp = Math.floor(new Date(participant.paymentDate).getTime() / 1000);
-          participantPaymentDates.set(participant.pubkey, paymentTimestamp);
-        } catch (err) {
-          console.error('Error parsing payment date for participant:', participant.pubkey, err);
-        }
+      // SIMPLIFIED: Create simple participant pubkey set (no individual payment dates)
+      const participantPubkeys = cachedParticipants.map(p => p.pubkey);
+      const participantSet = new Set(participantPubkeys);
+
+      console.log('[LeagueLeaderboard] Using simplified participant filtering:', {
+        participantCount: participantPubkeys.length,
+        participants: participantPubkeys,
+        competitionStart: new Date(COMPETITION_START * 1000).toISOString(),
+        competitionEnd: new Date(COMPETITION_END * 1000).toISOString()
       });
 
       // Create initial leaderboard and show it immediately (progressive loading)
@@ -368,15 +412,12 @@ export const useLeagueLeaderboard = () => {
         message: 'Fetching activity data...' 
       });
 
-      // Fetch events from Season Pass participants
-      const participantPubkeys = cachedParticipants.map(p => p.pubkey);
-      const earliestPaymentDate = Math.min(...Array.from(participantPaymentDates.values()));
-      
+      // SIMPLIFIED: Fetch events using only competition date range
       const events = await fetchEvents({
         kinds: [1301],
         authors: participantPubkeys,
         limit: MAX_EVENTS,
-        since: earliestPaymentDate,
+        since: COMPETITION_START,  // Use competition start, not individual payment dates
         until: COMPETITION_END
       });
       
@@ -400,7 +441,7 @@ export const useLeagueLeaderboard = () => {
       // Process events in batches to avoid blocking UI
       for (let i = 0; i < events.length; i += BATCH_SIZE) {
         const batchEnd = Math.min(i + BATCH_SIZE, events.length);
-        const batchProcessed = processEventsBatch(events, leaderboardMap, participantPaymentDates, i, batchEnd);
+        const batchProcessed = processEventsBatch(events, leaderboardMap, participantSet, i, batchEnd);
         
         allProcessedEvents.push(...batchProcessed);
         processedCount += (batchEnd - i);

@@ -240,15 +240,25 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
       <div className="bg-bg-secondary rounded-lg border border-border-secondary overflow-hidden">
         <div className="flex justify-between items-center p-4 border-b border-border-secondary bg-bg-tertiary">
           <h3 className="text-lg font-semibold text-text-primary">🏆 League Standings</h3>
-          {leaderboardLoading && (
-            <div className="flex items-center">
-              <div className="flex space-x-1">
-                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
-                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
-                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
+          <div className="flex items-center gap-2">
+            {/* Debug refresh button for mobile */}
+            <button
+              onClick={refreshLeaderboard}
+              className="px-2 py-1 bg-primary text-white text-xs rounded font-semibold"
+              disabled={leaderboardLoading}
+            >
+              {leaderboardLoading ? '...' : '🔄'}
+            </button>
+            {leaderboardLoading && (
+              <div className="flex items-center">
+                <div className="flex space-x-1">
+                  <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
+                  <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
+                  <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         
         {enhancedLeaderboard.length === 0 ? (
@@ -256,6 +266,14 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
             <p className="text-text-secondary">
               No {activityMode === 'run' ? 'runners' : activityMode === 'walk' ? 'walkers' : 'cyclists'} found yet. Be the first to start!
             </p>
+            {/* Debug info for mobile */}
+            {leaderboardLoading && (
+              <div className="mt-3 p-2 bg-bg-tertiary rounded text-xs">
+                <div className="text-text-muted">
+                  Debug: Fetching data...
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-border-secondary">
