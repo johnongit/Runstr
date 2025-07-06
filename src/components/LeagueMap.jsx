@@ -171,8 +171,8 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
               </button>
             )}
             {hasSeasonPass && (
-              <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm rounded-md font-semibold border border-green-500/30">
-                ✅ Season Member
+              <span className="px-3 py-1 bg-white text-black text-sm rounded-md font-semibold border border-gray-300">
+                ✓ Season Member
               </span>
             )}
           </div>
