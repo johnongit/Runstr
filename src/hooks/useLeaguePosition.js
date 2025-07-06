@@ -5,13 +5,13 @@ import { fetchEvents } from '../utils/nostr';
 /**
  * Hook: useLeaguePosition
  * Fetches user's Kind 1301 workout records and calculates their position
- * on the League course (1000 miles total). ALL runs count toward progress.
+ * on the League course (~805 km total). ALL runs count toward progress.
  * 
  * @returns {Object} { totalDistance, mapPosition, qualifyingRuns, isLoading, error }
  */
 export const useLeaguePosition = () => {
   const { publicKey: userPubkey } = useContext(NostrContext);
-  const [totalDistance, setTotalDistance] = useState(0); // in miles
+  const [totalDistance, setTotalDistance] = useState(0); // in km
   const [mapPosition, setMapPosition] = useState(0); // percentage (0-100)
   const [qualifyingRuns, setQualifyingRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +19,7 @@ export const useLeaguePosition = () => {
   const [lastFetchTime, setLastFetchTime] = useState(0);
 
   // Constants
-  const COURSE_TOTAL_MILES = 500; // Updated to match league race distance
+  const COURSE_TOTAL_KM = 500 * 1.609344; // 500 miles converted to km (~804.7 km)
   const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes cache
 
   /**
@@ -28,10 +28,10 @@ export const useLeaguePosition = () => {
    */
   const calculateDistanceFromEvents = useCallback((events) => {
     if (!events || events.length === 0) {
-      return { totalMiles: 0, runs: [] };
+      return { totalKm: 0, runs: [] };
     }
 
-    let totalMiles = 0;
+    let totalKm = 0;
     const runs = [];
 
     events.forEach(event => {
@@ -43,14 +43,31 @@ export const useLeaguePosition = () => {
         const unit = distanceTag[2] || 'km'; // default to km if no unit specified
         
         if (!isNaN(distanceValue) && distanceValue > 0) {
-          // Convert to miles for consistent calculation
-          const distanceInMiles = unit === 'km' ? (distanceValue * 0.621371) : distanceValue;
-          totalMiles += distanceInMiles;
+          // Add reasonable bounds checking to filter out corrupted data
+          const MAX_REASONABLE_DISTANCE_KM = 500; // 500km covers ultramarathons
+          const MIN_REASONABLE_DISTANCE_KM = 0.01; // 10 meters minimum
+          
+          // Convert to km first for validation
+          let distanceInKm = distanceValue;
+          if (unit === 'mi' || unit === 'mile' || unit === 'miles') {
+            distanceInKm = distanceValue * 1.609344;
+          } else if (unit === 'm' || unit === 'meter' || unit === 'meters') {
+            distanceInKm = distanceValue / 1000;
+          }
+          
+          // Validate reasonable range
+          if (distanceInKm < MIN_REASONABLE_DISTANCE_KM || distanceInKm > MAX_REASONABLE_DISTANCE_KM) {
+            console.warn(`Invalid distance detected: ${distanceValue} ${unit} (${distanceInKm.toFixed(2)}km) - filtering out event ${event.id}`);
+            return; // Skip this event
+          }
+          
+          // Keep in km for consistent calculation (like Profile/Stats)
+          totalKm += distanceInKm;
           
           // Store run data for reference
           runs.push({
             id: event.id,
-            distance: distanceInMiles,
+            distance: distanceInKm,
             originalDistance: distanceValue,
             unit: unit,
             timestamp: event.created_at,
@@ -61,7 +78,7 @@ export const useLeaguePosition = () => {
     });
 
     return {
-      totalMiles: Math.round(totalMiles * 100) / 100, // Round to 2 decimal places
+      totalKm: Math.round(totalKm * 100) / 100, // Round to 2 decimal places (now in km)
       runs: runs.sort((a, b) => b.timestamp - a.timestamp) // Most recent first
     };
   }, []);
@@ -69,8 +86,8 @@ export const useLeaguePosition = () => {
   /**
    * Convert total distance to map position percentage
    */
-  const calculateMapPosition = useCallback((totalMiles) => {
-    const percentage = (totalMiles / COURSE_TOTAL_MILES) * 100;
+  const calculateMapPosition = useCallback((totalKm) => {
+    const percentage = (totalKm / COURSE_TOTAL_KM) * 100;
     return Math.min(100, Math.max(0, percentage)); // Clamp between 0-100
   }, []);
 
@@ -104,16 +121,16 @@ export const useLeaguePosition = () => {
       const events = Array.from(eventSet).map(e => e.rawEvent ? e.rawEvent() : e);
       
       // Calculate distance and position
-      const { totalMiles, runs } = calculateDistanceFromEvents(events);
-      const position = calculateMapPosition(totalMiles);
+      const { totalKm, runs } = calculateDistanceFromEvents(events);
+      const position = calculateMapPosition(totalKm);
       
       // Update state
-      setTotalDistance(totalMiles);
+      setTotalDistance(totalKm);
       setMapPosition(position);
       setQualifyingRuns(runs);
       setLastFetchTime(now);
       
-      console.log(`[useLeaguePosition] Total distance: ${totalMiles} miles, Position: ${position.toFixed(1)}%`);
+      console.log(`[useLeaguePosition] Total distance: ${totalKm} km, Position: ${position.toFixed(1)}%`);
       
     } catch (err) {
       console.error('[useLeaguePosition] Error fetching position:', err);
@@ -137,19 +154,19 @@ export const useLeaguePosition = () => {
   }, [fetchLeaguePosition]);
 
   // Calculate additional derived values
-  const milesRemaining = Math.max(0, COURSE_TOTAL_MILES - totalDistance);
-  const isComplete = totalDistance >= COURSE_TOTAL_MILES;
+  const kmRemaining = Math.max(0, COURSE_TOTAL_KM - totalDistance);
+  const isComplete = totalDistance >= COURSE_TOTAL_KM;
   const progressPercentage = mapPosition;
 
   return {
     // Core data
-    totalDistance,        // Total miles accumulated from ALL runs
+    totalDistance,        // Total km accumulated from ALL runs
     mapPosition,         // Position percentage on course (0-100)
     qualifyingRuns,      // Array of run data that contributed to position
     
     // Derived values
-    milesRemaining,      // Miles left to complete the course
-    isComplete,          // Whether user has completed the 1000-mile course
+    kmRemaining,         // Km left to complete the course
+    isComplete,          // Whether user has completed the course
     progressPercentage,  // Same as mapPosition, for convenience
     
     // Meta

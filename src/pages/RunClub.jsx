@@ -87,7 +87,7 @@ export const RunClub = () => {
               fallbackMetrics.push({
                 label: 'Distance',
                 value: event.distance,
-                unit: event.distanceUnit || 'miles'
+                unit: event.distanceUnit || 'km'
               });
             }
             

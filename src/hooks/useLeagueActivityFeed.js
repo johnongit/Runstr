@@ -160,7 +160,7 @@ export const useLeagueActivityFeed = () => {
   }, [CACHE_KEY]);
 
   /**
-   * Extract distance from event tags with proper error handling
+   * Extract distance from event tags with proper error handling and validation
    */
   const extractDistance = useCallback((event) => {
     try {
@@ -172,23 +172,39 @@ export const useLeagueActivityFeed = () => {
       
       const unit = distanceTag[2]?.toLowerCase() || 'km';
       
-      // Convert to miles
+      // Add reasonable bounds checking to filter out corrupted data
+      const MAX_REASONABLE_DISTANCE_KM = 500; // 500km covers ultramarathons
+      const MIN_REASONABLE_DISTANCE_KM = 0.01; // 10 meters minimum
+      
+      // Convert to km first for validation
+      let distanceInKm = value;
       switch (unit) {
         case 'mi':
         case 'mile':
         case 'miles':
-          return value;
-        case 'km':
-        case 'kilometer':
-        case 'kilometers':
-          return value * 0.621371;
+          distanceInKm = value * 1.609344;
+          break;
         case 'm':
         case 'meter':
         case 'meters':
-          return value * 0.000621371;
+          distanceInKm = value / 1000;
+          break;
+        case 'km':
+        case 'kilometer':
+        case 'kilometers':
         default:
-          return value; // Default assumption is miles
+          distanceInKm = value;
+          break;
       }
+      
+      // Validate reasonable range
+      if (distanceInKm < MIN_REASONABLE_DISTANCE_KM || distanceInKm > MAX_REASONABLE_DISTANCE_KM) {
+        console.warn(`Invalid distance detected: ${value} ${unit} (${distanceInKm.toFixed(2)}km) - filtering out event ${event.id}`);
+        return 0;
+      }
+      
+      // Return in km for internal consistency (like Profile/Stats)
+      return distanceInKm;
     } catch (err) {
       console.error('Error extracting distance:', err);
       return 0;
@@ -211,7 +227,7 @@ export const useLeagueActivityFeed = () => {
         const currentDistance = extractDistance(event);
         const timeDiff = Math.abs(existing.created_at - event.created_at);
         
-        // Same distance within 0.05 miles and within 10 minutes
+        // Same distance within 0.05 km and within 10 minutes
         if (Math.abs(existingDistance - currentDistance) < 0.05 && timeDiff < 600) return true;
         
         // Check duration matching
@@ -308,7 +324,7 @@ export const useLeagueActivityFeed = () => {
           title: event.tags?.find(tag => tag[0] === 'title')?.[1] || '',
           duration: event.tags?.find(tag => tag[0] === 'duration')?.[1] || '',
           // Add feed-specific metadata
-          displayDistance: `${distance.toFixed(1)} mi`,
+          displayDistance: `${distance.toFixed(1)} km`,
           displayActivity: eventActivityType || 'activity',
           // Raw event for compatibility with existing PostList
           rawEvent: event

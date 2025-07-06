@@ -131,7 +131,7 @@ export const useLeagueLeaderboard = () => {
   }, [CACHE_KEY]);
 
   /**
-   * Extract distance from event tags with proper error handling
+   * Extract distance from event tags with proper error handling and validation
    */
   const extractDistance = useCallback((event) => {
     try {
@@ -143,23 +143,39 @@ export const useLeagueLeaderboard = () => {
       
       const unit = distanceTag[2]?.toLowerCase() || 'km';
       
-      // Convert to miles
+      // Add reasonable bounds checking to filter out corrupted data
+      const MAX_REASONABLE_DISTANCE_KM = 500; // 500km covers ultramarathons
+      const MIN_REASONABLE_DISTANCE_KM = 0.01; // 10 meters minimum
+      
+      // Convert to km first for validation
+      let distanceInKm = value;
       switch (unit) {
         case 'mi':
         case 'mile':
         case 'miles':
-          return value;
-        case 'km':
-        case 'kilometer':
-        case 'kilometers':
-          return value * 0.621371;
+          distanceInKm = value * 1.609344;
+          break;
         case 'm':
         case 'meter':
         case 'meters':
-          return value * 0.000621371;
+          distanceInKm = value / 1000;
+          break;
+        case 'km':
+        case 'kilometer':
+        case 'kilometers':
         default:
-          return value; // Default assumption is miles
+          distanceInKm = value;
+          break;
       }
+      
+      // Validate reasonable range
+      if (distanceInKm < MIN_REASONABLE_DISTANCE_KM || distanceInKm > MAX_REASONABLE_DISTANCE_KM) {
+        console.warn(`Invalid distance detected: ${value} ${unit} (${distanceInKm.toFixed(2)}km) - filtering out event ${event.id}`);
+        return 0;
+      }
+      
+      // Return in km for internal consistency (like Profile/Stats)
+      return distanceInKm;
     } catch (err) {
       console.error('Error extracting distance:', err);
       return 0;
