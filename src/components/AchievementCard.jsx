@@ -1,4 +1,5 @@
 import { useStreakRewards as useLinearStreakRewards } from '../hooks/useStreakRewards';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNostr } from '../hooks/useNostr';
 import { REWARDS } from '../config/rewardsConfig';
@@ -15,6 +16,9 @@ const AchievementCard = () => {
   
   // Get modalInfo and clearModal from the hook
   const { streakData, rewardState, modalInfo, clearModal } = useLinearStreakRewards(pubkey);
+  
+  // State for dropdown expansion
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const currentDays = streakData.currentStreakDays;
   
@@ -60,77 +64,95 @@ const AchievementCard = () => {
   const daysUntilPayout = getDaysUntilPayout();
   const weekProgress = (weeklyWorkouts / maxWeeklyWorkouts) * 100;
 
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
   return (
-    <div className="bg-bg-secondary rounded-xl shadow-lg p-4 border border-border-secondary">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-bg-secondary rounded-xl shadow-lg border border-border-secondary">
+      {/* Compact Summary Header - Always Visible */}
+      <div 
+        className="flex items-center justify-between p-4 cursor-pointer hover:bg-bg-tertiary transition-colors duration-200 rounded-xl"
+        onClick={toggleExpanded}
+      >
         <div className="flex items-center gap-3">
-          <div className="streak-flames">🔥</div>
-          <div>
-            <div className="streak-days text-xl font-bold text-text-primary">
-              {currentDays}
-            </div>
-            <div className="streak-label text-sm text-text-secondary">
-              day streak
-            </div>
+          <div className="streak-flames text-xl">🔥</div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-semibold text-text-primary">{currentDays} day streak</span>
+            <span className="text-text-secondary">•</span>
+            <span className="font-semibold" style={{ color: '#f7931a' }}>{weeklyTotal} sats</span>
+            <span className="text-text-secondary text-xs">this week</span>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-sm text-text-secondary">Next payout in</div>
-          <div className="text-lg font-semibold text-text-primary">{daysUntilPayout} days</div>
-        </div>
-      </div>
-      
-      {/* Weekly Progress */}
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-text-secondary">This Week's Progress</span>
-          <span className="text-sm font-bold text-text-primary">{weeklyWorkouts}/{maxWeeklyWorkouts} workouts</span>
-        </div>
-        <div className="w-full bg-bg-tertiary rounded-full h-2">
-          <div 
-            className="bg-gradient-to-r from-primary to-secondary h-2 rounded-full transition-all duration-300"
-            style={{ width: `${weekProgress}%` }}
-          ></div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-secondary">{daysUntilPayout}d to payout</span>
+          <svg 
+            className={`h-4 w-4 text-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
       </div>
-      
-      {/* Weekly Earnings Breakdown */}
-      <div className="bg-bg-tertiary rounded-lg p-3 mb-4">
-        <h4 className="text-sm font-medium text-text-secondary mb-2">Weekly Earnings</h4>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-text-secondary">Base reward ({weeklyWorkouts} workouts)</span>
-            <span className="text-sm font-semibold" style={{ color: '#f7931a' }}>{baseReward} sats</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-text-secondary">Streak bonus ({currentDays} days)</span>
-            <span className="text-sm font-semibold" style={{ color: '#f7931a' }}>+{streakBonus} sats</span>
-          </div>
-          <div className="border-t border-border-secondary pt-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-text-primary">Weekly Total</span>
-              <span className="text-lg font-bold" style={{ color: '#f7931a' }}>{weeklyTotal} sats</span>
+
+      {/* Detailed Content - Collapsible */}
+      {isExpanded && (
+        <div className="px-4 pb-4 border-t border-border-secondary">
+          {/* Weekly Progress */}
+          <div className="mb-4 mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-text-secondary">This Week's Progress</span>
+              <span className="text-sm font-bold text-text-primary">{weeklyWorkouts}/{maxWeeklyWorkouts} workouts</span>
             </div>
+            <div className="w-full bg-bg-tertiary rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-primary to-secondary h-2 rounded-full transition-all duration-300"
+                style={{ width: `${weekProgress}%` }}
+              ></div>
+            </div>
+          </div>
+          
+          {/* Weekly Earnings Breakdown */}
+          <div className="bg-bg-tertiary rounded-lg p-3 mb-4">
+            <h4 className="text-sm font-medium text-text-secondary mb-2">Weekly Earnings</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-text-secondary">Base reward ({weeklyWorkouts} workouts)</span>
+                <span className="text-sm font-semibold" style={{ color: '#f7931a' }}>{baseReward} sats</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-text-secondary">Streak bonus ({currentDays} days)</span>
+                <span className="text-sm font-semibold" style={{ color: '#f7931a' }}>+{streakBonus} sats</span>
+              </div>
+              <div className="border-t border-border-secondary pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-text-primary">Weekly Total</span>
+                  <span className="text-lg font-bold" style={{ color: '#f7931a' }}>{weeklyTotal} sats</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Motivational Message */}
+          <div className="text-center">
+            {weeklyWorkouts < maxWeeklyWorkouts ? (
+              <div className="tomorrow-reward">
+                <div className="reward-text">
+                  Run tomorrow (Day {currentDays + 1}) to earn <span style={{ color: '#f7931a', fontWeight: '600' }}>100 sats</span>
+                </div>
+              </div>
+            ) : (
+              <div className="reward-capped">
+                <div className="reward-text">
+                  🎉 Week complete! Great job maintaining your streak!
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      </div>
-      
-      {/* Motivational Message */}
-      <div className="text-center">
-        {weeklyWorkouts < maxWeeklyWorkouts ? (
-          <div className="tomorrow-reward">
-            <div className="reward-text">
-              Run tomorrow (Day {currentDays + 1}) to earn <span style={{ color: '#f7931a', fontWeight: '600' }}>100 sats</span>
-            </div>
-          </div>
-        ) : (
-          <div className="reward-capped">
-            <div className="reward-text">
-              🎉 Week complete! Great job maintaining your streak!
-            </div>
-          </div>
-        )}
-      </div>
+      )}
       
       {/* Notification Modal */}
       {modalInfo && (

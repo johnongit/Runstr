@@ -33,20 +33,6 @@ export const ActivityModeBanner = () => {
     <div className="dashboard-wallet-header">
       <div className="wallet-card">
         <div className="wallet-actions">
-          <button 
-            className="action-button distance-unit-button"
-            onClick={handleDistanceUnitToggle}
-            title={`Switch to ${distanceUnit === 'km' ? 'miles' : 'kilometers'}`}
-            style={{
-              backgroundColor: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-color)',
-              minWidth: '50px'
-            }}
-          >
-            {distanceUnit.toUpperCase()}
-          </button>
-          
           {activityModes.map((activity) => (
             <button
               key={activity.mode}

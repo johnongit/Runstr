@@ -171,13 +171,18 @@ export const MenuBar = () => {
     <div className="w-full">
       {/* Header with Music Player and Settings */}
       <header className="p-4 w-full">
-        {/* Music Player and Settings Row */}
-        <div className="flex justify-between items-center mb-3">
+        {/* Music Player (top right) */}
+        <div className="flex justify-end mb-3">
           <div className="min-w-[120px]">
             <FloatingMusicPlayer />
           </div>
+        </div>
+        
+        {/* Activity Mode Banner */}
+        <div className="relative">
+          <ActivityModeBanner />
           <button 
-            className="text-text-secondary hover:text-text-primary transition-colors duration-normal" 
+            className="absolute top-4 right-4 text-text-secondary hover:text-text-primary transition-colors duration-normal z-10" 
             onClick={toggleSettings}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -186,9 +191,6 @@ export const MenuBar = () => {
             </svg>
           </button>
         </div>
-        
-        {/* Activity Mode Banner */}
-        <ActivityModeBanner />
       </header>
 
       {/* Settings Modal */}
