@@ -1080,13 +1080,13 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
 
   const runDate = new Date(run.date);
   // Using a more generic title for the workout, can be overridden by user if UI allows
-  const workoutTitle = run.title || `${primaryHashtag} on ${runDate.toLocaleDateString()}`;
+  const workoutTitle = run.title || `${primaryHashtag}`;
 
   // Enhanced content generation following NIP-101e community linking
   let contentParts = [];
   
   // Start with user notes or default activity description
-  const baseContent = run.notes || `Completed a ${distanceValue}${distanceUnit} ${activityVerb}. ${activityEmoji}`;
+  const baseContent = run.notes || `Completed a ${activityVerb}. ${activityEmoji}`;
   contentParts.push(baseContent);
   
   // Add team association if present

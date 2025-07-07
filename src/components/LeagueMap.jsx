@@ -166,9 +166,6 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
               </span>
             )}
           </div>
-          <div className="text-xs text-text-secondary">
-            {lastUpdated && `Updated ${new Date(lastUpdated).toLocaleTimeString()}`}
-          </div>
         </div>
         
         {/* Prize Pool Section */}
@@ -228,31 +225,8 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
 
       {/* Workout-Card-Styled Leaderboard */}
       <div className="bg-bg-secondary rounded-lg border border-border-secondary overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-border-secondary bg-bg-tertiary">
+        <div className="p-4 border-b border-border-secondary bg-bg-tertiary">
           <h3 className="text-lg font-semibold text-text-primary">🏆 League Standings</h3>
-          <div className="flex items-center gap-2">
-            {/* Debug refresh button for mobile */}
-            <button
-              onClick={refreshLeaderboard}
-              className="px-2 py-1 bg-primary text-white text-xs rounded font-semibold"
-              disabled={leaderboardLoading}
-            >
-              {leaderboardLoading ? '...' : '🔄'}
-            </button>
-            {/* Data source indicator */}
-            <span className="text-xs text-text-muted">
-              {getDataSourceText()}
-            </span>
-            {leaderboardLoading && (
-              <div className="flex items-center">
-                <div className="flex space-x-1">
-                  <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
-                  <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
-                  <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
         
         {enhancedLeaderboard.length === 0 ? (
