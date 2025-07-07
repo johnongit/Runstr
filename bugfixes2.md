@@ -1280,3 +1280,113 @@ if (isRunstrWorkout) {
 - The Central Feed Manager had no awareness of Season Pass logic
 - Fix involved **removal** rather than addition (elegant solution)
 - Empty state handling in UI components (LeagueMap, PostList) remains intact
+
+## Bug Fix #6: League Standings Distance Always 0
+
+**Date:** 2025-01-17
+**Reporter:** User
+**Severity:** High
+**Status:** ✅ **OPTION 2 IMPLEMENTED - Ready for Testing**  
+
+### Problem Description
+
+The *League Standings* widget in the League tab shows every participant at **0.0&nbsp;mi** even though the feed clearly contains valid Kind-1301 workout events (distance, duration, etc.) inside the competition window (3-month paid Season 1 race).  All attempts to tweak date filters or add test data still result in a flat-zero leaderboard.
+
+### Initial Observations / Hypotheses
+1. `useLeagueLeaderboard` hook already fetches Kind-1301 events, aggregates distance per participant, and returns a `totalMiles` field – yet the rendered value remains **0**.
+2. Possible break-points:
+   * **Filtering Logic** – events might be rejected (date window, activity type, participant set).
+   * **Data Fetch** – `ndk.fetchEvents()` could be returning an empty set because of relay issues or wrong author keys (hex vs npub).
+   * **Distance Extraction** – `extractDistance()` could be failing (unit parsing, missing tag).
+   * **UI Formatting** – `formatDistance()` or `user.totalMiles` might be `NaN` → coerced to 0.
+3. Since the rest of the League feed shows those same events, the raw data is definitely reachable, meaning the bug is almost certainly *inside* the leaderboard hook / participant filter rather than network connectivity.
+
+### ✅ **OPTION 2 IMPLEMENTED: Client-side aggregation from feedPosts**
+
+**Implementation Details:**
+- Added `fallbackLeaderboardFromFeed` function in `LeagueMap.jsx` that processes existing `feedPosts`
+- Replicates the same distance extraction and filtering logic as `useLeagueLeaderboard`
+- Only processes events from Season Pass participants within competition window (July 1-30, 2025)
+- Filters by current activity mode (run/walk/cycle)
+- Converts distances to miles and validates reasonable ranges
+- Sorts by total distance, then run count, then last activity
+- Automatically falls back when main leaderboard shows all zeros
+
+**Smart Fallback Logic:**
+```javascript
+// Uses main leaderboard if any participant has > 0 miles
+const hasValidData = leaderboard.some(user => user.totalMiles > 0);
+
+if (hasValidData) {
+  return leaderboard; // Use main system
+} else if (fallbackFromFeed.length > 0) {
+  return fallbackFromFeed; // Use feed aggregation
+} else {
+  return leaderboard; // Show empty state
+}
+```
+
+**Files Modified:**
+- `src/components/LeagueMap.jsx` - Added 130 lines of fallback aggregation logic
+
+### Expected Results After Implementation
+
+1. ✅ **Immediate Distance Display** - If feed contains participant workouts, distances will appear instantly
+2. ✅ **Proper Ranking** - Participants sorted by total miles, then run count
+3. ✅ **Activity Mode Filtering** - Only shows runs/walks/cycles based on current mode
+4. ✅ **Zero Network Overhead** - Uses data already loaded in the feed
+5. ✅ **Seamless Fallback** - Automatically switches between main and fallback systems
+6. ✅ **Debug Logging** - Console shows which system is being used and participant totals
+
+### Testing Instructions
+
+**Test Case 1: Verify Fallback Activation**
+1. Open League tab and check browser console
+2. Look for log: `[LeagueMap] Main leaderboard empty/zero - using fallback from feed`
+3. Should see: `[LeagueMap] Fallback leaderboard generated: X participants`
+4. Each participant should show: `pubkey: X.X mi, Y runs`
+
+**Test Case 2: Verify Distance Calculations**
+1. Check that displayed distances match the workout posts in the feed
+2. Verify that 8.04672 km converts to ~5.0 miles (as shown in the feed post)
+3. Ensure ranking is correct (highest distance first)
+
+**Test Case 3: Verify Participant Filtering**
+1. Only Season Pass participants should appear in standings
+2. Non-participants should be filtered out even if they have workouts in feed
+3. Check console for: `Only process events from season pass participants`
+
+**Test Case 4: Verify Activity Mode Filtering**
+1. Switch between Run/Walk/Cycle modes
+2. Verify that only matching activities are counted
+3. Running mode should only count 'run', 'running', 'jog', 'jogging' activities
+
+**Test Case 5: Verify Date Range Filtering**
+1. Only workouts between July 1-30, 2025 should be counted
+2. Workouts outside this range should be ignored
+3. Check console for date filtering messages
+
+### Debug Information Available
+
+The implementation provides comprehensive console logging:
+```
+[LeagueMap] Generating fallback leaderboard from X feed posts
+[LeagueMap] Main leaderboard empty/zero - using fallback from feed
+[LeagueMap] Fallback leaderboard generated: X participants
+  30ceb64e: 5.0 mi, 1 runs
+  9358c676: 0.0 mi, 0 runs
+```
+
+### Next Steps if Successful
+
+1. **Immediate**: Test the fallback system shows correct distances
+2. **Short-term**: Debug why main `useLeagueLeaderboard` hook returns zeros
+3. **Long-term**: Fix main system and remove fallback, or promote fallback to primary if it proves more reliable
+
+### Advantages of This Approach
+
+- **Zero Risk**: No changes to existing hooks or network layers
+- **Immediate Results**: Leverages data that's already working (the feed)
+- **Perfect for Demo**: Shows actual distances right away
+- **Debugging Tool**: Helps isolate whether the issue is in data fetching vs. processing
+- **Future-Proof**: Can easily switch back to main system once it's fixed

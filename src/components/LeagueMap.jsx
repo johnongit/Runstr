@@ -25,10 +25,154 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     activityMode
   } = useLeagueLeaderboard();
 
-  // Get profiles for leaderboard users
-  const leaderboardPubkeys = useMemo(() => 
-    leaderboard.map(user => user.pubkey), [leaderboard]
-  );
+  // OPTION 2: Fallback aggregation from feedPosts
+  const fallbackLeaderboardFromFeed = useMemo(() => {
+    if (!feedPosts || feedPosts.length === 0) return [];
+    
+    console.log('[LeagueMap] Generating fallback leaderboard from', feedPosts.length, 'feed posts');
+    
+    // Competition date range (matches useLeagueLeaderboard)
+    const COMPETITION_START = Math.floor(new Date('2025-07-01T00:00:00Z').getTime() / 1000);
+    const COMPETITION_END = Math.floor(new Date('2025-07-30T23:59:59Z').getTime() / 1000);
+    
+    // Get season pass participants
+    const participants = seasonPassService.getParticipants();
+    const participantSet = new Set(participants);
+    
+    // Extract distance from event (matches useLeagueLeaderboard logic)
+    const extractDistance = (event) => {
+      try {
+        const distanceTag = event.tags?.find(tag => tag[0] === 'distance');
+        if (!distanceTag || !distanceTag[1]) return 0;
+        
+        const value = parseFloat(distanceTag[1]);
+        if (isNaN(value) || value < 0) return 0;
+        
+        const unit = distanceTag[2]?.toLowerCase() || 'km';
+        
+        // Convert to km first for validation
+        let distanceInKm = value;
+        switch (unit) {
+          case 'mi':
+          case 'mile':
+          case 'miles':
+            distanceInKm = value * 1.609344;
+            break;
+          case 'm':
+          case 'meter':
+          case 'meters':
+            distanceInKm = value / 1000;
+            break;
+          case 'km':
+          case 'kilometer':
+          case 'kilometers':
+          default:
+            distanceInKm = value;
+            break;
+        }
+        
+        // Validate reasonable range
+        if (distanceInKm < 0.01 || distanceInKm > 500) {
+          console.warn(`[LeagueMap] Invalid distance: ${value} ${unit} - filtering out`);
+          return 0;
+        }
+        
+        // Return in miles for consistency
+        return distanceInKm * 0.621371;
+      } catch (err) {
+        console.error('[LeagueMap] Error extracting distance:', err);
+        return 0;
+      }
+    };
+    
+    // Aggregate by participant
+    const participantMap = new Map();
+    
+    feedPosts.forEach(event => {
+      // Only process events from season pass participants
+      if (!participantSet.has(event.pubkey)) {
+        return;
+      }
+      
+      // Check date range
+      if (event.created_at < COMPETITION_START || event.created_at > COMPETITION_END) {
+        return;
+      }
+      
+      // Filter by current activity mode
+      const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
+      const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+      
+      const activityMatches = {
+        'run': ['run', 'running', 'jog', 'jogging'],
+        'cycle': ['cycle', 'cycling', 'bike', 'biking'],  
+        'walk': ['walk', 'walking', 'hike', 'hiking']
+      };
+      
+      const acceptedActivities = activityMatches[activityMode] || ['run', 'running', 'jog', 'jogging'];
+      
+      if (eventActivityType && !acceptedActivities.includes(eventActivityType)) {
+        return;
+      }
+      
+      const distance = extractDistance(event);
+      if (distance <= 0) return;
+      
+      // Add to participant map
+      if (!participantMap.has(event.pubkey)) {
+        participantMap.set(event.pubkey, {
+          pubkey: event.pubkey,
+          totalMiles: 0,
+          runCount: 0,
+          lastActivity: 0,
+          runs: []
+        });
+      }
+      
+      const participant = participantMap.get(event.pubkey);
+      participant.totalMiles += distance;
+      participant.runCount++;
+      participant.lastActivity = Math.max(participant.lastActivity, event.created_at);
+      participant.runs.push({
+        distance,
+        timestamp: event.created_at,
+        eventId: event.id,
+        activityType: eventActivityType
+      });
+    });
+    
+    // Convert to sorted array
+    const sortedParticipants = Array.from(participantMap.values())
+      .map(participant => ({
+        ...participant,
+        totalMiles: Math.round(participant.totalMiles * 100) / 100
+      }))
+      .sort((a, b) => {
+        if (b.totalMiles !== a.totalMiles) return b.totalMiles - a.totalMiles;
+        if (b.runCount !== a.runCount) return b.runCount - a.runCount;
+        return b.lastActivity - a.lastActivity;
+      });
+    
+    // Add ranks
+    const rankedParticipants = sortedParticipants.map((participant, index) => ({
+      ...participant,
+      rank: index + 1
+    }));
+    
+    console.log('[LeagueMap] Fallback leaderboard generated:', rankedParticipants.length, 'participants');
+    rankedParticipants.forEach(p => {
+      console.log(`  ${p.pubkey.slice(0, 8)}: ${p.totalMiles} mi, ${p.runCount} runs`);
+    });
+    
+    return rankedParticipants;
+  }, [feedPosts, activityMode]);
+
+  // Get profiles for leaderboard users (including fallback)
+  const leaderboardPubkeys = useMemo(() => {
+    const mainPubkeys = leaderboard.map(user => user.pubkey);
+    const fallbackPubkeys = fallbackLeaderboardFromFeed.map(user => user.pubkey);
+    return [...new Set([...mainPubkeys, ...fallbackPubkeys])];
+  }, [leaderboard, fallbackLeaderboardFromFeed]);
   const { profiles } = useProfiles(leaderboardPubkeys);
 
   // Phase 7: Get participant count
@@ -36,9 +180,29 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     seasonPassService.getParticipantCount(), []
   );
 
+  // Determine which leaderboard to use
+  const effectiveLeaderboard = useMemo(() => {
+    // Check if main leaderboard has meaningful data (any participant with > 0 miles)
+    const hasValidData = leaderboard.some(user => user.totalMiles > 0);
+    
+    if (hasValidData) {
+      console.log('[LeagueMap] Using main leaderboard with valid data');
+      return leaderboard;
+    }
+    
+    // Check if we have feed data to fall back to
+    if (fallbackLeaderboardFromFeed.length > 0) {
+      console.log('[LeagueMap] Main leaderboard empty/zero - using fallback from feed');
+      return fallbackLeaderboardFromFeed;
+    }
+    
+    console.log('[LeagueMap] Using main leaderboard (no fallback available)');
+    return leaderboard;
+  }, [leaderboard, fallbackLeaderboardFromFeed]);
+
   // Enhanced leaderboard with profile data
   const enhancedLeaderboard = useMemo(() => {
-    return leaderboard.map(user => {
+    return effectiveLeaderboard.map(user => {
       // Fix: useProfiles returns an object, not a Map
       const profile = profiles?.[user.pubkey] || profiles?.get?.(user.pubkey) || {};
       return {
@@ -48,7 +212,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
         isCurrentUser: user.pubkey === publicKey
       };
     });
-  }, [leaderboard, profiles, publicKey]);
+  }, [effectiveLeaderboard, profiles, publicKey]);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsInitialLoad(false), 500);
