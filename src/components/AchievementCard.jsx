@@ -76,16 +76,9 @@ const AchievementCard = () => {
         onClick={toggleExpanded}
       >
         <div className="flex items-center gap-3">
-          <div className="streak-flames text-xl">🔥</div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold text-text-primary">{currentDays} day streak</span>
-            <span className="text-text-secondary">•</span>
-            <span className="font-semibold" style={{ color: '#f7931a' }}>{weeklyTotal} sats</span>
-            <span className="text-text-secondary text-xs">this week</span>
-          </div>
+          <span className="font-semibold text-text-primary">Weekly Rewards Summary</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-text-secondary">{daysUntilPayout}d to payout</span>
           <svg 
             className={`h-4 w-4 text-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
             fill="none" 
@@ -133,23 +126,6 @@ const AchievementCard = () => {
                 </div>
               </div>
             </div>
-          </div>
-          
-          {/* Motivational Message */}
-          <div className="text-center">
-            {weeklyWorkouts < maxWeeklyWorkouts ? (
-              <div className="tomorrow-reward">
-                <div className="reward-text">
-                  Run tomorrow (Day {currentDays + 1}) to earn <span style={{ color: '#f7931a', fontWeight: '600' }}>100 sats</span>
-                </div>
-              </div>
-            ) : (
-              <div className="reward-capped">
-                <div className="reward-text">
-                  🎉 Week complete! Great job maintaining your streak!
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
