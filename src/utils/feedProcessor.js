@@ -127,15 +127,16 @@ export const lightweightProcessPosts = (posts, filterSource = null) => {
     const workoutTitle = workoutTitleTag ? workoutTitleTag[1] : 'Workout Record';
 
     const metrics = [];
-    const distanceTag = post.tags?.find(tag => tag[0] === 'distance');
-    if (distanceTag && distanceTag[1]) {
-      metrics.push({
-        label: "Distance",
-        value: distanceTag[1],
-        unit: distanceTag[2] || '',
-        // icon: <TrendingUp className="h-3 w-3" /> // Placeholder, requires import
-      });
-    }
+    // Remove distance from metrics to avoid duplication with content text
+    // const distanceTag = post.tags?.find(tag => tag[0] === 'distance');
+    // if (distanceTag && distanceTag[1]) {
+    //   metrics.push({
+    //     label: "Distance",
+    //     value: distanceTag[1],
+    //     unit: distanceTag[2] || '',
+    //     // icon: <TrendingUp className="h-3 w-3" /> // Placeholder, requires import
+    //   });
+    // }
 
     const durationTag = post.tags?.find(tag => tag[0] === 'duration');
     if (durationTag && durationTag[1]) {

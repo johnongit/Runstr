@@ -627,14 +627,15 @@ export const processPostsWithData = async (posts, supplementaryData) => {
         const workoutTitleTagOld = allTags.find(tag => tag[0] === 'title');
         workoutTitle = workoutTitleTagOld ? workoutTitleTagOld[1] : 'Workout Record';
 
-        const distanceTag = allTags.find(tag => tag[0] === 'distance');
-        if (distanceTag && distanceTag[1] && !metrics.find(m => m.label === "Distance")) {
-          metrics.push({
-            label: "Distance",
-            value: distanceTag[1],
-            unit: distanceTag[2] || '',
-          });
-        }
+        // Remove distance from metrics to avoid duplication with content text
+        // const distanceTag = allTags.find(tag => tag[0] === 'distance');
+        // if (distanceTag && distanceTag[1] && !metrics.find(m => m.label === "Distance")) {
+        //   metrics.push({
+        //     label: "Distance",
+        //     value: distanceTag[1],
+        //     unit: distanceTag[2] || '',
+        //   });
+        // }
 
         const durationTag = allTags.find(tag => tag[0] === 'duration');
         if (durationTag && durationTag[1] && !metrics.find(m => m.label === "Duration")) {
@@ -1079,14 +1080,14 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
   }
 
   const runDate = new Date(run.date);
-  // Using a more generic title for the workout, can be overridden by user if UI allows
-  const workoutTitle = run.title || `${primaryHashtag}`;
+  // Remove title completely to avoid duplication with date badge
+  const workoutTitle = run.title || '';
 
   // Enhanced content generation following NIP-101e community linking
   let contentParts = [];
   
-  // Start with user notes or default activity description
-  const baseContent = run.notes || `Completed a ${activityVerb}. ${activityEmoji}`;
+  // Start with user notes or default activity description - restore distance to content
+  const baseContent = run.notes || `Completed a ${distanceValue}${distanceUnit} ${activityVerb}. ${activityEmoji}`;
   contentParts.push(baseContent);
   
   // Add team association if present
