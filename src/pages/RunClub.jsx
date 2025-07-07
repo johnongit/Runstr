@@ -83,13 +83,14 @@ export const RunClub = () => {
           if (metrics.length === 0) {
             const fallbackMetrics = [];
             
-            if (event.distance) {
-              fallbackMetrics.push({
-                label: 'Distance',
-                value: event.distance,
-                unit: event.distanceUnit || 'km'
-              });
-            }
+            // Remove distance fallback to avoid duplication with content text
+            // if (event.distance) {
+            //   fallbackMetrics.push({
+            //     label: 'Distance',
+            //     value: event.distance,
+            //     unit: event.distanceUnit || 'km'
+            //   });
+            // }
             
             if (event.duration) {
               fallbackMetrics.push({
@@ -102,10 +103,15 @@ export const RunClub = () => {
             return fallbackMetrics;
           }
           
-          // Validate existing metrics
+          // Validate existing metrics and filter out distance metrics
           return metrics.filter(metric => {
             if (!metric.label || !metric.value) {
               validationErrors.push(`Event ${event.id}: Invalid metric (missing label or value)`);
+              return false;
+            }
+            // Remove distance metrics to avoid duplication
+            const labelLower = metric.label?.toLowerCase() || '';
+            if (labelLower.includes('dist')) {
               return false;
             }
             return true;
