@@ -196,16 +196,6 @@ const Settings = () => {
     setHealthEncryptionPref(enable ? 'encrypted' : 'plaintext');
   };
 
-  const handleAutoPostToggle = (e) => {
-    const value = e.target.checked;
-    setAutoPostToNostr(value);
-  };
-
-  const handleAutoPostKind1Toggle = (e) => {
-    const value = e.target.checked;
-    setAutoPostKind1Note(value);
-  };
-
   const handleTestBlossomConnection = async () => {
     if (!blossomEndpoint) {
       setConnectionStatus({ success: false, message: 'Please enter a Blossom server URL first' });
@@ -370,35 +360,6 @@ const Settings = () => {
             />
             <span className="toggle-slider"></span>
           </div>
-        </div>
-
-        <div className="setting-item">
-          <label htmlFor="autoPostToggle">Auto-post Workouts to Nostr</label>
-          <div className="toggle-switch">
-            <input
-              type="checkbox"
-              id="autoPostToggle"
-              checked={autoPostToNostr}
-              onChange={handleAutoPostToggle}
-            />
-            <span className="toggle-slider"></span>
-          </div>
-        </div>
-
-        <div className="setting-item">
-          <label htmlFor="autoPostKind1Toggle">Auto-post Run Notes to Nostr</label>
-          <div className="toggle-switch">
-            <input
-              type="checkbox"
-              id="autoPostKind1Toggle"
-              checked={autoPostKind1Note}
-              onChange={handleAutoPostKind1Toggle}
-            />
-            <span className="toggle-slider"></span>
-          </div>
-          <p className="setting-description">
-            Automatically opens a posting modal for sharing run notes after workout data is posted.
-          </p>
         </div>
 
         <div className="setting-item">

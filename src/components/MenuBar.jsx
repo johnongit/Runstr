@@ -24,7 +24,8 @@ export const MenuBar = () => {
     skipStartCountdown, setSkipStartCountdown,
     usePedometer, setUsePedometer,
     useLocalStats, setUseLocalStats,
-    autoPostToNostr, setAutoPostToNostr
+    autoPostToNostr, setAutoPostToNostr,
+    autoPostKind1Note, setAutoPostKind1Note
   } = useSettings();
 
   // State for the fallback lightning address in the modal
@@ -267,6 +268,18 @@ export const MenuBar = () => {
                 </div>
                 <p className="text-xs text-text-muted">
                   Automatically publish completed runs to Nostr with your team/challenge associations. You can still manually publish from the dashboard if disabled.
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-text-secondary mr-3">Auto-post Run Notes to Nostr</span>
+                  <input 
+                    type="checkbox"
+                    className="form-checkbox h-5 w-5 text-primary bg-bg-tertiary border-border-secondary focus:ring-primary rounded"
+                    checked={autoPostKind1Note}
+                    onChange={() => setAutoPostKind1Note(!autoPostKind1Note)}
+                  />
+                </div>
+                <p className="text-xs text-text-muted">
+                  Automatically opens a posting modal for sharing run notes after workout data is posted.
                 </p>
               </div>
             </div>
