@@ -1,0 +1,133 @@
+import { useState, useEffect } from 'react';
+import { ButtonGroup } from "@/components/ui/button-group";
+import { useRunTracker } from '../contexts/RunTrackerContext';
+import { useSettings } from '../contexts/SettingsContext';
+
+/**
+ * Goals dropdown component for setting distance targets
+ * Matches the styling of the Weekly Rewards Summary dropdown
+ */
+const GoalsDropdown = () => {
+  const { distanceUnit } = useSettings();
+  const { distance, isTracking, stopRun } = useRunTracker();
+  
+  // State for dropdown expansion and selected goal
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState(null);
+
+  // Distance goal options in meters (always stored as meters internally)
+  const goalOptions = [
+    { value: '1000', label: '1k' },
+    { value: '5000', label: '5k' },
+    { value: '10000', label: '10k' },
+    { value: '20000', label: '20k' }
+  ];
+
+  // Convert distance from meters to display units for goal checking
+  const getGoalInMeters = (goalValue) => {
+    const goalKm = parseInt(goalValue) / 1000;
+    // If user has miles selected, convert the goal to meters accordingly
+    if (distanceUnit === 'mi') {
+      // For mile users, treat goals as mile distances and convert to meters
+      const goalMiles = goalKm; // e.g., "1k" becomes 1 mile for mile users
+      return goalMiles * 1609.344;
+    }
+    return parseInt(goalValue); // Keep as meters for km users
+  };
+
+  // Check if goal is reached and auto-stop
+  useEffect(() => {
+    if (selectedGoal && isTracking && distance > 0) {
+      const goalDistanceInMeters = getGoalInMeters(selectedGoal);
+      
+      if (distance >= goalDistanceInMeters) {
+        console.log(`Goal reached! Distance: ${distance}m, Goal: ${goalDistanceInMeters}m`);
+        stopRun();
+        // Clear the goal after auto-stop
+        setSelectedGoal(null);
+      }
+    }
+  }, [distance, selectedGoal, isTracking, stopRun, distanceUnit]);
+
+  // Clear goal when not tracking
+  useEffect(() => {
+    if (!isTracking) {
+      setSelectedGoal(null);
+    }
+  }, [isTracking]);
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  const handleGoalSelect = (goalValue) => {
+    setSelectedGoal(goalValue);
+    setIsExpanded(false); // Close dropdown after selection
+  };
+
+  // Format goal label for display (adjust for miles vs km)
+  const formatGoalLabel = (goalValue) => {
+    const goalKm = parseInt(goalValue) / 1000;
+    if (distanceUnit === 'mi') {
+      // For mile users, show goals as mile distances
+      return `${goalKm}mi`;
+    }
+    return `${goalKm}k`;
+  };
+
+  return (
+    <div className="bg-bg-secondary rounded-xl shadow-lg border border-border-secondary mb-4">
+      {/* Compact Summary Header - Always Visible */}
+      <div 
+        className="flex items-center justify-between p-4 cursor-pointer hover:bg-bg-tertiary transition-colors duration-200 rounded-xl"
+        onClick={toggleExpanded}
+      >
+        <div className="flex items-center gap-3">
+          <span className="font-semibold text-text-primary">Goals</span>
+          {selectedGoal && (
+            <span className="text-sm px-2 py-1 bg-primary/20 text-primary rounded-md">
+              Target: {formatGoalLabel(selectedGoal)}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <svg 
+            className={`h-4 w-4 text-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Detailed Content - Collapsible */}
+      {isExpanded && (
+        <div className="px-4 pb-4 border-t border-border-secondary">
+          <div className="mt-4">
+            <h4 className="text-sm font-medium text-text-secondary mb-3">Distance Goals</h4>
+            <ButtonGroup
+              value={selectedGoal || ''}
+              onValueChange={handleGoalSelect}
+              options={goalOptions.map(option => ({
+                value: option.value,
+                label: formatGoalLabel(option.value)
+              }))}
+              size="default"
+              className="mb-2"
+            />
+            <p className="text-xs text-text-muted mt-2">
+              {selectedGoal 
+                ? `Your run will automatically stop when you reach ${formatGoalLabel(selectedGoal)}.`
+                : 'Select a distance goal to automatically stop your run when reached.'
+              }
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default GoalsDropdown; 

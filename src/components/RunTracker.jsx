@@ -9,6 +9,7 @@ import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
 import SplitsTable from './SplitsTable';
 import DashboardRunCard from './DashboardRunCard';
 import AchievementCard from './AchievementCard';
+import GoalsDropdown from './GoalsDropdown';
 import { validateEventRun, initializeEvents } from '../services/EventService';
 import { PostRunWizardModal } from './PostRunWizardModal';
 import { useContext } from 'react';
@@ -700,6 +701,9 @@ ${run.elevation && run.elevation.loss ? `\n📉 Elevation Loss: ${formatElevatio
       {/* Achievements & Rewards Card - Show only when not tracking */}
       {!isTracking && (
         <div className="mx-4">
+          {/* Goals Dropdown - Show above Weekly Rewards Summary */}
+          <GoalsDropdown />
+          
           <AchievementCard 
             currentStreak={
               // Calculate streak based on recent runs - fallback to 0 if not available
