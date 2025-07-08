@@ -47,14 +47,14 @@ const GoalsDropdown = () => {
         setSelectedGoal(null);
       }
     }
-  }, [distance, selectedGoal, isTracking, stopRun, distanceUnit]);
-
-  // Clear goal when not tracking
-  useEffect(() => {
-    if (!isTracking) {
+    
+    // Clear goal when not tracking (consolidated here to avoid race condition)
+    if (!isTracking && selectedGoal) {
       setSelectedGoal(null);
     }
-  }, [isTracking]);
+  }, [distance, selectedGoal, isTracking, stopRun, distanceUnit]);
+
+
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
