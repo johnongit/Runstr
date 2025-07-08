@@ -58,9 +58,26 @@ const AchievementCard = () => {
   
   const weeklyWorkouts = getWeeklyWorkoutCount();
   const maxWeeklyWorkouts = 7;
-  const baseReward = weeklyWorkouts * 50; // 50 sats per workout
-  const streakBonus = currentDays * 50; // 50 sats per streak day
-  const weeklyTotal = baseReward + streakBonus;
+  
+  // New reward structure: 20 sats × streak day number
+  // Calculate total weekly rewards based on consecutive streak days within the week
+  const calculateWeeklyRewards = () => {
+    if (weeklyWorkouts === 0) return 0;
+    
+    // For weekly summary, calculate rewards for consecutive days within this week
+    // Assuming the streak days within this week start from the most recent streak position
+    let totalRewards = 0;
+    const startingStreakDay = Math.max(1, currentDays - weeklyWorkouts + 1);
+    
+    for (let i = 0; i < weeklyWorkouts; i++) {
+      const streakDayNumber = startingStreakDay + i;
+      totalRewards += 20 * streakDayNumber;
+    }
+    
+    return totalRewards;
+  };
+  
+  const weeklyTotal = calculateWeeklyRewards();
   const daysUntilPayout = getDaysUntilPayout();
   const weekProgress = (weeklyWorkouts / maxWeeklyWorkouts) * 100;
 
@@ -112,12 +129,16 @@ const AchievementCard = () => {
             <h4 className="text-sm font-medium text-text-secondary mb-2">Weekly Earnings</h4>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-text-secondary">Base reward ({weeklyWorkouts} workouts)</span>
-                <span className="text-sm font-semibold" style={{ color: '#f7931a' }}>{baseReward} sats</span>
+                <span className="text-sm text-text-secondary">Streak rewards (20 × streak day)</span>
+                <span className="text-sm font-semibold" style={{ color: '#f7931a' }}>{weeklyTotal} sats</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-text-secondary">Streak bonus ({currentDays} days)</span>
-                <span className="text-sm font-semibold" style={{ color: '#f7931a' }}>+{streakBonus} sats</span>
+                <span className="text-xs text-text-muted">
+                  {weeklyWorkouts > 0 ? `${weeklyWorkouts} consecutive days this week` : 'No workouts this week'}
+                </span>
+                <span className="text-xs text-text-muted">
+                  {weeklyWorkouts > 0 ? `Current streak: ${currentDays} days` : ''}
+                </span>
               </div>
               <div className="border-t border-border-secondary pt-2">
                 <div className="flex justify-between items-center">
