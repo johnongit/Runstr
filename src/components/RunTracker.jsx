@@ -163,7 +163,13 @@ export const RunTracker = () => {
       };
 
       // Use the createAndPublishEvent function from nostr-tools
-      await createAndPublishEvent(eventTemplate);
+      const publishedEvent = await createAndPublishEvent(eventTemplate);
+      
+      // Save the event ID to track that this run has been posted
+      if (publishedEvent?.id) {
+        recentRun.nostrKind1EventId = publishedEvent.id;
+        runDataService.updateRun(recentRun.id, { nostrKind1EventId: publishedEvent.id });
+      }
       
       setShowPostModal(false);
       setAdditionalContent('');
@@ -482,7 +488,7 @@ export const RunTracker = () => {
     };
 
     const attemptAutoPostKind1 = async () => {
-      if (!autoPostKind1Note || !recentRun || autoPublishingKind1) return;
+      if (!autoPostKind1Note || !recentRun || recentRun.nostrKind1EventId || autoPublishingKind1) return;
       
       try {
         setAutoPublishingKind1(true);
@@ -752,6 +758,7 @@ ${run.elevation && run.elevation.loss ? `\n📉 Elevation Loss: ${formatElevatio
             isSaving={isSavingWorkout}
             isWorkoutSaved={workoutSaved}
             isDeleting={isDeleting}
+            isKind1Posted={!!recentRun.nostrKind1EventId}
           />
         </div>
       )}
