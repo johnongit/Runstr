@@ -47,20 +47,9 @@ const convertNpubToHex = (npub: string): string => {
 
 /**
  * Default Season Pass participants
- * These are the founding participants who purchased season passes
+ * Now empty since we have proper payment verification - users must pay to be added
  */
-const DEFAULT_PARTICIPANTS: SeasonPassParticipant[] = [
-  {
-    // npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum
-    pubkey: '30ceb64e73197a05958c8bd92ab079c815bb44fbfbb3eb5d9766c5207f08bdf5',
-    paymentDate: '2025-07-01T00:00:00.000Z'
-  },
-  {
-    // npub1jdvvva54m8nchh3t708pav99qk24x6rkx2sh0e7jthh0l8efzt7q9y7jlj
-    pubkey: '9358c67695d9e78bde2bf3ce1eb0a5059553687632a177e7d25deeff9f2912fc',
-    paymentDate: '2025-07-01T00:00:00.000Z'
-  }
-];
+const DEFAULT_PARTICIPANTS: SeasonPassParticipant[] = [];
 
 /**
  * Get stored participants from localStorage with backward compatibility

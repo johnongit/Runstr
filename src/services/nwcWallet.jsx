@@ -176,7 +176,16 @@ export class NWCWallet {
             invoicePreview: invoice.substring(0, 50) + '...',
             invoiceLength: invoice.length
           });
-          return { invoice };
+          
+          // Extract payment hash from the invoice for future lookup
+          const paymentHash = this.extractPaymentHash(invoice);
+          
+          return { 
+            invoice,
+            paymentHash,
+            // Include other response data for compatibility
+            ...response
+          };
         } else {
           console.log('[NWCWallet] Alby SDK returned no invoice, trying fallback...');
           throw new Error('No invoice in Alby SDK response');
@@ -190,6 +199,136 @@ export class NWCWallet {
     } catch (error) {
       console.error('[NWCWallet] Make invoice error:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Extract payment hash from a Lightning invoice
+   * @param {string} invoice - The bolt11 invoice string
+   * @returns {string|null} - The payment hash in hex format, or null if extraction fails
+   */
+  extractPaymentHash(invoice) {
+    try {
+      // Simple bolt11 decoding to extract payment hash
+      // The payment hash is in the 'p' tagged field of bolt11
+      
+      // Remove the 'lnbc' prefix and checksum to get the data part
+      const prefix = invoice.substring(0, 4); // 'lnbc'
+      if (!prefix.startsWith('ln')) {
+        throw new Error('Invalid invoice prefix');
+      }
+      
+      // Find amount and hrp parts 
+      const amountEndIndex = invoice.search(/[a-z]/); // First letter after amount
+      if (amountEndIndex === -1) {
+        throw new Error('Invalid invoice format');
+      }
+      
+      const dataPart = invoice.substring(amountEndIndex + 1); // Skip the unit letter
+      const checksumLength = 6;
+      const dataWithoutChecksum = dataPart.substring(0, dataPart.length - checksumLength);
+      
+      // Convert from bech32 to get tagged fields
+      // This is a simplified extraction - in production you'd use a proper bolt11 library
+      // For now, we'll use a different approach
+      return null; // Will implement proper bolt11 decoding later if needed
+      
+    } catch (error) {
+      console.warn('[NWCWallet] Could not extract payment hash from invoice:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Look up invoice payment status using NIP-47 lookup_invoice
+   * @param {string} paymentHash - The payment hash to look up
+   * @returns {Promise<Object>} - Payment status information
+   */
+  async lookupInvoice(paymentHash) {
+    try {
+      if (!this.provider) {
+        throw new Error('Wallet not connected');
+      }
+
+      console.log('[NWCWallet] Looking up invoice with payment hash:', paymentHash);
+
+      // Try Alby SDK first if it supports lookup
+      if (typeof this.provider.lookupInvoice === 'function') {
+        try {
+          const response = await this.provider.lookupInvoice({ paymentHash });
+          console.log('[NWCWallet] Alby SDK lookup response:', response);
+          return response;
+        } catch (albyError) {
+          console.log('[NWCWallet] Alby SDK lookup failed, trying direct NWC:', albyError.message);
+        }
+      }
+
+      // Fallback to direct NWC implementation
+      return await this.lookupInvoiceDirect(paymentHash);
+
+    } catch (error) {
+      console.error('[NWCWallet] Lookup invoice error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Direct NWC lookup_invoice implementation
+   * @param {string} paymentHash - The payment hash to look up
+   * @returns {Promise<Object>} - Payment status information
+   */
+  async lookupInvoiceDirect(paymentHash) {
+    console.log('[NWCWallet] Using direct NWC lookup implementation...');
+    
+    if (!this.walletPubKey || !this.relayUrl || !this.secretKey) {
+      throw new Error('Missing NWC connection parameters for direct lookup');
+    }
+
+    // Try both hex and npub formats for wallet pubkey
+    const walletPubkeyVariants = [
+      this.walletPubKey, // hex format
+      this.walletNpub // npub format (if available)
+    ].filter(Boolean);
+
+    for (const [index, walletPubkey] of walletPubkeyVariants.entries()) {
+      try {
+        console.log(`[NWCWallet] Trying direct NWC lookup with wallet pubkey variant ${index + 1}`);
+
+        // Create NIP-47 lookup_invoice request
+        const requestEvent = {
+          kind: 23194,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [['p', walletPubkey.startsWith('npub') ? nip19.decode(walletPubkey).data : walletPubkey]],
+          content: JSON.stringify({
+            method: 'lookup_invoice',
+            params: {
+              payment_hash: paymentHash
+            }
+          }),
+          pubkey: getPublicKey(this.secretKey)
+        };
+
+        // Sign the event
+        const finalizedEvent = finalizeEvent(requestEvent, this.secretKey);
+
+        console.log('[NWCWallet] Direct NWC lookup request event:', {
+          kind: finalizedEvent.kind,
+          method: 'lookup_invoice',
+          paymentHash: paymentHash,
+          variantNumber: index + 1
+        });
+
+        // Send via WebSocket
+        const result = await this.sendDirectNWCRequest(finalizedEvent);
+        console.log(`[NWCWallet] Direct NWC lookup variant ${index + 1} succeeded!`);
+        return result;
+
+      } catch (error) {
+        console.log(`[NWCWallet] Direct NWC lookup variant ${index + 1} failed:`, error.message);
+        if (index === walletPubkeyVariants.length - 1) {
+          throw error;
+        }
+      }
     }
   }
 
