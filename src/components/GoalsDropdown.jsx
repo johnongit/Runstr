@@ -15,14 +15,6 @@ const GoalsDropdown = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(null);
 
-  // Distance goal options in meters (always stored as meters internally)
-  const goalOptions = [
-    { value: '1000', label: '1k' },
-    { value: '5000', label: '5k' },
-    { value: '10000', label: '10k' },
-    { value: '20000', label: '20k' }
-  ];
-
   // Convert distance from meters to display units for goal checking
   const getGoalInMeters = (goalValue) => {
     const goalKm = parseInt(goalValue) / 1000;
@@ -33,6 +25,16 @@ const GoalsDropdown = () => {
       return goalMiles * 1609.344;
     }
     return parseInt(goalValue); // Keep as meters for km users
+  };
+
+  // Format goal label for display (adjust for miles vs km)
+  const formatGoalLabel = (goalValue) => {
+    const goalKm = parseInt(goalValue) / 1000;
+    if (distanceUnit === 'mi') {
+      // For mile users, show goals as mile distances
+      return `${goalKm}mi`;
+    }
+    return `${goalKm}k`;
   };
 
   // Check if goal is reached and auto-stop
@@ -63,16 +65,6 @@ const GoalsDropdown = () => {
   const handleGoalSelect = (goalValue) => {
     setSelectedGoal(goalValue);
     setIsExpanded(false); // Close dropdown after selection
-  };
-
-  // Format goal label for display (adjust for miles vs km)
-  const formatGoalLabel = (goalValue) => {
-    const goalKm = parseInt(goalValue) / 1000;
-    if (distanceUnit === 'mi') {
-      // For mile users, show goals as mile distances
-      return `${goalKm}mi`;
-    }
-    return `${goalKm}k`;
   };
 
   return (
@@ -110,10 +102,12 @@ const GoalsDropdown = () => {
             <ButtonGroup
               value={selectedGoal || ''}
               onValueChange={handleGoalSelect}
-              options={goalOptions.map(option => ({
-                value: option.value,
-                label: formatGoalLabel(option.value)
-              }))}
+              options={[
+                { value: '1000', label: distanceUnit === 'mi' ? '1mi' : '1k' },
+                { value: '5000', label: distanceUnit === 'mi' ? '5mi' : '5k' },
+                { value: '10000', label: distanceUnit === 'mi' ? '10mi' : '10k' },
+                { value: '20000', label: distanceUnit === 'mi' ? '20mi' : '20k' }
+              ]}
               size="default"
               className="mb-2"
             />

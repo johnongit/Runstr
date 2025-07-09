@@ -488,7 +488,7 @@ export const RunTracker = () => {
     };
 
     const attemptAutoPostKind1 = async () => {
-      if (!autoPostKind1Note || !recentRun || recentRun.nostrKind1EventId || autoPublishingKind1) return;
+      if (!autoPostKind1Note || !recentRun || recentRun.nostrKind1EventId || recentRun.autoPostKind1Declined || autoPublishingKind1) return;
       
       try {
         setAutoPublishingKind1(true);
@@ -756,7 +756,7 @@ ${run.elevation && run.elevation.loss ? `\n📉 Elevation Loss: ${formatElevatio
             onSave={handleSaveWorkoutRecord}
             onDelete={handleDeleteRun}
             isSaving={isSavingWorkout}
-            isWorkoutSaved={workoutSaved}
+            isWorkoutSaved={!!recentRun.nostrWorkoutEventId}
             isDeleting={isDeleting}
             isKind1Posted={!!recentRun.nostrKind1EventId}
           />
@@ -806,6 +806,11 @@ ${run.elevation && run.elevation.loss ? `\n📉 Elevation Loss: ${formatElevatio
             <div className="flex justify-end space-x-3">
               <Button 
                 onClick={() => {
+                  // Track cancellation for auto-posts to prevent modal from reappearing
+                  if (isAutoPost && recentRun) {
+                    recentRun.autoPostKind1Declined = true;
+                    runDataService.updateRun(recentRun.id, { autoPostKind1Declined: true });
+                  }
                   setShowPostModal(false);
                   setAdditionalContent('');
                   setIsAutoPost(false);
