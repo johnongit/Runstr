@@ -54,22 +54,40 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
           // Priority 3: Try to fetch team name from NDK if not cached
           if (!teamName) {
             try {
+              console.log('runPublisher: Attempting to fetch team name from NDK for:', teamUUID);
               // Import NDK services dynamically to avoid circular dependencies
-              const { ndk } = await import('../lib/ndkSingleton');
+              const { ndk, ndkReadyPromise } = await import('../lib/ndkSingleton');
               const { fetchTeamById, getTeamName } = await import('../services/nostr/NostrTeamsService');
-              if (ndk && ndk.connect) {
+              
+              // Wait for NDK to be ready with timeout
+              const isNdkReady = await Promise.race([
+                ndkReadyPromise,
+                new Promise(resolve => setTimeout(() => resolve(false), 5000)) // 5 second timeout
+              ]);
+              
+              if (isNdkReady && ndk && ndk.pool && ndk.pool.relays && ndk.pool.relays.size > 0) {
+                console.log('runPublisher: NDK is ready, fetching team data...');
                 const teamEvent = await fetchTeamById(ndk, teamCaptainPubkey, teamUUID);
                 if (teamEvent) {
                   teamName = getTeamName(teamEvent);
-                  if (teamName) {
+                  if (teamName && teamName !== 'Unnamed Team') {
+                    console.log('runPublisher: Successfully fetched team name:', teamName);
                     // Cache the team name for future use
                     cacheTeamName(teamUUID, teamCaptainPubkey, teamName);
+                  } else {
+                    console.log('runPublisher: Team event found but no valid name');
                   }
+                } else {
+                  console.log('runPublisher: No team event found for:', teamUUID);
                 }
+              } else {
+                console.log('runPublisher: NDK not ready or not connected, skipping team name fetch');
               }
             } catch (ndkError) {
               console.warn('runPublisher: could not fetch team data via NDK', ndkError);
             }
+          } else {
+            console.log('runPublisher: Using cached team name:', teamName);
           }
           
           teamAssociation = { 
@@ -89,9 +107,16 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
               // If no names were resolved, try fetching from NDK
               if (challengeNames.length === 0) {
                 try {
-                  const { ndk } = await import('../lib/ndkSingleton');
+                  const { ndk, ndkReadyPromise } = await import('../lib/ndkSingleton');
                   const { fetchTeamChallenges } = await import('../services/nostr/NostrTeamsService');
-                  if (ndk && ndk.connect) {
+                  
+                  // Wait for NDK to be ready with timeout
+                  const isNdkReady = await Promise.race([
+                    ndkReadyPromise,
+                    new Promise(resolve => setTimeout(() => resolve(false), 5000)) // 5 second timeout
+                  ]);
+                  
+                  if (isNdkReady && ndk && ndk.pool && ndk.pool.relays && ndk.pool.relays.size > 0) {
                     const teamAIdentifier = `33404:${teamCaptainPubkey}:${teamUUID}`;
                     const challenges = await fetchTeamChallenges(ndk, teamAIdentifier);
                     
@@ -122,10 +147,17 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
       } else {
         // Priority 3: AUTO-DETECT - Use user's first team if no default is set
         try {
-          const { ndk } = await import('../lib/ndkSingleton');
+          const { ndk, ndkReadyPromise } = await import('../lib/ndkSingleton');
           const { fetchUserMemberTeams, getTeamCaptain, getTeamUUID, getTeamName } = await import('../services/nostr/NostrTeamsService');
           
-          if (ndk && ndk.connect && userPubkey) {
+          // Wait for NDK to be ready with timeout
+          const isNdkReady = await Promise.race([
+            ndkReadyPromise,
+            new Promise(resolve => setTimeout(() => resolve(false), 5000)) // 5 second timeout
+          ]);
+          
+          if (isNdkReady && ndk && ndk.pool && ndk.pool.relays && ndk.pool.relays.size > 0 && userPubkey) {
+            console.log('runPublisher: Auto-detecting user teams...');
             const userTeams = await fetchUserMemberTeams(ndk, userPubkey);
             if (userTeams && userTeams.length > 0) {
               const firstTeam = userTeams[0];
@@ -135,6 +167,12 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
               
               if (teamCaptainPubkey && teamUUID) {
                 console.log('runPublisher: Auto-detected team for associations:', teamName || teamUUID);
+                
+                // Cache the team name if we have it
+                if (teamName && teamName !== 'Unnamed Team') {
+                  cacheTeamName(teamUUID, teamCaptainPubkey, teamName);
+                }
+                
                 teamAssociation = { 
                   teamCaptainPubkey, 
                   teamUUID,
@@ -180,6 +218,8 @@ export const publishRun = async (run, distanceUnit = 'km', settings = {}, teamCh
                 }
               }
             }
+          } else {
+            console.log('runPublisher: NDK not ready or no user pubkey, skipping auto-detection');
           }
         } catch (autoDetectErr) {
           console.warn('runPublisher: could not auto-detect user team', autoDetectErr);

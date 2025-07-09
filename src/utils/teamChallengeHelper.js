@@ -68,9 +68,16 @@ export const getWorkoutAssociations = async (teamChallengeData = null) => {
               // If no names were resolved, try fetching from NDK
               if (challengeNames.length === 0) {
                 try {
-                  const { ndk } = await import('../lib/ndkSingleton');
+                  const { ndk, ndkReadyPromise } = await import('../lib/ndkSingleton');
                   const { fetchTeamChallenges } = await import('../services/nostr/NostrTeamsService');
-                  if (ndk && ndk.connect) {
+                  
+                  // Wait for NDK to be ready with timeout
+                  const isNdkReady = await Promise.race([
+                    ndkReadyPromise,
+                    new Promise(resolve => setTimeout(() => resolve(false), 5000)) // 5 second timeout
+                  ]);
+                  
+                  if (isNdkReady && ndk && ndk.pool && ndk.pool.relays && ndk.pool.relays.size > 0) {
                     const teamAIdentifier = `33404:${teamCaptainPubkey}:${teamUUID}`;
                     const challenges = await fetchTeamChallenges(ndk, teamAIdentifier);
                     
