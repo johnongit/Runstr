@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
 import { REWARDS } from '../config/rewardsConfig';
 import { NostrContext } from '../contexts/NostrContext';
+import { useActivityMode } from '../contexts/ActivityModeContext';
 import { fetchEvents } from '../utils/nostr';
 
 /**
@@ -14,7 +15,8 @@ import { fetchEvents } from '../utils/nostr';
  */
 export const useHistoricalTotals = () => {
   const { ndk } = useContext(NostrContext);
-  const [totals, setTotals] = useState({});
+  const { mode: activityMode } = useActivityMode();
+  const [historicalTotals, setHistoricalTotals] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -159,7 +161,7 @@ export const useHistoricalTotals = () => {
    * Fetch historical totals for all participants
    */
   const fetchHistoricalTotals = useCallback(async () => {
-    if (participantsWithDates.length === 0) {
+    if (participants.length === 0) {
       console.log('[useHistoricalTotals] No participants found');
       setHistoricalTotals([]);
       setIsLoading(false);
@@ -168,14 +170,13 @@ export const useHistoricalTotals = () => {
 
     try {
       setError(null);
-      console.log(`[useHistoricalTotals] Fetching historical data for ${participantsWithDates.length} participants`);
+      console.log(`[useHistoricalTotals] Fetching historical data for ${participants.length} participants`);
 
-      // Create participant map with signup dates
+      // Create participant map (simplified - no individual payment dates)
       const participantMap = new Map();
-      participantsWithDates.forEach(participant => {
-        participantMap.set(participant.pubkey, {
-          pubkey: participant.pubkey,
-          signupDate: Math.floor(new Date(participant.paymentDate).getTime() / 1000),
+      participants.forEach(pubkey => {
+        participantMap.set(pubkey, {
+          pubkey,
           totalMiles: 0,
           runCount: 0,
           lastActivity: 0,
@@ -183,33 +184,22 @@ export const useHistoricalTotals = () => {
         });
       });
 
-      // Fetch all events for all participants (since their individual signup dates)
-      const participantPubkeys = participantsWithDates.map(p => p.pubkey);
-      const earliestSignupDate = Math.min(...participantsWithDates.map(p => 
-        Math.floor(new Date(p.paymentDate).getTime() / 1000)
-      ));
-
-      console.log(`[useHistoricalTotals] Fetching events since ${new Date(earliestSignupDate * 1000).toISOString()}`);
-
+      // Fetch all events for all participants using global competition dates
       const events = await fetchEvents({
         kinds: [1301],
-        authors: participantPubkeys,
-        since: earliestSignupDate,
-        limit: 5000 // Should be enough for 3-month competition
+        authors: participants,
+        since: COMPETITION_START,
+        until: COMPETITION_END,
+        limit: MAX_EVENTS
       });
 
-      console.log(`[useHistoricalTotals] Fetched ${events.size} total events`);
+      console.log(`[useHistoricalTotals] Fetched ${events.length} total events`);
 
       // Process events for each participant
       let processedCount = 0;
-      Array.from(events).forEach(event => {
+      events.forEach(event => {
         const participant = participantMap.get(event.pubkey);
         if (!participant) return;
-
-        // Only count events after participant's signup date
-        if (event.created_at < participant.signupDate) {
-          return;
-        }
 
         // Filter by activity mode
         if (!matchesActivityMode(event)) {
@@ -253,7 +243,7 @@ export const useHistoricalTotals = () => {
 
       console.log(`[useHistoricalTotals] Processed ${processedCount} events for ${rankedTotals.length} participants`);
       rankedTotals.forEach(p => {
-        console.log(`  ${p.pubkey.slice(0, 8)}: ${p.totalMiles} mi, ${p.runCount} runs (since ${new Date(p.signupDate * 1000).toLocaleDateString()})`);
+        console.log(`  ${p.pubkey.slice(0, 8)}: ${p.totalMiles} mi, ${p.runCount} runs`);
       });
 
       setHistoricalTotals(rankedTotals);
@@ -266,7 +256,7 @@ export const useHistoricalTotals = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [participantsWithDates, extractDistance, matchesActivityMode, saveCachedTotals]);
+  }, [participants, extractDistance, matchesActivityMode, saveCachedTotals, COMPETITION_START, COMPETITION_END, MAX_EVENTS]);
 
   /**
    * Force refresh (bypass cache)
