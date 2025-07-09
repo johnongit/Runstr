@@ -16,6 +16,9 @@ const ADMIN_PUBKEY = 'f241654d23b2aede8275dedd1eba1791e292d9ee0d887752e68a404deb
 const PARTICIPANT_LIST_D_TAG = 'runstr-season-1-participants';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+// Current production event: 59ae5e4138ec6604bee27a5ac0db08147b3cae493510c76a71e64f8339846708
+// Published to: relay.damus.io, nos.lol, relay.nostr.band
+
 // Cache for Nostr participants
 interface NostrParticipantCache {
   participants: string[];
@@ -45,8 +48,6 @@ const fetchNostrParticipants = async (): Promise<string[]> => {
       kinds: [30000], // NIP-51 list
       authors: [ADMIN_PUBKEY],
       '#d': [PARTICIPANT_LIST_D_TAG]
-    }, { 
-      timeout: 8000 // 8 second timeout
     });
 
     if (!events || events.size === 0) {
