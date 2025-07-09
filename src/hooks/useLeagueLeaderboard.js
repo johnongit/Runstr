@@ -23,6 +23,9 @@ export const useLeagueLeaderboard = () => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [participantsData, setParticipantsData] = useState([]);
   
+  // ADD: Track participant loading state to fix race condition
+  const [participantsLoaded, setParticipantsLoaded] = useState(false);
+  
   // Enhanced loading states for better UX
   const [loadingProgress, setLoadingProgress] = useState({
     phase: 'initializing',
@@ -52,6 +55,8 @@ export const useLeagueLeaderboard = () => {
     
     const loadParticipants = async () => {
       try {
+        setParticipantsLoaded(false); // ADD: Mark participants as not loaded
+        
         // Get participant data from both localStorage and Nostr
         const [mergedParticipants, participantsWithDates] = await Promise.all([
           enhancedSeasonPassService.getParticipants(),
@@ -70,6 +75,8 @@ export const useLeagueLeaderboard = () => {
         });
         
         setParticipantsData(participantData);
+        setParticipantsLoaded(true); // ADD: Mark participants as loaded
+        
         console.log('[LeagueLeaderboard] Loaded participants from enhanced service:', {
           merged: mergedParticipants.length,
           withDates: participantsWithDates.length,
@@ -81,6 +88,7 @@ export const useLeagueLeaderboard = () => {
         console.error('[LeagueLeaderboard] Error loading participants:', error);
         if (isMounted) {
           setParticipantsData([]);
+          setParticipantsLoaded(true); // ADD: Mark as loaded even on error
         }
       }
     };
@@ -582,8 +590,20 @@ export const useLeagueLeaderboard = () => {
     }
   }, [loadCachedData, fetchLeaderboardData]);
 
-  // Refresh when activity mode changes
+  // FIXED: Activity mode effect now waits for participants to be loaded
   useEffect(() => {
+    // Don't fetch if participants haven't been loaded yet
+    if (!participantsLoaded) {
+      console.log('[LeagueLeaderboard] Waiting for participants to load before fetching leaderboard...');
+      return;
+    }
+    
+    console.log('[LeagueLeaderboard] Activity mode changed, refetching leaderboard:', {
+      activityMode,
+      participantsCount: participantsData.length,
+      participantsLoaded
+    });
+    
     setIsLoading(true);
     setLoadingProgress({ 
       phase: 'initializing', 
@@ -593,7 +613,21 @@ export const useLeagueLeaderboard = () => {
       message: 'Switching activity mode...' 
     });
     fetchLeaderboardData();
-  }, [activityMode, fetchLeaderboardData]);
+  }, [activityMode, participantsLoaded, fetchLeaderboardData]); // ADD: participantsLoaded dependency
+
+  // FIXED: Initial fetch effect that waits for participants
+  useEffect(() => {
+    // Only do initial fetch when participants are loaded and we don't have cached data
+    if (!participantsLoaded) {
+      return;
+    }
+    
+    const hasCachedData = loadCachedData();
+    if (!hasCachedData) {
+      console.log('[LeagueLeaderboard] No cached data, fetching fresh leaderboard...');
+      fetchLeaderboardData();
+    }
+  }, [participantsLoaded, loadCachedData, fetchLeaderboardData]); // ADD: New effect for initial fetch
 
   // Auto-refresh every 30 minutes (only if cache duration > 0)
   useEffect(() => {
