@@ -19,9 +19,26 @@ const SeasonPassPaymentModal: React.FC<Props> = ({ open, onClose, onPaymentSucce
   const [step, setStep] = useState<'generating' | 'payment' | 'verifying' | 'success'>('generating');
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [showDebug, setShowDebug] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
 
   const seasonDetails = seasonPassPaymentService.getSeasonDetails();
-  const participantCount = seasonPassPaymentService.getParticipantCount();
+
+  // Load participant count when modal opens
+  useEffect(() => {
+    const loadParticipantCount = async () => {
+      try {
+        const count = await seasonPassPaymentService.getParticipantCount();
+        setParticipantCount(count);
+      } catch (error) {
+        console.error('[SeasonPassPaymentModal] Error loading participant count:', error);
+        setParticipantCount(0);
+      }
+    };
+
+    if (open) {
+      loadParticipantCount();
+    }
+  }, [open]);
 
   // Generate invoice when modal opens
   useEffect(() => {

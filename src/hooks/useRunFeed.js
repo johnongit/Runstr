@@ -12,7 +12,7 @@ import { getEventTargetId } from '../utils/eventHelpers';
 import { useProfileCache } from '../hooks/useProfileCache.js';
 import { ensureRelays } from '../utils/relays.js';
 import { useActivityMode } from '../contexts/ActivityModeContext';
-import seasonPassService from '../services/seasonPassService';
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -260,7 +260,7 @@ export const useRunFeed = (filterSource = null) => {
       // Phase 4: Season Pass Participant Filter
       // Only show posts from Season Pass participants (for all activity modes)
       if (isRunstrWorkout) {
-        const isParticipant = seasonPassService.isParticipant(event.pubkey);
+        const isParticipant = enhancedSeasonPassService.isParticipant(event.pubkey);
         if (!isParticipant) {
           console.log(`[useRunFeed] Filtering out non-participant post from ${event.pubkey} (${activityMode} mode)`);
           return false;

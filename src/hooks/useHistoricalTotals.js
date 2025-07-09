@@ -1,36 +1,54 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
+import { REWARDS } from '../config/rewardsConfig';
+import { NostrContext } from '../contexts/NostrContext';
 import { fetchEvents } from '../utils/nostr';
-import seasonPassService from '../services/seasonPassService';
-import { useActivityMode } from '../contexts/ActivityModeContext';
 
 /**
  * Hook: useHistoricalTotals
- * Fetches complete historical workout data for all Season Pass participants
- * Uses simple, proven fetching logic with heavy caching for performance
- * Returns total distances since each participant's signup date
+ * Fetches complete historical totals for all Season Pass participants
+ * Uses GLOBAL competition date range for all participants (no individual payment date filtering)
+ * Heavily cached (30 min) since historical data doesn't change frequently
  * 
- * @returns {Object} { historicalTotals, isLoading, error, refresh, lastUpdated }
+ * @returns {Object} { totals, isLoading, error, refresh, lastUpdated }
  */
 export const useHistoricalTotals = () => {
-  const { mode: activityMode } = useActivityMode();
-  const [historicalTotals, setHistoricalTotals] = useState([]);
+  const { ndk } = useContext(NostrContext);
+  const [totals, setTotals] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Cache settings - aggressive caching since historical data changes slowly
+  // Cache configuration
   const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
-  const CACHE_KEY = `runstr_historical_totals_${activityMode}_v1`;
+  const CACHE_KEY = 'runstr_historical_totals_v4_global_dates'; // Updated for global dates
+  const MAX_EVENTS = 5000;
 
-  // Get participants with their signup dates
-  const participantsWithDates = useMemo(() => {
-    try {
-      return seasonPassService.getParticipantsWithDates();
-    } catch (err) {
-      console.error('[useHistoricalTotals] Error loading participants:', err);
-      return [];
-    }
-  }, []);
+  // Global competition date range from rewardsConfig (no individual payment filtering)
+  const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
+
+  // Get participants from enhanced service
+  const [participants, setParticipants] = useState([]);
+  
+  useEffect(() => {
+    const loadParticipants = async () => {
+      try {
+        const mergedParticipants = await enhancedSeasonPassService.getParticipants();
+        setParticipants(mergedParticipants);
+        console.log('[HistoricalTotals] Loaded participants:', {
+          count: mergedParticipants.length,
+          competitionStart: new Date(COMPETITION_START * 1000).toISOString(),
+          competitionEnd: new Date(COMPETITION_END * 1000).toISOString()
+        });
+      } catch (error) {
+        console.error('[HistoricalTotals] Error loading participants:', error);
+        setParticipants([]);
+      }
+    };
+
+    loadParticipants();
+  }, [COMPETITION_START, COMPETITION_END]);
 
   /**
    * Extract and validate distance from workout event

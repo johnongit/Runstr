@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
 import { fetchEvents } from '../utils/nostr';
 import { useActivityMode } from '../contexts/ActivityModeContext';
-import seasonPassService from '../services/seasonPassService';
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
 import { REWARDS } from '../config/rewardsConfig';
 
 /**
  * Hook: useLeagueLeaderboard
  * Fetches Kind 1301 workout records from Season Pass participants only and creates a comprehensive leaderboard
  * Filters by current activity mode (run/walk/cycle) for activity-specific leagues
- * Only counts runs during the competition period (July 1 - October 11, 2025)
+ * Uses GLOBAL competition date range for all participants (no individual payment date filtering)
  * Uses localStorage caching (30 min expiry) and progressive loading for optimal UX
  * 
  * @returns {Object} { leaderboard, isLoading, error, refresh, lastUpdated, activityMode, courseTotal, loadingProgress }
@@ -21,6 +21,7 @@ export const useLeagueLeaderboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [participantsData, setParticipantsData] = useState([]);
   
   // Enhanced loading states for better UX
   const [loadingProgress, setLoadingProgress] = useState({
@@ -35,25 +36,56 @@ export const useLeagueLeaderboard = () => {
   const COURSE_TOTAL_MILES = 500;
   const CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
   const PARTICIPANT_CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
-  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v6_simplified`; // Force refresh with simplified approach
-  const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v3`; // Incremented for mobile
+  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v8_global_dates`; // Updated for global dates
+  const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v5_global_dates`; // Updated for global dates
   const MAX_EVENTS = 5000; // Limit to prevent overwhelming queries
   const BATCH_SIZE = 100; // Process events in batches
   const UPDATE_DEBOUNCE_MS = 500; // Debounce UI updates
   
-  // Competition date range - SIMPLIFIED: Use fixed date range for testing
-  const COMPETITION_START = Math.floor(new Date('2025-07-01T00:00:00Z').getTime() / 1000);
-  const COMPETITION_END = Math.floor(new Date('2025-07-30T23:59:59Z').getTime() / 1000); // July 30 for testing
+  // Global competition date range from rewardsConfig (no individual payment filtering)
+  const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
+
+  // Load participants data using enhanced service
+  useEffect(() => {
+    const loadParticipants = async () => {
+      try {
+        // Get participant data from both localStorage and Nostr
+        const [mergedParticipants, participantsWithDates] = await Promise.all([
+          enhancedSeasonPassService.getParticipants(),
+          enhancedSeasonPassService.getParticipantsWithDates()
+        ]);
+        
+        // Create participants data with dates for display purposes only (not for filtering)
+        const participantData = mergedParticipants.map(pubkey => {
+          const withDate = participantsWithDates.find(p => p.pubkey === pubkey);
+          return {
+            pubkey,
+            paymentDate: withDate?.paymentDate || new Date().toISOString() // For display only
+          };
+        });
+        
+        setParticipantsData(participantData);
+        console.log('[LeagueLeaderboard] Loaded participants from enhanced service:', {
+          merged: mergedParticipants.length,
+          withDates: participantsWithDates.length,
+          final: participantData.length,
+          competitionStart: new Date(COMPETITION_START * 1000).toISOString(),
+          competitionEnd: new Date(COMPETITION_END * 1000).toISOString()
+        });
+      } catch (error) {
+        console.error('[LeagueLeaderboard] Error loading participants:', error);
+        setParticipantsData([]);
+      }
+    };
+
+    loadParticipants();
+  }, [COMPETITION_START, COMPETITION_END]);
 
   // Memoized participant data for performance
   const participantsWithDates = useMemo(() => {
-    try {
-      return seasonPassService.getParticipantsWithDates();
-    } catch (err) {
-      console.error('Error loading participants:', err);
-      return [];
-    }
-  }, []);
+    return participantsData;
+  }, [participantsData]);
 
   // Separate participant cache management
   const loadCachedParticipants = useCallback(() => {

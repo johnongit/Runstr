@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
-import seasonPassService from '../services/seasonPassService';
+import { useMemo, useState, useEffect } from 'react';
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
 import { useActivityMode } from '../contexts/ActivityModeContext';
+import { REWARDS } from '../config/rewardsConfig';
 
 /**
  * Hook: useRecentActivity
@@ -14,6 +15,26 @@ import { useActivityMode } from '../contexts/ActivityModeContext';
  */
 export const useRecentActivity = (feedPosts = [], cutoffTimestamp = null) => {
   const { mode: activityMode } = useActivityMode();
+  const [participants, setParticipants] = useState([]);
+
+  // Global competition date range from rewardsConfig
+  const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
+
+  // Load participants from enhanced service
+  useEffect(() => {
+    const loadParticipants = async () => {
+      try {
+        const mergedParticipants = await enhancedSeasonPassService.getParticipants();
+        setParticipants(mergedParticipants);
+      } catch (error) {
+        console.error('[RecentActivity] Error loading participants:', error);
+        setParticipants([]);
+      }
+    };
+
+    loadParticipants();
+  }, []);
 
   /**
    * Extract and validate distance from workout event
@@ -90,11 +111,15 @@ export const useRecentActivity = (feedPosts = [], cutoffTimestamp = null) => {
       return [];
     }
 
+    if (participants.length === 0) {
+      console.log('[useRecentActivity] No participants loaded yet');
+      return [];
+    }
+
     console.log(`[useRecentActivity] Processing ${feedPosts.length} recent feed events`);
     console.log(`[useRecentActivity] Cutoff timestamp: ${cutoffTimestamp ? new Date(cutoffTimestamp * 1000).toISOString() : 'none'}`);
 
-    // Get season pass participants
-    const participants = seasonPassService.getParticipants();
+    // Use enhanced service participants (from both localStorage and Nostr)
     const participantSet = new Set(participants);
 
     // Aggregate recent activity by participant
@@ -104,6 +129,11 @@ export const useRecentActivity = (feedPosts = [], cutoffTimestamp = null) => {
     feedPosts.forEach(event => {
       // Only process events from season pass participants
       if (!participantSet.has(event.pubkey)) {
+        return;
+      }
+
+      // Validate event is within global competition dates
+      if (event.created_at < COMPETITION_START || event.created_at > COMPETITION_END) {
         return;
       }
 
@@ -156,7 +186,7 @@ export const useRecentActivity = (feedPosts = [], cutoffTimestamp = null) => {
     });
 
     return recentActivityArray;
-  }, [feedPosts, cutoffTimestamp, activityMode]);
+  }, [feedPosts, cutoffTimestamp, activityMode, participants, COMPETITION_START, COMPETITION_END]);
 
   return {
     recentActivity,

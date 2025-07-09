@@ -5,12 +5,14 @@ import { useNostr } from '../hooks/useNostr';
 import SeasonPassPaymentModal from './modals/SeasonPassPaymentModal';
 import PrizePoolModal from './modals/PrizePoolModal';
 import seasonPassPaymentService from '../services/seasonPassPaymentService';
-import seasonPassService from '../services/seasonPassService';
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
 
 export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = null }) => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [showSeasonPassModal, setShowSeasonPassModal] = useState(false);
   const [showPrizePoolModal, setShowPrizePoolModal] = useState(false);
+  const [hasSeasonPass, setHasSeasonPass] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
   
   const { publicKey } = useNostr();
   
@@ -31,10 +33,38 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   );
   const { profiles } = useProfiles(leaderboardPubkeys);
 
-  // Phase 7: Get participant count
-  const participantCount = useMemo(() => 
-    seasonPassService.getParticipantCount(), []
-  );
+  // Check season pass status and participant count when publicKey changes
+  useEffect(() => {
+    const checkSeasonPassStatus = async () => {
+      if (publicKey) {
+        try {
+          const [hasPass, count] = await Promise.all([
+            enhancedSeasonPassService.isParticipant(publicKey),
+            enhancedSeasonPassService.getParticipantCount()
+          ]);
+          setHasSeasonPass(hasPass);
+          setParticipantCount(count);
+        } catch (error) {
+          console.error('[LeagueMap] Error checking season pass status:', error);
+          // Fallback to localStorage only
+          setHasSeasonPass(seasonPassPaymentService.hasSeasonPass ? await seasonPassPaymentService.hasSeasonPass(publicKey) : false);
+          setParticipantCount(await seasonPassPaymentService.getParticipantCount());
+        }
+      } else {
+        setHasSeasonPass(false);
+        // Still get participant count for display
+        try {
+          const count = await enhancedSeasonPassService.getParticipantCount();
+          setParticipantCount(count);
+        } catch (error) {
+          console.error('[LeagueMap] Error getting participant count:', error);
+          setParticipantCount(0);
+        }
+      }
+    };
+
+    checkSeasonPassStatus();
+  }, [publicKey]);
 
   // Enhanced leaderboard with profile data
   const enhancedLeaderboard = useMemo(() => {
@@ -77,11 +107,6 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     return Number(distance || 0).toFixed(1);
   };
 
-  // Season Pass helpers
-  const hasSeasonPass = useMemo(() => {
-    return publicKey ? seasonPassPaymentService.hasSeasonPass(publicKey) : false;
-  }, [publicKey]);
-
   const handleSeasonPassClick = () => {
     if (!publicKey) {
       alert('Please connect your Nostr account first');
@@ -90,9 +115,23 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     setShowSeasonPassModal(true);
   };
 
-  const handlePaymentSuccess = () => {
-    // Refresh the leaderboard to show updated content
+  const handlePaymentSuccess = async () => {
+    // Refresh both the leaderboard and season pass status
     refreshLeaderboard();
+    
+    // Update season pass status
+    if (publicKey) {
+      try {
+        const [hasPass, count] = await Promise.all([
+          enhancedSeasonPassService.isParticipant(publicKey),
+          enhancedSeasonPassService.getParticipantCount()
+        ]);
+        setHasSeasonPass(hasPass);
+        setParticipantCount(count);
+      } catch (error) {
+        console.error('[LeagueMap] Error updating season pass status after payment:', error);
+      }
+    }
   };
 
   // Data source indicator for debugging

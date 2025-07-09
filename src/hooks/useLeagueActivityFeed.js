@@ -4,17 +4,17 @@ import { fetchEvents } from '../utils/nostr';
 import { useActivityMode } from '../contexts/ActivityModeContext';
 import { useProfiles } from './useProfiles';
 import { useNostr } from './useNostr';
-import seasonPassService from '../services/seasonPassService';
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
 import { REWARDS } from '../config/rewardsConfig';
 
 /**
- * Hook: useLeagueActivityFeed
- * Fetches Kind 1301 workout records from Season Pass participants only for feed display
- * Filters by current activity mode (run/walk/cycle) for activity-specific leagues
- * Only shows activities during the competition period (July 11 - September 11, 2025)
- * Uses localStorage caching (15 min expiry) and returns chronological feed data with profile metadata
+ * Hook: useLeagueActivityFeed  
+ * Fetches Kind 1301 workout records from Season Pass participants for activity feed display
+ * Filters by current activity mode (run/walk/cycle) for activity-specific feeds
+ * Uses GLOBAL competition date range for all participants (no individual payment date filtering)
+ * Optimized for feed display with real-time updates and comprehensive participant filtering
  * 
- * @returns {Object} { feedEvents, enhancedFeedEvents, isLoading, error, refresh, lastUpdated, activityMode, loadingProgress, profilesLoading }
+ * @returns {Object} { feedEvents, isLoading, error, refresh, lastUpdated, activityMode, loadingProgress, profiles }
  */
 export const useLeagueActivityFeed = () => {
   const { ndk } = useContext(NostrContext);
@@ -37,24 +37,50 @@ export const useLeagueActivityFeed = () => {
   // Constants
   const FEED_CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
   const PARTICIPANT_CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
-  const CACHE_KEY = `runstr_league_activity_feed_${activityMode}_v3_simplified`; // Force refresh
-  const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v4_simplified`; // Force refresh
+  const CACHE_KEY = `runstr_league_activity_feed_${activityMode}_v4_global_dates`; // Updated for global dates
+  const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v6_global_dates`; // Updated for global dates
   const MAX_EVENTS = 2000; // Limit for feed queries
   const FEED_LIMIT = 50; // Maximum number of feed events to return
   const BATCH_SIZE = 100; // Process events in batches
   
-  // Competition date range - SIMPLIFIED: Use fixed date range for testing (July 1-30)
-  const COMPETITION_START = Math.floor(new Date('2025-07-01T00:00:00Z').getTime() / 1000);
-  const COMPETITION_END = Math.floor(new Date('2025-07-30T23:59:59Z').getTime() / 1000); // July 30 for testing
+  // Global competition date range from rewardsConfig (no individual payment filtering)
+  const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
 
-  // Memoized participant data for performance
-  const participantsWithDates = useMemo(() => {
-    try {
-      return seasonPassService.getParticipantsWithDates();
-    } catch (err) {
-      console.error('Error loading participants:', err);
-      return [];
-    }
+  // Memoized participant data for performance (using enhanced service)
+  const [participantsWithDates, setParticipantsWithDates] = useState([]);
+  
+  // Load participants using enhanced service
+  useEffect(() => {
+    const loadParticipants = async () => {
+      try {
+        const [mergedParticipants, participantsWithDates] = await Promise.all([
+          enhancedSeasonPassService.getParticipants(),
+          enhancedSeasonPassService.getParticipantsWithDates()
+        ]);
+        
+        const participantData = mergedParticipants.map(pubkey => {
+          const withDate = participantsWithDates.find(p => p.pubkey === pubkey);
+          return {
+            pubkey,
+            paymentDate: withDate?.paymentDate || new Date().toISOString() // For display only
+          };
+        });
+        
+        setParticipantsWithDates(participantData);
+        console.log('[LeagueActivityFeed] Loaded participants:', {
+          merged: mergedParticipants.length,
+          final: participantData.length,
+          competitionStart: new Date(COMPETITION_START * 1000).toISOString(),
+          competitionEnd: new Date(COMPETITION_END * 1000).toISOString()
+        });
+      } catch (error) {
+        console.error('[LeagueActivityFeed] Error loading participants:', error);
+        setParticipantsWithDates([]);
+      }
+    };
+
+    loadParticipants();
   }, []);
 
   // Extract pubkeys for profile loading (Phase 4)
@@ -62,8 +88,8 @@ export const useLeagueActivityFeed = () => {
     return Array.from(new Set(feedEvents.map(event => event.pubkey).filter(Boolean)));
   }, [feedEvents]);
 
-  // Get profiles for feed events (Phase 4)
-  const { profiles, isLoading: profilesLoading } = useProfiles(feedEventPubkeys);
+  // Load profiles for feed events
+  const { profiles } = useProfiles(feedEventPubkeys);
 
   // Enhanced feed events with profile data (Phase 4)
   const enhancedFeedEvents = useMemo(() => {
@@ -416,17 +442,6 @@ export const useLeagueActivityFeed = () => {
         message: `Found ${cachedParticipants.length} participants` 
       });
 
-      // Create participant payment date lookup map
-      const participantPaymentDates = new Map();
-      cachedParticipants.forEach(participant => {
-        try {
-          const paymentTimestamp = Math.floor(new Date(participant.paymentDate).getTime() / 1000);
-          participantPaymentDates.set(participant.pubkey, paymentTimestamp);
-        } catch (err) {
-          console.error('Error parsing payment date for participant:', participant.pubkey, err);
-        }
-      });
-
       setLoadingProgress({ 
         phase: 'fetching_events', 
         participantCount: cachedParticipants.length, 
@@ -435,15 +450,14 @@ export const useLeagueActivityFeed = () => {
         message: 'Fetching activity feed...' 
       });
 
-      // Fetch events from Season Pass participants
+      // Fetch events from Season Pass participants using global competition dates
       const participantPubkeys = cachedParticipants.map(p => p.pubkey);
-      const earliestPaymentDate = Math.min(...Array.from(participantPaymentDates.values()));
       
       const events = await fetchEvents({
         kinds: [1301],
         authors: participantPubkeys,
         limit: MAX_EVENTS,
-        since: earliestPaymentDate,
+        since: COMPETITION_START, // Use global competition start instead of individual payment dates
         until: COMPETITION_END
       });
       
@@ -537,7 +551,7 @@ export const useLeagueActivityFeed = () => {
     feedEvents, // Raw feed events without profile data
     enhancedFeedEvents, // Feed events with profile metadata attached (Phase 4)
     isLoading,
-    profilesLoading, // Separate loading state for profiles (Phase 4)
+    profilesLoading: false, // Profiles are now loaded directly in the component
     error,
     refresh,
     lastUpdated,

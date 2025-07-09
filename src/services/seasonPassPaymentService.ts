@@ -7,7 +7,10 @@
 
 import { NWCWallet } from './nwcWallet.jsx';
 import seasonPassService from './seasonPassService';
+import enhancedSeasonPassService from './enhancedSeasonPassService';
 import { REWARDS } from '../config/rewardsConfig';
+import { createAndPublishEvent } from '../utils/nostr.js';
+import { nip19 } from 'nostr-tools';
 
 // RUNSTR Reward NWC URI - Updated January 2025
 const RUNSTR_REWARD_NWC_URI = "nostr+walletconnect://ba80990666ef0b6f4ba5059347beb13242921e54669e680064ca755256a1e3a6?relay=wss%3A%2F%2Frelay.coinos.io&secret=975686fcf2632af13e263013337d6ee76747e85c5ead6863d6897c1c199ee0da&lud16=RUNSTR@coinos.io";
@@ -30,6 +33,19 @@ interface PendingPayment {
   invoice: string;
   paymentHash?: string;
   timestamp: number;
+}
+
+/**
+ * Generate random verification strings for anti-spam purposes
+ * These strings don't have any cryptographic purpose - just to throw off spammers
+ */
+function generateVerificationString(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
 
 class SeasonPassPaymentService {
@@ -96,8 +112,8 @@ class SeasonPassPaymentService {
    */
   async generateSeasonPassInvoice(userPubkey: string): Promise<SeasonPassPaymentResult> {
     try {
-      // Check if user is already a participant
-      if (seasonPassService.isParticipant(userPubkey)) {
+      // Check if user is already a participant (checks both localStorage and Nostr)
+      if (await enhancedSeasonPassService.isParticipant(userPubkey)) {
         return {
           success: false,
           error: 'You already have a Season Pass!'
@@ -185,8 +201,8 @@ class SeasonPassPaymentService {
     try {
       console.log(`[SeasonPassPayment] Starting payment verification for user ${userPubkey}`);
 
-      // Check if user is already a participant
-      if (seasonPassService.isParticipant(userPubkey)) {
+      // Check if user is already a participant (checks both localStorage and Nostr)
+      if (await enhancedSeasonPassService.isParticipant(userPubkey)) {
         console.log(`[SeasonPassPayment] User ${userPubkey} is already a participant`);
         return {
           success: true,
@@ -240,13 +256,13 @@ class SeasonPassPaymentService {
           console.log('[SeasonPassPayment] Payment lookup result:', lookupResult);
           
           // Check if payment was settled
-          if (lookupResult?.settled === true || lookupResult?.paid === true || lookupResult?.status === 'settled') {
+          if ((lookupResult as any)?.settled === true || (lookupResult as any)?.paid === true || (lookupResult as any)?.status === 'settled') {
             paymentVerified = true;
             verificationMethod = 'payment_hash_lookup';
             console.log('[SeasonPassPayment] Payment verified via payment hash lookup');
           }
         } catch (lookupError) {
-          console.log('[SeasonPassPayment] Payment hash lookup failed:', lookupError.message);
+          console.log('[SeasonPassPayment] Payment hash lookup failed:', (lookupError as Error).message);
         }
       }
 
@@ -268,7 +284,7 @@ class SeasonPassPaymentService {
             verificationMethod = 'time_window_confirmation';
           }
         } catch (balanceError) {
-          console.log('[SeasonPassPayment] Balance check failed:', balanceError.message);
+          console.log('[SeasonPassPayment] Balance check failed:', (balanceError as Error).message);
         }
       }
 
@@ -289,6 +305,56 @@ class SeasonPassPaymentService {
         seasonPassService.addParticipant(userPubkey);
         
         console.log(`[SeasonPassPayment] Successfully verified payment and added user ${userPubkey} to Season Pass participants (method: ${verificationMethod})`);
+
+        // Publish Season Pass Nostr event (Kind 33406)
+        try {
+          const { passPrice, startUtc, endUtc, title } = REWARDS.SEASON_1;
+          const paymentTimestamp = Math.floor(Date.now() / 1000);
+          const eventStartTimestamp = Math.floor(new Date(startUtc).getTime() / 1000);
+          const eventEndTimestamp = Math.floor(new Date(endUtc).getTime() / 1000);
+          
+          // Convert pubkey to npub format for the event
+          const purchaserNpub = nip19.npubEncode(userPubkey);
+          
+          const seasonPassEvent = {
+            kind: 33406,
+            content: `${title} Pass - 3-month running competition with leaderboards, achievements, and rewards`,
+            tags: [
+              ['d', 'runstr-season-1-2025'],
+              ['name', `${title} Pass`],
+              ['event_title', title],
+              ['event_start', eventStartTimestamp.toString()],
+              ['event_end', eventEndTimestamp.toString()],
+              ['payment_date', paymentTimestamp.toString()],
+              ['payment_amount', passPrice.toString()],
+              ['currency', 'sats'],
+              ['purchaser', purchaserNpub],
+              ['client', 'runstr'],
+              ['client_version', '1.0.0'],
+              ['verification_alpha', generateVerificationString()],
+              ['verification_beta', generateVerificationString()],
+              ['competition_type', 'distance_leaderboard'],
+              ['t', 'season_pass'],
+              ['t', 'runstr'],
+              ['t', 'fitness_ticket']
+            ]
+          };
+
+          // Publish the event asynchronously - don't block the response
+          createAndPublishEvent(seasonPassEvent, userPubkey)
+            .then(result => {
+              console.log(`[SeasonPassPayment] Season Pass event published successfully for user ${userPubkey}:`, result);
+            })
+            .catch(err => {
+              console.error(`[SeasonPassPayment] Error publishing Season Pass event for user ${userPubkey}:`, err);
+              // Note: We don't fail the payment verification if event publishing fails
+              // The user still gets added to localStorage participants list
+            });
+
+        } catch (eventError) {
+          console.error(`[SeasonPassPayment] Error creating Season Pass event for user ${userPubkey}:`, eventError);
+          // Continue with success - don't fail payment verification due to event publishing issues
+        }
 
         return {
           success: true
@@ -311,12 +377,12 @@ class SeasonPassPaymentService {
   }
 
   /**
-   * Check if a user already has a season pass
+   * Check if a user already has a season pass (enhanced version checks both sources)
    * @param userPubkey The user's public key
-   * @returns true if user has season pass, false otherwise
+   * @returns Promise<boolean> true if user has season pass, false otherwise
    */
-  hasSeasonPass(userPubkey: string): boolean {
-    return seasonPassService.isParticipant(userPubkey);
+  async hasSeasonPass(userPubkey: string): Promise<boolean> {
+    return await enhancedSeasonPassService.isParticipant(userPubkey);
   }
 
   /**
@@ -327,10 +393,10 @@ class SeasonPassPaymentService {
   }
 
   /**
-   * Get participant count for display
+   * Get participant count for display (enhanced version includes both sources)
    */
-  getParticipantCount(): number {
-    return seasonPassService.getParticipantCount();
+  async getParticipantCount(): Promise<number> {
+    return await enhancedSeasonPassService.getParticipantCount();
   }
 
   /**
