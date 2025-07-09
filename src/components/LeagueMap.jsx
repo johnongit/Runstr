@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useCombinedLeaderboard } from '../hooks/useCombinedLeaderboard';
 import { useProfiles } from '../hooks/useProfiles';
 import { useNostr } from '../hooks/useNostr';
+import { useActivityMode } from '../contexts/ActivityModeContext';
 import SeasonPassPaymentModal from './modals/SeasonPassPaymentModal';
 import PrizePoolModal from './modals/PrizePoolModal';
 import seasonPassPaymentService from '../services/seasonPassPaymentService';
@@ -15,6 +16,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   const [participantCount, setParticipantCount] = useState(0);
   
   const { publicKey } = useNostr();
+  const { mode: activityMode } = useActivityMode();
   
   // Use the new hybrid leaderboard system
   const {
@@ -70,24 +72,33 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   const enhancedLeaderboard = useMemo(() => {
     return leaderboard.map(user => {
       const profile = profiles?.[user.pubkey] || profiles?.get?.(user.pubkey) || {};
+      const defaultName = activityMode === 'walk' ? 'Walker' : 
+                          activityMode === 'cycle' ? 'Cyclist' : 'Runner';
       return {
         ...user,
-        displayName: profile.display_name || profile.name || `Runner ${user.pubkey.slice(0, 8)}`,
+        displayName: profile.display_name || profile.name || `${defaultName} ${user.pubkey.slice(0, 8)}`,
         picture: profile.picture,
         isCurrentUser: user.pubkey === publicKey
       };
     });
-  }, [leaderboard, profiles, publicKey]);
+  }, [leaderboard, profiles, publicKey, activityMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsInitialLoad(false), 500);
     return () => clearTimeout(timer);
   }, []);
 
-  // Generate dynamic league title based on activity mode (simplified)
+  // Generate dynamic league title based on activity mode
   const getLeagueTitle = () => {
-    // For now, default to RUNSTR SEASON 1 - can be enhanced later
-    return 'RUNSTR SEASON 1';
+    switch (activityMode) {
+      case 'walk':
+        return 'WALKSTR SEASON 1';
+      case 'cycle':
+        return 'CYCLESTR SEASON 1';
+      case 'run':
+      default:
+        return 'RUNSTR SEASON 1';
+    }
   };
 
   // Phase 7: Get participant count text
@@ -97,9 +108,17 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     return `${participantCount} Season Pass Holders`;
   };
 
-  // Generate dynamic activity text
+  // Generate dynamic activity text based on activity mode
   const getActivityText = (count) => {
-    return `${count} run${count !== 1 ? 's' : ''}`;
+    switch (activityMode) {
+      case 'walk':
+        return `${count} walk${count !== 1 ? 's' : ''}`;
+      case 'cycle':
+        return `${count} ride${count !== 1 ? 's' : ''}`;
+      case 'run':
+      default:
+        return `${count} run${count !== 1 ? 's' : ''}`;
+    }
   };
 
   // Format distance to 1 decimal place
@@ -271,7 +290,9 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
         {enhancedLeaderboard.length === 0 ? (
           <div className="p-4 text-center">
             <p className="text-text-secondary">
-              No runners found yet. Be the first to start!
+              {activityMode === 'walk' ? 'No walkers found yet. Be the first to start!' :
+               activityMode === 'cycle' ? 'No cyclists found yet. Be the first to start!' :
+               'No runners found yet. Be the first to start!'}
             </p>
             {/* Debug info for mobile */}
             {leaderboardLoading && (
