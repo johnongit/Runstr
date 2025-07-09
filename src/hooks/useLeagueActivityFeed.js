@@ -35,8 +35,8 @@ export const useLeagueActivityFeed = () => {
   });
 
   // Constants
-  const FEED_CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
-  const PARTICIPANT_CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
+  const FEED_CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes cache duration for activity feed
+  const PARTICIPANT_CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes participant cache
   const CACHE_KEY = `runstr_league_activity_feed_${activityMode}_v4_global_dates`; // Updated for global dates
   const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v6_global_dates`; // Updated for global dates
   const MAX_EVENTS = 2000; // Limit for feed queries

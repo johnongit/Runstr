@@ -34,8 +34,8 @@ export const useLeagueLeaderboard = () => {
 
   // Constants
   const COURSE_TOTAL_MILES = 500;
-  const CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
-  const PARTICIPANT_CACHE_DURATION_MS = 0; // TEMPORARILY DISABLED - always fetch fresh data
+  const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes cache duration
+  const PARTICIPANT_CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes participant cache
   const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v8_global_dates`; // Updated for global dates
   const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v5_global_dates`; // Updated for global dates
   const MAX_EVENTS = 5000; // Limit to prevent overwhelming queries
@@ -46,8 +46,10 @@ export const useLeagueLeaderboard = () => {
   const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
   const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
 
-  // Load participants data using enhanced service
+  // Load participants data using enhanced service (only once on mount)
   useEffect(() => {
+    let isMounted = true;
+    
     const loadParticipants = async () => {
       try {
         // Get participant data from both localStorage and Nostr
@@ -55,6 +57,8 @@ export const useLeagueLeaderboard = () => {
           enhancedSeasonPassService.getParticipants(),
           enhancedSeasonPassService.getParticipantsWithDates()
         ]);
+        
+        if (!isMounted) return; // Prevent state update if component unmounted
         
         // Create participants data with dates for display purposes only (not for filtering)
         const participantData = mergedParticipants.map(pubkey => {
@@ -75,12 +79,18 @@ export const useLeagueLeaderboard = () => {
         });
       } catch (error) {
         console.error('[LeagueLeaderboard] Error loading participants:', error);
-        setParticipantsData([]);
+        if (isMounted) {
+          setParticipantsData([]);
+        }
       }
     };
 
     loadParticipants();
-  }, [COMPETITION_START, COMPETITION_END]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Remove COMPETITION_START and COMPETITION_END from dependencies
 
   // Memoized participant data for performance
   const participantsWithDates = useMemo(() => {
@@ -585,14 +595,16 @@ export const useLeagueLeaderboard = () => {
     fetchLeaderboardData();
   }, [activityMode, fetchLeaderboardData]);
 
-  // Auto-refresh every 30 minutes
+  // Auto-refresh every 30 minutes (only if cache duration > 0)
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchLeaderboardData();
-    }, CACHE_DURATION_MS);
+    if (CACHE_DURATION_MS > 0) {
+      const interval = setInterval(() => {
+        fetchLeaderboardData();
+      }, CACHE_DURATION_MS);
 
-    return () => clearInterval(interval);
-  }, [fetchLeaderboardData]);
+      return () => clearInterval(interval);
+    }
+  }, [fetchLeaderboardData, CACHE_DURATION_MS]);
 
   return {
     leaderboard,
