@@ -12,8 +12,8 @@ import { REWARDS } from '../config/rewardsConfig';
 import { createAndPublishEvent } from '../utils/nostr.js';
 import { nip19 } from 'nostr-tools';
 
-// RUNSTR Reward NWC URI - Updated January 2025
-const RUNSTR_REWARD_NWC_URI = "nostr+walletconnect://ba80990666ef0b6f4ba5059347beb13242921e54669e680064ca755256a1e3a6?relay=wss%3A%2F%2Frelay.coinos.io&secret=975686fcf2632af13e263013337d6ee76747e85c5ead6863d6897c1c199ee0da&lud16=RUNSTR@coinos.io";
+// RUNSTR Season Pass Payment NWC URI - Updated January 2025
+const RUNSTR_REWARD_NWC_URI = "nostr+walletconnect://0e4a6bfbe4143ebf1f76f7f811a465a6a0c5b55d3ff4bed02f719fd8ee6deffb?relay=wss://relay.getalby.com/v1&secret=00a577ecc599b27a0d3949dd48f8dd64612d779522f5ae4d8adcce3284719640&lud16=hustle@getalby.com";
 
 export interface SeasonPassPaymentResult {
   success: boolean;
