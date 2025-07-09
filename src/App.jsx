@@ -72,12 +72,6 @@ const AppRoutes = lazy(() =>
 const App = () => {
   const [hasError, setHasError] = useState(false);
   
-  // Add global NDK initialization log
-  const { isInitialized } = useContext(NostrContext);
-  useEffect(() => {
-    console.log('~~ GLOBAL App.jsx: isInitialized changed to:', isInitialized);
-  }, [isInitialized]);
-  
   // Initialize app services
   useEffect(() => {
     const initializeApp = async () => {
@@ -188,7 +182,61 @@ const App = () => {
                               <AppRoutes />
                             </Suspense>
                           </main>
-                          <Toaster position="top-center" />
+                          <Toaster 
+                            position="top-center"
+                            toastOptions={{
+                              // Default styles for all toasts
+                              style: {
+                                background: '#000000',
+                                color: '#ffffff',
+                                border: '1px solid #ffffff',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                padding: '12px 16px',
+                                boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
+                              },
+                              // Pure black/white theme - no colored icons
+                              iconTheme: {
+                                primary: '#ffffff',
+                                secondary: '#000000',
+                              },
+                              duration: 3000,
+                              // Override specific toast types to maintain black/white theme
+                              success: {
+                                style: {
+                                  background: '#000000',
+                                  color: '#ffffff',
+                                  border: '1px solid #ffffff',
+                                },
+                                iconTheme: {
+                                  primary: '#ffffff',
+                                  secondary: '#000000',
+                                },
+                              },
+                              error: {
+                                style: {
+                                  background: '#000000',
+                                  color: '#ffffff',
+                                  border: '1px solid #ffffff',
+                                },
+                                iconTheme: {
+                                  primary: '#ffffff',
+                                  secondary: '#000000',
+                                },
+                              },
+                              loading: {
+                                style: {
+                                  background: '#000000',
+                                  color: '#ffffff',
+                                  border: '1px solid #ffffff',
+                                },
+                                iconTheme: {
+                                  primary: '#ffffff',
+                                  secondary: '#000000',
+                                },
+                              },
+                            }}
+                          />
                         </div>
                       </WalletProvider>
                     </TeamChallengeProvider>

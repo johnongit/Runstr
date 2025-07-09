@@ -1,65 +1,65 @@
 import toast from 'react-hot-toast';
 
-// Custom toast styles matching the app's black/white theme
+// Custom toast styles matching the app's pure black/white theme
 const toastStyles = {
   success: {
     style: {
-      background: '#1f2937', // Dark gray background
+      background: '#000000', // Pure black background
       color: '#ffffff',      // White text
-      border: '1px solid #4ade80', // Green border for success
+      border: '1px solid #ffffff', // White border
       borderRadius: '8px',
       fontSize: '14px',
       padding: '12px 16px',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
     },
     iconTheme: {
-      primary: '#4ade80', // Green checkmark
-      secondary: '#ffffff',
+      primary: '#ffffff', // White icon
+      secondary: '#000000',
     },
   },
   error: {
     style: {
-      background: '#1f2937', // Dark gray background
+      background: '#000000', // Pure black background
       color: '#ffffff',      // White text
-      border: '1px solid #ef4444', // Red border for error
+      border: '1px solid #ffffff', // White border
       borderRadius: '8px',
       fontSize: '14px',
       padding: '12px 16px',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
     },
     iconTheme: {
-      primary: '#ef4444', // Red X
-      secondary: '#ffffff',
+      primary: '#ffffff', // White icon
+      secondary: '#000000',
     },
   },
   loading: {
     style: {
-      background: '#1f2937', // Dark gray background
+      background: '#000000', // Pure black background
       color: '#ffffff',      // White text
-      border: '1px solid #6b7280', // Gray border for loading
+      border: '1px solid #ffffff', // White border
       borderRadius: '8px',
       fontSize: '14px',
       padding: '12px 16px',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
     },
     iconTheme: {
-      primary: '#6b7280', // Gray spinner
-      secondary: '#ffffff',
+      primary: '#ffffff', // White spinner
+      secondary: '#000000',
     },
   },
   default: {
     style: {
-      background: '#1f2937', // Dark gray background
+      background: '#000000', // Pure black background
       color: '#ffffff',      // White text
-      border: '1px solid #6b7280', // Gray border for default
+      border: '1px solid #ffffff', // White border
       borderRadius: '8px',
       fontSize: '14px',
       padding: '12px 16px',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
     },
     iconTheme: {
-      primary: '#6b7280', // Gray icon
-      secondary: '#ffffff',
+      primary: '#ffffff', // White icon
+      secondary: '#000000',
     },
   },
 };
@@ -69,17 +69,17 @@ export const appToast = {
   success: (message, options = {}) => {
     return toast.success(message, {
       style: {
-        background: '#1f2937',
+        background: '#000000',
         color: '#ffffff',
-        border: '1px solid #4ade80',
+        border: '1px solid #ffffff',
         borderRadius: '8px',
         fontSize: '14px',
         padding: '12px 16px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
       },
       iconTheme: {
-        primary: '#4ade80',
-        secondary: '#ffffff',
+        primary: '#ffffff',
+        secondary: '#000000',
       },
       duration: 3000,
       position: 'top-center',
@@ -90,17 +90,17 @@ export const appToast = {
   error: (message, options = {}) => {
     return toast.error(message, {
       style: {
-        background: '#1f2937',
+        background: '#000000',
         color: '#ffffff',
-        border: '1px solid #ef4444',
+        border: '1px solid #ffffff',
         borderRadius: '8px',
         fontSize: '14px',
         padding: '12px 16px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
       },
       iconTheme: {
-        primary: '#ef4444',
-        secondary: '#ffffff',
+        primary: '#ffffff',
+        secondary: '#000000',
       },
       duration: 4000,
       position: 'top-center',
@@ -111,17 +111,17 @@ export const appToast = {
   loading: (message, options = {}) => {
     return toast.loading(message, {
       style: {
-        background: '#1f2937',
+        background: '#000000',
         color: '#ffffff',
-        border: '1px solid #6b7280',
+        border: '1px solid #ffffff',
         borderRadius: '8px',
         fontSize: '14px',
         padding: '12px 16px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
       },
       iconTheme: {
-        primary: '#6b7280',
-        secondary: '#ffffff',
+        primary: '#ffffff',
+        secondary: '#000000',
       },
       position: 'top-center',
       ...options,
@@ -131,17 +131,17 @@ export const appToast = {
   info: (message, options = {}) => {
     return toast(message, {
       style: {
-        background: '#1f2937',
+        background: '#000000',
         color: '#ffffff',
-        border: '1px solid #6b7280',
+        border: '1px solid #ffffff',
         borderRadius: '8px',
         fontSize: '14px',
         padding: '12px 16px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
       },
       iconTheme: {
-        primary: '#6b7280',
-        secondary: '#ffffff',
+        primary: '#ffffff',
+        secondary: '#000000',
       },
       duration: 3000,
       position: 'top-center',
@@ -160,17 +160,17 @@ export const appToast = {
       },
       {
         style: {
-          background: '#1f2937',
+          background: '#000000',
           color: '#ffffff',
-          border: '1px solid #6b7280',
+          border: '1px solid #ffffff',
           borderRadius: '8px',
           fontSize: '14px',
           padding: '12px 16px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
         },
         iconTheme: {
-          primary: '#6b7280',
-          secondary: '#ffffff',
+          primary: '#ffffff',
+          secondary: '#000000',
         },
         position: 'top-center',
         ...options,
