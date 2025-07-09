@@ -23,7 +23,7 @@ export const useHistoricalTotals = () => {
 
   // Cache configuration
   const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
-  const CACHE_KEY = 'runstr_historical_totals_v4_global_dates'; // Updated for global dates
+  const CACHE_KEY = `runstr_historical_totals_${activityMode}_v4_global_dates`; // Activity-specific cache
   const MAX_EVENTS = 5000;
 
   // Global competition date range from rewardsConfig (no individual payment filtering)

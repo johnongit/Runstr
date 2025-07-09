@@ -1281,168 +1281,42 @@ if (isRunstrWorkout) {
 - Fix involved **removal** rather than addition (elegant solution)
 - Empty state handling in UI components (LeagueMap, PostList) remains intact
 
-## Bug Fix #6: League Standings Distance Always 0
+## Bug Fix #6: League Standings Activity Mode Filtering Issues
 
-**Date:** 2025-01-17
-**Reporter:** User
-**Severity:** High
-**Status:** ✅ **HYBRID SYSTEM IMPLEMENTED - Ready for Testing**  
+**Date:** 2025-07-09  
+**Reporter:** User  
+**Severity:** Medium  
+**Status:** 🔍 **Analysis in progress**  
 
 ### Problem Description
+- Switching activity mode tabs (RUNSTR / WALKSTR / CYCLESTR) does **not** update the League Standings leaderboard; it stays stuck on the Running leaderboard.
+- Distances from Walk or Cycle activities are incorrectly counted toward the Run leaderboard.
+- The 1301 activity feed below the standings *does* filter correctly, proving that `ActivityModeContext` itself works.
 
-The *League Standings* widget in the League tab shows every participant at **0.0&nbsp;mi** even though the feed clearly contains valid Kind-1301 workout events (distance, duration, etc.) inside the competition window (3-month paid Season 1 race).  All attempts to tweak date filters or add test data still result in a flat-zero leaderboard.
+### Initial Root Cause Hypothesis
+1. **Shared Cache Key Across Activity Modes**  
+   `useHistoricalTotals` stores aggregated totals in localStorage under a static key:
+   ```javascript
+   const CACHE_KEY = 'runstr_historical_totals_v4_global_dates';
+   ```
+   Because the key is the same for every activity mode, the first dataset fetched (usually "run") is reused for all modes.
+2. **Cache Hit Short-Circuits Re-Fetch**  
+   When the user changes activity mode, `loadCachedTotals()` finds cached data and returns early, preventing a fresh fetch with the new mode.  
+   Result: Cycling/Walking leaderboards still show the previously cached Running totals.
+3. **Recent Activity Hook Works Correctly**  
+   `useRecentActivity` performs no caching and filters by `activityMode` at runtime, which is why the 1301 feed switches as expected.
 
-### Root Cause Analysis
-The original `useLeagueLeaderboard` hook was over-engineered with:
-- Complex caching and batch processing
-- Intricate date filtering that was rejecting valid events  
-- Competing systems (main leaderboard vs feed processing)
-- No clear separation between historical data and real-time updates
+### Evidence Gathered
+- `src/hooks/useHistoricalTotals.js`  
+  • Static `CACHE_KEY` (no activity suffix)  
+  • `matchesActivityMode` filters by `activityMode` *only* during the fetch path.  
+  • If cache is hit, no new fetch = no new filtering.
+- `src/hooks/useCombinedLeaderboard.js` relies on `useHistoricalTotals`, therefore inherits the stale-cache issue.
+- UI component `LeagueMap.jsx` renders `enhancedLeaderboard` produced by `useCombinedLeaderboard`, so it displays the stale data.
 
-### ✅ **HYBRID SYSTEM IMPLEMENTED: Complete Architecture Replacement**
+### Next Steps (Proposed Fixes)
+1. Incorporate `activityMode` into the cache key, e.g., `runstr_historical_totals_${activityMode}_v4_global_dates`.
+2. Store the cached mode alongside the data; bypass cache if it doesn't match the current mode.
+3. Add a small migration/cleanup to clear the old shared cache key so users get fresh per-mode data.
 
-**New Architecture Overview:**
-Replaced the single complex `useLeagueLeaderboard` hook with a clean **three-tier system**:
-
-1. **`useHistoricalTotals`** - Fetches complete participant history (cached 30 min)
-2. **`useRecentActivity`** - Processes recent feed events for real-time updates  
-3. **`useCombinedLeaderboard`** - Intelligently merges both sources without double-counting
-
-**Key Design Principles:**
-- **Proven Fetching Logic** - Uses same NDK patterns that work for the feed
-- **Complete History** - Never loses old runs (fetches since individual signup dates)
-- **Real-time Updates** - Responsive to new activity via feed processing
-- **Smart Caching** - Historical data cached heavily, recent data processed live
-- **No Double-counting** - Uses timestamp cutoffs to avoid overlap
-
-**Implementation Details:**
-
-**Tier 1: Historical Totals (`useHistoricalTotals`)**
-```javascript
-// Simple, proven query for complete history
-const events = await fetchEvents({
-  kinds: [1301],
-  authors: participantPubkeys,
-  since: earliestSignupDate, // Individual signup dates
-  limit: 5000
-});
-```
-
-**Tier 2: Recent Activity (`useRecentActivity`)**
-```javascript
-// Process existing feedPosts for real-time updates
-const recentActivity = useMemo(() => {
-  // Only count events after historical cutoff timestamp
-  // Aggregate by participant, no network calls
-}, [feedPosts, cutoffTimestamp]);
-```
-
-**Tier 3: Smart Combination (`useCombinedLeaderboard`)**
-```javascript
-// Merge without double-counting
-const combinedData = historicalTotals.map(historical => {
-  const recent = recentActivityMap.get(historical.pubkey);
-  return {
-    totalMiles: historical.totalMiles + (recent?.recentMiles || 0),
-    runCount: historical.runCount + (recent?.recentRunCount || 0)
-  };
-});
-```
-
-**Files Created:**
-- ✅ `src/hooks/useHistoricalTotals.js` - Complete participant history with caching
-- ✅ `src/hooks/useRecentActivity.js` - Real-time feed processing  
-- ✅ `src/hooks/useCombinedLeaderboard.js` - Intelligent data merging
-- ✅ `src/components/LeagueMap.jsx` - Updated to use hybrid system
-
-**Files Replaced:**
-- ❌ Removed dependency on `useLeagueLeaderboard` (complex, unreliable)
-- ❌ Removed fallback aggregation system (temporary fix)
-
-### Expected Results After Implementation
-
-1. ✅ **Complete Historical Data** - Shows all runs since individual signup dates
-2. ✅ **Real-time Updates** - New runs appear immediately via feed processing
-3. ✅ **No Missing Runs** - 3-month competition data fully preserved
-4. ✅ **Efficient Performance** - Historical data cached, only recent events processed frequently
-5. ✅ **Proven Reliability** - Uses same fetching patterns that work for the feed
-6. ✅ **Smart Data Source Indicators** - UI shows whether using historical, recent, or hybrid data
-
-### Testing Instructions
-
-**Test Case 1: Verify Historical Data Loading**
-1. Open League tab and check browser console
-2. Look for: `[useHistoricalTotals] Fetching historical data for X participants`
-3. Should see: `[useHistoricalTotals] Processed Y events for Z participants`
-4. Each participant should show complete totals since their signup date
-
-**Test Case 2: Verify Real-time Updates**
-1. Post a new workout in the app
-2. Check that it appears in the feed immediately
-3. Verify the leaderboard updates with the new distance
-4. Console should show: `[useRecentActivity] Processed X recent events`
-
-**Test Case 3: Verify Data Source Indicators**
-1. Check the leaderboard header for data source status:
-   - "Historical data only" - when no recent activity
-   - "Historical + X recent" - when combining both sources
-   - "Loading..." - during initial fetch
-2. Recent activity should show as green "+X.X recent" in participant details
-
-**Test Case 4: Verify No Double-counting**
-1. Wait for historical data to load completely
-2. Post a new workout
-3. Verify the distance is only added once (not doubled)
-4. Check console for cutoff timestamp logic
-
-**Test Case 5: Verify 3-Month Coverage**
-1. Historical data should include all runs since July 1, 2025
-2. No runs should be lost from the 3-month competition window
-3. Verify older runs (not in recent feed) still appear in totals
-
-### Debug Information Available
-
-The hybrid system provides comprehensive logging:
-```
-[useHistoricalTotals] Fetching historical data for 2 participants
-[useHistoricalTotals] Fetched 15 total events
-[useHistoricalTotals] Processed 12 events for 2 participants
-  30ceb64e: 15.2 mi, 3 runs (since 7/1/2025)
-  9358c676: 8.7 mi, 2 runs (since 7/1/2025)
-
-[useRecentActivity] Processing 5 recent feed events
-[useRecentActivity] Processed 2 recent events for 1 participants
-  30ceb64e: +5.0 mi, +1 runs (recent)
-
-[useCombinedLeaderboard] Combined leaderboard:
-  30ceb64e: 20.2 mi (15.2 historical + 5.0 recent), 4 runs
-  9358c676: 8.7 mi (8.7 historical + 0.0 recent), 2 runs
-```
-
-### Advantages of Hybrid System
-
-**Reliability:**
-- Uses proven fetching patterns from working feed system
-- No complex date filtering that was rejecting events
-- Clear separation of concerns between historical and real-time data
-
-**Performance:**
-- Historical data cached for 30 minutes (changes slowly)
-- Recent data processed from existing feed (no extra network calls)
-- Smart cutoff timestamps prevent double-counting
-
-**Completeness:**
-- Fetches complete history since individual signup dates
-- Never loses old runs from 3-month competition
-- Real-time updates for immediate feedback
-
-**Maintainability:**
-- Three focused hooks instead of one complex system
-- Easy to debug with clear data flow
-- Extensible for future enhancements
-
-### Next Steps After Testing
-
-1. **Immediate**: Verify distances appear correctly in League Standings
-2. **Short-term**: Monitor performance and caching behavior
-3. **Long-term**: Consider removing old `useLeagueLeaderboard` hook entirely if hybrid system proves reliable
+_No code changes implemented yet – this entry documents the analysis phase._
