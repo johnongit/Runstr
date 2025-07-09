@@ -15,26 +15,30 @@ const GoalsDropdown = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(null);
 
-  // Convert distance from meters to display units for goal checking
+  // Convert goal value to meters for distance comparison
   const getGoalInMeters = (goalValue) => {
-    const goalKm = parseInt(goalValue) / 1000;
-    // If user has miles selected, convert the goal to meters accordingly
+    // goalValue is stored as meters (e.g., "1000" = 1000 meters)
+    const goalInMeters = parseInt(goalValue);
+    
+    // If user has miles selected, the display shows miles but the stored value
+    // should still represent the actual distance in meters
     if (distanceUnit === 'mi') {
-      // For mile users, treat goals as mile distances and convert to meters
-      const goalMiles = goalKm; // e.g., "1k" becomes 1 mile for mile users
-      return goalMiles * 1609.344;
+      // Convert the meter value to what it would be if interpreted as miles
+      // For example: "1000" represents 1km, but for mile users we want 1 mile
+      const milesEquivalent = goalInMeters / 1000; // Convert to "units" (1000m = 1 unit)
+      return milesEquivalent * 1609.344; // Convert units to miles in meters
     }
-    return parseInt(goalValue); // Keep as meters for km users
+    
+    return goalInMeters; // Keep as meters for km users
   };
 
   // Format goal label for display (adjust for miles vs km)
   const formatGoalLabel = (goalValue) => {
-    const goalKm = parseInt(goalValue) / 1000;
+    const goalUnits = parseInt(goalValue) / 1000; // Convert to display units
     if (distanceUnit === 'mi') {
-      // For mile users, show goals as mile distances
-      return `${goalKm}mi`;
+      return `${goalUnits}mi`;
     }
-    return `${goalKm}k`;
+    return `${goalUnits}k`;
   };
 
   // Check if goal is reached and auto-stop
@@ -49,14 +53,7 @@ const GoalsDropdown = () => {
         setSelectedGoal(null);
       }
     }
-    
-    // Clear goal when not tracking (consolidated here to avoid race condition)
-    if (!isTracking && selectedGoal) {
-      setSelectedGoal(null);
-    }
-  }, [distance, selectedGoal, isTracking, stopRun, distanceUnit]);
-
-
+  }, [distance, selectedGoal, isTracking, stopRun]);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
