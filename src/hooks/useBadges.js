@@ -246,7 +246,7 @@ export const useBadges = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [userPubkey, ndk, canReadData, parseProfileBadgesEvent, parseBadgeAwardEvents]);
+  }, [userPubkey, ndk, canReadData]);
 
   // Auto-reload badges periodically to catch new awards
   useEffect(() => {

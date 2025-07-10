@@ -1320,3 +1320,39 @@ if (isRunstrWorkout) {
 3. Add a small migration/cleanup to clear the old shared cache key so users get fresh per-mode data.
 
 _No code changes implemented yet – this entry documents the analysis phase._
+
+## Badge Loading Infinite Loop Bug
+
+**Bug Description:** 
+Badges stuck in perpetual loading state in profile/nostr stats section, never completing the loading process.
+
+**Root Cause Analysis:**
+1. **Primary Issue (Fixed):** `useContext(NostrContext)` called outside NostrProvider in App.jsx
+   - Context hook was called before provider was rendered 
+   - Caused entire NostrContext to receive default values instead of actual provider values
+   - Broke the badge loading chain
+
+2. **Secondary Issue (Fixed):** Infinite re-rendering loop in `useBadges` hook
+   - `loadBadges` useCallback included `parseProfileBadgesEvent` and `parseBadgeAwardEvents` in dependencies
+   - These functions are recreated on every render despite having empty dependency arrays
+   - Caused `loadBadges` to be recreated on every render 
+   - Triggered useEffect infinitely: render → functions recreated → loadBadges recreated → useEffect runs → setIsLoading(true) → re-render → repeat
+   - `setIsLoading(false)` was immediately overridden by next loop iteration
+
+**Steps Taken:**
+1. **Fixed context placement** - Removed `useContext(NostrContext)` call that was outside NostrProvider
+2. **Fixed infinite loop** - Removed `parseProfileBadgesEvent` and `parseBadgeAwardEvents` from `loadBadges` dependencies
+
+**Implementation Details:**
+- App.jsx: Removed debugging code that called NostrContext hook outside provider
+- useBadges.js: Changed `loadBadges` dependencies from `[userPubkey, ndk, canReadData, parseProfileBadgesEvent, parseBadgeAwardEvents]` to `[userPubkey, ndk, canReadData]`
+
+**Result:**
+- Badges now load properly without infinite loops
+- Loading state completes correctly
+- No performance impact from constant re-rendering
+
+**Lesson Learned:**
+- Context hooks must be called inside their respective providers
+- useCallback dependencies should only include values that actually change and affect the callback's behavior
+- Functions with empty dependency arrays are stable and don't need to be included in other dependency arrays
