@@ -86,7 +86,7 @@ export function DashboardRunCard({
               disabled={isKind1Posted}
               className={`flex-1 font-medium py-2 px-4 rounded-lg border transition-colors ${
                 isKind1Posted 
-                  ? 'bg-success text-white border-success cursor-not-allowed' 
+                  ? 'bg-black text-white border-white cursor-not-allowed' 
                   : 'bg-bg-primary hover:bg-bg-tertiary text-text-primary border-border-primary'
               }`}
             >
@@ -100,7 +100,7 @@ export function DashboardRunCard({
               disabled={isWorkoutSaved}
               className={`flex-1 font-medium py-2 px-4 rounded-lg border transition-colors ${
                 isWorkoutSaved 
-                  ? 'bg-success text-white border-success cursor-not-allowed' 
+                  ? 'bg-black text-white border-white cursor-not-allowed' 
                   : 'bg-bg-primary hover:bg-bg-tertiary text-text-primary border-border-primary'
               }`}
             >
