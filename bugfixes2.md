@@ -1281,45 +1281,83 @@ if (isRunstrWorkout) {
 - Fix involved **removal** rather than addition (elegant solution)
 - Empty state handling in UI components (LeagueMap, PostList) remains intact
 
-## Bug Fix #6: League Standings Activity Mode Filtering Issues
-
-**Date:** 2025-07-09  
+## Bug Fix #6: Badges & Teams Pages Stuck in "Loading" State  
+**Date:** 2025-07-10  
 **Reporter:** User  
-**Severity:** Medium  
-**Status:** 🔍 **Analysis in progress**  
+**Severity:** High  
+**Status:** 🔍 **ANALYSIS IN PROGRESS**  
 
-### Problem Description
-- Switching activity mode tabs (RUNSTR / WALKSTR / CYCLESTR) does **not** update the League Standings leaderboard; it stays stuck on the Running leaderboard.
-- Distances from Walk or Cycle activities are incorrectly counted toward the Run leaderboard.
-- The 1301 activity feed below the standings *does* filter correctly, proving that `ActivityModeContext` itself works.
+### Problem Description  
+After recent updates, both the Profile page (badge grid) and the Teams section never progress beyond their respective loading messages:  
+- **Profile → BadgeDisplay:** Shows *"Loading badges…"* indefinitely.  
+- **Teams page:** Shows *"Loading NIP-101e teams…"* indefinitely.  
 
-### Initial Root Cause Hypothesis
-1. **Shared Cache Key Across Activity Modes**  
-   `useHistoricalTotals` stores aggregated totals in localStorage under a static key:
-   ```javascript
-   const CACHE_KEY = 'runstr_historical_totals_v4_global_dates';
-   ```
-   Because the key is the same for every activity mode, the first dataset fetched (usually "run") is reused for all modes.
-2. **Cache Hit Short-Circuits Re-Fetch**  
-   When the user changes activity mode, `loadCachedTotals()` finds cached data and returns early, preventing a fresh fetch with the new mode.  
-   Result: Cycling/Walking leaderboards still show the previously cached Running totals.
-3. **Recent Activity Hook Works Correctly**  
-   `useRecentActivity` performs no caching and filters by `activityMode` at runtime, which is why the 1301 feed switches as expected.
+Previous builds loaded these resources without issue, so the regression was introduced by a recent change (suspected around the time we migrated most data-fetching to **NDK** and expanded the relay list).
 
-### Evidence Gathered
-- `src/hooks/useHistoricalTotals.js`  
-  • Static `CACHE_KEY` (no activity suffix)  
-  • `matchesActivityMode` filters by `activityMode` *only* during the fetch path.  
-  • If cache is hit, no new fetch = no new filtering.
-- `src/hooks/useCombinedLeaderboard.js` relies on `useHistoricalTotals`, therefore inherits the stale-cache issue.
-- UI component `LeagueMap.jsx` renders `enhancedLeaderboard` produced by `useCombinedLeaderboard`, so it displays the stale data.
+### Initial Hypothesis  
+1. **Relay Connectivity / EOSE Dead-lock** – `NDK.fetchEvents()` waits for an *EOSE* (End-Of-Stored-Events) message from **every** subscribed relay before resolving. If just *one* relay never responds (or is offline), the promise never resolves ⇒ `isLoading` flag is never cleared.  
+2. **Unbounded Timeout** – Our wrapper `utils/nostr.js fetchEvents()` does *not* pass a timeout to `ndk.fetchEvents()`, so the call can hang forever.  
+3. **Recent Relay List Expansion** – `src/config/relays.js` now includes `wss://purplepag.es` (and a few others) which is intermittently down / doesn't send EOSE. This lines up with the timing of the regression.  
+4. **Badge & Team Hooks Share the Same Bottleneck** –  
+   - `useBadges → loadBadges()` ⇒ 2× `fetchEvents()` (kinds `30008` & `8`)  
+   - `useNip101TeamsFeed → fetchPublicTeams()` ⇒ `ndk.fetchEvents()` (kind `33404`)  
+   Both ultimately funnel through **the same wrapper** and therefore hang if any configured relay is misbehaving.
 
-### Next Steps (Proposed Fixes)
-1. Incorporate `activityMode` into the cache key, e.g., `runstr_historical_totals_${activityMode}_v4_global_dates`.
-2. Store the cached mode alongside the data; bypass cache if it doesn't match the current mode.
-3. Add a small migration/cleanup to clear the old shared cache key so users get fresh per-mode data.
+### Reproduction Notes  
+```bash
+# With current relay list, run in dev mode
+npm run dev  # or mobile build
+# Observe console
+[nostr.js] Fetching events with filter: { kinds: [30008], authors: [...] }
+# …no further log – promise never resolves
+```
 
-_No code changes implemented yet – this entry documents the analysis phase._
+Commenting out the problematic relay(s) or creating a small `NDKRelaySet` of known-good relays causes the hooks to complete in < 1 s and the UI renders correctly.
+
+### Proposed Solutions (ordered from simplest to more complex)  
+1. **Prune / Comment-out Unreliable Relays (⟵ RECOMMENDED)**  
+   - Keep only the three confirmed fast relays:
+     ```js
+     export const relays = [
+       'wss://relay.damus.io',
+       'wss://nos.lol',
+       'wss://relay.nostr.band',
+     ];
+     ```
+   - Pros: one-line change, immediate fix, zero new code paths.  
+   - Cons: slightly less redundancy; can revisit once smarter timeout logic lands.
+2. **Pass a Timeout to `ndk.fetchEvents()` via our Wrapper**  
+   - Wrap the promise in `Promise.race([ndk.fetchEvents(), timeout])`. 6-8 s is plenty for badge/team queries.  
+   - Pros: Shields us from any future relay hangs automatically.  
+   - Cons: Slightly more code; need to choose sensible default; still does one network hit per relay.
+3. **Query a *fast* `NDKRelaySet` Instead of the Whole Pool**  
+   - For one-shot reads (badges, team list) create `NDKRelaySet.fromRelayUrls(getFastestRelays(3))` and pass `{ relaySet }` to `ndk.fetchEvents()`.  
+   - Pros: Faster, lower battery & data usage.  
+   - Cons: Requires extra helper; still relies on `getFastestRelays` heuristics.
+4. **Add Centralised EOSE/Timeout Logic in NDK Layer**  
+   - Contribute PR upstream or wrap `ndk.subscribe()` ourselves so a single slow relay can't block.  
+   - Pros: Robust long-term fix.  
+   - Cons: Largest effort, more moving parts.
+
+### Next Steps  
+- **Quick win:** comment-out / remove `wss://purplepag.es` and any other flaky relays and retest.  
+- If we still want broader relay coverage, implement **Solution 2** afterwards so UI never hangs again.
+
+### Affected Files  
+- `src/config/relays.js`  
+- (Optionally) `src/utils/nostr.js` – wrapper timeout logic  
+
+### Related Commits / Changes  
+- Migration to **@nostr-dev-kit/ndk** & introduction of `awaitNDKReady` (mid-June)  
+- Relay list expanded to include `wss://purplepag.es` (24 June)
+
+### Verification Checklist  
+1. Remove flaky relays → rebuild → Profile badges load within 1-2 s.  
+2. Teams page lists public teams or (if none) gracefully shows "No Teams Found" after same timeframe.  
+3. Confirm no other components relying on `fetchEvents()` remain stuck.  
+4. Observe console – `nostr.js] Fetched X events…` appears within timeout.  
+
+---
 
 ## Badge Loading Infinite Loop Bug
 

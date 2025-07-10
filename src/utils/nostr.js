@@ -20,8 +20,13 @@ const activeSubscriptions = new Set();
  * @param {Object} fetchOpts - Additional fetch options
  * @returns {Promise<Set<NDKEvent>>} Set of events
  */
+// Default timeout (ms) for one-shot fetches where UI is waiting
+const DEFAULT_FETCH_TIMEOUT = 8000; // 8 s – enough for fast relays, short enough for UX
+
 export const fetchEvents = async (filter, fetchOpts = {}) => {
-  // Ensure relay pool is connected before issuing query
+  // Split out timeout so we can still forward other NDK opts untouched
+  const { timeout = DEFAULT_FETCH_TIMEOUT, ...ndkOpts } = fetchOpts;
+
   try {
     const ndkReady = await ndkReadyPromise;
     if (!ndkReady) {
@@ -33,9 +38,17 @@ export const fetchEvents = async (filter, fetchOpts = {}) => {
     if (!filter.limit) {
       filter.limit = 30;
     }
-    // All functions will now use the imported singleton `ndk`
-    const events = await ndk.fetchEvents(filter, fetchOpts);
-    console.log(`[nostr.js] Fetched ${events.size} events for filter:`, filter);
+
+    // Race the real fetch against a timeout so a single silent relay can’t block
+    const ndkFetchPromise = ndk.fetchEvents(filter, ndkOpts);
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => {
+      console.warn(`[nostr.js] fetchEvents timeout (${timeout} ms) for filter`, filter);
+      resolve(new Set());
+    }, timeout));
+
+    const events = await Promise.race([ndkFetchPromise, timeoutPromise]);
+
+    console.log(`[nostr.js] fetchEvents resolved with ${events.size} events for filter:`, filter);
     return events;
   } catch (error) {
     console.error('[nostr.js] Error fetching events:', error);
