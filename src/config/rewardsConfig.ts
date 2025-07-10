@@ -29,8 +29,8 @@ export const REWARDS = {
   },
   SEASON_1: {
     passPrice: 10000,
-    startUtc: '2025-07-01T00:00:00Z', // Testing period: July 1-30
-    endUtc: '2025-07-30T23:59:59Z',   // Testing period: July 1-30
+    startUtc: '2025-07-11T00:00:00Z', // Official RUNSTR SEASON 1: July 11 - October 9
+    endUtc: '2025-10-09T23:59:59Z',   // Official RUNSTR SEASON 1: July 11 - October 9
     title: 'RUNSTR SEASON 1'
   }
 } as const;
