@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       # Output whether a release was created by semantic-release OR manual release
-      released: ${{ steps.semantic_release.outputs.released == 'true' || steps.manual_release.outputs.released == 'true' }}
+      released: ${{ steps.determine_build_version.outputs.released == 'true' }}
       # Output the final version determined (semantic or package.json)
       build_version: ${{ steps.determine_build_version.outputs.build_version }}
       # Output the final APK path for artifact upload/download
@@ -410,8 +410,8 @@ jobs:
 
       # --- Create GitHub Release ---
       - name: Create GitHub Release and Upload APK
-        # Only run if semantic-release created a new version
-        if: steps.semantic_release.outputs.released == 'true'
+        # Run if either semantic-release OR manual-release path marked this build as a release
+        if: steps.determine_build_version.outputs.released == 'true'
         uses: softprops/action-gh-release@v1
         with:
           # Tag name should match the tag created by semantic-release (usually with 'v' prefix)
