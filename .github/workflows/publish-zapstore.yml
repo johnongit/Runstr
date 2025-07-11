@@ -27,8 +27,8 @@ jobs:
   release_and_build:
     runs-on: ubuntu-latest
     outputs:
-      # Output whether a release was created by semantic-release
-      released: ${{ steps.semantic_release.outputs.released || 'false' }}
+      # Output whether a release was created by semantic-release OR manual release
+      released: ${{ steps.semantic_release.outputs.released == 'true' || steps.manual_release.outputs.released == 'true' }}
       # Output the final version determined (semantic or package.json)
       build_version: ${{ steps.determine_build_version.outputs.build_version }}
       # Output the final APK path for artifact upload/download
