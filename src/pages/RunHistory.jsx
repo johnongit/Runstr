@@ -307,7 +307,12 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       };
 
       // Use the new createAndPublishEvent function from nostr-tools
-      await createAndPublishEvent(eventTemplate);
+      const publishedEvent = await createAndPublishEvent(eventTemplate);
+      
+      // Save the event ID to track that this run has been posted
+      if (publishedEvent?.id) {
+        runDataService.updateRun(selectedRun.id, { nostrKind1EventId: publishedEvent.id });
+      }
       
       setShowModal(false);
       setAdditionalContent('');

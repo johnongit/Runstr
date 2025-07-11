@@ -1,0 +1,313 @@
+/* Badge Display Styles - Minimalistic Black/White Theme */
+.badge-display {
+  margin: 12px 0;
+  width: 100%;
+}
+
+/* Level Badges Section */
+.level-badges {
+  margin-bottom: 16px;
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  max-width: 280px; /* 7 badges * 36px + gaps */
+  margin: 0 auto;
+}
+
+/* Individual Badge Slot - Updated for minimalistic theme */
+.badge-slot {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.2s ease-in-out;
+}
+
+.badge-slot.empty {
+  background: transparent;
+  border: 2px dashed var(--border-secondary, rgba(255, 255, 255, 0.2));
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+}
+
+.badge-slot.filled {
+  background: var(--text-primary, white);
+  border: 2px solid var(--text-primary, white);
+  color: var(--bg-primary, black);
+  box-shadow: none;
+}
+
+.badge-slot.filled:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
+}
+
+.badge-placeholder,
+.badge-content {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1;
+}
+
+.badge-placeholder {
+  opacity: 0.6;
+}
+
+
+
+/* Loading State */
+.badge-display.loading {
+  padding: 20px;
+  text-align: center;
+}
+
+.badge-loading {
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 480px) {
+  .badge-grid {
+    gap: 4px;
+    max-width: 252px; /* 7 badges * 32px + gaps */
+  }
+  
+  .badge-slot {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .badge-placeholder,
+  .badge-content {
+    font-size: 11px;
+  }
+  
+
+}
+
+/* Badge Claim Modal Styles - Updated for minimalistic theme */
+.badge-claim-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.badge-claim-modal {
+  background: var(--bg-secondary, #1a1a1a);
+  border: 1px solid var(--border-secondary, #333);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.celebration-stars {
+  font-size: 24px;
+  margin-bottom: 8px;
+  animation: bounce 1s ease-in-out infinite alternate;
+}
+
+@keyframes bounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-5px); }
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, white);
+  margin: 0 0 8px 0;
+}
+
+.modal-subtitle {
+  color: var(--text-secondary, #ccc);
+  margin: 0;
+  font-size: 14px;
+}
+
+.unclaimed-badges-list {
+  margin-bottom: 24px;
+  space-y: 16px;
+}
+
+.unclaimed-badge-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.05));
+  border-radius: 8px;
+  border: 1px solid var(--border-secondary, rgba(255, 255, 255, 0.1));
+  margin-bottom: 12px;
+}
+
+.unclaimed-badge-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.badge-icon {
+  flex-shrink: 0;
+}
+
+.level-badge-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+  background: var(--text-primary, white);
+  color: var(--bg-primary, black);
+  border: 2px solid var(--text-primary, white);
+}
+
+
+
+.badge-info {
+  flex: 1;
+}
+
+.badge-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, white);
+  margin: 0 0 4px 0;
+}
+
+.badge-description {
+  font-size: 14px;
+  color: var(--text-secondary, #ccc);
+  margin: 0 0 4px 0;
+}
+
+.badge-date {
+  font-size: 12px;
+  color: var(--text-muted, #999);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.claim-all-btn {
+  flex: 1;
+  background: var(--text-primary, white);
+  color: var(--bg-primary, black);
+  border: 2px solid var(--text-primary, white);
+  font-weight: 600;
+}
+
+.claim-all-btn:hover {
+  background: var(--text-secondary, #ccc);
+  border-color: var(--text-secondary, #ccc);
+}
+
+.claim-individual-btn {
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.modal-info {
+  text-align: center;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-secondary, rgba(255, 255, 255, 0.1));
+}
+
+.modal-info p {
+  font-size: 14px;
+  color: var(--text-secondary, #ccc);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Notification Banner - Updated for minimalistic theme */
+.badge-notification-banner {
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-secondary, rgba(255, 255, 255, 0.1));
+  color: var(--text-primary, white);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.badge-notification-banner:hover {
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.1));
+  border-color: var(--text-primary, rgba(255, 255, 255, 0.3));
+}
+
+/* Notification Badge */
+.badge-notification {
+  position: relative;
+}
+
+.badge-notification-dot {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  background: #ff4444;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  border: 2px solid var(--bg-secondary, #1a1a1a);
+}
+
+/* Dark/Light Theme Support */
+@media (prefers-color-scheme: light) {
+  .badge-slot.empty {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.2);
+    color: rgba(0, 0, 0, 0.4);
+  }
+  
+  .badge-claim-modal {
+    background: var(--bg-secondary, #f5f5f5);
+    border-color: var(--border-secondary, #ddd);
+  }
+  
+  .unclaimed-badge-wrapper {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+} 

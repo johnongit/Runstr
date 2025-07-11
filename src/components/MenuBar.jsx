@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FloatingMusicPlayer } from './FloatingMusicPlayer';
+import { ActivityModeBanner } from './ActivityModeBanner';
 // import { DashboardWalletHeader } from './DashboardWalletHeader'; // Temporarily disabled - ecash wallet under development
 import { useActivityMode, ACTIVITY_TYPES } from '../contexts/ActivityModeContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -23,27 +24,28 @@ export const MenuBar = () => {
     skipStartCountdown, setSkipStartCountdown,
     usePedometer, setUsePedometer,
     useLocalStats, setUseLocalStats,
-    autoPostToNostr, setAutoPostToNostr
+    autoPostToNostr, setAutoPostToNostr,
+    autoPostKind1Note, setAutoPostKind1Note
   } = useSettings();
 
-  // State for the fallback lightning address in the modal
-  const [manualLnAddress, setManualLnAddress] = useState('');
-  const [lnAddressStatusMessage, setLnAddressStatusMessage] = useState('');
+  // State for the fallback lightning address in the modal - COMMENTED OUT (moving to manual weekly rewards)
+  // const [manualLnAddress, setManualLnAddress] = useState('');
+  // const [lnAddressStatusMessage, setLnAddressStatusMessage] = useState('');
   
   // Blossom connection test state
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(null);
   const [customBlossomUrl, setCustomBlossomUrl] = useState('');
 
-  // Load manualLnAddress when settings modal becomes visible or component mounts
-  useEffect(() => {
-    // Only load if the modal might be opened, or simply on mount.
-    // If settingsOpen state is not directly accessible here, loading on mount is fine.
-    const savedLnAddress = localStorage.getItem('manualLightningAddress');
-    if (savedLnAddress) {
-      setManualLnAddress(savedLnAddress);
-    }
-  }, []); // Empty dependency array: runs once on mount.
+  // Load manualLnAddress when settings modal becomes visible or component mounts - COMMENTED OUT (moving to manual weekly rewards)
+  // useEffect(() => {
+  //   // Only load if the modal might be opened, or simply on mount.
+  //   // If settingsOpen state is not directly accessible here, loading on mount is fine.
+  //   const savedLnAddress = localStorage.getItem('manualLightningAddress');
+  //   if (savedLnAddress) {
+  //     setManualLnAddress(savedLnAddress);
+  //   }
+  // }, []); // Empty dependency array: runs once on mount.
            // Or, if settingsOpen is available: [settingsOpen] to run when modal visibility changes
 
   const menuItems = [
@@ -116,18 +118,19 @@ export const MenuBar = () => {
     setHealthEncryptionPref(enable ? 'encrypted' : 'plaintext');
   };
 
-  const handleSaveLnAddress = () => {
-    if (manualLnAddress && manualLnAddress.includes('@') && manualLnAddress.includes('.')) {
-      localStorage.setItem('manualLightningAddress', manualLnAddress);
-      setLnAddressStatusMessage('Lightning Address saved!');
-    } else if (!manualLnAddress) {
-      localStorage.removeItem('manualLightningAddress');
-      setLnAddressStatusMessage('Lightning Address cleared.');
-    } else {
-      setLnAddressStatusMessage('Please enter a valid Lightning Address (e.g., user@domain.com)');
-    }
-    setTimeout(() => setLnAddressStatusMessage(''), 3000);
-  };
+  // COMMENTED OUT - Moving to manual weekly rewards, no longer need lightning address input
+  // const handleSaveLnAddress = () => {
+  //   if (manualLnAddress && manualLnAddress.includes('@') && manualLnAddress.includes('.')) {
+  //     localStorage.setItem('manualLightningAddress', manualLnAddress);
+  //     setLnAddressStatusMessage('Lightning Address saved!');
+  //   } else if (!manualLnAddress) {
+  //     localStorage.removeItem('manualLightningAddress');
+  //     setLnAddressStatusMessage('Lightning Address cleared.');
+  //   } else {
+  //     setLnAddressStatusMessage('Please enter a valid Lightning Address (e.g., user@domain.com)');
+  //   }
+  //   setTimeout(() => setLnAddressStatusMessage(''), 3000);
+  // };
 
   const handleTestBlossomConnection = async () => {
     // Determine the actual URL to test
@@ -177,34 +180,8 @@ export const MenuBar = () => {
           </div>
         </div>
         
-        {/* Wallet Header temporarily hidden - ecash wallet under development */}
-        {/* 
-        <div className="relative">
-          <DashboardWalletHeader />
-          <button 
-            className="absolute top-4 right-4 text-text-secondary hover:text-text-primary transition-colors duration-normal z-10" 
-            onClick={toggleSettings}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </div>
-        */}
-        
-        {/* Settings button when wallet header is hidden */}
-        <div className="flex justify-end">
-          <button 
-            className="text-text-secondary hover:text-text-primary transition-colors duration-normal p-2 rounded-lg bg-bg-secondary border border-border-secondary" 
-            onClick={toggleSettings}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </div>
+        {/* Activity Mode Banner */}
+        <ActivityModeBanner onSettingsClick={toggleSettings} />
       </header>
 
       {/* Settings Modal */}
@@ -293,6 +270,18 @@ export const MenuBar = () => {
                 <p className="text-xs text-text-muted">
                   Automatically publish completed runs to Nostr with your team/challenge associations. You can still manually publish from the dashboard if disabled.
                 </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-text-secondary mr-3">Auto-post Run Notes to Nostr</span>
+                  <input 
+                    type="checkbox"
+                    className="form-checkbox h-5 w-5 text-primary bg-bg-tertiary border-border-secondary focus:ring-primary rounded"
+                    checked={autoPostKind1Note}
+                    onChange={() => setAutoPostKind1Note(!autoPostKind1Note)}
+                  />
+                </div>
+                <p className="text-xs text-text-muted">
+                  Automatically opens a posting modal for sharing run notes after workout data is posted.
+                </p>
               </div>
             </div>
             
@@ -375,10 +364,10 @@ export const MenuBar = () => {
               </div>
             </div>
             
-            {/* Bitcoin Rewards Section */}
+            {/* Bitcoin Rewards Section - COMMENTED OUT (moving to manual weekly rewards) */}
+            {/*
             <div className="mb-6">
               <h4 className="subsection-heading mb-3">Bitcoin Rewards</h4>
-              {/*
               <div className="space-y-2">
                 <label htmlFor="lnAddressInput" className="text-sm text-text-secondary">Lightning Address (to receive streak rewards)</label>
                 <div className="flex">
@@ -405,13 +394,12 @@ export const MenuBar = () => {
                 </div>
                 <p className="text-xs text-text-muted">If you also connect an NWC wallet, the app will pay that first and fall back to this address if needed.</p>
               </div>
-              */}
               <p className="text-sm text-text-secondary">
                 Runstr now automatically sends Bitcoin rewards directly to your connected Nostr account (via Zaps).
                 You no longer need to configure a separate Lightning Address here. Ensure your Nostr profile has a Lightning Address set up to receive rewards.
               </p>
-              {/* End of debug section – TEST PAYOUT button removed for production */}
             </div>
+            */}
             
             {/* Step Counting Settings Section */}
             <div className="mb-6">
@@ -491,6 +479,8 @@ export const MenuBar = () => {
               </div>
             </div>
             
+            {/* COMMENTED OUT - Fallback Lightning Address section (moving to manual weekly rewards) */}
+            {/*
             <div className="mb-6">
               <h4 className="subsection-heading mb-2 text-text-primary">Rewards</h4>
               <div className="setting-item bg-bg-tertiary p-3 rounded-md border border-border-secondary">
@@ -515,6 +505,7 @@ export const MenuBar = () => {
                 </p>
               </div>
             </div>
+            */}
 
             <div className="flex flex-col space-y-4">
               <Link 

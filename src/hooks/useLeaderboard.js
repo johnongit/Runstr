@@ -7,6 +7,7 @@ import {
   createImprovementLeaderboard
 } from '../utils/leaderboardUtils';
 import bitcoinRewardsService from '../services/bitcoinRewardsService';
+import { useActivityMode } from '../contexts/ActivityModeContext';
 
 /**
  * Custom hook for managing leaderboards
@@ -19,6 +20,9 @@ import bitcoinRewardsService from '../services/bitcoinRewardsService';
 export const useLeaderboard = (publicKey, profiles, runHistory, stats) => {
   // Ensure profiles is a Map to avoid null errors in WebView
   const profileMap = profiles instanceof Map ? profiles : new Map();
+  
+  // Get current activity mode for Season Pass filtering
+  const { mode: activityMode } = useActivityMode();
 
   const [participating, setParticipating] = useState(getLeaderboardParticipation());
   const [distanceLeaderboard, setDistanceLeaderboard] = useState([]);
@@ -106,12 +110,12 @@ export const useLeaderboard = (publicKey, profiles, runHistory, stats) => {
       }
     ];
     
-    // Update leaderboards
-    setDistanceLeaderboard(createDistanceLeaderboard(demoUsers, currentPeriod));
-    setStreakLeaderboard(createStreakLeaderboard(demoUsers));
-    setImprovementLeaderboard(createImprovementLeaderboard(demoUsers));
+    // Phase 4: Update leaderboards with Season Pass filtering
+    setDistanceLeaderboard(createDistanceLeaderboard(demoUsers, currentPeriod, activityMode));
+    setStreakLeaderboard(createStreakLeaderboard(demoUsers, activityMode));
+    setImprovementLeaderboard(createImprovementLeaderboard(demoUsers, activityMode));
     
-  }, [generateUserData, currentPeriod, participating]);
+  }, [generateUserData, currentPeriod, participating, activityMode]);
   
   /**
    * Distribute rewards for a specific leaderboard

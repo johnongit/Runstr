@@ -9,15 +9,15 @@ const DEMO_MODE = false; // set true to bypass real network calls during dev
 
 // 1) Allow runtime override via localStorage (fundingNwcUri)
 // 2) Use env variables baked by Vite / Node
-// 3) Final hard-coded fallback provided by project owner
-const HARDCODED_NWC_URI = 'nostr+walletconnect://17292be0ffe9b1ab3830f9a26fabb8e91c14bec383be4faf00c5e11042192e51?relay=wss://wallets.bitvora.com&secret=250e610ea41fe21aa4ab42cc5d9b718f989977f742c10f8679bd940cda96f48e';
+// 3) Final hard-coded fallback removed - not needed
+// const HARDCODED_NWC_URI = '...'; // REMOVED
 
 const NWC_URI =
   (typeof localStorage !== 'undefined' && localStorage.getItem('fundingNwcUri')) ||
   (typeof import.meta !== 'undefined' && (import.meta?.env?.VITE_NWC_URI || import.meta?.env?.NWC_URI)) ||
   process.env.VITE_NWC_URI ||
   process.env.NWC_URI ||
-  HARDCODED_NWC_URI;
+  null; // No hardcoded fallback
 
 if (!NWC_URI) {
   console.warn('[nwcService] NWC_URI env variable is not set – payments will fail');

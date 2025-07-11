@@ -1,4 +1,5 @@
 import { useStreakRewards as useLinearStreakRewards } from '../hooks/useStreakRewards';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNostr } from '../hooks/useNostr';
 import { REWARDS } from '../config/rewardsConfig';
@@ -16,87 +17,150 @@ const AchievementCard = () => {
   // Get modalInfo and clearModal from the hook
   const { streakData, rewardState, modalInfo, clearModal } = useLinearStreakRewards(pubkey);
   
-  // Compute next milestone details from reward config
-  const { satsPerDay, capDays } = REWARDS.STREAK;
+  // State for dropdown expansion
+  const [isExpanded, setIsExpanded] = useState(false);
+  
   const currentDays = streakData.currentStreakDays;
   
-  // Calculate today's reward (if any was earned)
-  const todaysReward = currentDays > streakData.lastRewardedDay ? 
-    (currentDays - streakData.lastRewardedDay) * satsPerDay : 0;
+  // Calculate current week's workout count
+  const getWeeklyWorkoutCount = () => {
+    const runHistory = JSON.parse(localStorage.getItem('runHistory') || '[]');
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday as start of week
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const workoutsThisWeek = runHistory.filter(run => {
+      const runDate = new Date(run.date);
+      return runDate >= startOfWeek && runDate <= now;
+    });
+    
+    return workoutsThisWeek.length;
+  };
   
-  // Calculate tomorrow's reward
-  const tomorrowDay = Math.min(currentDays + 1, capDays);
-  const tomorrowReward = tomorrowDay > streakData.lastRewardedDay ? 
-    (tomorrowDay * satsPerDay) : 0;
+  // Calculate days until next payout (Friday nights)
+  const getDaysUntilPayout = () => {
+    const now = new Date();
+    const nextFriday = new Date(now);
+    const daysUntilFriday = (5 - now.getDay() + 7) % 7; // Friday is day 5
+    
+    if (daysUntilFriday === 0) {
+      // Today is Friday, get next Friday
+      nextFriday.setDate(now.getDate() + 7);
+    } else {
+      nextFriday.setDate(now.getDate() + daysUntilFriday);
+    }
+    
+    const timeDiff = nextFriday.getTime() - now.getTime();
+    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    return daysDiff;
+  };
   
-  // Check if we're at the cap
-  const isAtCap = currentDays >= capDays && streakData.lastRewardedDay >= capDays;
+  const weeklyWorkouts = getWeeklyWorkoutCount();
+  const maxWeeklyWorkouts = 7;
   
+  // New reward structure: 20 sats × streak day number
+  // Calculate total weekly rewards based on consecutive streak days within the week
+  const calculateWeeklyRewards = () => {
+    if (weeklyWorkouts === 0) return 0;
+    
+    // For weekly summary, calculate rewards for consecutive days within this week
+    // Assuming the streak days within this week start from the most recent streak position
+    let totalRewards = 0;
+    const startingStreakDay = Math.max(1, currentDays - weeklyWorkouts + 1);
+    
+    for (let i = 0; i < weeklyWorkouts; i++) {
+      const streakDayNumber = startingStreakDay + i;
+      totalRewards += 20 * streakDayNumber;
+    }
+    
+    return totalRewards;
+  };
+  
+  const weeklyTotal = calculateWeeklyRewards();
+  const daysUntilPayout = getDaysUntilPayout();
+  const weekProgress = (weeklyWorkouts / maxWeeklyWorkouts) * 100;
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
   return (
-    <>
-      <div className="bg-bg-secondary rounded-xl overflow-hidden mb-4 shadow-lg border border-border-secondary">
-        <div className="p-4 flex flex-col gap-3">
-          {/* Current Streak Display */}
-          <div className="bg-bg-primary/50 rounded-lg p-2.5 flex items-center border border-border-secondary">
-            <div className="flex items-center justify-center mr-2.5 w-8 h-8 rounded-lg bg-warning/20">
-              {/* Fire outline SVG icon */}
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-warning">
-                <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
-              </svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs text-text-muted">Current Streak</span>
-              <span className="text-sm font-semibold text-text-primary">{currentDays} {currentDays === 1 ? 'day' : 'days'}</span>
-            </div>
-          </div>
-
-          {/* Today's Reward (if earned) */}
-          {todaysReward > 0 && (
-            <div className="bg-bg-primary/50 rounded-lg p-2.5 flex items-center border border-border-secondary">
-              <div className="flex items-center justify-center mr-2.5 w-8 h-8 rounded-lg bg-bitcoin/20">
-                {/* Bitcoin/Lightning bolt icon instead of dollar sign */}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-bitcoin">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                </svg>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-text-muted">Today's Reward (Day {currentDays})</span>
-                <span className="text-sm font-semibold text-bitcoin">{todaysReward} sats</span>
-              </div>
-            </div>
-          )}
-
-          {/* Next Reward Information */}
-          <div className="bg-bg-primary/50 rounded-lg p-2.5 border border-border-secondary">
-            <div className="flex flex-col gap-2">
-              {!isAtCap ? (
-                <div className="text-center">
-                  <span className="text-sm text-text-primary">
-                    Run tomorrow (Day {tomorrowDay}) to earn <span className="font-semibold text-bitcoin">{tomorrowReward} sats</span>
-                  </span>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <span className="text-sm text-primary font-medium">
-                    Maximum {capDays}-day reward reached! Keep the streak alive!
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+    <div className="bg-bg-secondary rounded-xl shadow-lg border border-border-secondary">
+      {/* Compact Summary Header - Always Visible */}
+      <div 
+        className="flex items-center justify-between p-4 cursor-pointer hover:bg-bg-tertiary transition-colors duration-200 rounded-xl"
+        onClick={toggleExpanded}
+      >
+        <div className="flex items-center gap-3">
+          <span className="font-semibold text-text-primary">Weekly Rewards Summary</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <svg 
+            className={`h-4 w-4 text-text-secondary transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
       </div>
 
-      {/* Render the NotificationModal */}
-      {modalInfo && modalInfo.isVisible && (
+      {/* Detailed Content - Collapsible */}
+      {isExpanded && (
+        <div className="px-4 pb-4 border-t border-border-secondary">
+          {/* Weekly Progress */}
+          <div className="mb-4 mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-text-secondary">This Week's Progress</span>
+              <span className="text-sm font-bold text-text-primary">{weeklyWorkouts}/{maxWeeklyWorkouts} workouts</span>
+            </div>
+            <div className="w-full bg-bg-tertiary rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-primary to-secondary h-2 rounded-full transition-all duration-300"
+                style={{ width: `${weekProgress}%` }}
+              ></div>
+            </div>
+          </div>
+          
+          {/* Weekly Earnings Breakdown */}
+          <div className="bg-bg-tertiary rounded-lg p-3 mb-4">
+            <h4 className="text-sm font-medium text-text-secondary mb-2">Weekly Earnings</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-text-secondary">Streak rewards (20 × streak day)</span>
+                <span className="text-sm font-semibold" style={{ color: '#f7931a' }}>{weeklyTotal} sats</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-text-muted">
+                  {weeklyWorkouts > 0 ? `${weeklyWorkouts} consecutive days this week` : 'No workouts this week'}
+                </span>
+                <span className="text-xs text-text-muted">
+                  {weeklyWorkouts > 0 ? `Current streak: ${currentDays} days` : ''}
+                </span>
+              </div>
+              <div className="border-t border-border-secondary pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-text-primary">Weekly Total</span>
+                  <span className="text-lg font-bold" style={{ color: '#f7931a' }}>{weeklyTotal} sats</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Notification Modal */}
+      {modalInfo && (
         <NotificationModal
+          isOpen={modalInfo.isVisible}
+          onClose={clearModal}
           title={modalInfo.title}
           message={modalInfo.message}
-          isVisible={modalInfo.isVisible}
-          onClose={clearModal} 
         />
       )}
-    </>
+    </div>
   );
 };
 

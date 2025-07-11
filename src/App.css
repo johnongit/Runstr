@@ -442,9 +442,9 @@
 }
 
 .disconnect-button {
-  background: var(--error);
-  color: white;
-  border: none;
+  background: white;
+  color: black;
+  border: 2px solid black;
   border-radius: var(--radius-md);
   padding: 8px 16px;
   font-size: 0.9rem;
@@ -453,7 +453,7 @@
 }
 
 .disconnect-button:hover {
-  background: #c82333;
+  background: #f0f0f0;
 }
 
 /* Balance Card */
@@ -867,9 +867,9 @@
 .save-button,
 .check-connection-button,
 .disconnect-button {
-  background: var(--primary, #f7931a);
-  color: var(--bg-primary, #000000);
-  border: none;
+  background: white;
+  color: black;
+  border: 2px solid black;
   border-radius: var(--radius-md, 8px);
   padding: 12px 20px;
   font-size: 0.9rem;
@@ -882,14 +882,17 @@
 .connect-button:hover:not(:disabled),
 .auth-url-button:hover:not(:disabled),
 .save-button:hover:not(:disabled),
-.check-connection-button:hover {
-  background: var(--primary-hover, #e88b00);
+.check-connection-button:hover,
+.disconnect-button:hover:not(:disabled) {
+  background: #f0f0f0;
   transform: translateY(-1px);
 }
 
 .connect-button:disabled,
 .save-button:disabled {
   background: var(--text-muted, #666);
+  color: white;
+  border-color: var(--text-muted, #666);
   cursor: not-allowed;
   transform: none;
 }
@@ -922,13 +925,14 @@
 }
 
 .disconnect-button {
-  background: var(--error, #dc3545);
-  color: white;
+  background: white;
+  color: black;
+  border: 2px solid black;
   margin-left: 12px;
 }
 
 .disconnect-button:hover {
-  background: #c82333;
+  background: #f0f0f0;
 }
 
 .zap-amount-setting {
@@ -964,9 +968,9 @@
 }
 
 .donate-button {
-  background: var(--primary, #f7931a);
-  color: var(--bg-primary, #000000);
-  border: none;
+  background: white;
+  color: black;
+  border: 2px solid black;
   border-radius: var(--radius-md, 8px);
   padding: 12px 24px;
   font-size: 0.95rem;
@@ -978,12 +982,14 @@
 }
 
 .donate-button:hover:not(:disabled) {
-  background: var(--primary-hover, #e88b00);
+  background: #f0f0f0;
   transform: translateY(-1px);
 }
 
 .donate-button:disabled {
   background: var(--text-muted, #666);
+  color: white;
+  border-color: var(--text-muted, #666);
   cursor: not-allowed;
 }
 

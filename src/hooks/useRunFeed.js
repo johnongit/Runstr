@@ -8,11 +8,11 @@ import { awaitNDKReady, ndk } from '../lib/ndkSingleton';
 import { lightweightProcessPosts, mergeProcessedPosts } from '../utils/feedProcessor';
 import { NDKRelaySet } from '@nostr-dev-kit/ndk';
 import { getFastestRelays } from '../utils/feedFetcher';
-import { startFeed, subscribeFeed, getFeed } from '../lib/feedManager';
 import { getEventTargetId } from '../utils/eventHelpers';
 import { useProfileCache } from '../hooks/useProfileCache.js';
 import { ensureRelays } from '../utils/relays.js';
 import { useActivityMode } from '../contexts/ActivityModeContext';
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
 
 // Global state for caching posts across component instances
 const globalState = {
@@ -26,9 +26,9 @@ const globalState = {
 
 export const useRunFeed = (filterSource = null) => {
   const { mode: activityMode } = useActivityMode();
-  // Prefer central manager; hydrate immediately
-  const [posts, setPosts] = useState(() => getFeed());
-  const [loading, setLoading] = useState(getFeed().length === 0);
+  // Initialize with empty array instead of getFeed() to prevent override
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userLikes, setUserLikes] = useState(new Set());
   const [userReposts, setUserReposts] = useState(new Set());
@@ -178,7 +178,7 @@ export const useRunFeed = (filterSource = null) => {
     setUserReposts(newUserReposts);
   }, [userLikes, userReposts]);
 
-  // Helper function to apply RUNSTR filtering to posts (same logic as in nostr.js)
+  // Helper function to apply RUNSTR filtering and Season Pass participant filtering to posts
   const applyRunstrFilter = useCallback((posts, filterSourceToUse) => {
     if (!filterSourceToUse || filterSourceToUse.toUpperCase() !== 'RUNSTR') {
       return posts; // No filtering applied
@@ -256,6 +256,16 @@ export const useRunFeed = (filterSource = null) => {
                                 hasRequiredTags.duration;
       
       const isRunstrWorkout = hasRunstrIdentification && hasRunstrStructure;
+      
+      // Phase 4: Season Pass Participant Filter
+      // Only show posts from Season Pass participants (for all activity modes)
+      if (isRunstrWorkout) {
+        const isParticipant = enhancedSeasonPassService.isParticipant(event.pubkey);
+        if (!isParticipant) {
+          console.log(`[useRunFeed] Filtering out non-participant post from ${event.pubkey} (${activityMode} mode)`);
+          return false;
+        }
+      }
       
       // Add activity mode filter (same logic as useLeagueLeaderboard) - WITH FALLBACK
       if (isRunstrWorkout && activityMode) {
@@ -680,19 +690,7 @@ export const useRunFeed = (filterSource = null) => {
     run();
   }, [posts, fetchProfiles]);
 
-  // --- Central Feed Manager integration ----
-  useEffect(() => {
-    // Ensure the manager is running (no-op if already started)
-    startFeed();
-    // Subscribe for updates
-    const unsub = subscribeFeed((newPosts) => {
-      setPosts(newPosts);
-      setLoading(false);
-    });
-    return unsub;
-  }, []);
-
-  // Add effect after posts state updates
+  // Reaction subscription for real-time updates (likes, zaps, comments)
   useEffect(() => {
     if (posts.length === 0) return;
     // Start reaction subscription once

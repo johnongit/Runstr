@@ -27,10 +27,14 @@ export const useRunTracker = () => {
       elevation: { current: null, gain: 0, loss: 0 },
       activityType: ACTIVITY_TYPES.RUN,
       pedometerStatus: 'idle',
+      distanceGoal: null,
       startRun: () => console.warn('RunTracker not initialized'),
       pauseRun: () => console.warn('RunTracker not initialized'),
       resumeRun: () => console.warn('RunTracker not initialized'),
       stopRun: () => console.warn('RunTracker not initialized'),
+      setDistanceGoal: () => console.warn('RunTracker not initialized'),
+      clearDistanceGoal: () => console.warn('RunTracker not initialized'),
+      getDistanceGoal: () => null,
       runTracker
     };
   }
@@ -59,7 +63,8 @@ export const RunTrackerProvider = ({ children }) => {
         splits: runTracker.splits,
         elevation: runTracker.elevation,
         activityType: runTracker.activityType || activityType,
-        pedometerStatus: isPedometerEnabled() ? 'idle' : 'disabled'
+        pedometerStatus: isPedometerEnabled() ? 'idle' : 'disabled',
+        distanceGoal: runTracker.getDistanceGoal()
       };
     } catch (error) {
       console.error('Error initializing run tracker state:', error);
@@ -74,7 +79,8 @@ export const RunTrackerProvider = ({ children }) => {
         splits: [],
         elevation: { current: null, gain: 0, loss: 0, lastAltitude: null },
         activityType: activityType,
-        pedometerStatus: isPedometerEnabled() ? 'idle' : 'disabled'
+        pedometerStatus: isPedometerEnabled() ? 'idle' : 'disabled',
+        distanceGoal: null
       };
     }
   });
@@ -160,6 +166,12 @@ export const RunTrackerProvider = ({ children }) => {
         // The actual saving is now handled by the RunTracker service using RunDataService
       };
 
+      // Handler for auto-stopping when distance goal is reached
+      const handleGoalReached = (goalData) => {
+        console.log('Distance goal reached, auto-stopping run:', goalData);
+        stopRun(); // This already has access to publicKey via lightningAddress || publicKey
+      };
+
       // Subscribe to events from the run tracker
       runTracker.on('distanceChange', handleDistanceChange);
       runTracker.on('durationChange', handleDurationChange);
@@ -170,6 +182,7 @@ export const RunTrackerProvider = ({ children }) => {
       runTracker.on('stopped', handleRunStopped);
       runTracker.on('stepsChange', handleStepsChange);
       runTracker.on('speedChange', handleSpeedChange);
+      runTracker.on('goalReached', handleGoalReached);
 
       // Check for active run state in localStorage on mount
       const savedRunState = localStorage.getItem('activeRunState');
@@ -224,6 +237,7 @@ export const RunTrackerProvider = ({ children }) => {
         runTracker.off('stopped', handleRunStopped);
         runTracker.off('stepsChange', handleStepsChange);
         runTracker.off('speedChange', handleSpeedChange);
+        runTracker.off('goalReached', handleGoalReached);
       };
     } catch (error) {
       console.error('Error setting up run tracker event listeners:', error);
@@ -347,7 +361,11 @@ export const RunTrackerProvider = ({ children }) => {
     resumeRun,
     stopRun,
     runTracker, // Expose the original instance for advanced use cases
-    pedometerStatus: trackingState.pedometerStatus
+    pedometerStatus: trackingState.pedometerStatus,
+    // Goal management methods
+    setDistanceGoal: (meters) => runTracker.setDistanceGoal(meters),
+    clearDistanceGoal: () => runTracker.clearDistanceGoal(),
+    getDistanceGoal: () => runTracker.getDistanceGoal()
   };
 
   return (

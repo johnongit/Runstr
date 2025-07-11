@@ -87,3 +87,33 @@
   -webkit-touch-callout: none !important;
   -webkit-user-select: none !important;
 } 
+
+/* Activity Mode Banner Styles */
+.action-button.active {
+  font-weight: 600;
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #ffffff !important;
+}
+
+.action-button:hover {
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+  background-color: var(--bg-tertiary);
+}
+
+.distance-unit-button {
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 35px;
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.distance-unit-button:hover {
+  background-color: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+}

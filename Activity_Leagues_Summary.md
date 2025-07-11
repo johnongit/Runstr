@@ -12,7 +12,7 @@
 - Only shows activities matching the selected mode
 
 ### 2. Dynamic Titles  
-- **Run Mode**: "THE RUNSTR 500"
+- **Run Mode**: "THE RUNSTR SEASON 1"
 - **Walk Mode**: "THE WALKSTR 500"
 - **Cycle Mode**: "THE CYCLESTR 500"
 

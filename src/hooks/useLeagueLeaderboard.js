@@ -1,15 +1,18 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
+import { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
 import { fetchEvents } from '../utils/nostr';
 import { useActivityMode } from '../contexts/ActivityModeContext';
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
+import { REWARDS } from '../config/rewardsConfig';
 
 /**
  * Hook: useLeagueLeaderboard
- * Fetches ALL Kind 1301 workout records from ALL users and creates a comprehensive leaderboard
+ * Fetches Kind 1301 workout records from Season Pass participants only and creates a comprehensive leaderboard
  * Filters by current activity mode (run/walk/cycle) for activity-specific leagues
- * Uses localStorage caching (30 min expiry) and lazy loading for better UX
+ * Uses GLOBAL competition date range for all participants (no individual payment date filtering)
+ * Uses localStorage caching (30 min expiry) and progressive loading for optimal UX
  * 
- * @returns {Object} { leaderboard, isLoading, error, refresh, lastUpdated, activityMode }
+ * @returns {Object} { leaderboard, isLoading, error, refresh, lastUpdated, activityMode, courseTotal, loadingProgress }
  */
 export const useLeagueLeaderboard = () => {
   const { ndk } = useContext(NostrContext);
@@ -18,12 +21,119 @@ export const useLeagueLeaderboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [participantsData, setParticipantsData] = useState([]);
+  
+  // ADD: Track participant loading state to fix race condition
+  const [participantsLoaded, setParticipantsLoaded] = useState(false);
+  
+  // Enhanced loading states for better UX
+  const [loadingProgress, setLoadingProgress] = useState({
+    phase: 'initializing',
+    participantCount: 0,
+    processedEvents: 0,
+    totalEvents: 0,
+    message: 'Loading participants...'
+  });
 
   // Constants
-  const COURSE_TOTAL_MILES = 500; // Updated to 500 miles
-  const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes cache
-  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}`; // Activity-specific cache
+  const COURSE_TOTAL_MILES = 500;
+  const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes cache duration
+  const PARTICIPANT_CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes participant cache
+  const CACHE_KEY = `runstr_league_leaderboard_${activityMode}_v8_global_dates`; // Updated for global dates
+  const PARTICIPANT_CACHE_KEY = `runstr_participants_cache_v5_global_dates`; // Updated for global dates
   const MAX_EVENTS = 5000; // Limit to prevent overwhelming queries
+  const BATCH_SIZE = 100; // Process events in batches
+  const UPDATE_DEBOUNCE_MS = 500; // Debounce UI updates
+  
+  // Global competition date range from rewardsConfig (no individual payment filtering)
+  const COMPETITION_START = Math.floor(new Date(REWARDS.SEASON_1.startUtc).getTime() / 1000);
+  const COMPETITION_END = Math.floor(new Date(REWARDS.SEASON_1.endUtc).getTime() / 1000);
+
+  // Load participants data using enhanced service (only once on mount)
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadParticipants = async () => {
+      try {
+        setParticipantsLoaded(false); // ADD: Mark participants as not loaded
+        
+        // Get participant data from both localStorage and Nostr
+        const [mergedParticipants, participantsWithDates] = await Promise.all([
+          enhancedSeasonPassService.getParticipants(),
+          enhancedSeasonPassService.getParticipantsWithDates()
+        ]);
+        
+        if (!isMounted) return; // Prevent state update if component unmounted
+        
+        // Create participants data with dates for display purposes only (not for filtering)
+        const participantData = mergedParticipants.map(pubkey => {
+          const withDate = participantsWithDates.find(p => p.pubkey === pubkey);
+          return {
+            pubkey,
+            paymentDate: withDate?.paymentDate || new Date().toISOString() // For display only
+          };
+        });
+        
+        setParticipantsData(participantData);
+        setParticipantsLoaded(true); // ADD: Mark participants as loaded
+        
+        console.log('[LeagueLeaderboard] Loaded participants from enhanced service:', {
+          merged: mergedParticipants.length,
+          withDates: participantsWithDates.length,
+          final: participantData.length,
+          competitionStart: new Date(COMPETITION_START * 1000).toISOString(),
+          competitionEnd: new Date(COMPETITION_END * 1000).toISOString()
+        });
+      } catch (error) {
+        console.error('[LeagueLeaderboard] Error loading participants:', error);
+        if (isMounted) {
+          setParticipantsData([]);
+          setParticipantsLoaded(true); // ADD: Mark as loaded even on error
+        }
+      }
+    };
+
+    loadParticipants();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Remove COMPETITION_START and COMPETITION_END from dependencies
+
+  // Memoized participant data for performance
+  const participantsWithDates = useMemo(() => {
+    return participantsData;
+  }, [participantsData]);
+
+  // Separate participant cache management
+  const loadCachedParticipants = useCallback(() => {
+    try {
+      const cached = localStorage.getItem(PARTICIPANT_CACHE_KEY);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        const now = Date.now();
+        
+        if (now - timestamp < PARTICIPANT_CACHE_DURATION_MS) {
+          return data;
+        }
+      }
+    } catch (err) {
+      console.error('Error loading participant cache:', err);
+    }
+    return null;
+  }, []);
+
+  const saveCachedParticipants = useCallback((data) => {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(PARTICIPANT_CACHE_KEY, JSON.stringify(cacheData));
+    } catch (err) {
+      console.error('Error saving participant cache:', err);
+    }
+  }, []);
 
   /**
    * Load cached leaderboard data
@@ -36,281 +146,508 @@ export const useLeagueLeaderboard = () => {
         const now = Date.now();
         
         if (now - timestamp < CACHE_DURATION_MS) {
-          console.log('[useLeagueLeaderboard] Using cached data');
           setLeaderboard(data);
           setLastUpdated(new Date(timestamp));
+          setLoadingProgress({ 
+            phase: 'complete', 
+            participantCount: data.length, 
+            processedEvents: 0, 
+            totalEvents: 0, 
+            message: 'Using cached data' 
+          });
           setIsLoading(false);
-          return true; // Cache is valid
+          return true;
         }
       }
     } catch (err) {
-      console.error('[useLeagueLeaderboard] Error loading cache:', err);
+      console.error('Error loading cache:', err);
     }
-    return false; // No valid cache
+    return false;
   }, [CACHE_KEY]);
 
   /**
    * Save leaderboard data to cache
    */
-  const saveToCache = useCallback((data) => {
+  const saveCachedData = useCallback((data) => {
     try {
-      const timestamp = Date.now();
-      localStorage.setItem(CACHE_KEY, JSON.stringify({
+      const cacheData = {
         data,
-        timestamp
-      }));
-      setLastUpdated(new Date(timestamp));
+        timestamp: Date.now()
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
     } catch (err) {
-      console.error('[useLeagueLeaderboard] Error saving to cache:', err);
+      console.error('Error saving cache:', err);
     }
   }, [CACHE_KEY]);
 
   /**
-   * Calculate distance from event tags
+   * Extract distance from event tags with proper error handling and validation
+   * FIXED: Now properly returns miles for leaderboard consistency
    */
   const extractDistance = useCallback((event) => {
-    const distanceTag = event.tags?.find(tag => tag[0] === 'distance');
-    if (!distanceTag || !distanceTag[1]) return 0;
-
-    const distanceValue = parseFloat(distanceTag[1]);
-    const unit = distanceTag[2] || 'km';
-
-    if (isNaN(distanceValue) || distanceValue <= 0) return 0;
-
-    // Convert to miles for consistent calculation
-    return unit === 'km' ? (distanceValue * 0.621371) : distanceValue;
+    try {
+      const distanceTag = event.tags?.find(tag => tag[0] === 'distance');
+      if (!distanceTag || !distanceTag[1]) return 0;
+      
+      const value = parseFloat(distanceTag[1]);
+      if (isNaN(value) || value < 0) return 0;
+      
+      const unit = distanceTag[2]?.toLowerCase() || 'km';
+      
+      // Add reasonable bounds checking to filter out corrupted data
+      const MAX_REASONABLE_DISTANCE_KM = 500; // 500km covers ultramarathons
+      const MIN_REASONABLE_DISTANCE_KM = 0.01; // 10 meters minimum
+      
+      // Convert to km first for validation
+      let distanceInKm = value;
+      switch (unit) {
+        case 'mi':
+        case 'mile':
+        case 'miles':
+          distanceInKm = value * 1.609344;
+          break;
+        case 'm':
+        case 'meter':
+        case 'meters':
+          distanceInKm = value / 1000;
+          break;
+        case 'km':
+        case 'kilometer':
+        case 'kilometers':
+        default:
+          distanceInKm = value;
+          break;
+      }
+      
+      // Validate reasonable range
+      if (distanceInKm < MIN_REASONABLE_DISTANCE_KM || distanceInKm > MAX_REASONABLE_DISTANCE_KM) {
+        console.warn(`Invalid distance detected: ${value} ${unit} (${distanceInKm.toFixed(2)}km) - filtering out event ${event.id}`);
+        return 0;
+      }
+      
+      // FIXED: Return in miles for leaderboard consistency (convert km to miles)
+      return distanceInKm * 0.621371;
+    } catch (err) {
+      console.error('Error extracting distance:', err);
+      return 0;
+    }
   }, []);
 
   /**
-   * Check for duplicate events with enhanced detection
+   * Check if event is duplicate with comprehensive validation
    */
-  const isDuplicateEvent = useCallback((event, existingEvents) => {
-    const eventTime = event.created_at;
-    const eventDistance = extractDistance(event);
-    const eventAuthor = event.pubkey;
-    const eventId = event.id;
-
-    return existingEvents.some(existing => {
-      // Skip if different user
-      if (existing.pubkey !== eventAuthor) return false;
-
-      // Check for exact same event ID (most reliable duplicate check)
-      if (existing.id === eventId) return true;
-
-      // Check for time-based duplicates with same distance
-      const timeDiff = Math.abs(existing.created_at - eventTime);
-      const distanceDiff = Math.abs(extractDistance(existing) - eventDistance);
-      
-      // Same user, same distance (within 0.05 miles), within 10 minutes = likely duplicate
-      if (timeDiff < 600 && distanceDiff < 0.05) return true;
-
-      // Check for identical workout data (distance, duration if available)
-      const eventDuration = event.tags?.find(tag => tag[0] === 'duration')?.[1];
-      const existingDuration = existing.tags?.find(tag => tag[0] === 'duration')?.[1];
-      
-      // If both have duration and they match exactly with same distance = duplicate
-      if (eventDuration && existingDuration && 
-          eventDuration === existingDuration && 
-          distanceDiff < 0.01) return true;
-
-      // Check for content-based duplicates (same workout description)
-      if (event.content && existing.content && 
-          event.content.trim() === existing.content.trim() && 
-          distanceDiff < 0.1 && 
-          timeDiff < 3600) return true; // Within 1 hour
-
+  const isDuplicateEvent = useCallback((event, processedEvents) => {
+    try {
+      return processedEvents.some(existing => {
+        // Primary check: exact same event ID
+        if (existing.id === event.id) return true;
+        
+        // Secondary checks for same user
+        if (existing.pubkey !== event.pubkey) return false;
+        
+        const existingDistance = extractDistance(existing);
+        const currentDistance = extractDistance(event);
+        const timeDiff = Math.abs(existing.created_at - event.created_at);
+        
+        // Same distance within 0.05 miles and within 10 minutes
+        if (Math.abs(existingDistance - currentDistance) < 0.05 && timeDiff < 600) return true;
+        
+        // Check duration matching
+        const existingDuration = existing.tags?.find(tag => tag[0] === 'duration')?.[1];
+        const currentDuration = event.tags?.find(tag => tag[0] === 'duration')?.[1];
+        if (existingDuration && currentDuration && existingDuration === currentDuration && 
+            Math.abs(existingDistance - currentDistance) < 0.1) return true;
+        
+        // Check content similarity
+        if (existing.content && event.content && existing.content === event.content && 
+            Math.abs(existingDistance - currentDistance) < 0.1 && timeDiff < 3600) return true;
+        
+        return false;
+      });
+    } catch (err) {
+      console.error('Error checking duplicate event:', err);
       return false;
-    });
+    }
   }, [extractDistance]);
 
   /**
-   * Process events into user statistics
+   * Process events in batches to avoid blocking UI
    */
-  const processEvents = useCallback((events) => {
-    const userStats = {};
-    const processedEvents = [];
-
-    // Filter duplicates and process events
-    events.forEach(event => {
-      if (!event.pubkey || isDuplicateEvent(event, processedEvents)) return;
+  const processEventsBatch = useCallback((events, leaderboardMap, participantSet, batchStart, batchEnd) => {
+    try {
+      const batch = events.slice(batchStart, batchEnd);
+      const processedEvents = [];
       
-      // Filter by current activity mode using exercise tag
-      const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
-      const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+      console.log(`[LeagueLeaderboard] Processing batch ${batchStart}-${batchEnd}, ${batch.length} events`);
       
-      // Map activity mode to possible exercise tag values (RUNSTR uses 'run', others might use 'running')
-      const activityMatches = {
-        'run': ['run', 'running', 'jog', 'jogging'],
-        'cycle': ['cycle', 'cycling', 'bike', 'biking'],  
-        'walk': ['walk', 'walking', 'hike', 'hiking']
-      };
-      
-      const acceptedActivities = activityMatches[activityMode] || [activityMode];
-      
-      // Skip events that don't match current activity mode
-      if (eventActivityType && !acceptedActivities.includes(eventActivityType)) return;
-      
-      // If no exercise tag but is valid event, allow it through (fallback)
-      if (!eventActivityType) {
-        console.log(`[useLeagueLeaderboard] Event with no exercise tag - allowing through`);
-      }
-      
-      const distance = extractDistance(event);
-      if (distance <= 0) return;
-
-      processedEvents.push(event);
-
-      // Initialize user if not exists
-      if (!userStats[event.pubkey]) {
-        userStats[event.pubkey] = {
-          pubkey: event.pubkey,
-          totalMiles: 0,
-          runCount: 0, // Keep as runCount for backward compatibility but it represents activity count
-          lastActivity: 0,
-          runs: [] // Keep as runs for backward compatibility but it represents activities
+      batch.forEach(event => {
+        if (!event.pubkey) {
+          console.log(`[LeagueLeaderboard] Skipping event - no pubkey:`, event.id);
+          return;
+        }
+        
+        // SIMPLIFIED: Only check if user is a participant (no individual payment dates)
+        if (!participantSet.has(event.pubkey)) {
+          console.log(`[LeagueLeaderboard] Skipping event - not a participant:`, event.pubkey);
+          return;
+        }
+        
+        // SIMPLIFIED: Only filter by competition date range (use event's created_at)
+        if (event.created_at < COMPETITION_START) {
+          console.log(`[LeagueLeaderboard] Skipping event - before competition start:`, {
+            eventDate: new Date(event.created_at * 1000).toISOString(),
+            competitionStart: new Date(COMPETITION_START * 1000).toISOString()
+          });
+          return;
+        }
+        
+        if (event.created_at > COMPETITION_END) {
+          console.log(`[LeagueLeaderboard] Skipping event - after competition end:`, {
+            eventDate: new Date(event.created_at * 1000).toISOString(),
+            competitionEnd: new Date(COMPETITION_END * 1000).toISOString()
+          });
+          return;
+        }
+        
+        // Filter by current activity mode using exercise tag
+        const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
+        const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+        
+        const activityMatches = {
+          'run': ['run', 'running', 'jog', 'jogging'],
+          'cycle': ['cycle', 'cycling', 'bike', 'biking'],  
+          'walk': ['walk', 'walking', 'hike', 'hiking']
         };
-      }
+        
+        const acceptedActivities = activityMatches[activityMode] || [activityMode];
+        
+        if (eventActivityType && !acceptedActivities.includes(eventActivityType)) {
+          console.log(`[LeagueLeaderboard] Skipping event - activity mismatch:`, {
+            eventType: eventActivityType,
+            acceptedTypes: acceptedActivities
+          });
+          return;
+        }
+        
+        const distance = extractDistance(event);
+        if (distance <= 0) {
+          console.log(`[LeagueLeaderboard] Skipping event - invalid distance:`, distance);
+          return;
+        }
 
-      // Add activity data
-      userStats[event.pubkey].totalMiles += distance;
-      userStats[event.pubkey].runCount++; // Actually activity count
-      userStats[event.pubkey].lastActivity = Math.max(
-        userStats[event.pubkey].lastActivity, 
-        event.created_at
-      );
-      userStats[event.pubkey].runs.push({ // Actually activities
-        distance,
-        timestamp: event.created_at,
-        eventId: event.id,
-        activityType: eventActivityType // Store the activity type for reference
+        processedEvents.push(event);
+        console.log(`[LeagueLeaderboard] ✅ Processing event:`, {
+          eventId: event.id,
+          pubkey: event.pubkey,
+          distance: distance,
+          activityType: eventActivityType,
+          eventDate: new Date(event.created_at * 1000).toISOString()
+        });
+
+        // Update participant data
+        const participant = leaderboardMap.get(event.pubkey);
+        if (participant) {
+          participant.totalMiles += distance;
+          participant.runCount++;
+          participant.lastActivity = Math.max(participant.lastActivity, event.created_at);
+          participant.runs.push({
+            distance,
+            timestamp: event.created_at,
+            eventId: event.id,
+            activityType: eventActivityType
+          });
+          
+          console.log(`[LeagueLeaderboard] Updated participant:`, {
+            pubkey: event.pubkey,
+            totalMiles: participant.totalMiles,
+            runCount: participant.runCount
+          });
+        } else {
+          console.log(`[LeagueLeaderboard] ⚠️ Participant not found in leaderboard map:`, event.pubkey);
+        }
       });
-    });
-
-    // Convert to leaderboard format and sort
-    const leaderboardData = Object.values(userStats)
-      .map(user => ({
-        ...user,
-        totalMiles: Math.round(user.totalMiles * 100) / 100, // Round to 2 decimals
-        progressPercentage: Math.min(100, (user.totalMiles / COURSE_TOTAL_MILES) * 100),
-        isComplete: user.totalMiles >= COURSE_TOTAL_MILES
-      }))
-      .sort((a, b) => b.totalMiles - a.totalMiles) // Sort by distance descending
-      .slice(0, 10) // Top 10 only
-      .map((user, index) => ({ ...user, rank: index + 1 }));
-
-    return leaderboardData;
-  }, [extractDistance, isDuplicateEvent, COURSE_TOTAL_MILES, activityMode]);
+      
+      console.log(`[LeagueLeaderboard] Batch complete: ${processedEvents.length}/${batch.length} events processed`);
+      return processedEvents;
+    } catch (err) {
+      console.error('Error processing events batch:', err);
+      return [];
+    }
+  }, [extractDistance, activityMode, COMPETITION_START, COMPETITION_END]);
 
   /**
-   * Fetch comprehensive leaderboard data with lazy loading
+   * Fetch fresh leaderboard data from Season Pass participants only
+   * Enhanced with progressive loading and performance optimizations
    */
-  const fetchLeaderboard = useCallback(async (useCache = true) => {
-    console.log('[useLeagueLeaderboard] Starting fetch...');
-    
-    // Try cache first if requested
-    if (useCache && loadCachedData()) {
+  const fetchLeaderboardData = useCallback(async () => {
+    if (!ndk) {
+      setError('Nostr connection not available');
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-
     try {
-      if (!ndk) {
-        throw new Error('NDK not available');
-      }
-
-      console.log('[useLeagueLeaderboard] Fetching all 1301 events...');
+      setError(null);
+      setLoadingProgress({ 
+        phase: 'fetching_participants', 
+        participantCount: 0, 
+        processedEvents: 0, 
+        totalEvents: 0, 
+        message: 'Loading participants...' 
+      });
       
-      // Fetch ALL 1301 events from ALL users
-      const filter = {
-        kinds: [1301],
-        limit: MAX_EVENTS,
-        since: Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60) // Last year
-      };
-
-      const eventSet = await fetchEvents(filter);
-      const events = Array.from(eventSet).map(e => e.rawEvent ? e.rawEvent() : e);
-      
-      console.log(`[useLeagueLeaderboard] Fetched ${events.length} events`);
-
-      // Process events
-      const processedLeaderboard = processEvents(events);
-      
-      console.log(`[useLeagueLeaderboard] Processed leaderboard with ${processedLeaderboard.length} users`);
-
-      // Update state and cache
-      setLeaderboard(processedLeaderboard);
-      saveToCache(processedLeaderboard);
-
-    } catch (err) {
-      console.error('[useLeagueLeaderboard] Error fetching leaderboard:', err);
-      setError(err.message || 'Failed to fetch leaderboard data');
-      
-      // Try to use stale cache on error
-      if (useCache) {
-        try {
-          const cached = localStorage.getItem(CACHE_KEY);
-          if (cached) {
-            const { data } = JSON.parse(cached);
-            setLeaderboard(data);
-            console.log('[useLeagueLeaderboard] Using stale cache due to error');
-          }
-        } catch (cacheErr) {
-          console.error('[useLeagueLeaderboard] Cache fallback failed:', cacheErr);
+      // Check for cached participants first
+      let cachedParticipants = loadCachedParticipants();
+      if (!cachedParticipants) {
+        cachedParticipants = participantsWithDates;
+        if (cachedParticipants.length > 0) {
+          saveCachedParticipants(cachedParticipants);
         }
       }
+      
+      // Handle empty participants gracefully
+      if (cachedParticipants.length === 0) {
+        const emptyLeaderboard = [];
+        setLeaderboard(emptyLeaderboard);
+        saveCachedData(emptyLeaderboard);
+        setLastUpdated(new Date());
+        setLoadingProgress({ 
+          phase: 'complete', 
+          participantCount: 0, 
+          processedEvents: 0, 
+          totalEvents: 0, 
+          message: 'No participants found' 
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      setLoadingProgress({ 
+        phase: 'fetching_participants', 
+        participantCount: cachedParticipants.length, 
+        processedEvents: 0, 
+        totalEvents: 0, 
+        message: `Found ${cachedParticipants.length} participants` 
+      });
+
+      // SIMPLIFIED: Create simple participant pubkey set (no individual payment dates)
+      const participantPubkeys = cachedParticipants.map(p => p.pubkey);
+      const participantSet = new Set(participantPubkeys);
+
+      console.log('[LeagueLeaderboard] Using simplified participant filtering:', {
+        participantCount: participantPubkeys.length,
+        participants: participantPubkeys,
+        competitionStart: new Date(COMPETITION_START * 1000).toISOString(),
+        competitionEnd: new Date(COMPETITION_END * 1000).toISOString()
+      });
+
+      // Create initial leaderboard and show it immediately (progressive loading)
+      const initialLeaderboard = cachedParticipants.map((participant, index) => ({
+        pubkey: participant.pubkey,
+        totalMiles: 0,
+        runCount: 0,
+        lastActivity: 0,
+        runs: [],
+        isComplete: false,
+        paymentDate: participant.paymentDate,
+        rank: index + 1
+      }));
+
+      // Show initial participant list immediately
+      setLeaderboard(initialLeaderboard);
+      setLoadingProgress({ 
+        phase: 'fetching_events', 
+        participantCount: cachedParticipants.length, 
+        processedEvents: 0, 
+        totalEvents: 0, 
+        message: 'Fetching activity data...' 
+      });
+
+      // SIMPLIFIED: Fetch events using only competition date range
+      const events = await fetchEvents({
+        kinds: [1301],
+        authors: participantPubkeys,
+        limit: MAX_EVENTS,
+        since: COMPETITION_START,  // Use competition start, not individual payment dates
+        until: COMPETITION_END
+      });
+      
+      setLoadingProgress({ 
+        phase: 'processing_events', 
+        participantCount: cachedParticipants.length, 
+        processedEvents: 0, 
+        totalEvents: events.length, 
+        message: `Processing ${events.length} activities...` 
+      });
+
+      // Process events in batches
+      const leaderboardMap = new Map();
+      initialLeaderboard.forEach(participant => {
+        leaderboardMap.set(participant.pubkey, { ...participant });
+      });
+
+      const allProcessedEvents = [];
+      let processedCount = 0;
+
+      // Process events in batches to avoid blocking UI
+      for (let i = 0; i < events.length; i += BATCH_SIZE) {
+        const batchEnd = Math.min(i + BATCH_SIZE, events.length);
+        const batchProcessed = processEventsBatch(events, leaderboardMap, participantSet, i, batchEnd);
+        
+        allProcessedEvents.push(...batchProcessed);
+        processedCount += (batchEnd - i);
+        
+        // Update progress
+        setLoadingProgress({ 
+          phase: 'processing_events', 
+          participantCount: cachedParticipants.length, 
+          processedEvents: processedCount, 
+          totalEvents: events.length, 
+          message: `Processing activities... ${processedCount}/${events.length}` 
+        });
+        
+        // Allow UI to update between batches
+        if (i + BATCH_SIZE < events.length) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
+
+      // Final sorting and ranking
+      const sortedParticipants = Array.from(leaderboardMap.values())
+        .map(participant => ({
+          ...participant,
+          totalMiles: Math.round(participant.totalMiles * 100) / 100,
+          isComplete: participant.totalMiles >= COURSE_TOTAL_MILES
+        }))
+        .sort((a, b) => {
+          if (b.totalMiles !== a.totalMiles) {
+            return b.totalMiles - a.totalMiles;
+          }
+          if (b.runCount !== a.runCount) {
+            return b.runCount - a.runCount;
+          }
+          if (b.lastActivity !== a.lastActivity) {
+            return b.lastActivity - a.lastActivity;
+          }
+          return a.pubkey.localeCompare(b.pubkey);
+        });
+
+      const leaderboardData = sortedParticipants.map((participant, index) => {
+        let rank = index + 1;
+        if (index > 0 && participant.totalMiles === sortedParticipants[index - 1].totalMiles) {
+          rank = sortedParticipants[index - 1].rank;
+        }
+        return { ...participant, rank };
+      });
+
+      // Final update
+      setLeaderboard(leaderboardData);
+      saveCachedData(leaderboardData);
+      setLastUpdated(new Date());
+      setLoadingProgress({ 
+        phase: 'complete', 
+        participantCount: leaderboardData.length, 
+        processedEvents: events.length, 
+        totalEvents: events.length, 
+        message: 'Complete' 
+      });
+
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+      const errorMessage = err.message || 'Failed to load leaderboard data';
+      setError(errorMessage);
+      setLoadingProgress({ 
+        phase: 'complete', 
+        participantCount: 0, 
+        processedEvents: 0, 
+        totalEvents: 0, 
+        message: 'Error loading data' 
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [ndk, loadCachedData, processEvents, saveToCache, CACHE_KEY]);
+  }, [ndk, participantsWithDates, loadCachedParticipants, saveCachedParticipants, saveCachedData, processEventsBatch, COMPETITION_END, COURSE_TOTAL_MILES]);
 
   /**
-   * Force refresh leaderboard (bypass cache)
+   * Refresh leaderboard data
    */
   const refresh = useCallback(async () => {
-    console.log('[useLeagueLeaderboard] Force refresh requested');
-    await fetchLeaderboard(false);
-  }, [fetchLeaderboard]);
+    setIsLoading(true);
+    setLoadingProgress({ 
+      phase: 'initializing', 
+      participantCount: 0, 
+      processedEvents: 0, 
+      totalEvents: 0, 
+      message: 'Refreshing...' 
+    });
+    await fetchLeaderboardData();
+  }, [fetchLeaderboardData]);
 
-  /**
-   * Background refresh (use cache first, then update in background)
-   */
-  const backgroundRefresh = useCallback(async () => {
-    // If we have cached data, use it first
-    if (loadCachedData()) {
-      // Then fetch fresh data in background
-      setTimeout(() => {
-        fetchLeaderboard(false);
-      }, 1000);
-    } else {
-      // No cache, do normal fetch
-      await fetchLeaderboard(false);
+  // Load cached data on mount
+  useEffect(() => {
+    const hasCachedData = loadCachedData();
+    if (!hasCachedData) {
+      fetchLeaderboardData();
     }
-  }, [loadCachedData, fetchLeaderboard]);
+  }, [loadCachedData, fetchLeaderboardData]);
 
-  // Initial load on mount and when activity mode changes
+  // FIXED: Activity mode effect now waits for participants to be loaded
   useEffect(() => {
-    backgroundRefresh();
-  }, [backgroundRefresh, activityMode]);
+    // Don't fetch if participants haven't been loaded yet
+    if (!participantsLoaded) {
+      console.log('[LeagueLeaderboard] Waiting for participants to load before fetching leaderboard...');
+      return;
+    }
+    
+    console.log('[LeagueLeaderboard] Activity mode changed, refetching leaderboard:', {
+      activityMode,
+      participantsCount: participantsData.length,
+      participantsLoaded
+    });
+    
+    setIsLoading(true);
+    setLoadingProgress({ 
+      phase: 'initializing', 
+      participantCount: 0, 
+      processedEvents: 0, 
+      totalEvents: 0, 
+      message: 'Switching activity mode...' 
+    });
+    fetchLeaderboardData();
+  }, [activityMode, participantsLoaded, fetchLeaderboardData]); // ADD: participantsLoaded dependency
 
-  // Auto-refresh every 30 minutes
+  // FIXED: Initial fetch effect that waits for participants
   useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('[useLeagueLeaderboard] Auto-refreshing leaderboard');
-      fetchLeaderboard(false); // Background refresh
-    }, CACHE_DURATION_MS);
+    // Only do initial fetch when participants are loaded and we don't have cached data
+    if (!participantsLoaded) {
+      return;
+    }
+    
+    const hasCachedData = loadCachedData();
+    if (!hasCachedData) {
+      console.log('[LeagueLeaderboard] No cached data, fetching fresh leaderboard...');
+      fetchLeaderboardData();
+    }
+  }, [participantsLoaded, loadCachedData, fetchLeaderboardData]); // ADD: New effect for initial fetch
 
-    return () => clearInterval(interval);
-  }, [fetchLeaderboard]);
+  // Auto-refresh every 30 minutes (only if cache duration > 0)
+  useEffect(() => {
+    if (CACHE_DURATION_MS > 0) {
+      const interval = setInterval(() => {
+        fetchLeaderboardData();
+      }, CACHE_DURATION_MS);
+
+      return () => clearInterval(interval);
+    }
+  }, [fetchLeaderboardData, CACHE_DURATION_MS]);
 
   return {
-    leaderboard,           // Top 10 users with comprehensive stats
-    isLoading,            // Loading state (false if using cache)
-    error,                // Error message if fetch failed
-    lastUpdated,          // Timestamp of last successful update
-    refresh,              // Force refresh function
-    courseTotal: COURSE_TOTAL_MILES, // Total course distance for calculations
-    activityMode,         // Current activity mode for UI display
+    leaderboard,
+    isLoading,
+    error,
+    refresh,
+    lastUpdated,
+    activityMode,
+    courseTotal: COURSE_TOTAL_MILES,
+    loadingProgress
   };
 }; 

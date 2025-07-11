@@ -20,8 +20,13 @@ const activeSubscriptions = new Set();
  * @param {Object} fetchOpts - Additional fetch options
  * @returns {Promise<Set<NDKEvent>>} Set of events
  */
+// Default timeout (ms) for one-shot fetches where UI is waiting
+const DEFAULT_FETCH_TIMEOUT = 8000; // 8 s – enough for fast relays, short enough for UX
+
 export const fetchEvents = async (filter, fetchOpts = {}) => {
-  // Ensure relay pool is connected before issuing query
+  // Split out timeout so we can still forward other NDK opts untouched
+  const { timeout = DEFAULT_FETCH_TIMEOUT, ...ndkOpts } = fetchOpts;
+
   try {
     const ndkReady = await ndkReadyPromise;
     if (!ndkReady) {
@@ -33,9 +38,17 @@ export const fetchEvents = async (filter, fetchOpts = {}) => {
     if (!filter.limit) {
       filter.limit = 30;
     }
-    // All functions will now use the imported singleton `ndk`
-    const events = await ndk.fetchEvents(filter, fetchOpts);
-    console.log(`[nostr.js] Fetched ${events.size} events for filter:`, filter);
+
+    // Race the real fetch against a timeout so a single silent relay can’t block
+    const ndkFetchPromise = ndk.fetchEvents(filter, ndkOpts);
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => {
+      console.warn(`[nostr.js] fetchEvents timeout (${timeout} ms) for filter`, filter);
+      resolve(new Set());
+    }, timeout));
+
+    const events = await Promise.race([ndkFetchPromise, timeoutPromise]);
+
+    console.log(`[nostr.js] fetchEvents resolved with ${events.size} events for filter:`, filter);
     return events;
   } catch (error) {
     console.error('[nostr.js] Error fetching events:', error);
@@ -627,14 +640,15 @@ export const processPostsWithData = async (posts, supplementaryData) => {
         const workoutTitleTagOld = allTags.find(tag => tag[0] === 'title');
         workoutTitle = workoutTitleTagOld ? workoutTitleTagOld[1] : 'Workout Record';
 
-        const distanceTag = allTags.find(tag => tag[0] === 'distance');
-        if (distanceTag && distanceTag[1] && !metrics.find(m => m.label === "Distance")) {
-          metrics.push({
-            label: "Distance",
-            value: distanceTag[1],
-            unit: distanceTag[2] || '',
-          });
-        }
+        // Remove distance from metrics to avoid duplication with content text
+        // const distanceTag = allTags.find(tag => tag[0] === 'distance');
+        // if (distanceTag && distanceTag[1] && !metrics.find(m => m.label === "Distance")) {
+        //   metrics.push({
+        //     label: "Distance",
+        //     value: distanceTag[1],
+        //     unit: distanceTag[2] || '',
+        //   });
+        // }
 
         const durationTag = allTags.find(tag => tag[0] === 'duration');
         if (durationTag && durationTag[1] && !metrics.find(m => m.label === "Duration")) {
@@ -1079,13 +1093,13 @@ export const createWorkoutEvent = (run, distanceUnit, options = {}) => {
   }
 
   const runDate = new Date(run.date);
-  // Using a more generic title for the workout, can be overridden by user if UI allows
-  const workoutTitle = run.title || `${primaryHashtag} on ${runDate.toLocaleDateString()}`;
+  // Remove title completely to avoid duplication with date badge
+  const workoutTitle = run.title || '';
 
   // Enhanced content generation following NIP-101e community linking
   let contentParts = [];
   
-  // Start with user notes or default activity description
+  // Start with user notes or default activity description - restore distance to content
   const baseContent = run.notes || `Completed a ${distanceValue}${distanceUnit} ${activityVerb}. ${activityEmoji}`;
   contentParts.push(baseContent);
   

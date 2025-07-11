@@ -14,7 +14,8 @@ export function DashboardRunCard({
   onDelete,
   isSaving,
   isWorkoutSaved,
-  isDeleting
+  isDeleting,
+  isKind1Posted
 }) {
   return (
     <div className="bg-bg-secondary rounded-xl overflow-hidden mb-4 shadow-lg border border-border-secondary">
@@ -82,9 +83,14 @@ export function DashboardRunCard({
               onClick={onShare}
               isLoading={false}
               loadingText="Sharing..."
-              className="flex-1 bg-bg-primary hover:bg-bg-tertiary text-text-primary font-medium py-2 px-4 rounded-lg border border-border-primary transition-colors"
+              disabled={isKind1Posted}
+              className={`flex-1 font-medium py-2 px-4 rounded-lg border transition-colors ${
+                isKind1Posted 
+                  ? 'bg-black text-white border-white cursor-not-allowed' 
+                  : 'bg-bg-primary hover:bg-bg-tertiary text-text-primary border-border-primary'
+              }`}
             >
-              Share
+              {isKind1Posted ? 'Posted ✓' : 'Share'}
             </LoadingButton>
             
             <LoadingButton
@@ -94,7 +100,7 @@ export function DashboardRunCard({
               disabled={isWorkoutSaved}
               className={`flex-1 font-medium py-2 px-4 rounded-lg border transition-colors ${
                 isWorkoutSaved 
-                  ? 'bg-success text-white border-success cursor-not-allowed' 
+                  ? 'bg-black text-white border-white cursor-not-allowed' 
                   : 'bg-bg-primary hover:bg-bg-tertiary text-text-primary border-border-primary'
               }`}
             >
@@ -140,13 +146,15 @@ DashboardRunCard.propTypes = {
   onDelete: PropTypes.func.isRequired,
   isSaving: PropTypes.bool,
   isWorkoutSaved: PropTypes.bool,
-  isDeleting: PropTypes.bool
+  isDeleting: PropTypes.bool,
+  isKind1Posted: PropTypes.bool
 };
 
 DashboardRunCard.defaultProps = {
   isSaving: false,
   isWorkoutSaved: false,
-  isDeleting: false
+  isDeleting: false,
+  isKind1Posted: false
 };
 
 export default DashboardRunCard; 

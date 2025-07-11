@@ -40,6 +40,9 @@ class RunTracker extends EventEmitter {
     this.splits = []; // Array to store split objects { km, time, pace }
     this.positions = [];
     
+    // Add simple distance goal tracking
+    this.distanceGoal = null; // Target distance in meters, null = no goal
+    
     // Add stride length property that can be customized
     this.strideLength = this.getCustomStrideLength();
     
@@ -241,6 +244,14 @@ class RunTracker extends EventEmitter {
       if (distanceIncrement >= MOVEMENT_THRESHOLD) {
         this.distance += distanceIncrement;
         this.emit('distanceChange', this.distance); // Emit distance change
+
+        // Check distance goal and auto-stop if reached
+        if (this.distanceGoal && this.distance >= this.distanceGoal) {
+          console.log(`Distance goal reached! Distance: ${this.distance}m, Goal: ${this.distanceGoal}m`);
+          // Emit goal reached event for context to handle
+          this.emit('goalReached', { distance: this.distance, goal: this.distanceGoal });
+          return; // Exit early since run will be stopping
+        }
 
         // If walking, calculate and emit steps
         if (this.activityType === ACTIVITY_TYPES.WALK) {
@@ -598,6 +609,9 @@ class RunTracker extends EventEmitter {
     this.isTracking = false;
     this.isPaused = false;
     
+    // Clear any active distance goal when run stops
+    this.distanceGoal = null;
+    
     // Final calculations
     this.duration = Math.floor((Date.now() - this.startTime - this.pausedTime) / 1000);
     
@@ -746,6 +760,19 @@ class RunTracker extends EventEmitter {
     this.emit('elevationChange', {...this.elevation});
     this.emit('stepsChange', this.estimatedSteps);
     this.emit('speedChange', this.currentSpeed);
+  }
+
+  // Distance goal management methods
+  setDistanceGoal(meters) {
+    this.distanceGoal = meters && meters > 0 ? meters : null;
+  }
+
+  clearDistanceGoal() {
+    this.distanceGoal = null;
+  }
+
+  getDistanceGoal() {
+    return this.distanceGoal;
   }
 
   // Get custom stride length from settings or calculate from height

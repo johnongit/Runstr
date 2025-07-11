@@ -43,6 +43,8 @@ export const useSettings = () => {
       setUsePedometer: () => console.warn('Settings not initialized'),
       autoPostToNostr: false,
       setAutoPostToNostr: () => console.warn('Settings not initialized'),
+      autoPostKind1Note: false,
+      setAutoPostKind1Note: () => console.warn('Settings not initialized'),
       useLocalStats: false,
       setUseLocalStats: () => console.warn('Settings not initialized'),
     };
@@ -81,6 +83,7 @@ export const SettingsProvider = ({ children }) => {
   const [skipStartCountdown, setSkipStartCountdown] = useState(() => initBooleanState('skipStartCountdown', false));
   const [usePedometer, setUsePedometer] = useState(() => initBooleanState('usePedometer', true));
   const [autoPostToNostr, setAutoPostToNostr] = useState(() => initBooleanState('autoPostToNostr', false));
+  const [autoPostKind1Note, setAutoPostKind1Note] = useState(() => initBooleanState('autoPostKind1Note', false));
   const [useLocalStats, setUseLocalStats] = useState(() => initBooleanState('useLocalStats', false));
 
   const initialMetricPrefs = useMemo(() => PUBLISHABLE_METRICS.reduce((acc, metric) => {
@@ -106,6 +109,7 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => localStorage.setItem('skipStartCountdown', skipStartCountdown.toString()), [skipStartCountdown]);
   useEffect(() => localStorage.setItem('usePedometer', usePedometer.toString()), [usePedometer]);
   useEffect(() => localStorage.setItem('autoPostToNostr', autoPostToNostr.toString()), [autoPostToNostr]);
+  useEffect(() => localStorage.setItem('autoPostKind1Note', autoPostKind1Note.toString()), [autoPostKind1Note]);
   useEffect(() => localStorage.setItem('useLocalStats', useLocalStats.toString()), [useLocalStats]);
 
   useEffect(() => {
@@ -166,6 +170,8 @@ export const SettingsProvider = ({ children }) => {
     setUsePedometer,
     autoPostToNostr,
     setAutoPostToNostr,
+    autoPostKind1Note,
+    setAutoPostKind1Note,
     useLocalStats,
     setUseLocalStats,
     ...metricPublishPrefs,
@@ -180,6 +186,7 @@ export const SettingsProvider = ({ children }) => {
     skipStartCountdown, setSkipStartCountdown,
     usePedometer, setUsePedometer,
     autoPostToNostr, setAutoPostToNostr,
+    autoPostKind1Note, setAutoPostKind1Note,
     useLocalStats, setUseLocalStats,
     metricPublishPrefs,
     dynamicMetricSetters

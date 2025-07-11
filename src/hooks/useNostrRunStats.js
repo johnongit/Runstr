@@ -101,31 +101,39 @@ export const useNostrRunStats = () => {
           }
         }
 
-        // Calculate personal bests for specific distances
+        // Calculate personal bests based on pace (more accurate than distance-specific runs)
         if (durTag && !isNaN(val)) {
           const parts = durTag[1].split(':').map(Number);
           if (parts.length === 3) {
             const durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
             const distanceKm = unit === 'km' ? val : (val * 1.609344);
             
-            // Check for personal bests (allowing some tolerance for GPS variations)
-            const checkPB = (targetDistance, tolerance = 0.1) => {
-              if (Math.abs(distanceKm - targetDistance) <= tolerance) {
-                const pacePerKm = durationSeconds / distanceKm; // seconds per km
-                const currentPB = personalBests[`${targetDistance}k`];
-                if (!currentPB || pacePerKm < currentPB.pacePerKm) {
-                  personalBests[`${targetDistance}k`] = {
-                    time: durationSeconds,
-                    pacePerKm: pacePerKm,
-                    date: ev.created_at
-                  };
-                }
+            // Only consider runs that are at least 1km and have reasonable pace (2-20 min/km)
+            if (distanceKm >= 1 && durationSeconds > 0) {
+              const pacePerKm = durationSeconds / distanceKm; // seconds per km
+              
+              // Validate reasonable running pace (2-20 minutes per km)
+              if (pacePerKm >= 120 && pacePerKm <= 1200) {
+                // Update personal bests if this is the fastest pace we've seen
+                const distances = [1, 5, 10];
+                distances.forEach(targetDistance => {
+                  // Only update if the run is long enough to include this distance
+                  if (distanceKm >= targetDistance) {
+                    const projectedTime = pacePerKm * targetDistance;
+                    const currentPB = personalBests[`${targetDistance}k`];
+                    
+                    if (!currentPB || projectedTime < currentPB.time) {
+                      personalBests[`${targetDistance}k`] = {
+                        time: projectedTime,
+                        pacePerKm: pacePerKm,
+                        date: ev.created_at,
+                        sourceDistance: distanceKm // Track which run this came from
+                      };
+                    }
+                  }
+                });
               }
-            };
-
-            checkPB(1);   // 1k
-            checkPB(5);   // 5k  
-            checkPB(10);  // 10k
+            }
           }
         }
       }

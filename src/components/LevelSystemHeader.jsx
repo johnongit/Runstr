@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { NostrContext } from '../contexts/NostrContext';
+import BadgeDisplay from './BadgeDisplay';
+import '../assets/styles/badges.css';
 
 // Circular Progress Ring Component
 const CircularProgress = ({ percentage, level, size = 80 }) => {
@@ -113,6 +115,9 @@ const LevelSystemHeader = ({ levelData }) => {
           </div>
         </div>
       </div>
+
+      {/* Badge Display - Right below username */}
+      <BadgeDisplay />
 
       {/* Bottom Stats */}
       <div className="text-sm text-text-secondary">

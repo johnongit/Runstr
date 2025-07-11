@@ -3,6 +3,8 @@
  * Functions for managing leaderboard data, calculations, and user preferences.
  */
 
+import seasonPassService from '../services/seasonPassService';
+
 /**
  * Get leaderboard participation preference
  * @returns {boolean} Whether user has opted into leaderboards
@@ -32,6 +34,34 @@ export const saveLeaderboardParticipation = (participate) => {
     console.error('Error saving leaderboard participation:', err);
     return false;
   }
+};
+
+/**
+ * Apply Season Pass participant filtering to users
+ * Applies consistently across all activity modes (run/walk/cycle) for RUNSTR Season 1
+ * @param {Array} users - Array of user objects
+ * @param {string} activityMode - Current activity mode ('run', 'walk', 'cycle')
+ * @returns {Array} Filtered array of users
+ */
+export const applySeasonPassFilter = (users, activityMode = null) => {
+  // Apply Season Pass filtering consistently across ALL activity modes
+  // This is a PAID competition - only Season Pass participants should appear
+  
+  return users.filter(user => {
+    const pubkey = user.pubkey || user.publicKey;
+    if (!pubkey) {
+      console.warn('[LeaderboardUtils] User missing pubkey, excluding from leaderboard');
+      return false;
+    }
+    
+    const isParticipant = seasonPassService.isParticipant(pubkey);
+    if (!isParticipant) {
+      console.log(`[LeaderboardUtils] Filtering out non-participant ${pubkey} from ${activityMode || 'unknown'} leaderboard`);
+      return false;
+    }
+    
+    return true;
+  });
 };
 
 /**
@@ -134,13 +164,17 @@ export const getPreviousWeekDates = () => {
  * Create a distance leaderboard
  * @param {Array} users - Array of user objects with run history
  * @param {string} period - Time period (week, month, all-time)
+ * @param {string} activityMode - Current activity mode ('run', 'walk', 'cycle')
  * @returns {Array} Sorted leaderboard entries
  */
-export const createDistanceLeaderboard = (users, period = 'week') => {
+export const createDistanceLeaderboard = (users, period = 'week', activityMode = null) => {
   if (!users || !users.length) return [];
   
+  // Phase 4: Apply Season Pass participant filtering
+  const filteredUsers = applySeasonPassFilter(users, activityMode);
+  
   // Map users to leaderboard entries with calculated distances
-  const entries = users.map(user => {
+  const entries = filteredUsers.map(user => {
     const distance = getDistanceForPeriod(user.runHistory || [], period);
     return formatLeaderboardEntry(user, distance, 'distance');
   });
@@ -157,13 +191,17 @@ export const createDistanceLeaderboard = (users, period = 'week') => {
 /**
  * Create a streak leaderboard
  * @param {Array} users - Array of user objects with streak information
+ * @param {string} activityMode - Current activity mode ('run', 'walk', 'cycle')
  * @returns {Array} Sorted leaderboard entries
  */
-export const createStreakLeaderboard = (users) => {
+export const createStreakLeaderboard = (users, activityMode = null) => {
   if (!users || !users.length) return [];
   
+  // Phase 4: Apply Season Pass participant filtering
+  const filteredUsers = applySeasonPassFilter(users, activityMode);
+  
   // Map users to leaderboard entries
-  const entries = users.map(user => {
+  const entries = filteredUsers.map(user => {
     return formatLeaderboardEntry(user, user.streak || 0, 'streak');
   });
   
@@ -179,13 +217,17 @@ export const createStreakLeaderboard = (users) => {
 /**
  * Create an improvement rate leaderboard
  * @param {Array} users - Array of user objects with run history
+ * @param {string} activityMode - Current activity mode ('run', 'walk', 'cycle')
  * @returns {Array} Sorted leaderboard entries
  */
-export const createImprovementLeaderboard = (users) => {
+export const createImprovementLeaderboard = (users, activityMode = null) => {
   if (!users || !users.length) return [];
   
+  // Phase 4: Apply Season Pass participant filtering
+  const filteredUsers = applySeasonPassFilter(users, activityMode);
+  
   // Calculate improvement rates
-  const entries = users.map(user => {
+  const entries = filteredUsers.map(user => {
     let improvementRate = 0;
     
     if (user.stats) {
@@ -226,15 +268,22 @@ export const createImprovementLeaderboard = (users) => {
  *   Each run should have at minimum `{ pubkey, distance }`.
  * @param {Set<string>} optInPubkeys - Set of pubkeys who have opted in. If empty, everyone is considered opted-out.
  * @param {number} maxWinners - Number of winners to return (default 3).
+ * @param {string} activityMode - Current activity mode ('run', 'walk', 'cycle')
  * @returns {Array<{ pubkey: string, distance: number, rank: number }>} Sorted list of winners.
  */
-export const computeDailyWinners = (runs = [], optInPubkeys = new Set(), maxWinners = 3) => {
+export const computeDailyWinners = (runs = [], optInPubkeys = new Set(), maxWinners = 3, activityMode = null) => {
   if (!runs.length) return [];
+
+  // Phase 4: Apply Season Pass participant filtering (for all activity modes)
+  const filteredRuns = runs.filter(run => {
+    const userPubkey = run.pubkey || run.publicKey || 'unknown';
+    return seasonPassService.isParticipant(userPubkey);
+  });
 
   // Aggregate distance per pubkey
   const distanceByUser = new Map();
 
-  runs.forEach((run) => {
+  filteredRuns.forEach((run) => {
     const userPubkey = run.pubkey || run.publicKey || 'unknown';
     if (optInPubkeys.size > 0 && !optInPubkeys.has(userPubkey)) return; // Skip non-opt-ins
 

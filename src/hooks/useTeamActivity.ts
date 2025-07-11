@@ -19,10 +19,26 @@ const getDistance = (event: NostrWorkoutEvent): number => {
   const raw = parseFloat(distanceTag[1]);
   const unit = distanceTag[2] || 'km'; // default km
   if (isNaN(raw)) return 0;
-  if (unit === 'mi') {
-    return raw * 1.60934; // convert miles to km for unified leaderboard
+  
+  // Add reasonable bounds checking to filter out corrupted data
+  const MAX_REASONABLE_DISTANCE_KM = 500; // 500km covers ultramarathons
+  const MIN_REASONABLE_DISTANCE_KM = 0.01; // 10 meters minimum
+  
+  // Convert to km first for validation
+  let distanceInKm = raw;
+  if (unit === 'mi' || unit === 'mile' || unit === 'miles') {
+    distanceInKm = raw * 1.609344;
+  } else if (unit === 'm' || unit === 'meter' || unit === 'meters') {
+    distanceInKm = raw / 1000;
   }
-  return raw; // already km
+  
+  // Validate reasonable range
+  if (distanceInKm < MIN_REASONABLE_DISTANCE_KM || distanceInKm > MAX_REASONABLE_DISTANCE_KM) {
+    console.warn(`Invalid distance detected: ${raw} ${unit} (${distanceInKm.toFixed(2)}km) - filtering out event ${event.id}`);
+    return 0;
+  }
+  
+  return distanceInKm; // return in km for unified leaderboard
 };
 
 export const useTeamActivity = (workoutEvents: NostrWorkoutEvent[]) => {

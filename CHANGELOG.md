@@ -1,26 +1,33 @@
-# RUNSTR v0.5.2 - Precision Cycling, League Upgrade, Auto-Post Workout Record🚴‍♂️🏆🔄 
+# RUNSTR v0.6.0 - Season 1 Launch & Rewards Overhaul 🏆🎯
 
-## 🚴‍♂️ **Enhanced Cycling Experience**:
+## 🏆 **RUNSTR SEASON 1**:
+• 3-Month Competition - Compete to log the most distance across all activity types
+• 200k in Prizes - Substantial rewards pool with 1st, 2nd, and 3rd place prizes for each activity mode
+• Community Support - Portion of ticket sales directly supports open source development
 
-• Faster Update Frequency - Tracking precision improved from 5 seconds to 1 second for real-time feedback
+## 🎯 **Goals System**:
+• Distance Targeting - Set specific distance goals for your activities
+• Auto-Completion - Activities automatically complete once your goal distance is achieved
+• Progress Tracking - Visual feedback as you approach your target distance
 
-• Intelligent Stationary Detection - Smart pausing at low speeds (below 0.5 km/h or 0.3 mph)
+## 💰 **Revamped Rewards**:
+• Weekly Reward Structure - Transition from automatic payouts to weekly reward distributions
+• Streak Bonuses - Continue earning additional rewards for consistent workout streaks
+• Achievement-Based - Rewards based on workouts saved to Nostr
 
-• Recent Position Analysis - More accurate speed calculation using 10-second position windows
+## 🏅 **Badge System**:
+• Claimable Achievements - Level badges now available to claim from the profile screen
+• Initial Badges - Level 1 and Level 2 badges now released
+• Reward Boosts - Level 1 badge gives 25 weekly base reward (submit 1 workout/week to receive)
+• Streak Enhancement - Level 2 badge adds +5 to streak rewards
 
-• Speed Smoothing Algorithm - 70/30 exponential smoothing for more stable speed readings
+## 📝 **Expanded Auto-Post**:
+• Kind 1 Notes - Auto-post standard notes in addition to workout records
 
----
-## 🏆 **League Improvement**:
+## 🛠️ **Improvements & Bug Fixes**:
+• Amber Integration - Improved Amber implementation to fix connectivity issues
+• Activity Mode Switching - Improved banner interface for changing activity types
+• Monthly Stats Grouping - Profile Nostr Stats now organized by month
+• UI Refinements - Continued enhancement of our black and white design language
 
-• Activity-specific leaderboards that automatically filter based on the user's current activity mode.
-
-
----
-## 🔄 **Auto-Posting Feature**:
-
-• Seamless Sharing - Option to automatically post workouts as kind 1301 records
-
-• User Control - Enable/disable auto-posting through settings menu
-
-Let's Go! 🏃‍♂️🚴‍♂️🚶‍♀️
+Let's Go!

@@ -71,7 +71,7 @@ export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; w
   };
 
   const workoutData = {
-    title: post.title || 'Workout Record',
+    title: post.kind === 1301 ? '' : (post.title || 'Workout Record'),
     content: post.content || '',
     timestamp: new Date(post.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     date: new Date(post.created_at * 1000).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
@@ -91,12 +91,14 @@ export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; w
   
   // Pass through metrics processed by feedProcessor/nostr.js
   // The WorkoutCard component itself can handle icon mapping if we pass a label/type
-  const cardMetrics = post.metrics?.map((metric: any) => {
+  // Filter out distance metrics to avoid duplication with content text
+  const cardMetrics = post.metrics?.filter((metric: any) => {
+    const labelLower = metric.label?.toLowerCase() || '';
+    return !labelLower.includes('dist'); // Remove distance metrics
+  }).map((metric: any) => {
     let icon = null;
     const labelLower = metric.label?.toLowerCase() || '';
-    if (labelLower.includes('dist')) {
-      icon = <TrendingUp className="h-3 w-3" />;
-    } else if (labelLower.includes('time') || labelLower.includes('dur')) {
+    if (labelLower.includes('time') || labelLower.includes('dur')) {
       icon = <Timer className="h-3 w-3" />;
     } else if (labelLower.includes('pace')) {
       icon = <Clock className="h-3 w-3" />;

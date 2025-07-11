@@ -27,6 +27,8 @@ const Settings = () => {
     setBlossomEndpoint,
     autoPostToNostr,
     setAutoPostToNostr,
+    autoPostKind1Note,
+    setAutoPostKind1Note,
     // skipStartCountdown,
     // setSkipStartCountdown,
     // skipEndCountdown,
@@ -39,8 +41,9 @@ const Settings = () => {
   const [darkMode, setDarkMode] = useState(true);
   const [showNotifications, setShowNotifications] = useState(true);
   const [leaderboardParticipation, setLeaderboardParticipation] = useState(true);
-  const [autoClaimRewards, setAutoClaimRewards] = useState(false);
-  const [rewardsEnabled, setRewardsEnabled] = useState(true);
+  // COMMENTED OUT - Bitcoin rewards state (moving to manual weekly rewards)
+  // const [autoClaimRewards, setAutoClaimRewards] = useState(false);
+  // const [rewardsEnabled, setRewardsEnabled] = useState(true);
   const [isSyncingWatch, setIsSyncingWatch] = useState(false);
   const [syncedRun, setSyncedRun] = useState(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -76,10 +79,11 @@ const Settings = () => {
       // Load leaderboard participation
       setLeaderboardParticipation(getLeaderboardParticipation());
       
+      // COMMENTED OUT - Load rewards settings (moving to manual weekly rewards)
       // Load rewards settings
-      const rewardsSettings = getRewardsSettings();
-      setRewardsEnabled(rewardsSettings.enabled);
-      setAutoClaimRewards(rewardsSettings.autoClaimRewards);
+      // const rewardsSettings = getRewardsSettings();
+      // setRewardsEnabled(rewardsSettings.enabled);
+      // setAutoClaimRewards(rewardsSettings.autoClaimRewards);
       
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -134,27 +138,28 @@ const Settings = () => {
     saveLeaderboardParticipation(value);
   };
   
+  // COMMENTED OUT - Bitcoin rewards functions (moving to manual weekly rewards)
   // Save rewards settings
-  const handleRewardsEnabledToggle = (e) => {
-    const value = e.target.checked;
-    setRewardsEnabled(value);
-    saveRewardsSettings({
-      enabled: value,
-      autoClaimRewards,
-      showNotifications
-    });
-  };
+  // const handleRewardsEnabledToggle = (e) => {
+  //   const value = e.target.checked;
+  //   setRewardsEnabled(value);
+  //   saveRewardsSettings({
+  //     enabled: value,
+  //     autoClaimRewards,
+  //     showNotifications
+  //   });
+  // };
   
   // Save auto-claim rewards setting
-  const handleAutoClaimToggle = (e) => {
-    const value = e.target.checked;
-    setAutoClaimRewards(value);
-    saveRewardsSettings({
-      enabled: rewardsEnabled,
-      autoClaimRewards: value,
-      showNotifications
-    });
-  };
+  // const handleAutoClaimToggle = (e) => {
+  //   const value = e.target.checked;
+  //   setAutoClaimRewards(value);
+  //   saveRewardsSettings({
+  //     enabled: rewardsEnabled,
+  //     autoClaimRewards: value,
+  //     showNotifications
+  //   });
+  // };
 
   const handleSyncFromWatch = async () => {
     try {
@@ -192,11 +197,6 @@ const Settings = () => {
       }
     }
     setHealthEncryptionPref(enable ? 'encrypted' : 'plaintext');
-  };
-
-  const handleAutoPostToggle = (e) => {
-    const value = e.target.checked;
-    setAutoPostToNostr(value);
   };
 
   const handleTestBlossomConnection = async () => {
@@ -366,19 +366,6 @@ const Settings = () => {
         </div>
 
         <div className="setting-item">
-          <label htmlFor="autoPostToggle">Auto-post Workouts to Nostr</label>
-          <div className="toggle-switch">
-            <input
-              type="checkbox"
-              id="autoPostToggle"
-              checked={autoPostToNostr}
-              onChange={handleAutoPostToggle}
-            />
-            <span className="toggle-slider"></span>
-          </div>
-        </div>
-
-        <div className="setting-item">
           <label>Workout Extras Publishing (Calories/Intensity)</label>
           <ButtonGroup
             value={calorieIntensityPref}
@@ -412,6 +399,8 @@ const Settings = () => {
           </div>
         </div>
         
+        {/* COMMENTED OUT - Bitcoin rewards toggles (moving to manual weekly rewards) */}
+        {/*
         <div className="setting-item">
           <label htmlFor="rewardsToggle">Enable Bitcoin Rewards</label>
           <div className="toggle-switch">
@@ -441,6 +430,7 @@ const Settings = () => {
             When enabled, streak rewards will be automatically claimed when you reach milestones.
           </p>
         </div>
+        */}
       </div>
       
       <div className="settings-section">

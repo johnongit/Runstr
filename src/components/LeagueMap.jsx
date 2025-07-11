@@ -1,24 +1,33 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useLeaguePosition } from '../hooks/useLeaguePosition';
-import { useLeagueLeaderboard } from '../hooks/useLeagueLeaderboard';
+import { useCombinedLeaderboard } from '../hooks/useCombinedLeaderboard';
 import { useProfiles } from '../hooks/useProfiles';
 import { useNostr } from '../hooks/useNostr';
+import { useActivityMode } from '../contexts/ActivityModeContext';
+import SeasonPassPaymentModal from './modals/SeasonPassPaymentModal';
+import PrizePoolModal from './modals/PrizePoolModal';
+import seasonPassPaymentService from '../services/seasonPassPaymentService';
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
 
 export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = null }) => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [showSeasonPassModal, setShowSeasonPassModal] = useState(false);
+  const [showPrizePoolModal, setShowPrizePoolModal] = useState(false);
+  const [hasSeasonPass, setHasSeasonPass] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
   
   const { publicKey } = useNostr();
+  const { mode: activityMode } = useActivityMode();
   
-  // Get comprehensive leaderboard data with caching
+  // Use the new hybrid leaderboard system
   const {
     leaderboard,
     isLoading: leaderboardLoading,
     error: leaderboardError,
-    lastUpdated,
     refresh: refreshLeaderboard,
-    courseTotal,
-    activityMode
-  } = useLeagueLeaderboard();
+    lastUpdated,
+    dataSource,
+    debugInfo
+  } = useCombinedLeaderboard(feedPosts);
 
   // Get profiles for leaderboard users
   const leaderboardPubkeys = useMemo(() => 
@@ -26,19 +35,53 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
   );
   const { profiles } = useProfiles(leaderboardPubkeys);
 
+  // Check season pass status and participant count when publicKey changes
+  useEffect(() => {
+    const checkSeasonPassStatus = async () => {
+      if (publicKey) {
+        try {
+          const [hasPass, count] = await Promise.all([
+            enhancedSeasonPassService.isParticipant(publicKey),
+            enhancedSeasonPassService.getParticipantCount()
+          ]);
+          setHasSeasonPass(hasPass);
+          setParticipantCount(count);
+        } catch (error) {
+          console.error('[LeagueMap] Error checking season pass status:', error);
+          // Fallback to localStorage only
+          setHasSeasonPass(seasonPassPaymentService.hasSeasonPass ? await seasonPassPaymentService.hasSeasonPass(publicKey) : false);
+          setParticipantCount(await seasonPassPaymentService.getParticipantCount());
+        }
+      } else {
+        setHasSeasonPass(false);
+        // Still get participant count for display
+        try {
+          const count = await enhancedSeasonPassService.getParticipantCount();
+          setParticipantCount(count);
+        } catch (error) {
+          console.error('[LeagueMap] Error getting participant count:', error);
+          setParticipantCount(0);
+        }
+      }
+    };
+
+    checkSeasonPassStatus();
+  }, [publicKey]);
+
   // Enhanced leaderboard with profile data
   const enhancedLeaderboard = useMemo(() => {
     return leaderboard.map(user => {
-      // Fix: useProfiles returns an object, not a Map
       const profile = profiles?.[user.pubkey] || profiles?.get?.(user.pubkey) || {};
+      const defaultName = activityMode === 'walk' ? 'Walker' : 
+                          activityMode === 'cycle' ? 'Cyclist' : 'Runner';
       return {
         ...user,
-        displayName: profile.display_name || profile.name || `Runner ${user.pubkey.slice(0, 8)}`,
+        displayName: profile.display_name || profile.name || `${defaultName} ${user.pubkey.slice(0, 8)}`,
         picture: profile.picture,
         isCurrentUser: user.pubkey === publicKey
       };
     });
-  }, [leaderboard, profiles, publicKey]);
+  }, [leaderboard, profiles, publicKey, activityMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsInitialLoad(false), 500);
@@ -47,39 +90,35 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
 
   // Generate dynamic league title based on activity mode
   const getLeagueTitle = () => {
-    if (!activityMode) return 'THE RUNSTR 500'; // Fallback for loading state
-    
     switch (activityMode) {
-      case 'run':
-        return 'THE RUNSTR 500';
       case 'walk':
-        return 'THE WALKSTR 500';
+        return 'WALKSTR SEASON 1';
       case 'cycle':
-        return 'THE CYCLESTR 500';
+        return 'CYCLESTR SEASON 1';
+      case 'run':
       default:
-        return 'THE RUNSTR 500';
+        return 'RUNSTR SEASON 1';
     }
+  };
+
+  // Phase 7: Get participant count text
+  const getParticipantCountText = () => {
+    if (participantCount === 0) return 'No season pass holders yet';
+    if (participantCount === 1) return '1 Season Pass Holder';
+    return `${participantCount} Season Pass Holders`;
   };
 
   // Generate dynamic activity text based on activity mode
   const getActivityText = (count) => {
-    if (!activityMode) return `${count} run${count !== 1 ? 's' : ''}`; // Fallback
-    
     switch (activityMode) {
-      case 'run':
-        return `${count} run${count !== 1 ? 's' : ''}`;
       case 'walk':
         return `${count} walk${count !== 1 ? 's' : ''}`;
       case 'cycle':
         return `${count} ride${count !== 1 ? 's' : ''}`;
+      case 'run':
       default:
         return `${count} run${count !== 1 ? 's' : ''}`;
     }
-  };
-
-  // Calculate position along race track (0-100%)
-  const calculateTrackPosition = (totalMiles) => {
-    return Math.min(100, (totalMiles / courseTotal) * 100);
   };
 
   // Format distance to 1 decimal place
@@ -87,81 +126,44 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
     return Number(distance || 0).toFixed(1);
   };
 
-  // Calculate distributed positions to prevent overlapping
-  const calculateDistributedPositions = (users) => {
-    if (users.length === 0) return [];
-    
-    const TRACK_WIDTH = 320; // SVG track width in pixels
-    const TRACK_START = 40;  // SVG track start position
-    const TRACK_END = 360;   // SVG track end position
-    const MIN_SPACING = 15;  // Minimum pixels between dots (increased for better visibility)
-    
-    // Sort users by distance (maintaining ranking order)
-    const sortedUsers = [...users].sort((a, b) => b.totalMiles - a.totalMiles);
-    
-    // Calculate ideal positions based on actual progress
-    let positions = sortedUsers.map(user => ({
-      ...user,
-      idealX: TRACK_START + (calculateTrackPosition(user.totalMiles) / 100 * TRACK_WIDTH),
-      adjustedX: TRACK_START + (calculateTrackPosition(user.totalMiles) / 100 * TRACK_WIDTH)
-    }));
-    
-    // Multi-pass algorithm to resolve all conflicts
-    let hasConflicts = true;
-    let maxIterations = 10; // Prevent infinite loops
-    let iteration = 0;
-    
-    while (hasConflicts && iteration < maxIterations) {
-      hasConflicts = false;
-      iteration++;
-      
-      // Check each pair of adjacent users (in ranking order)
-      for (let i = 0; i < positions.length - 1; i++) {
-        const currentUser = positions[i];
-        const nextUser = positions[i + 1];
-        
-        const distance = currentUser.adjustedX - nextUser.adjustedX;
-        
-        if (distance < MIN_SPACING) {
-          hasConflicts = true;
-          
-          // Calculate how much we need to separate them
-          const adjustment = (MIN_SPACING - distance) / 2;
-          
-          // Move current user forward and next user backward
-          currentUser.adjustedX = Math.min(TRACK_END - 5, currentUser.adjustedX + adjustment);
-          nextUser.adjustedX = Math.max(TRACK_START, nextUser.adjustedX - adjustment);
-          
-          // If we can't move the leading user forward enough, move the trailing user back more
-          if (currentUser.adjustedX - nextUser.adjustedX < MIN_SPACING) {
-            nextUser.adjustedX = currentUser.adjustedX - MIN_SPACING;
-            nextUser.adjustedX = Math.max(TRACK_START, nextUser.adjustedX);
-          }
-        }
-      }
+  const handleSeasonPassClick = () => {
+    if (!publicKey) {
+      alert('Please connect your Nostr account first');
+      return;
     }
-    
-    // Final pass: ensure no one goes beyond track boundaries and maintain minimum spacing
-    for (let i = 0; i < positions.length; i++) {
-      positions[i].adjustedX = Math.max(TRACK_START, Math.min(TRACK_END - 5, positions[i].adjustedX));
-    }
-    
-    // If users are still bunched up at the start, spread them out evenly
-    const startLineUsers = positions.filter(p => p.adjustedX <= TRACK_START + MIN_SPACING);
-    if (startLineUsers.length > 1) {
-      for (let i = 0; i < startLineUsers.length; i++) {
-        startLineUsers[i].adjustedX = TRACK_START + (i * MIN_SPACING);
-      }
-    }
-    
-    return positions;
+    setShowSeasonPassModal(true);
   };
 
-  // Calculate positions for leaderboard users on the track
-  const racePositions = useMemo(() => {
-    const topUsers = enhancedLeaderboard.slice(0, 10);
-    return calculateDistributedPositions(topUsers);
-  }, [enhancedLeaderboard, courseTotal]);
+  const handlePaymentSuccess = async () => {
+    // Refresh both the leaderboard and season pass status
+    refreshLeaderboard();
+    
+    // Update season pass status
+    if (publicKey) {
+      try {
+        const [hasPass, count] = await Promise.all([
+          enhancedSeasonPassService.isParticipant(publicKey),
+          enhancedSeasonPassService.getParticipantCount()
+        ]);
+        setHasSeasonPass(hasPass);
+        setParticipantCount(count);
+      } catch (error) {
+        console.error('[LeagueMap] Error updating season pass status after payment:', error);
+      }
+    }
+  };
+
+  // Data source indicator for debugging
+  const getDataSourceText = () => {
+    switch (dataSource) {
+      case 'loading': return 'Loading...';
+      case 'error': return 'Error loading data';
+      case 'empty': return 'No data available';
+      case 'hybrid': return `Historical + ${debugInfo.totalRecentEvents} recent`;
+      case 'historical': return 'Historical data only';
+      default: return '';
+    }
+  };
 
   // Loading state with lazy loading support
   const isLoading = isInitialLoad || (leaderboardLoading && leaderboard.length === 0);
@@ -199,129 +201,107 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
 
   return (
     <div className="space-y-4 mb-4">
-      {/* Linear Race Track */}
+      {/* Prize Pool Display */}
       <div className="bg-bg-secondary rounded-lg border border-border-secondary p-4">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-lg font-semibold text-text-primary">{getLeagueTitle()}</h3>
-          <div className="text-xs text-text-secondary">
-            {lastUpdated && `Updated ${new Date(lastUpdated).toLocaleTimeString()}`}
+          <div className="flex items-center gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-text-primary">{getLeagueTitle()}</h3>
+              {/* Phase 7: Participant count display */}
+              <p className="text-sm text-text-secondary mt-1">{getParticipantCountText()}</p>
+            </div>
+            {!hasSeasonPass && (
+              <button
+                onClick={handleSeasonPassClick}
+                className="px-3 py-1 bg-primary text-text-primary text-sm rounded-md font-semibold hover:bg-primary/80 transition-colors"
+              >
+                🎫 Season Pass
+              </button>
+            )}
+            {hasSeasonPass && (
+              <span className="px-3 py-1 bg-white text-black text-sm rounded-md font-semibold border border-gray-300">
+                ✓ Season Member
+              </span>
+            )}
           </div>
         </div>
         
-        <div className="relative">
-          <svg 
-            viewBox="0 0 400 100" 
-            className="w-full h-24 race-track-svg"
-            preserveAspectRatio="xMidYMid meet"
-          >
-            {/* Track line */}
-            <line 
-              x1="40" y1="60" x2="360" y2="60" 
-              stroke="currentColor" 
-              strokeWidth="4" 
-              strokeLinecap="round"
-              className="text-text-muted"
-            />
+        {/* Prize Pool Section */}
+        <div 
+          onClick={() => setShowPrizePoolModal(true)}
+          className="relative bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-2 border-amber-500/30 rounded-xl p-6 cursor-pointer hover:border-amber-500/50 hover:shadow-lg transition-all duration-300 group"
+        >
+          {/* Background decoration */}
+          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-orange-500/5 rounded-xl group-hover:from-amber-500/10 group-hover:to-orange-500/10 transition-all duration-300"></div>
+          
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-4xl">🏆</div>
+              <div>
+                <div className="text-xl font-bold text-text-primary mb-1">Total Prize Pool</div>
+                <div className="text-text-secondary text-sm">Click to view breakdown & rules</div>
+              </div>
+            </div>
             
-            {/* Start line */}
-            <line 
-              x1="40" y1="50" x2="40" y2="70" 
-              stroke="currentColor" 
-              strokeWidth="3" 
-              strokeLinecap="round"
-              className="text-text-primary"
-            />
-            <text x="40" y="45" fontSize="10" textAnchor="middle" fill="currentColor" className="text-text-secondary">START</text>
-            
-            {/* Finish line */}
-            <line 
-              x1="360" y1="50" x2="360" y2="70" 
-              stroke="currentColor" 
-              strokeWidth="3" 
-              strokeLinecap="round"
-              className="text-text-primary"
-            />
-            <text x="325" y="45" fontSize="10" fill="currentColor" className="text-text-secondary">500mi</text>
-            
-            {/* Mile markers */}
-            {[100, 200, 300, 400].map(mile => {
-              const x = 40 + ((mile / 500) * 320);
-              return (
-                <g key={mile}>
-                  <line 
-                    x1={x} y1="55" x2={x} y2="65" 
-                    stroke="currentColor" 
-                    strokeWidth="1" 
-                    className="text-text-muted"
-                  />
-                  <text x={x} y="80" fontSize="8" textAnchor="middle" fill="currentColor" className="text-text-muted">
-                    {mile}
-                  </text>
-                </g>
-              );
-            })}
-            
-            {/* Position runners on track */}
-            {racePositions.map((user, index) => {
-              const colors = {
-                1: '#FFD700', // Gold
-                2: '#C0C0C0', // Silver  
-                3: '#CD7F32', // Bronze
-                default: '#6B7280' // Gray
-              };
-              const color = colors[user.rank] || colors.default;
-              
-              return (
-                <g key={user.pubkey}>
-                  {/* Position dot */}
-                  <circle 
-                    cx={user.adjustedX} 
-                    cy="60" 
-                    r="6" 
-                    fill={color}
-                    stroke={user.isCurrentUser ? "#FF6B35" : "#000"}
-                    strokeWidth={user.isCurrentUser ? "2" : "1"}
-                    className="drop-shadow-sm"
-                  />
-                  
-                  {/* Rank number */}
-                  <text 
-                    x={user.adjustedX} 
-                    y="64" 
-                    fontSize="10" 
-                    fontWeight="bold"
-                    textAnchor="middle" 
-                    fill="#000"
-                  >
-                    {user.rank}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-amber-400 mb-1">200,000</div>
+              <div className="text-amber-300 font-semibold">SATS</div>
+            </div>
+          </div>
+          
+          {/* Prize distribution preview */}
+          <div className="mt-4 pt-4 border-t border-amber-500/20">
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div className="text-xs">
+                <div className="text-amber-300 font-semibold">1st</div>
+                <div className="text-text-secondary">30k</div>
+              </div>
+              <div className="text-xs">
+                <div className="text-gray-300 font-semibold">2nd</div>
+                <div className="text-text-secondary">20k</div>
+              </div>
+              <div className="text-xs">
+                <div className="text-orange-300 font-semibold">3rd</div>
+                <div className="text-text-secondary">15k</div>
+              </div>
+              <div className="text-xs">
+                <div className="text-blue-300 font-semibold">Hon.</div>
+                <div className="text-text-secondary">5k</div>
+              </div>
+            </div>
+            <div className="text-xs text-text-muted text-center mt-2">Per activity mode (Running, Walking, Cycling)</div>
+          </div>
+          
+          {/* Click indicator */}
+          <div className="absolute top-4 right-4 text-text-muted group-hover:text-text-secondary transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </div>
         </div>
       </div>
 
       {/* Workout-Card-Styled Leaderboard */}
       <div className="bg-bg-secondary rounded-lg border border-border-secondary overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-border-secondary bg-bg-tertiary">
+        <div className="p-4 border-b border-border-secondary bg-bg-tertiary">
           <h3 className="text-lg font-semibold text-text-primary">🏆 League Standings</h3>
-          {leaderboardLoading && (
-            <div className="flex items-center">
-              <div className="flex space-x-1">
-                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
-                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
-                <span className="w-1 h-1 bg-text-secondary rounded-full"></span>
-              </div>
-            </div>
-          )}
         </div>
         
         {enhancedLeaderboard.length === 0 ? (
           <div className="p-4 text-center">
             <p className="text-text-secondary">
-              No {activityMode === 'run' ? 'runners' : activityMode === 'walk' ? 'walkers' : 'cyclists'} found yet. Be the first to start!
+              {activityMode === 'walk' ? 'No walkers found yet. Be the first to start!' :
+               activityMode === 'cycle' ? 'No cyclists found yet. Be the first to start!' :
+               'No runners found yet. Be the first to start!'}
             </p>
+            {/* Debug info for mobile */}
+            {leaderboardLoading && (
+              <div className="mt-3 p-2 bg-bg-tertiary rounded text-xs">
+                <div className="text-text-muted">
+                  Debug: Fetching data...
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-border-secondary">
@@ -358,6 +338,12 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
                     </div>
                     <div className="text-xs text-text-secondary">
                       {getActivityText(user.runCount)}
+                      {/* Debug info for hybrid data */}
+                      {user.recentMiles > 0 && (
+                        <span className="ml-2 text-green-400">
+                          (+{user.recentMiles.toFixed(1)} recent)
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -368,14 +354,7 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
                     {formatDistance(user.totalMiles)} mi
                   </div>
                   <div className="text-xs text-text-secondary">
-                    {user.progressPercentage.toFixed(1)}% complete
-                  </div>
-                  {/* Mini progress bar */}
-                  <div className="w-16 h-1 bg-bg-tertiary rounded-full mt-1">
-                    <div 
-                      className="h-full bg-primary rounded-full"
-                      style={{ width: `${Math.min(100, user.progressPercentage)}%` }}
-                    />
+                    Rank #{user.rank}
                   </div>
                 </div>
               </div>
@@ -383,6 +362,19 @@ export const LeagueMap = ({ feedPosts = [], feedLoading = false, feedError = nul
           </div>
         )}
       </div>
+
+      {/* Season Pass Payment Modal */}
+      <SeasonPassPaymentModal
+        open={showSeasonPassModal}
+        onClose={() => setShowSeasonPassModal(false)}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
+
+      {/* Prize Pool Modal */}
+      <PrizePoolModal
+        open={showPrizePoolModal}
+        onClose={() => setShowPrizePoolModal(false)}
+      />
     </div>
   );
 };

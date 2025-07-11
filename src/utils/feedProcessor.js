@@ -4,14 +4,17 @@
  * without sacrificing existing rich functionality
  */
 
+import enhancedSeasonPassService from '../services/enhancedSeasonPassService';
+
 /**
  * Lightweight post processor for initial fast display
  * Creates minimal post objects with placeholders for supplementary data
  * @param {Array} posts - Raw post events from Nostr
  * @param {string} filterSource - Optional filter for specific app source ('RUNSTR' for RUNSTR-only posts)
+ * @param {Array} participantList - Optional pre-fetched list of participants for sync filtering
  * @returns {Array} Minimally processed posts ready for display
  */
-export const lightweightProcessPosts = (posts, filterSource = null) => {
+export const lightweightProcessPosts = (posts, filterSource = null, participantList = null) => {
   if (!posts || !Array.isArray(posts) || posts.length === 0) {
     return [];
   }
@@ -87,6 +90,20 @@ export const lightweightProcessPosts = (posts, filterSource = null) => {
       
       const isRunstrWorkout = hasRunstrIdentification && hasRunstrStructure;
       
+      // Phase 4: Season Pass Participant Filter for all activity modes
+      if (isRunstrWorkout && participantList) {
+        // Get current activity mode from exercise tag  
+        const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
+        const eventActivityType = exerciseTag?.[1]?.toLowerCase() || 'unknown';
+        
+        // Apply Season Pass filtering for all activity types
+        const isParticipant = participantList.includes(event.pubkey);
+        if (!isParticipant) {
+          console.log(`[feedProcessor] Filtering out non-participant post from ${event.pubkey} (${eventActivityType} activity)`);
+          return false;
+        }
+      }
+      
       // Debug logging for rejected events in lightweight processor
       if (!isRunstrWorkout && (hasRequiredTags.source || hasRequiredTags.client)) {
         console.log('[feedProcessor] Event has RUNSTR tags but missing signature:', {
@@ -111,15 +128,16 @@ export const lightweightProcessPosts = (posts, filterSource = null) => {
     const workoutTitle = workoutTitleTag ? workoutTitleTag[1] : 'Workout Record';
 
     const metrics = [];
-    const distanceTag = post.tags?.find(tag => tag[0] === 'distance');
-    if (distanceTag && distanceTag[1]) {
-      metrics.push({
-        label: "Distance",
-        value: distanceTag[1],
-        unit: distanceTag[2] || '',
-        // icon: <TrendingUp className="h-3 w-3" /> // Placeholder, requires import
-      });
-    }
+    // Remove distance from metrics to avoid duplication with content text
+    // const distanceTag = post.tags?.find(tag => tag[0] === 'distance');
+    // if (distanceTag && distanceTag[1]) {
+    //   metrics.push({
+    //     label: "Distance",
+    //     value: distanceTag[1],
+    //     unit: distanceTag[2] || '',
+    //     // icon: <TrendingUp className="h-3 w-3" /> // Placeholder, requires import
+    //   });
+    // }
 
     const durationTag = post.tags?.find(tag => tag[0] === 'duration');
     if (durationTag && durationTag[1]) {
@@ -182,6 +200,31 @@ export const lightweightProcessPosts = (posts, filterSource = null) => {
       needsProfile: true // Explicitly mark that we still need to fetch author profile
     }
   }).sort((a, b) => b.created_at - a.created_at);
+};
+
+/**
+ * Async version of lightweightProcessPosts with enhanced season pass filtering
+ * @param {Array} posts - Raw post events from Nostr
+ * @param {string} filterSource - Optional filter for specific app source
+ * @returns {Promise<Array>} Minimally processed posts ready for display
+ */
+export const lightweightProcessPostsAsync = async (posts, filterSource = null) => {
+  try {
+    // Pre-fetch participant list for filtering
+    let participantList = null;
+    if (filterSource && filterSource.toUpperCase() === 'RUNSTR') {
+      console.log('[feedProcessor] Pre-fetching participant list for filtering...');
+      participantList = await enhancedSeasonPassService.getParticipants();
+      console.log(`[feedProcessor] Retrieved ${participantList.length} participants for filtering`);
+    }
+    
+    // Use the sync version with pre-fetched participant list
+    return lightweightProcessPosts(posts, filterSource, participantList);
+  } catch (error) {
+    console.error('[feedProcessor] Error in async processing:', error);
+    // Fallback to no participant filtering
+    return lightweightProcessPosts(posts, filterSource, null);
+  }
 };
 
 /**

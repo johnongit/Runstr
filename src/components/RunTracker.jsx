@@ -9,6 +9,7 @@ import { createAndPublishEvent, createWorkoutEvent } from '../utils/nostr';
 import SplitsTable from './SplitsTable';
 import DashboardRunCard from './DashboardRunCard';
 import AchievementCard from './AchievementCard';
+import GoalsDropdown from './GoalsDropdown';
 import { validateEventRun, initializeEvents } from '../services/EventService';
 import { PostRunWizardModal } from './PostRunWizardModal';
 import { useContext } from 'react';
@@ -36,7 +37,7 @@ export const RunTracker = () => {
   } = useRunTracker();
 
   const { getActivityText, mode } = useActivityMode();
-  const { distanceUnit, skipStartCountdown, skipEndCountdown, autoPostToNostr } = useSettings();
+  const { distanceUnit, skipStartCountdown, skipEndCountdown, autoPostToNostr, autoPostKind1Note } = useSettings();
   const { publicKey, lightningAddress } = useContext(NostrContext);
 
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -52,6 +53,8 @@ export const RunTracker = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showPostRunWizard, setShowPostRunWizard] = useState(false);
   const [autoPublishing, setAutoPublishing] = useState(false);
+  const [autoPublishingKind1, setAutoPublishingKind1] = useState(false);
+  const [isAutoPost, setIsAutoPost] = useState(false);
 
   // Initialize events when the component mounts
   useEffect(() => {
@@ -105,10 +108,33 @@ export const RunTracker = () => {
       loadRecentRun();
     };
     
+    // Listen for run history updated events
+    const handleRunHistoryUpdate = () => {
+      console.log("Run history update event received");
+      loadRecentRun();
+    };
+    
+    // Listen for run deleted events
+    const handleRunDeleted = (event) => {
+      console.log("Run deleted event received", event.detail);
+      // If we have the updated runs in the event detail, use them directly
+      if (event.detail && event.detail.remainingRuns) {
+        const sortedRuns = [...event.detail.remainingRuns].sort((a, b) => new Date(b.date) - new Date(a.date));
+        setRecentRun(sortedRuns.length > 0 ? sortedRuns[0] : null);
+      } else {
+        // Otherwise reload from storage
+        loadRecentRun();
+      }
+    };
+    
     document.addEventListener('runCompleted', handleRunCompleted);
+    document.addEventListener('runHistoryUpdated', handleRunHistoryUpdate);
+    document.addEventListener('runDeleted', handleRunDeleted);
     
     return () => {
       document.removeEventListener('runCompleted', handleRunCompleted);
+      document.removeEventListener('runHistoryUpdated', handleRunHistoryUpdate);
+      document.removeEventListener('runDeleted', handleRunDeleted);
     };
   }, []);
 
@@ -125,67 +151,29 @@ export const RunTracker = () => {
     setIsPosting(true);
     
     try {
-      const run = recentRun;
-      const activity = run.activityType || ACTIVITY_TYPES.RUN; // Determine activity type
-
-      // Calculate calories (simplified version, ensure it uses run data if available)
-      const caloriesBurned = run.calories !== null && run.calories !== undefined 
-        ? run.calories 
-        : Math.round(run.distance * 0.06);
-
-      let activitySpecificMetricLine = '';
-      let introMessage = '';
-      let primaryHashtag = '#Running';
-
-      if (activity === ACTIVITY_TYPES.WALK) {
-        const steps = run.estimatedTotalSteps !== undefined ? Math.round(run.estimatedTotalSteps).toLocaleString() : '0';
-        activitySpecificMetricLine = `👟 Steps: ${steps} steps`;
-        introMessage = `Just completed a walk with RUNSTR! 🚶‍♀️💨`;
-        primaryHashtag = '#Walking';
-      } else if (activity === ACTIVITY_TYPES.CYCLE) {
-        const avgSpeed = run.averageSpeed && run.averageSpeed.value !== undefined ? parseFloat(run.averageSpeed.value).toFixed(1) : '0.0';
-        const speedUnit = run.averageSpeed && run.averageSpeed.unit ? run.averageSpeed.unit : (distanceUnit === 'km' ? 'km/h' : 'mph');
-        activitySpecificMetricLine = `🚴 Speed: ${avgSpeed} ${speedUnit}`;
-        introMessage = `Just completed a cycle with RUNSTR! 🚴💨`;
-        primaryHashtag = '#Cycling';
-      } else { // Default to RUN
-        const paceValue = (run.duration / 60 / (distanceUnit === 'km' ? run.distance/1000 : run.distance/1609.344));
-        const paceString = (paceValue && paceValue !== Infinity && paceValue !== 0) 
-                          ? `${Math.floor(paceValue)}:${Math.round((paceValue - Math.floor(paceValue)) * 60).toString().padStart(2, '0')}`
-                          : '-';
-        activitySpecificMetricLine = `⚡ Pace: ${paceString} min/${distanceUnit}`;
-        introMessage = `Just completed a run with RUNSTR! 🏃‍♂️💨`;
-      }
-      
-      const content = `
-${introMessage}
-
-⏱️ Duration: ${runDataService.formatTime(run.duration)}
-📏 Distance: ${displayDistance(run.distance, distanceUnit)}
-${activitySpecificMetricLine}
-🔥 Calories: ${caloriesBurned} kcal
-${run.elevation && run.elevation.gain ? `\n🏔️ Elevation Gain: ${formatElevation(run.elevation.gain, distanceUnit)}` : ''}
-${run.elevation && run.elevation.loss ? `\n📉 Elevation Loss: ${formatElevation(run.elevation.loss, distanceUnit)}` : ''}
-${additionalContent ? `\n${additionalContent}` : ''}
-#RUNSTR ${primaryHashtag}
-`.trim();
-
       // Create the event template for nostr-tools
       const eventTemplate = {
         kind: 1,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
           ['t', 'RUNSTR'], // Uppercase app name
-          ['t', primaryHashtag.substring(1)] // Remove # for tag value
+          ['t', 'Running'] // Default tag, could be dynamic based on activity
         ],
-        content: content
+        content: additionalContent
       };
 
       // Use the createAndPublishEvent function from nostr-tools
-      await createAndPublishEvent(eventTemplate);
+      const publishedEvent = await createAndPublishEvent(eventTemplate);
+      
+      // Save the event ID to track that this run has been posted
+      if (publishedEvent?.id) {
+        recentRun.nostrKind1EventId = publishedEvent.id;
+        runDataService.updateRun(recentRun.id, { nostrKind1EventId: publishedEvent.id });
+      }
       
       setShowPostModal(false);
       setAdditionalContent('');
+      setIsAutoPost(false);
       
       // Show success message
       const successMsg = `Successfully posted to Nostr!`;
@@ -204,7 +192,6 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       }
     } finally {
       setIsPosting(false);
-      setShowPostModal(false);
     }
   };
 
@@ -448,7 +435,7 @@ ${additionalContent ? `\n${additionalContent}` : ''}
   };
 
   useEffect(() => {
-    const attemptAutoPost = async () => {
+    const attemptAutoPostWorkout = async () => {
       if (!autoPostToNostr || !recentRun || recentRun.nostrWorkoutEventId || autoPublishing) return;
       
       try {
@@ -486,10 +473,10 @@ ${additionalContent ? `\n${additionalContent}` : ''}
           throw new Error('Failed to get ID from published workout event.');
         }
       } catch (err) {
-        console.error('Auto-post failed:', err);
+        console.error('Auto-post workout failed:', err);
         
         // Show error feedback
-        const errorMessage = `Auto-post to Nostr failed: ${err.message}`;
+        const errorMessage = `Auto-post workout to Nostr failed: ${err.message}`;
         if (window.Android && window.Android.showToast) {
           window.Android.showToast(errorMessage);
         } else {
@@ -499,9 +486,94 @@ ${additionalContent ? `\n${additionalContent}` : ''}
         setAutoPublishing(false);
       }
     };
-    
-    attemptAutoPost();
-  }, [recentRun, autoPostToNostr, distanceUnit, autoPublishing]);
+
+    const attemptAutoPostKind1 = async () => {
+      if (!autoPostKind1Note || !recentRun || recentRun.nostrKind1EventId || recentRun.autoPostKind1Declined || autoPublishingKind1) return;
+      
+      try {
+        setAutoPublishingKind1(true);
+        
+        // Generate the kind 1 content using the same format as manual posts
+        const run = recentRun;
+        const activity = run.activityType || ACTIVITY_TYPES.RUN;
+        const caloriesBurned = run.calories !== null && run.calories !== undefined 
+          ? run.calories 
+          : Math.round(run.distance * 0.06);
+
+        let activitySpecificMetricLine = '';
+        let introMessage = '';
+        let primaryHashtag = '#Running';
+
+        if (activity === ACTIVITY_TYPES.WALK) {
+          const steps = run.estimatedTotalSteps !== undefined ? Math.round(run.estimatedTotalSteps).toLocaleString() : '0';
+          activitySpecificMetricLine = `👟 Steps: ${steps} steps`;
+          introMessage = `Just completed a walk with RUNSTR! 🚶‍♀️💨`;
+          primaryHashtag = '#Walking';
+        } else if (activity === ACTIVITY_TYPES.CYCLE) {
+          const avgSpeed = run.averageSpeed && run.averageSpeed.value !== undefined ? parseFloat(run.averageSpeed.value).toFixed(1) : '0.0';
+          const speedUnit = run.averageSpeed && run.averageSpeed.unit ? run.averageSpeed.unit : (distanceUnit === 'km' ? 'km/h' : 'mph');
+          activitySpecificMetricLine = `🚴 Speed: ${avgSpeed} ${speedUnit}`;
+          introMessage = `Just completed a cycle with RUNSTR! 🚴💨`;
+          primaryHashtag = '#Cycling';
+        } else {
+          const paceValue = (run.duration / 60 / (distanceUnit === 'km' ? run.distance/1000 : run.distance/1609.344));
+          const paceString = (paceValue && paceValue !== Infinity && paceValue !== 0) 
+                            ? `${Math.floor(paceValue)}:${Math.round((paceValue - Math.floor(paceValue)) * 60).toString().padStart(2, '0')}`
+                            : '-';
+          activitySpecificMetricLine = `⚡ Pace: ${paceString} min/${distanceUnit}`;
+          introMessage = `Just completed a run with RUNSTR! 🏃‍♂️💨`;
+        }
+        
+        const generatedContent = `
+${introMessage}
+
+⏱️ Duration: ${runDataService.formatTime(run.duration)}
+📏 Distance: ${displayDistance(run.distance, distanceUnit)}
+${activitySpecificMetricLine}
+🔥 Calories: ${caloriesBurned} kcal
+${run.elevation && run.elevation.gain ? `\n🏔️ Elevation Gain: ${formatElevation(run.elevation.gain, distanceUnit)}` : ''}
+${run.elevation && run.elevation.loss ? `\n📉 Elevation Loss: ${formatElevation(run.elevation.loss, distanceUnit)}` : ''}
+#RUNSTR ${primaryHashtag}
+`.trim();
+
+        // Pre-populate the modal with the generated content
+        setAdditionalContent(generatedContent);
+        setIsAutoPost(true);
+        setShowPostModal(true);
+        
+      } catch (err) {
+        console.error('Auto-post kind 1 preparation failed:', err);
+        
+        // Show error feedback
+        const errorMessage = `Auto-post note preparation failed: ${err.message}`;
+        if (window.Android && window.Android.showToast) {
+          window.Android.showToast(errorMessage);
+        } else {
+          appToast.error(errorMessage);
+        }
+      } finally {
+        setAutoPublishingKind1(false);
+      }
+    };
+
+    // Sequential auto-posting: first workout (kind 1301), then kind 1 note
+    const handleAutoPosting = async () => {
+      if (!recentRun) return;
+      
+      // First attempt workout auto-post
+      await attemptAutoPostWorkout();
+      
+      // Then attempt kind 1 auto-post (only if enabled and not already publishing)
+      if (autoPostKind1Note && !autoPublishingKind1) {
+        // Small delay to ensure workout post completes first
+        setTimeout(() => {
+          attemptAutoPostKind1();
+        }, 1000);
+      }
+    };
+
+    handleAutoPosting();
+  }, [recentRun, autoPostToNostr, autoPostKind1Note, distanceUnit, autoPublishing, autoPublishingKind1]);
 
   return (
     <div className="w-full h-full flex flex-col bg-bg-primary text-text-primary relative">
@@ -635,6 +707,9 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {/* Achievements & Rewards Card - Show only when not tracking */}
       {!isTracking && (
         <div className="mx-4">
+          {/* Goals Dropdown - Show above Weekly Rewards Summary */}
+          <GoalsDropdown />
+          
           <AchievementCard 
             currentStreak={
               // Calculate streak based on recent runs - fallback to 0 if not available
@@ -681,8 +756,9 @@ ${additionalContent ? `\n${additionalContent}` : ''}
             onSave={handleSaveWorkoutRecord}
             onDelete={handleDeleteRun}
             isSaving={isSavingWorkout}
-            isWorkoutSaved={workoutSaved}
+            isWorkoutSaved={!!recentRun.nostrWorkoutEventId}
             isDeleting={isDeleting}
+            isKind1Posted={!!recentRun.nostrKind1EventId}
           />
         </div>
       )}
@@ -711,18 +787,34 @@ ${additionalContent ? `\n${additionalContent}` : ''}
       {showPostModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="bg-bg-secondary rounded-xl p-6 w-full max-w-md border border-border-primary">
-            <h3 className="text-xl font-semibold mb-4 text-text-primary">Post Run to Nostr</h3>
+            <h3 className="text-xl font-semibold mb-4 text-text-primary">
+              {isAutoPost ? 'Auto-post Run to Nostr' : 'Post Run to Nostr'}
+            </h3>
+            {isAutoPost && (
+              <p className="text-sm text-text-secondary mb-3">
+                Your run summary has been prepared. You can edit it before posting or cancel to skip.
+              </p>
+            )}
             <textarea
               value={additionalContent}
               onChange={(e) => setAdditionalContent(e.target.value)}
-              placeholder="Add any additional comments or hashtags..."
-              rows={4}
+              placeholder={isAutoPost ? "Edit your run summary..." : "Add any additional comments or hashtags..."}
+              rows={isAutoPost ? 10 : 4}
               className="w-full bg-bg-tertiary border border-border-secondary rounded-lg p-3 mb-4 text-text-primary placeholder-text-muted focus:border-border-focus outline-none"
               disabled={isPosting}
             />
             <div className="flex justify-end space-x-3">
               <Button 
-                onClick={() => setShowPostModal(false)} 
+                onClick={() => {
+                  // Track cancellation for auto-posts to prevent modal from reappearing
+                  if (isAutoPost && recentRun) {
+                    recentRun.autoPostKind1Declined = true;
+                    runDataService.updateRun(recentRun.id, { autoPostKind1Declined: true });
+                  }
+                  setShowPostModal(false);
+                  setAdditionalContent('');
+                  setIsAutoPost(false);
+                }} 
                 disabled={isPosting}
                 variant="outline"
               >

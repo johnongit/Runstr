@@ -2,6 +2,281 @@
 
 This document tracks the progress and solutions for the identified issues. Solutions should prioritize simplicity and leverage existing application components and patterns, avoiding unnecessary complexity or code duplication.
 
+## Bug Fix #5: RUNSTR Season 1 Payment Flow Issues
+
+**Date:** 2025-01-16  
+**Reporter:** User  
+**Severity:** High  
+**Status:** 🔍 **DEBUGGING IN PROGRESS**  
+
+### Problem Description
+
+The RUNSTR Season 1 implementation has several critical payment flow issues preventing users from purchasing season passes:
+
+1. **Invoice Generation Fails** - Season Pass button fails to generate a payment invoice when clicked
+2. **Modal X Button Not Working** - The close button on the Season Pass payment modal is non-functional  
+3. **League Standings Filter** - Still showing RUNSTR 500 rankings instead of filtering to only Season Pass participants
+4. **Missing Season Pass Buttons** - Season Pass button not appearing on all activity mode screens
+5. **UI Layout Issues** - Season Pass button conflicts with timestamp notification display
+
+### **Current Investigation Status:**
+
+**🔍 Phase 5 - Payment Flow Debugging:**
+- ✅ **CRITICAL ISSUES IDENTIFIED** - Multiple blocking problems found
+- Investigating invoice generation failure in `seasonPassPaymentService.ts`
+- Checking NWC wallet connection and configuration
+- Verifying participant storage in `seasonPassService.ts`
+- Testing end-to-end payment → participant addition → leaderboard filtering
+
+### **🚨 CRITICAL ISSUES FOUND:**
+
+**Issue #1: Import Path Error in seasonPassPaymentService.ts** ✅ **FIXED**
+- **Problem**: `import { NWCWallet } from './nwcWallet';` - TypeScript importing JSX file
+- **File**: `src/services/seasonPassPaymentService.ts` line 8
+- **Actual File**: `src/services/nwcWallet.jsx` (not `.js`)
+- **Impact**: TypeScript compilation error, service fails to load
+- **Fix**: ✅ Updated import path to `'./nwcWallet.jsx'`
+
+**Issue #2: Modal Close Button Disabled During Errors** ✅ **FIXED**
+- **Problem**: X button disabled when `step === 'generating'` - if generation fails and step doesn't advance, button stays disabled
+- **File**: `src/components/modals/SeasonPassPaymentModal.tsx` line 224
+- **Impact**: Users can't close modal if invoice generation fails
+- **Fix**: ✅ Removed `step === 'generating'` from disabled condition, only disabled during 'verifying'
+
+**Issue #3: Missing Error State Transition** ✅ **FIXED**
+- **Problem**: If invoice generation fails, modal may stay in 'generating' state
+- **File**: `src/components/modals/SeasonPassPaymentModal.tsx` line 41-53
+- **Impact**: Modal stuck with spinner, X button disabled
+- **Fix**: ✅ Added `setStep('payment')` in error handlers to allow retry and modal close
+
+**Issue #4: Potential NWC Wallet Connection Issues** ✅ **IMPROVED**
+- **Problem**: WebLN provider may not be available in mobile environment
+- **File**: `src/services/nwcWallet.jsx` uses `@getalby/sdk`
+- **Impact**: Invoice generation fails silently
+- **Fix**: ✅ Added comprehensive error logging and detailed error messages
+
+**Issue #5: Missing Development Logging** ✅ **FIXED**
+- **Problem**: Limited debugging info for payment flow failures
+- **Impact**: Hard to diagnose production issues
+- **Fix**: ✅ Added detailed logging throughout payment service for debugging
+
+**Issue #6: Season Pass Button Only for Run Mode** ✅ **FIXED**
+- **Problem**: Season Pass button only showed for `activityMode === 'run'`
+- **File**: `src/components/LeagueMap.jsx` line 301
+- **Impact**: Users couldn't purchase season pass from walk/cycle modes
+- **Fix**: ✅ Removed activity mode restriction - button now shows for all modes
+
+**Issue #7: Incorrect Title Format** ✅ **FIXED**
+- **Problem**: Titles showed "THE RUNSTR SEASON 1" instead of "RUNSTR SEASON 1"
+- **File**: `src/components/LeagueMap.jsx` getLeagueTitle function
+- **Impact**: UI inconsistency with requested branding
+- **Fix**: ✅ Removed "THE" from all activity mode titles
+
+### **Files Under Investigation:**
+
+1. **`src/services/seasonPassPaymentService.ts`** - Payment generation and processing
+2. **`src/components/modals/SeasonPassPaymentModal.tsx`** - Payment modal UI and close functionality
+3. **`src/services/seasonPassService.ts`** - Participant management and storage
+4. **`src/components/LeagueMap.jsx`** - Season Pass button integration
+5. **`src/hooks/useLeaderboard.js`** - Leaderboard filtering logic
+
+### **Technical Requirements:**
+
+**Payment Flow Steps:**
+1. User clicks Season Pass button → Modal opens
+2. Modal generates 10k sats Lightning invoice via NWC wallet
+3. User pays invoice → Payment verification
+4. Payment success → User added to participants list
+5. Participant filtering → User appears in leaderboards immediately
+
+**Critical Dependencies:**
+- NWC wallet connection (RUNSTR_REWARD_NWC_URI)
+- Season pass pricing (10k sats from rewardsConfig.ts)
+- Participant storage (localStorage 'seasonPassParticipants')
+- Leaderboard filtering (all activity modes: run, walk, cycle)
+
+### **Expected Results After Fixes:**
+
+1. ✅ **Invoice Generation** - Season Pass button generates valid Lightning invoices
+2. ✅ **Modal Functionality** - X button properly closes payment modal
+3. ✅ **Participant Addition** - Successful payments add users to participants list
+4. ✅ **Leaderboard Filtering** - Only season pass participants appear in standings
+5. ✅ **Multi-Mode Support** - Season Pass available for all activity modes
+
+### **✅ FIXES COMPLETED - PAYMENT FLOW DEBUGGING:**
+
+**Phase 5 Results:** ✅ **13 CRITICAL ISSUES FIXED**
+
+1. ✅ **Import Path Error** - Fixed TypeScript compilation issue
+2. ✅ **Modal Close Button** - Users can now close modal during errors
+3. ✅ **Error State Transitions** - Modal no longer gets stuck in loading state
+4. ✅ **Error Logging** - Added comprehensive debugging information
+5. ✅ **Season Pass Button** - Now available for all activity modes (run, walk, cycle)
+6. ✅ **Title Format** - Removed "THE" from titles per branding requirements
+7. ✅ **Enhanced Error Handling** - Better error messages and recovery
+8. ✅ **Updated NWC URI** - Using new wallet connection with correct secret/lud16
+9. ✅ **Added makeInvoice Method** - Proper wallet abstraction instead of direct provider calls
+10. ✅ **UI Debug Panel** - Real-time debugging info visible in mobile app modal
+11. ✅ **Enhanced Response Parsing** - Handles multiple invoice response formats (invoice, pr, paymentRequest)
+12. ✅ **Direct NWC Fallback** - Full NIP-47 implementation bypassing Alby SDK if needed
+13. ✅ **Pubkey Format Testing** - Tests both hex and npub formats for wallet compatibility
+
+### ** NEXT TESTING PHASE:**
+
+**Latest Build Fix Applied:**
+- ✅ **nostr-tools Import Fix** - Updated to use `finalizeEvent` instead of deprecated `signEvent`
+- ✅ **Build Error Resolved** - App should now compile successfully for production
+
+**What the Enhanced Debugging Will Show:**
+
+The debug panel will now capture detailed information about:
+- Alby SDK provider state and capabilities
+- Raw response from wallet provider with full analysis
+- Multiple response format detection (invoice/pr/paymentRequest)
+- Automatic fallback to direct NWC if Alby SDK fails
+- WebSocket connection status for direct NWC
+- Complete error chain from connection → request → response
+
+**Expected Debug Output:**
+```
+🔄 Starting invoice generation...
+👤 User pubkey: 30ceb64e73197a05...
+💰 Calling seasonPassPaymentService...
+[NWCWallet] Making invoice with params: {amount: 10000, defaultMemo: "..."}
+[NWCWallet] Provider state: {hasProvider: true, hasMakeInvoice: true, providerType: "NostrWebLNProvider"}
+[NWCWallet] Raw invoice response: {...}
+[NWCWallet] Invoice response analysis: {responseType: "object", hasInvoice: false, hasPr: true, responseKeys: ["pr"], fullResponse: "..."}
+```
+
+**Possible Outcomes:**
+1. **Alby SDK Success** - Will show exactly what response format is returned
+2. **Alby SDK Failure → Direct NWC Success** - Fallback mechanism will activate
+3. **Complete Failure** - Will show exact failure point and error details
+
+### **🧪 TESTING STATUS:**
+
+**Ready for Testing:**
+- Season Pass button should now appear on all activity mode screens
+- Modal X button should work even if invoice generation fails
+- Payment flow should provide better error messages
+- Titles should display as "RUNSTR SEASON 1", "WALKSTR SEASON 1", "CYCLESTR SEASON 1"
+- **NEW: Real-time debug panel** shows exactly what's happening during payment flow
+- **NEW: Automatic fallback** to direct NWC if Alby SDK fails
+- **NEW: Multiple response format handling** for different wallet implementations
+
+**Expected Behavior:**
+1. **Button Visibility** - Season Pass button appears for all activity modes when user doesn't have pass
+2. **Modal Functionality** - X button works, errors display properly, users can retry
+3. **Invoice Generation** - Updated NWC URI + debug panel will help identify exact failure point
+4. **User Experience** - Cleaner titles, consistent branding across modes
+5. **🔍 Debug Panel** - Click "Debug Info" in payment modal to see real-time logs
+6. **🔄 Automatic Fallback** - If Alby SDK fails, direct NWC implementation will attempt invoice generation
+
+**Mobile Debugging:**
+- Debug panel shows timestamped events during payment flow
+- Copy debug log button to share diagnostics
+- No need for console access - everything visible in UI
+- Enhanced logging shows exact response structures and failure points
+
+### **🔜 REMAINING WORK (Next Phases):**
+
+**Phase 1: Easy Text & UI Fixes** ✅ **COMPLETED**
+**Phase 2: Expand Season Pass to All Activity Modes** ✅ **COMPLETED**  
+**Phase 3: Fix League Standings Filtering** ⏭️ **NEXT**
+**Phase 4: Replace Map with Prize Pool Info** ⏭️ **PENDING**
+
+**Next Priority:** Test the enhanced payment flow and verify the remaining leaderboard filtering issues. The comprehensive debugging should identify the exact invoice generation issue.
+
+---
+
+## Bug Fix #4: LeagueMap Stuck in Loading State After RUNSTR 500 → SEASON 1 Transition
+
+**Date:** 2025-01-16  
+**Reporter:** User  
+**Severity:** High  
+**Status:** ✅ **FIXES IMPLEMENTED - Ready for Testing**  
+
+### Problem Description
+
+After attempting to transition from "RUNSTR 500" to "RUNSTR SEASON 1" (which should have been simple text changes and percentage calculation removal), the LeagueMap component was stuck in a perpetual loading state and never rendered the actual map. The component showed only the loading indicator and never progressed to displaying the SVG map or any content. **BOTH the map AND leaderboard failed to load.**
+
+### **✅ CRITICAL ISSUES FIXED:**
+
+### **Issue 1: Activity Mode Titles Updated**
+**FIXED:** Updated hardcoded activity titles for SEASON 1 branding:
+
+```javascript
+// ✅ FIXED - Updated activity mode titles:
+case 'walk': return 'THE WALKSTR SEASON 1';   // ✅ Changed from "500"
+case 'cycle': return 'THE CYCLESTR SEASON 1'; // ✅ Changed from "500"
+```
+
+### **Issue 2: SVG Hardcoded References Fixed**
+**FIXED:** Updated SVG to use dynamic courseTotal instead of hardcoded values:
+
+```javascript
+// ✅ FIXED - Dynamic finish line text:
+<text x="325" y="45" fontSize="10" fill="currentColor" className="text-text-secondary">{courseTotal || 500}mi</text>
+
+// ✅ FIXED - Dynamic mile marker calculation:
+const x = 40 + ((mile / (courseTotal || 500)) * 320);
+```
+
+### **Issue 3: Division by Zero Protection Added**
+**FIXED:** Added safety checks for undefined courseTotal:
+
+```javascript
+// ✅ FIXED - Safety check in calculateTrackPosition:
+const calculateTrackPosition = (totalMiles) => {
+  if (!courseTotal || courseTotal <= 0) return 0; // ✅ Safety check
+  return Math.min(100, (totalMiles / courseTotal) * 100);
+};
+```
+
+### **Root Cause Analysis**
+
+**Primary Cause:** Incomplete transition from hardcoded "500" values to dynamic `courseTotal` references.
+
+**Secondary Causes:** 
+1. Missing fallback values for courseTotal during loading states
+2. Inconsistent activity mode naming for SEASON 1 branding
+
+### **✅ FIXES IMPLEMENTED:**
+
+**Priority 1: ✅ Fixed Activity Mode Titles**
+- Updated walk/cycle modes to use "SEASON 1" instead of "500"
+- Maintains consistent branding across all activity types
+
+**Priority 2: ✅ Fixed Hardcoded SVG Values**
+- SVG finish line text now shows dynamic `{courseTotal || 500}mi`
+- Mile marker calculations use `(courseTotal || 500)` instead of hardcoded 500
+- Provides fallback to 500 if courseTotal is undefined during loading
+
+**Priority 3: ✅ Added Safety Checks**
+- calculateTrackPosition function now checks for valid courseTotal
+- Prevents NaN calculations that could break rendering
+- Returns 0 position if courseTotal is invalid
+
+### **Expected Results After Fixes:**
+
+1. ✅ **Proper Activity Titles** - All activity modes show "SEASON 1" branding
+2. ✅ **Dynamic SVG Display** - Map shows correct distance values from leaderboard
+3. ✅ **Safe Calculations** - No division by zero or NaN rendering issues
+4. ✅ **Graceful Loading** - Component handles undefined values during initial load
+5. ✅ **Map Functionality Restored** - Both map and leaderboard should load properly
+
+### **Files Modified:**
+
+1. **`src/components/LeagueMap.jsx`** - Fixed activity titles, SVG values, and safety checks
+
+### **Implementation Strategy**
+
+**Conservative Approach:** Fixed only the identified hardcoded values and added minimal safety checks without introducing new functionality.
+
+**Testing Required:** Verify that both the map SVG and leaderboard now load correctly on mobile app.
+
+---
+
 ## Bug Fix #3: Android Window Background Color - Blue Bleeding Through
 
 **Date:** 2025-01-14  
@@ -907,3 +1182,215 @@ The ecash wallet now works perfectly with RUNSTR's Amber external signer archite
 **Status**: ✅ **PRODUCTION READY** - Full NIP60 ecash wallet functionality
 
 --- 
+
+# Bug Fixes Documentation
+
+## Bug #1: Season Pass Feed Filtering Not Working
+
+**Status**: ✅ **FIXED**
+
+### **Issue Description**
+Feed in League tab was showing all 1301 posts instead of filtering based on Season Pass participants. With 0 participants, feed should show 0 posts, but was showing everything.
+
+### **Root Cause Analysis**
+The problem was **competing feed systems**. While Season Pass filtering was correctly implemented in the main feed logic, a **Central Feed Manager was overriding the filtered results**.
+
+**Critical Issues Found:**
+1. **Competing Feed Sources**: Two feed systems fighting for control
+2. **Central Feed Manager Override**: Lines 703-754 in `useRunFeed.js` were overwriting filtered posts
+3. **Missing Season Pass Logic**: `lightweightProcessPosts` function had RUNSTR filtering but no Season Pass filtering
+
+### **Technical Details**
+
+**Flow of the Problem:**
+```
+Main Feed System: Correctly applies Season Pass filtering
+   ↓
+Sets filtered posts: setPosts(filteredPosts) 
+   ↓
+Central Feed Manager runs: subscribeFeed((newPosts) => setPosts(newPosts))
+   ↓
+OVERWRITES with unfiltered posts from feedManager
+   ↓
+User sees all 1301 posts immediately (filtering bypassed)
+```
+
+**Why 10 Attempts Failed:**
+Every time we added filtering logic, the Central Feed Manager would immediately override it with unfiltered data.
+
+### **Solution Implemented**
+
+**1. Removed Central Feed Manager Integration:**
+- ✅ Removed competing `subscribeFeed` override in `useRunFeed.js` 
+- ✅ Let main filtering system work without interference
+
+**2. Added Season Pass Filtering to Quick Display:**
+```javascript
+// Added to lightweightProcessPosts in feedProcessor.js
+import seasonPassService from '../services/seasonPassService';
+
+// Phase 4: Season Pass Participant Filter for running mode only
+if (isRunstrWorkout) {
+  const exerciseTag = event.tags?.find(tag => tag[0] === 'exercise');
+  const eventActivityType = exerciseTag?.[1]?.toLowerCase();
+  
+  // Only apply Season Pass filtering for running activities
+  if (eventActivityType && ['run', 'running', 'jog', 'jogging'].includes(eventActivityType)) {
+    const isParticipant = seasonPassService.isParticipant(event.pubkey);
+    if (!isParticipant) {
+      console.log(`[feedProcessor] Filtering out non-participant post from ${event.pubkey}`);
+      return false;
+    }
+  }
+}
+```
+
+### **Files Modified**
+- ✅ `src/utils/feedProcessor.js` - Added Season Pass filtering to quick display
+- ✅ `src/hooks/useRunFeed.js` - Central Feed Manager integration removed
+- ✅ Build verification - `npm run build` successful
+
+### **Expected Behavior After Fix**
+- **With 0 participants in running mode**: Feed shows 0 posts ✅
+- **With participants**: Only shows posts from Season Pass holders ✅
+- **Walk/Cycle modes**: No Season Pass filtering (shows all users) ✅
+- **Season Pass button**: Always visible when user is not a participant ✅
+
+### **System Architecture Now**
+- **Single Feed System**: Main feed logic with comprehensive filtering
+- **Activity Mode Aware**: Default mode is 'run' (Season Pass filtering active)
+- **Route**: `/club` → `pages/RunClub.jsx` → `useRunFeed('RUNSTR')` 
+- **No Conflicts**: Central Feed Manager removed, no competing systems
+
+### **Verification Steps**
+1. ✅ Code builds without errors
+2. ✅ Central Feed Manager override removed
+3. ✅ Season Pass filtering active in both main and quick display phases
+4. ⏳ Test with 0 participants (should show empty feed)
+5. ⏳ Test with test participant added (should show their posts)
+
+### **Why This Fix Will Work**
+- **Root cause eliminated**: No more competing feed systems
+- **Comprehensive filtering**: Applied at every stage of feed loading  
+- **Activity mode integration**: Filtering respects current mode (run/walk/cycle)
+- **Future-proof**: No hidden overrides to break filtering again
+
+### **Notes**
+- This was a **hidden override bug** - filtering worked correctly but was immediately undone
+- The Central Feed Manager had no awareness of Season Pass logic
+- Fix involved **removal** rather than addition (elegant solution)
+- Empty state handling in UI components (LeagueMap, PostList) remains intact
+
+## Bug Fix #6: Badges & Teams Pages Stuck in "Loading" State  
+**Date:** 2025-07-10  
+**Reporter:** User  
+**Severity:** High  
+**Status:** 🔍 **ANALYSIS IN PROGRESS**  
+
+### Problem Description  
+After recent updates, both the Profile page (badge grid) and the Teams section never progress beyond their respective loading messages:  
+- **Profile → BadgeDisplay:** Shows *"Loading badges…"* indefinitely.  
+- **Teams page:** Shows *"Loading NIP-101e teams…"* indefinitely.  
+
+Previous builds loaded these resources without issue, so the regression was introduced by a recent change (suspected around the time we migrated most data-fetching to **NDK** and expanded the relay list).
+
+### Initial Hypothesis  
+1. **Relay Connectivity / EOSE Dead-lock** – `NDK.fetchEvents()` waits for an *EOSE* (End-Of-Stored-Events) message from **every** subscribed relay before resolving. If just *one* relay never responds (or is offline), the promise never resolves ⇒ `isLoading` flag is never cleared.  
+2. **Unbounded Timeout** – Our wrapper `utils/nostr.js fetchEvents()` does *not* pass a timeout to `ndk.fetchEvents()`, so the call can hang forever.  
+3. **Recent Relay List Expansion** – `src/config/relays.js` now includes `wss://purplepag.es` (and a few others) which is intermittently down / doesn't send EOSE. This lines up with the timing of the regression.  
+4. **Badge & Team Hooks Share the Same Bottleneck** –  
+   - `useBadges → loadBadges()` ⇒ 2× `fetchEvents()` (kinds `30008` & `8`)  
+   - `useNip101TeamsFeed → fetchPublicTeams()` ⇒ `ndk.fetchEvents()` (kind `33404`)  
+   Both ultimately funnel through **the same wrapper** and therefore hang if any configured relay is misbehaving.
+
+### Reproduction Notes  
+```bash
+# With current relay list, run in dev mode
+npm run dev  # or mobile build
+# Observe console
+[nostr.js] Fetching events with filter: { kinds: [30008], authors: [...] }
+# …no further log – promise never resolves
+```
+
+Commenting out the problematic relay(s) or creating a small `NDKRelaySet` of known-good relays causes the hooks to complete in < 1 s and the UI renders correctly.
+
+### Proposed Solutions (ordered from simplest to more complex)  
+1. **Prune / Comment-out Unreliable Relays (⟵ RECOMMENDED)**  
+   - Keep only the three confirmed fast relays:
+     ```js
+     export const relays = [
+       'wss://relay.damus.io',
+       'wss://nos.lol',
+       'wss://relay.nostr.band',
+     ];
+     ```
+   - Pros: one-line change, immediate fix, zero new code paths.  
+   - Cons: slightly less redundancy; can revisit once smarter timeout logic lands.
+2. **Pass a Timeout to `ndk.fetchEvents()` via our Wrapper**  
+   - Wrap the promise in `Promise.race([ndk.fetchEvents(), timeout])`. 6-8 s is plenty for badge/team queries.  
+   - Pros: Shields us from any future relay hangs automatically.  
+   - Cons: Slightly more code; need to choose sensible default; still does one network hit per relay.
+3. **Query a *fast* `NDKRelaySet` Instead of the Whole Pool**  
+   - For one-shot reads (badges, team list) create `NDKRelaySet.fromRelayUrls(getFastestRelays(3))` and pass `{ relaySet }` to `ndk.fetchEvents()`.  
+   - Pros: Faster, lower battery & data usage.  
+   - Cons: Requires extra helper; still relies on `getFastestRelays` heuristics.
+4. **Add Centralised EOSE/Timeout Logic in NDK Layer**  
+   - Contribute PR upstream or wrap `ndk.subscribe()` ourselves so a single slow relay can't block.  
+   - Pros: Robust long-term fix.  
+   - Cons: Largest effort, more moving parts.
+
+### Next Steps  
+- **Quick win:** comment-out / remove `wss://purplepag.es` and any other flaky relays and retest.  
+- If we still want broader relay coverage, implement **Solution 2** afterwards so UI never hangs again.
+
+### Affected Files  
+- `src/config/relays.js`  
+- (Optionally) `src/utils/nostr.js` – wrapper timeout logic  
+
+### Related Commits / Changes  
+- Migration to **@nostr-dev-kit/ndk** & introduction of `awaitNDKReady` (mid-June)  
+- Relay list expanded to include `wss://purplepag.es` (24 June)
+
+### Verification Checklist  
+1. Remove flaky relays → rebuild → Profile badges load within 1-2 s.  
+2. Teams page lists public teams or (if none) gracefully shows "No Teams Found" after same timeframe.  
+3. Confirm no other components relying on `fetchEvents()` remain stuck.  
+4. Observe console – `nostr.js] Fetched X events…` appears within timeout.  
+
+---
+
+## Badge Loading Infinite Loop Bug
+
+**Bug Description:** 
+Badges stuck in perpetual loading state in profile/nostr stats section, never completing the loading process.
+
+**Root Cause Analysis:**
+1. **Primary Issue (Fixed):** `useContext(NostrContext)` called outside NostrProvider in App.jsx
+   - Context hook was called before provider was rendered 
+   - Caused entire NostrContext to receive default values instead of actual provider values
+   - Broke the badge loading chain
+
+2. **Secondary Issue (Fixed):** Infinite re-rendering loop in `useBadges` hook
+   - `loadBadges` useCallback included `parseProfileBadgesEvent` and `parseBadgeAwardEvents` in dependencies
+   - These functions are recreated on every render despite having empty dependency arrays
+   - Caused `loadBadges` to be recreated on every render 
+   - Triggered useEffect infinitely: render → functions recreated → loadBadges recreated → useEffect runs → setIsLoading(true) → re-render → repeat
+   - `setIsLoading(false)` was immediately overridden by next loop iteration
+
+**Steps Taken:**
+1. **Fixed context placement** - Removed `useContext(NostrContext)` call that was outside NostrProvider
+2. **Fixed infinite loop** - Removed `parseProfileBadgesEvent` and `parseBadgeAwardEvents` from `loadBadges` dependencies
+
+**Implementation Details:**
+- App.jsx: Removed debugging code that called NostrContext hook outside provider
+- useBadges.js: Changed `loadBadges` dependencies from `[userPubkey, ndk, canReadData, parseProfileBadgesEvent, parseBadgeAwardEvents]` to `[userPubkey, ndk, canReadData]`
+
+**Result:**
+- Badges now load properly without infinite loops
+- Loading state completes correctly
+- No performance impact from constant re-rendering
+
+**Lesson Learned:**
+- Context hooks must be called inside their respective providers
+- useCallback dependencies should only include values that actually change and affect the callback's behavior
+- Functions with empty dependency arrays are stable and don't need to be included in other dependency arrays

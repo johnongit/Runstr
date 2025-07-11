@@ -26,6 +26,12 @@ export const REWARDS = {
     endUtc: '2025-06-10T23:59:59Z',
     distanceKm: 100,
     nostrRelay: 'wss://relay.damus.io', // Example relay for event-specific notes
+  },
+  SEASON_1: {
+    passPrice: 10000,
+    startUtc: '2025-07-11T00:00:00Z', // Official RUNSTR SEASON 1: July 11 - October 9
+    endUtc: '2025-10-09T23:59:59Z',   // Official RUNSTR SEASON 1: July 11 - October 9
+    title: 'RUNSTR SEASON 1'
   }
 } as const;
 
@@ -38,11 +44,19 @@ export interface EventConfig {
   readonly nostrRelay?: string; // Optional recommended relay for event posts
 }
 
+export interface SeasonConfig {
+  readonly passPrice: number;
+  readonly startUtc: string;
+  readonly endUtc: string;
+  readonly title: string;
+}
+
 type ValueOf<T> = T[keyof T];
 export type RewardKey = keyof typeof REWARDS;
 // export type StreakConfig = typeof REWARDS["STREAK"]; // Now an interface
 export type DailyLeaderboardConfig = typeof REWARDS["DAILY_LEADERBOARD"]; // Now an interface
 export type Event100kConfig = typeof REWARDS["EVENT_100K"]; // Now an interface
+export type Season1Config = typeof REWARDS["SEASON_1"]; // Now an interface
 
 export const MIN_STREAK_DISTANCE = {
   km: 0, // lowered from 500 (0.5 km) to allow any run to qualify during testing

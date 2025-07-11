@@ -2,6 +2,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useNostrRunStats } from '../hooks/useNostrRunStats';
 import { Button } from "@/components/ui/button";
 import LevelSystemHeader from '../components/LevelSystemHeader';
+import { useState, useMemo } from 'react';
 
 const Stat = ({ label, value }) => (
   <div className="flex flex-col">
@@ -39,9 +40,50 @@ const metricString = (event) => {
   return `${dist} • ${durTag[1]}`;
 };
 
+const groupWorkoutsByMonth = (events) => {
+  const grouped = {};
+  
+  events.forEach(event => {
+    const date = new Date(event.created_at * 1000);
+    const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    if (!grouped[monthYear]) {
+      grouped[monthYear] = {
+        monthName,
+        events: []
+      };
+    }
+    
+    grouped[monthYear].events.push(event);
+  });
+  
+  // Sort by month/year (newest first)
+  return Object.entries(grouped)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([key, value]) => ({ key, ...value }));
+};
+
 const NostrStatsPage = () => {
   const { distanceUnit } = useSettings(); // eslint-disable-line no-unused-vars
   const { workoutEvents, stats, isLoading, error, reload } = useNostrRunStats();
+  const [expandedMonths, setExpandedMonths] = useState(new Set());
+
+  const groupedWorkouts = useMemo(() => {
+    return groupWorkoutsByMonth(workoutEvents);
+  }, [workoutEvents]);
+
+  const toggleMonth = (monthKey) => {
+    setExpandedMonths(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(monthKey)) {
+        newSet.delete(monthKey);
+      } else {
+        newSet.add(monthKey);
+      }
+      return newSet;
+    });
+  };
 
   if (isLoading) return <p className="p-4 text-text-primary">Loading…</p>;
   if (error) return <p className="p-4 text-error">Error: {error}</p>;
@@ -83,17 +125,42 @@ const NostrStatsPage = () => {
         </div>
       ) : <p className="text-text-secondary">No workouts on Nostr yet.</p>}
 
-      <ul className="space-y-3">
-        {workoutEvents.map(ev => (
-          <li key={ev.id} className="bg-bg-secondary border border-border-secondary p-3 rounded-md text-sm text-text-primary">
-            <div className="flex justify-between">
-              <span>{new Date(ev.created_at * 1000).toLocaleDateString()}</span>
-              <span className="text-text-secondary">{metricString(ev)}</span>
-            </div>
-            {renderAssociations(ev)}
-          </li>
+      {/* Monthly Workout History */}
+      <div className="space-y-3">
+        {groupedWorkouts.map(({ key, monthName, events }) => (
+          <div key={key} className="bg-bg-secondary border border-border-secondary rounded-lg">
+            {/* Month Header */}
+            <button
+              onClick={() => toggleMonth(key)}
+              className="w-full p-4 text-left flex justify-between items-center hover:bg-bg-tertiary transition-colors"
+            >
+              <h3 className="font-semibold text-text-primary">
+                {monthName} Activity ({events.length} workout{events.length !== 1 ? 's' : ''})
+              </h3>
+              <span className="text-text-secondary">
+                {expandedMonths.has(key) ? '▼' : '▶'}
+              </span>
+            </button>
+            
+            {/* Month Content */}
+            {expandedMonths.has(key) && (
+              <div className="border-t border-border-secondary">
+                <ul className="space-y-2 p-4">
+                  {events.map(ev => (
+                    <li key={ev.id} className="bg-bg-primary border border-border-tertiary p-3 rounded-md text-sm text-text-primary">
+                      <div className="flex justify-between">
+                        <span>{new Date(ev.created_at * 1000).toLocaleDateString()}</span>
+                        <span className="text-text-secondary">{metricString(ev)}</span>
+                      </div>
+                      {renderAssociations(ev)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   );
 };

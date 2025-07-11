@@ -5,9 +5,13 @@
   "type": "module",
   "main": "check-group-membership.js",
   "scripts": {
-    "check-membership": "node check-group-membership.js"
+    "check-membership": "node check-group-membership.js",
+    "rewards": "node calculate-weekly-rewards.js",
+    "levels": "node calculate-level-achievements.js",
+    "newsletter": "node generate-newsletter.js"
   },
   "dependencies": {
+    "@nostr-dev-kit/ndk": "^2.12.2",
     "nostr-tools": "^1.14.0",
     "ws": "^8.14.2"
   }
