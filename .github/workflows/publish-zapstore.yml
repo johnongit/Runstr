@@ -476,20 +476,18 @@ jobs:
         run: ls -lR ./release
 
       # --- Install Zapstore Tools ---
-      - name: Install ZapStore CLI and apktool # Keep one valid version of this step
+      - name: Install fresh ZapStore CLI
         run: |
-          echo "Installing latest Zapstore CLI..."
-          # Use the latest stable release instead of hardcoded old version
+          # Remove whatever was pre-installed in the runner image
+          sudo rm -f $(command -v zapstore) || true
+
+          # Always fetch the latest build
           curl -L https://cdn.zapstore.dev/latest/zapstore-linux -o zapstore
           chmod +x zapstore
           sudo mv zapstore /usr/local/bin/
-          
-          # Self-update to ensure we have the absolute latest version
-          echo "Updating to latest zapstore version..."
-          yes | zapstore install zapstore || echo "Self-update failed, continuing with downloaded version"
-          
-          zapstore --version || { echo "❌ Zapstore CLI install failed."; exit 1; }
-          echo "✅ Zapstore CLI installed and updated."
+
+          # Double-check the version (should say 0.2.x or higher)
+          zapstore --version
 
           # Force manual installation of apktool
           echo "Installing apktool manually..."

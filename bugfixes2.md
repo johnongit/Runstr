@@ -1394,3 +1394,58 @@ Badges stuck in perpetual loading state in profile/nostr stats section, never co
 - Context hooks must be called inside their respective providers
 - useCallback dependencies should only include values that actually change and affect the callback's behavior
 - Functions with empty dependency arrays are stable and don't need to be included in other dependency arrays
+
+## Bug Fix #6: Zapstore Release Not Created (Zapstore CLI Publish Failure)
+
+**Date:** 2025-07-11  
+**Reporter:** Developer / CI  
+**Severity:** High  
+**Status:** 🔍 DEBUGGING IN PROGRESS  
+
+### Problem Description
+Even though the GitHub Action workflow `publish_zapstore` reports success, **no new release appears on Zapstore**.  The final publish step logs the following error:
+
+```
+ERROR FormatException: Unexpected end of input (at character 1)
+... (zapstore_cli stack-trace) ...
+❌ Zapstore publish failed with exit code 127
+```
+
+### Likely Root Cause
+The Zapstore CLI bundled in the workflow (`zapstore-cli 0.1.2`) has a **known bug** that causes a JSON parsing failure when uploading assets to the Blossom storage service.  Newer versions (≥ 0.2.0) switched to a different upload endpoint and fix this exception.  Because the CLI exits with code 127 the workflow still records the overall job as failed, preventing the release from showing up on Zapstore.
+
+### Direct Solution Options (ranked simplest → complex)
+
+1. **Manual publish with latest CLI (RECOMMENDED)**  
+   a. Install latest CLI locally or in WSL:  
+   ```bash
+   curl -L https://cdn.zapstore.dev/latest/zapstore-linux -o zapstore && chmod +x zapstore
+   ./zapstore --version   # should print >= 0.2.0
+   ```
+   b. Export secret key: `export NSEC="<your-nsec-here>"`  
+   c. Run publish:
+   ```bash
+   ./zapstore publish runstr \
+     --overwrite-app --overwrite-release --daemon-mode \
+     --icon runstr_logo.png \
+     -n MANUAL_RELEASE_NOTES.md \
+     -a apk-build/runstr-test.apk \
+     -v 0.6.0 --verbose
+   ```
+   d. Verify release appears at https://zapstore.dev/app/runstr
+
+2. **Hot-patch workflow (small change)**  
+   Replace hard-coded hash download with `https://cdn.zapstore.dev/latest/zapstore-linux` **and** add a `zapstore install zapstore` self-update step so the runner always gets the newest CLI.
+
+3. **Retry publish step only**  
+   Manually re-run *just* the "Publish to Zapstore" job in GitHub Actions after updating the CLI binary (saves build time).
+
+### Recommended Next Step
+Attempt option 1 immediately (no code changes required).  If successful, implement option 2 in the workflow so future automated publishes use the fixed CLI.
+
+### Test Cases
+- [ ] `./zapstore --version` returns ≥ 0.2.0  
+- [ ] `zapstore publish` exits with code 0  
+- [ ] Release v0.6.0 visible on Zapstore within minutes  
+
+---
