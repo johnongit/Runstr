@@ -444,13 +444,18 @@ jobs:
       # --- Install Zapstore Tools ---
       - name: Install ZapStore CLI and apktool # Keep one valid version of this step
         run: |
-          echo "Installing Zapstore CLI..."
-          ZAP_CLI_URL="https://cdn.zapstore.dev/0d684425c4bbd3fdecc58f7bf7fc55366d71b8ded9d68b3bbfcb3fcca1072325"
-          curl -L -o zapstore "$ZAP_CLI_URL"
+          echo "Installing latest Zapstore CLI..."
+          # Use the latest stable release instead of hardcoded old version
+          curl -L https://cdn.zapstore.dev/latest/zapstore-linux -o zapstore
           chmod +x zapstore
           sudo mv zapstore /usr/local/bin/
+          
+          # Self-update to ensure we have the absolute latest version
+          echo "Updating to latest zapstore version..."
+          yes | zapstore install zapstore || echo "Self-update failed, continuing with downloaded version"
+          
           zapstore --version || { echo "❌ Zapstore CLI install failed."; exit 1; }
-          echo "✅ Zapstore CLI installed."
+          echo "✅ Zapstore CLI installed and updated."
 
           # Force manual installation of apktool
           echo "Installing apktool manually..."
@@ -751,10 +756,13 @@ jobs:
           # Attempt to publish to Zapstore, capture output and exit code
           echo "Attempting to publish to Zapstore..."
           set +e # Prevent script from exiting immediately on error
+          # Added --verbose and --debug-network flags for better error reporting
           PUBLISH_OUTPUT=$(APKSIGNER_PATH="$APKSIGNER_PATH" zapstore publish runstr \
             --daemon-mode \
             --overwrite-app \
             --overwrite-release \
+            --verbose \
+            --debug-network \
             --icon "${ICON_FILENAME}" \
             -n "${NOTES_FILENAME}" \
             -a "${APK_FILENAME}" \
