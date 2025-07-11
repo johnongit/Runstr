@@ -113,3 +113,5 @@ Nostr - Runstr@nostrcheck.com
 Email - Runstr@proton.me 
 Website - [RUNSTR](https://www.runstr.club/) 
 Pitch Deck - [Pitch Deck](https://nostr-run-club-the--nm03p65.gamma.site/)
+
+<!-- release-trigger -->
