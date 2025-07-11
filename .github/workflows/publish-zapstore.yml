@@ -104,17 +104,9 @@ jobs:
           # This requires more complex output parsing from semantic-release, sticking to tag existence for now.
 
           if [[ "$LATEST_TAG" != "none" ]]; then
-            # Check if the latest tag points to the current commit HEAD
-            # This confirms semantic-release just created it on this run
-            if git rev-parse HEAD | grep -q "$(git rev-list -n 1 $LATEST_TAG)"; then
-               echo "✅ New release tag $LATEST_TAG created by semantic-release."
-               echo "released=true" >> $GITHUB_OUTPUT
-               echo "new_version=${LATEST_TAG#v}" >> $GITHUB_OUTPUT # Store version without 'v' prefix
-            else
-               echo "ℹ️ Latest tag $LATEST_TAG exists but doesn't point to HEAD. Assuming no new release on this run."
-               echo "released=false" >> $GITHUB_OUTPUT
-               echo "new_version=unknown" >> $GITHUB_OUTPUT # Set explicitly
-            fi
+            echo "✅ Detected latest tag $LATEST_TAG – treating as new release."
+            echo "released=true" >> $GITHUB_OUTPUT
+            echo "new_version=${LATEST_TAG#v}" >> $GITHUB_OUTPUT # Strip leading 'v'
           else
              echo "ℹ️ No tags found or semantic-release determined no release needed."
              echo "released=false" >> $GITHUB_OUTPUT
