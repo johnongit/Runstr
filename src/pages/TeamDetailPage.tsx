@@ -604,8 +604,8 @@ const TeamDetailPage: React.FC = () => {
       if (isCurrentUserMember) {
         console.log('renderJoinButton: Hidden - user is already a member');
         return (
-          <div className="mt-4 px-6 py-3 bg-gray-600 text-gray-300 rounded-lg text-center">
-            ✅ You are a member of this team
+          <div className="mt-4 px-6 py-3 bg-black text-white rounded-lg text-center border-2 border-white">
+            ✓ You are a member of this team
           </div>
         );
       }
@@ -627,10 +627,10 @@ const TeamDetailPage: React.FC = () => {
           <button 
             onClick={handleJoinTeam}
             disabled={isJoining}
-            className={`mt-4 w-full sm:w-auto px-6 py-3 font-semibold rounded-lg transition-colors ${
+            className={`mt-4 w-full sm:w-auto px-6 py-3 font-semibold rounded-lg transition-colors border-2 ${
               isJoining 
-                ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-                : 'bg-purple-600 hover:bg-purple-700 text-white'
+                ? 'bg-gray-600 text-gray-300 cursor-not-allowed border-gray-500' 
+                : 'bg-white hover:bg-gray-100 text-black border-black'
             }`}
             title={`Join ${getTeamName(team)} (Captain: ${getPubkeyDisplayName(actualCaptain)})`}
           >
@@ -678,8 +678,8 @@ const TeamDetailPage: React.FC = () => {
           <div className="mt-4">
             {isCurrentTeamDefault() ? (
               <div className="flex flex-col sm:flex-row gap-2">
-                <div className="px-4 py-2 bg-success text-success-foreground rounded-lg text-sm font-medium text-center border border-success">
-                  ✅ Default Posting Team
+                <div className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium text-center border-2 border-white">
+                  ✓ Default Posting Team
                 </div>
                 <button
                   onClick={handleClearDefaultTeam}

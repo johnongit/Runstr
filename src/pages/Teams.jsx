@@ -114,8 +114,8 @@ export default function Teams() {
               <div className="flex flex-col gap-1">
                 {isDefault ? (
                   <div className="flex flex-col gap-1">
-                    <div className="px-3 py-2 bg-success text-success-foreground rounded-lg text-sm font-medium text-center border border-success">
-                      ✅ Default Team
+                    <div className="px-3 py-2 bg-black text-white rounded-lg text-sm font-medium text-center border-2 border-white">
+                      ✓ Default Team
                     </div>
                     <button
                       onClick={handleClearDefaultTeam}
