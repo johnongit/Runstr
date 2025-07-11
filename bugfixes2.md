@@ -1494,3 +1494,25 @@ When a feed map includes items with `kind === 1`, the component short-circuits. 
 3. Decide on desired UX: should generic notes display as simple text cards or be excluded entirely?
 
 ---
+
+### Fix Implemented (2025-07-11)
+
+1. **Single Source of Truth for `released` flag**  
+   • Job output `released` now takes its value directly from the **`determine_build_version`** step, which is already aware of both the semantic-release *and* manual-release paths.  
+   • This guarantees downstream jobs (`publish_zapstore`) fire whenever *either* path produced a release.
+
+2. **GitHub-Release step condition simplified**  
+   • It now checks `steps.determine_build_version.outputs.released == 'true'` instead of only the semantic-release step.  
+   • This means manual releases will finally create a proper GitHub Release (and upload the APK) again.
+
+3. **Removed brittle expression in job outputs**  
+   • Replaced the previous `steps.semantic_release.outputs.released == 'true' || …` expression with the single, explicit flag mentioned above to avoid expression evaluation quirks.
+
+**Commit:** `ci: refactor release outputs to ensure GitHub release & Zapstore publish trigger reliably`  
+**Expectation:** The next push that triggers a release should now:  
+   1. Generate/commit the semantic version (or respect the manual one).  
+   2. Upload the signed APK in a GitHub Release.  
+   3. Proceed to Zapstore publish job.  
+   4. Fail noisily if Zapstore rejects the upload.
+
+*If the next run still fails to publish, investigate the semantic-release logs first, then the GitHub-Release action output.*
