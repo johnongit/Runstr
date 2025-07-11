@@ -1449,3 +1449,48 @@ Attempt option 1 immediately (no code changes required).  If successful, impleme
 - [ ] Release v0.6.0 visible on Zapstore within minutes  
 
 ---
+
+## Bug Investigation #6: Blank Kind-1 Posts in Feeds
+
+**Date:** 2025-07-11  
+**Reporter:** Internal QA / User Reports  
+**Severity:** Medium  
+**Status:** 🔍 **INVESTIGATING**  
+
+### Problem Description
+
+Some users have reported that regular *kind 1* Nostr notes appearing in our in-app feeds are rendering as completely blank cards (empty space with no content). The issue is intermittent and seems to affect only certain posts – typically standard text notes coming from external clients or from our own older posting flows.
+
+### Initial Hypothesis
+
+1. **Rendering Filter in `Post.tsx`** – The current *Post component* explicitly returns `null` unless the incoming `post.kind === 1301`:
+
+```typescript 38:44:src/components/Post.tsx
+if (!post || post.kind !== 1301) {
+  return null;
+}
+```
+
+When a feed map includes items with `kind === 1`, the component short-circuits. Because the parent feed still allocates space in its map for every element, this results in an empty gap that looks like a "blank post" to the user.
+
+2. **Feed Processor Pass-Through** – `lightweightProcessPosts` and `processPostsWithData` preserve the original `event.kind` when constructing the simplified post objects. Nothing upstream converts `kind 1` → `kind 1301`, so ordinary notes reach the UI unchanged.
+
+3. **Content Possibly Empty** – For some legacy flows (`handlePostSubmit` in `RunHistory.jsx`) we previously posted kind-1 events whose `content` might be an empty string.  If those events slip through future UI that *does* render kind-1, they would still appear blank.  However, the primary blank-card symptom happens even when `content` is non-empty, pointing back to the rendering guard above.
+
+### Evidence Collected
+
+* `src/components/Post.tsx` – hard stop on non-1301 events (lines 34-42).  
+* `src/pages/RunClub.jsx` – converts all workout feed events to `kind: 1301`, therefore not affected.  
+* Other feed consumers (`useRunFeed`, `feedManager`, etc.) do **not** convert kinds, so they feed kind-1 notes straight into the same `Post` component – leading to the blank UI.
+
+### Likely Root Cause
+
+> **The UI layer intentionally ignores any post that is not `kind 1301`, but the data layer still delivers `kind 1` items, producing empty slots in the rendered list.**
+
+### Next Steps / Potential Fix Directions (no code yet)
+
+1. **Either filter out kind-1 posts before mapping** in the relevant feed hooks/pages *or* extend `Post.tsx` so it has a fallback render path for generic text notes.
+2. Audit any legacy helpers that still emit `kind 1` workout posts and plan migration to proper kind 1301 (or dedicated renderer) to avoid further confusion.
+3. Decide on desired UX: should generic notes display as simple text cards or be excluded entirely?
+
+---

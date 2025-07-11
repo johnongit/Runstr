@@ -35,9 +35,62 @@ const getTagValue = (tags: any[], tagName: string) => {
 export const Post = ({ post, handleZap, wallet }: { post: any; handleZap: any; wallet: any }) => {
   const { userTeams, activeChallenges, isLoading } = useTeamChallenge();
 
-  // Only render if it's a Kind 1301 event
-  if (!post || post.kind !== 1301) {
-    return null; 
+  // Handle different post types
+  if (!post) {
+    return null;
+  }
+
+  // Render kind 1 notes with simple layout
+  if (post.kind === 1) {
+    const authorName = post.author?.profile?.name || 
+                      post.author?.profile?.display_name || 
+                      post.author?.pubkey?.slice(0, 8) + '…' || 
+                      'Runner';
+    const avatar = getAvatarUrl(post.author?.profile?.picture, 48) || 
+                   (post.author?.pubkey ? `https://robohash.org/${post.author.pubkey}.png?size=48x48` : undefined);
+    const timeAgo = formatTimeAgo(post.created_at);
+    const images = post.images || [];
+
+    return (
+      <div className="bg-bg-secondary p-4 rounded-lg border border-border-secondary mb-4">
+        {/* Author header */}
+        <div className="flex items-center mb-3">
+          <img 
+            src={avatar} 
+            alt={authorName} 
+            className="w-8 h-8 rounded-full mr-3"
+          />
+          <div>
+            <div className="font-medium text-text-primary">{authorName}</div>
+            <div className="text-sm text-text-secondary">{timeAgo}</div>
+          </div>
+        </div>
+        
+        {/* Note content */}
+        <div className="text-text-primary whitespace-pre-wrap mb-3">
+          {post.content || '[empty note]'}
+        </div>
+        
+        {/* First image if available */}
+        {images.length > 0 && (
+          <img 
+            src={images[0]} 
+            alt="note image" 
+            className="rounded mt-2 max-h-60 w-auto"
+          />
+        )}
+        
+        {/* Simple engagement */}
+        <div className="flex items-center mt-3 text-text-secondary text-sm">
+          <span>{post.zaps || 0} ⚡</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Only render kind 1301 workout events beyond this point
+  if (post.kind !== 1301) {
+    return null;
   }
 
   // Use enhanced tag parsing utilities

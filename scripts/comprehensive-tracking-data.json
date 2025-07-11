@@ -1,0 +1,222 @@
+{
+  "users": {
+    "npub1ct0dc463rup0jet5dfrn5zzen3r6k667qztu78gq4p0sxgd9cfsqelp79r": {
+      "level": 2,
+      "totalXP": 245,
+      "totalWorkouts": 18,
+      "firstWorkout": "6/29/2025",
+      "lastWorkout": "7/11/2025"
+    },
+    "npub15jt7cd5k3s2f3wptnctfxjqzhluz0fm0km74g6wj5xrc9ssfmcdsfcvctj": {
+      "level": 1,
+      "totalXP": 10,
+      "totalWorkouts": 1,
+      "firstWorkout": "7/11/2025",
+      "lastWorkout": "7/11/2025"
+    },
+    "npub1hcnntn7hnwe4punz62favp6fz9r3j5exw0wmxpaj7hgfyqypxqzqpxqygc": {
+      "level": 2,
+      "totalXP": 295,
+      "totalWorkouts": 9,
+      "firstWorkout": "7/2/2025",
+      "lastWorkout": "7/11/2025"
+    },
+    "npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum": {
+      "level": 6,
+      "totalXP": 600,
+      "totalWorkouts": 53,
+      "firstWorkout": "5/25/2025",
+      "lastWorkout": "7/10/2025"
+    },
+    "npub1ee3755fsejc9uvdp8u7j8r8z3j9lgum5s7kzv22q2x997w8rnkjs6sc65t": {
+      "level": 1,
+      "totalXP": 20,
+      "totalWorkouts": 2,
+      "firstWorkout": "7/10/2025",
+      "lastWorkout": "7/10/2025"
+    },
+    "npub1w30t22wsuskjlfkfqjau9sg8qt02a9jtfhfs0xqr4w95x5mdmgfqghvnqu": {
+      "level": 1,
+      "totalXP": 180,
+      "totalWorkouts": 14,
+      "firstWorkout": "7/1/2025",
+      "lastWorkout": "7/10/2025"
+    },
+    "npub1jdvvva54m8nchh3t708pav99qk24x6rkx2sh0e7jthh0l8efzt7q9y7jlj": {
+      "level": 8,
+      "totalXP": 845,
+      "totalWorkouts": 26,
+      "firstWorkout": "5/28/2025",
+      "lastWorkout": "7/9/2025"
+    },
+    "npub1kxr0kw6l630t2e67e6c4u5n9mpgavln0wcyjy5nwc67j6vnc9swq7e4atx": {
+      "level": 2,
+      "totalXP": 225,
+      "totalWorkouts": 11,
+      "firstWorkout": "6/18/2025",
+      "lastWorkout": "7/9/2025"
+    },
+    "npub1marc26z8nh3xkj5rcx7ufkatvx6ueqhp5vfw9v5teq26z254renshtf3g0": {
+      "level": 1,
+      "totalXP": 10,
+      "totalWorkouts": 2,
+      "firstWorkout": "7/9/2025",
+      "lastWorkout": "7/9/2025"
+    },
+    "npub1jp54xt8x4pezxdnmlvzfkkppver2ss263z65v5uadla29m4jr2dqj7xcra": {
+      "level": 1,
+      "totalXP": 195,
+      "totalWorkouts": 6,
+      "firstWorkout": "6/1/2025",
+      "lastWorkout": "7/9/2025"
+    },
+    "npub177wyksgf9xl9q8u2cc38ue49shltsjs2j9302s2e4f6jvkrz97ks3s25zh": {
+      "level": 1,
+      "totalXP": 175,
+      "totalWorkouts": 5,
+      "firstWorkout": "6/1/2025",
+      "lastWorkout": "7/9/2025"
+    },
+    "npub1vgldyxx7syc30qm9v7padnnfpdfp4zwymsyl9ztzuklaf7j5jfyspk36wu": {
+      "level": 8,
+      "totalXP": 850,
+      "totalWorkouts": 8,
+      "firstWorkout": "6/26/2025",
+      "lastWorkout": "7/8/2025"
+    },
+    "npub1f9ny8m9w56l6uj9ggyqfmrwlxp2v4lhvz9rwf9c39kfnawn9atrq59xqpw": {
+      "level": 1,
+      "totalXP": 25,
+      "totalWorkouts": 1,
+      "firstWorkout": "7/8/2025",
+      "lastWorkout": "7/8/2025"
+    },
+    "npub1z36shlpxe50vs40ym24g2hdwzjpltlk9a2pj9wual284duerrfhswp3j7z": {
+      "level": 1,
+      "totalXP": 110,
+      "totalWorkouts": 4,
+      "firstWorkout": "7/3/2025",
+      "lastWorkout": "7/6/2025"
+    },
+    "npub1t6evvsk5pfv8j4pzzgtzt0nlher73yq5sks630qpuxg8hzh2p2ds6an5x4": {
+      "level": 1,
+      "totalXP": 25,
+      "totalWorkouts": 1,
+      "firstWorkout": "7/6/2025",
+      "lastWorkout": "7/6/2025"
+    },
+    "npub1fwlrszde96s4qjrglqhxl6afhq2qyvxah6gvgpvyx0dwtx9l809snapjam": {
+      "level": 1,
+      "totalXP": 105,
+      "totalWorkouts": 5,
+      "firstWorkout": "6/27/2025",
+      "lastWorkout": "7/5/2025"
+    },
+    "npub1t8rss7n94k0ayh38rfsdlplcdwem2j4wkncnuqtzrzlkvusqhvuqx3aevz": {
+      "level": 1,
+      "totalXP": 15,
+      "totalWorkouts": 1,
+      "firstWorkout": "7/5/2025",
+      "lastWorkout": "7/5/2025"
+    },
+    "npub1l7j9s2znwsfcezul4635gnezjg52t7x88efrdehm8h5sp7r6yu4qqfkujm": {
+      "level": 1,
+      "totalXP": 15,
+      "totalWorkouts": 1,
+      "firstWorkout": "7/5/2025",
+      "lastWorkout": "7/5/2025"
+    },
+    "npub1v40sr983gxp3x685mgmjvgsxy3t77u7t78ndk9e56truqhsq989q3e2y09": {
+      "level": 1,
+      "totalXP": 10,
+      "totalWorkouts": 1,
+      "firstWorkout": "7/1/2025",
+      "lastWorkout": "7/1/2025"
+    },
+    "npub1vkd8fak0h37z2tzcmy699wwe2a0rd3ry4fj5f33h2gnuj9n2dmvs7u9g2t": {
+      "level": 2,
+      "totalXP": 210,
+      "totalWorkouts": 19,
+      "firstWorkout": "5/29/2025",
+      "lastWorkout": "6/24/2025"
+    },
+    "npub1ump2p5acxxc6z5amx07ygc86f7vt5ykx98z6j0kax9g8hfahe34qm6dkxz": {
+      "level": 1,
+      "totalXP": 20,
+      "totalWorkouts": 2,
+      "firstWorkout": "6/12/2025",
+      "lastWorkout": "6/17/2025"
+    },
+    "npub1vvn4z08s36kqld2kl8aykxsfwpltgwgga0f2y4c4yl8z5uwdnd0qtu7nq8": {
+      "level": 1,
+      "totalXP": 30,
+      "totalWorkouts": 4,
+      "firstWorkout": "6/2/2025",
+      "lastWorkout": "6/9/2025"
+    },
+    "npub14d6fzrrszhmtnz39u2092cmkfep4rlpvr6j7gzfewwjwpl6cf43sh37wra": {
+      "level": 4,
+      "totalXP": 450,
+      "totalWorkouts": 11,
+      "firstWorkout": "6/1/2025",
+      "lastWorkout": "6/7/2025"
+    },
+    "npub1eaeg9y44n6q4858x855ndzsh8fqajpr4v3kv9ep4v4pk97cmpu6s58pzm5": {
+      "level": 1,
+      "totalXP": 60,
+      "totalWorkouts": 2,
+      "firstWorkout": "6/7/2025",
+      "lastWorkout": "6/7/2025"
+    },
+    "npub18zvwmk9hgvzru5uuthaskzfg6ywyk2zhzewde6u5x530c3v4kvlqnaswvz": {
+      "level": 1,
+      "totalXP": 25,
+      "totalWorkouts": 3,
+      "firstWorkout": "5/31/2025",
+      "lastWorkout": "6/3/2025"
+    },
+    "npub1s8kgc4mjnz0ywm2kammesp2fmjcy8ws5p7ks3m0jgmsftuaylecqdt9622": {
+      "level": 1,
+      "totalXP": 10,
+      "totalWorkouts": 1,
+      "firstWorkout": "6/3/2025",
+      "lastWorkout": "6/3/2025"
+    },
+    "npub1skj8seswn26k8y3egwu0m90dc026aqg4as4mua0m64qg89p08w7qv5nq8z": {
+      "level": 1,
+      "totalXP": 30,
+      "totalWorkouts": 1,
+      "firstWorkout": "6/1/2025",
+      "lastWorkout": "6/1/2025"
+    },
+    "npub1e78s06llhh8yjah232urpn7kqdhlkcsruea636m6nfzg5ap2d64q730a0m": {
+      "level": 1,
+      "totalXP": 5,
+      "totalWorkouts": 1,
+      "firstWorkout": "5/30/2025",
+      "lastWorkout": "5/30/2025"
+    },
+    "npub1aw2czlr382tu7857swr3txydhchwhcl5qpg2c2uxvg6a85rhmfzq0cgknw": {
+      "level": 1,
+      "totalXP": 5,
+      "totalWorkouts": 1,
+      "firstWorkout": "7/7/2025",
+      "lastWorkout": "7/7/2025"
+    },
+    "npub14uwf3332hd2jx2pzmz8m0lp868vjmqpkah70lxfvv0799zmsqvnsq5r9e5": {
+      "level": 1,
+      "totalXP": 40,
+      "totalWorkouts": 1,
+      "firstWorkout": "7/1/2025",
+      "lastWorkout": "7/1/2025"
+    },
+    "npub1fy74hyaxp7tutk0nlahlf8nwr3qh0ljrvr43k8u2ee9wwegr9rrquwndz6": {
+      "level": 1,
+      "totalXP": 25,
+      "totalWorkouts": 1,
+      "firstWorkout": "6/27/2025",
+      "lastWorkout": "6/27/2025"
+    }
+  },
+  "lastUpdate": "2025-07-11T14:12:40.670Z"
+}
