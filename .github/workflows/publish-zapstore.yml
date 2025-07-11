@@ -131,19 +131,40 @@ jobs:
           FORCED_VERSION="${{ github.event.inputs.force_version }}"
           echo "Using manually specified version: $FORCED_VERSION"
           
-          # Update package.json version
-          npm version $FORCED_VERSION --no-git-tag-version
+          # Check current version in package.json
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current package.json version: $CURRENT_VERSION"
+          
+          # Only update package.json if version is different
+          if [ "$CURRENT_VERSION" != "$FORCED_VERSION" ]; then
+            echo "Updating package.json version from $CURRENT_VERSION to $FORCED_VERSION"
+            npm version $FORCED_VERSION --no-git-tag-version
+          else
+            echo "Version $FORCED_VERSION already matches package.json, skipping npm version"
+          fi
           
           # Create a simple CHANGELOG entry for manual version
           echo "# Release v$FORCED_VERSION" > CHANGELOG.md
           echo "" >> CHANGELOG.md
           echo "Manual release created on $(date)" >> CHANGELOG.md
           
-          # Commit the changes
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add package.json CHANGELOG.md
-          git commit -m "chore(release): $FORCED_VERSION [skip ci]"
+          # Check if we need to commit changes
+          if git diff --quiet; then
+            echo "No changes to commit, proceeding with tag creation"
+          else
+            echo "Committing changes to package.json and CHANGELOG.md"
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add package.json CHANGELOG.md
+            git commit -m "chore(release): $FORCED_VERSION [skip ci]"
+          fi
+          
+          # Check if tag already exists
+          if git tag -l "v$FORCED_VERSION" | grep -q "v$FORCED_VERSION"; then
+            echo "Tag v$FORCED_VERSION already exists, deleting it first"
+            git tag -d "v$FORCED_VERSION" || true
+            git push --delete origin "v$FORCED_VERSION" || true
+          fi
           
           # Create and push the tag
           git tag -a "v$FORCED_VERSION" -m "Release v$FORCED_VERSION"
@@ -185,24 +206,35 @@ jobs:
           echo "Keystore configured."
 
       # --- Determine Final Version for Build ---
-      # Use semantic-release version if available, otherwise use package.json version
+      # Use semantic-release version if available, manual release version, or package.json version
       - name: Determine Build Version
         id: determine_build_version
         run: |
           SEMANTIC_VERSION="${{ steps.semantic_release.outputs.new_version }}"
+          MANUAL_VERSION="${{ steps.manual_release.outputs.new_version }}"
           PACKAGE_VERSION="${{ steps.read_package_version.outputs.version }}"
           BUILD_VERSION=""
 
+          # Check if semantic release created a new version
           if [[ "${{ steps.semantic_release.outputs.released }}" == "true" && "$SEMANTIC_VERSION" != "unknown" ]]; then
              echo "Using version from semantic-release: $SEMANTIC_VERSION"
              BUILD_VERSION="$SEMANTIC_VERSION"
+             echo "released=true" >> $GITHUB_OUTPUT
+          # Check if manual release was used
+          elif [[ "${{ steps.manual_release.outputs.released }}" == "true" && -n "$MANUAL_VERSION" ]]; then
+             echo "Using version from manual release: $MANUAL_VERSION"
+             BUILD_VERSION="$MANUAL_VERSION"
+             echo "released=true" >> $GITHUB_OUTPUT
+          # Fallback to package.json version
           elif [[ -n "$PACKAGE_VERSION" ]]; then
              echo "Using version from package.json: $PACKAGE_VERSION"
              BUILD_VERSION="$PACKAGE_VERSION"
+             echo "released=false" >> $GITHUB_OUTPUT
           else
              FALLBACK_VERSION="0.0.0-sha-${GITHUB_SHA::7}"
              echo "Warning: Could not determine version reliably. Using fallback: $FALLBACK_VERSION"
              BUILD_VERSION="$FALLBACK_VERSION"
+             echo "released=false" >> $GITHUB_OUTPUT
           fi
           echo "Final build version: $BUILD_VERSION"
           echo "build_version=$BUILD_VERSION" >> $GITHUB_OUTPUT
@@ -425,6 +457,8 @@ jobs:
   publish_zapstore:
     needs: release_and_build # Depends on the release and build job
     runs-on: ubuntu-latest
+    # Only run if a release was actually created
+    if: needs.release_and_build.outputs.released == 'true'
     # Add environment for manual approval
 
     steps:
