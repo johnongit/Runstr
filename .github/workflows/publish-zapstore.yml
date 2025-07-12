@@ -473,32 +473,44 @@ jobs:
           # Remove whatever was pre-installed in the runner image
           sudo rm -f $(command -v zapstore) || true
 
-          # Always fetch the latest build
-          curl -L https://cdn.zapstore.dev/latest/zapstore-linux -o zapstore
+          # Download Zapstore CLI using the working URL (post-CDN migration)
+          echo "Downloading Zapstore CLI from working CDN URL..."
+          curl -L --fail --connect-timeout 30 --max-time 120 \
+            http://cdn.zapstore.dev/f7028aec3186b28347ebc6e6d26af79d6e9d2a3e2a137b5c4b4aad467bfba5de \
+            -o zapstore || {
+            echo "❌ Failed to download Zapstore CLI from CDN"
+            echo "URL: http://cdn.zapstore.dev/f7028aec3186b28347ebc6e6d26af79d6e9d2a3e2a137b5c4b4aad467bfba5de"
+            exit 1
+          }
+          
+          # Verify the download
+          if [ ! -f "zapstore" ] || [ ! -s "zapstore" ]; then
+            echo "❌ Downloaded zapstore file is missing or empty"
+            exit 1
+          fi
+          
+          # Verify checksum for security (expected SHA-256 for Linux amd64)
+          EXPECTED_HASH="f7028aec3186b28347ebc6e6d26af79d6e9d2a3e2a137b5c4b4aad467bfba5de"
+          ACTUAL_HASH=$(sha256sum zapstore | cut -d' ' -f1)
+          if [ "$ACTUAL_HASH" != "$EXPECTED_HASH" ]; then
+            echo "❌ Checksum verification failed!"
+            echo "Expected: $EXPECTED_HASH"
+            echo "Actual:   $ACTUAL_HASH"
+            exit 1
+          fi
+          echo "✅ Checksum verified successfully"
+          
+          # Make it executable and install
           chmod +x zapstore
           sudo mv zapstore /usr/local/bin/
 
           # Double-check the version (should say 0.2.x or higher)
-          zapstore --version
-
-          # Force manual installation of apktool
-          echo "Installing apktool manually..."
-          APKTOOL_VERSION="2.9.3" # Use a known compatible version
-          APKTOOL_JAR_URL="https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_${APKTOOL_VERSION}.jar"
-          APKTOOL_WRAPPER_URL="https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool"
-          echo "Downloading apktool jar from $APKTOOL_JAR_URL"
-          curl -L -o apktool.jar "$APKTOOL_JAR_URL" || { echo "❌ Failed to download apktool jar"; exit 1; }
-          echo "Downloading apktool wrapper script from $APKTOOL_WRAPPER_URL"
-          curl -L -o apktool "$APKTOOL_WRAPPER_URL" || { echo "❌ Failed to download apktool wrapper"; exit 1; }
-          chmod +x apktool
-          sudo mv apktool /usr/local/bin/
-          sudo mv apktool.jar /usr/local/bin/
-          echo "✅ apktool manually installed to /usr/local/bin/"
-
-          # Verify apktool installation rigorously
-          echo "Verifying apktool installation..."
-          apktool --version || { echo "❌ apktool command not found or failed after manual install."; exit 1; }
-          echo "✅ apktool verification successful."
+          if zapstore --version; then
+            echo "✅ Zapstore CLI installed successfully"
+          else
+            echo "❌ Zapstore CLI installation failed - version check failed"
+            exit 1
+          fi
 
       - name: Install Android apksigner tool
         run: |
