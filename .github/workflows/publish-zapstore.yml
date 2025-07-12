@@ -620,18 +620,20 @@ jobs:
           fi
           echo "✅ Copied $ICON_FILENAME to $(pwd)"
 
-          # --- Modify zapstore.yaml to use local icon ---
-          echo "--- Modifying $ZAPSTORE_YAML_FILENAME to use local icon: $ICON_FILENAME ---"
-          # Replace the line containing 'url:' under 'icons:' with the local filename
-          # Using simple sed; adjust if your yaml structure is more complex
-          # This assumes the icon section looks somewhat like:
-          # icons:
-          #   - url: https://...
-          #     type: image/png
-          # It will replace the url line with 'file: runstr_logo.png'
-          sed -i "/icons:/,/^[^[:space:]]/{ s|url:.*|file: $ICON_FILENAME|g }" "./$ZAPSTORE_YAML_FILENAME"
-          echo "✅ Modified $ZAPSTORE_YAML_FILENAME."
-          echo "--- Modified $ZAPSTORE_YAML_FILENAME contents ---"
+          # --- Update zapstore.yaml to use local files ---
+          echo "--- Updating $ZAPSTORE_YAML_FILENAME to use local files ---"
+          # Update the zapstore.yaml to reference local APK, icon, and release notes
+          # Use sed to update the assets and icon paths
+          sed -i "s|assets:.*|assets:\n  - $ACTUAL_APK_FILENAME|g" "./$ZAPSTORE_YAML_FILENAME"
+          sed -i "s|icon:.*|icon: $ICON_FILENAME|g" "./$ZAPSTORE_YAML_FILENAME"
+          # Add changelog entry if it doesn't exist
+          if ! grep -q "changelog:" "./$ZAPSTORE_YAML_FILENAME"; then
+            echo "changelog: $NOTES_FILENAME" >> "./$ZAPSTORE_YAML_FILENAME"
+          else
+            sed -i "s|changelog:.*|changelog: $NOTES_FILENAME|g" "./$ZAPSTORE_YAML_FILENAME"
+          fi
+          echo "✅ Updated $ZAPSTORE_YAML_FILENAME to use local files."
+          echo "--- Updated $ZAPSTORE_YAML_FILENAME contents ---"
           cat "./$ZAPSTORE_YAML_FILENAME"
           echo "-------------------------------------------"
 
@@ -792,13 +794,10 @@ jobs:
           # Attempt to publish to Zapstore, capture output and exit code
           echo "Attempting to publish to Zapstore..."
           set +e # Prevent script from exiting immediately on error
-          # Use basic publish command with only supported flags
-          PUBLISH_OUTPUT=$(APKSIGNER_PATH="$APKSIGNER_PATH" zapstore publish runstr \
+          # Use proper zapstore publish command with only supported flags
+          PUBLISH_OUTPUT=$(APKSIGNER_PATH="$APKSIGNER_PATH" zapstore publish \
             --daemon-mode \
-            --icon "${ICON_FILENAME}" \
-            -n "${NOTES_FILENAME}" \
-            -a "${APK_FILENAME}" \
-            -v "${VERSION}" 2>&1) # Redirect stderr to stdout to capture all output
+            --overwrite-release 2>&1) # Redirect stderr to stdout to capture all output
           PUBLISH_EXIT_CODE=$?
           set -e # Re-enable immediate exit on error
 
