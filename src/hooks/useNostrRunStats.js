@@ -7,8 +7,9 @@ import { fetchEvents } from '../utils/nostr';
  * Fetches all Kind 1301 workout records for the logged-in user and returns
  * aggregated statistics plus the raw events for further UI needs.
  */
-export const useNostrRunStats = () => {
-  const { publicKey: userPubkey } = useContext(NostrContext);
+export const useNostrRunStats = (pubkeyOverride) => {
+  const { publicKey: contextPubkey } = useContext(NostrContext);
+  const userPubkey = pubkeyOverride || contextPubkey;
   const [workoutEvents, setWorkoutEvents] = useState([]);
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -217,10 +218,7 @@ export const useNostrRunStats = () => {
   }, [calculateWorkoutXP, calculateLevelData]);
 
   const loadEvents = useCallback(async () => {
-    if (!userPubkey) {
-      setError('No user pubkey');
-      return;
-    }
+    if (!userPubkey) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -237,8 +235,10 @@ export const useNostrRunStats = () => {
   }, [userPubkey, aggregateStats]);
 
   useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
+    if (userPubkey) {
+      loadEvents();
+    }
+  }, [userPubkey, loadEvents]);
 
   return { workoutEvents, stats, isLoading, error, reload: loadEvents };
 }; 

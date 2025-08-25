@@ -1,6 +1,6 @@
 import { useSettings } from '../contexts/SettingsContext';
 import { useNostrRunStats } from '../hooks/useNostrRunStats';
-import { Button } from "@/components/ui/button";
+import { useNostr } from '../hooks/useNostr';
 import LevelSystemHeader from '../components/LevelSystemHeader';
 import { useState, useMemo } from 'react';
 
@@ -64,9 +64,9 @@ const groupWorkoutsByMonth = (events) => {
     .map(([key, value]) => ({ key, ...value }));
 };
 
-const NostrStatsPage = () => {
+const NostrStatsContent = ({ pubkey }) => {
   const { distanceUnit } = useSettings(); // eslint-disable-line no-unused-vars
-  const { workoutEvents, stats, isLoading, error, reload } = useNostrRunStats();
+  const { workoutEvents, stats, isLoading, error } = useNostrRunStats(pubkey);
   const [expandedMonths, setExpandedMonths] = useState(new Set());
 
   const groupedWorkouts = useMemo(() => {
@@ -165,4 +165,10 @@ const NostrStatsPage = () => {
   );
 };
 
-export default NostrStatsPage; 
+const NostrStatsPage = () => {
+  const { publicKey } = useNostr();
+  if (!publicKey) return <p className="p-4 text-text-primary">Veuillez connecter votre clé Nostr.</p>;
+  return <NostrStatsContent pubkey={publicKey} />;
+};
+
+export default NostrStatsPage;
