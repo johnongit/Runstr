@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import runDataService, { ACTIVITY_TYPES } from '../services/RunDataService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -13,6 +13,19 @@ const AddManualActivity = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
+  const [avgSpeed, setAvgSpeed] = useState('');
+
+  useEffect(() => {
+    const dist = parseFloat(distance);
+    const dur = parseFloat(duration);
+    if (isNaN(dist) || isNaN(dur) || dur <= 0) {
+      setAvgSpeed('');
+      return;
+    }
+    const hours = dur / 60;
+    const speed = dist / hours;
+    setAvgSpeed(speed.toFixed(1));
+  }, [distance, duration]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -23,13 +36,25 @@ const AddManualActivity = () => {
     const distanceMeters = distanceUnit === 'mi' ? dist * 1609.34 : dist * 1000;
     const durationSeconds = dur * 60;
 
-    runDataService.saveRun({
-      activityType: type,
-      distance: distanceMeters,
-      duration: durationSeconds,
-      timestamp: new Date(date).getTime(),
-      unit: distanceUnit
-    }, publicKey);
+    const speedValue =
+      distanceUnit === 'km'
+        ? ((distanceMeters / durationSeconds) * 3.6).toFixed(1)
+        : ((distanceMeters / durationSeconds) * 2.23694).toFixed(1);
+
+    runDataService.saveRun(
+      {
+        activityType: type,
+        distance: distanceMeters,
+        duration: durationSeconds,
+        averageSpeed: {
+          value: speedValue,
+          unit: distanceUnit === 'km' ? 'km/h' : 'mph'
+        },
+        timestamp: new Date(date).getTime(),
+        unit: distanceUnit
+      },
+      publicKey
+    );
 
     navigate('/history');
   };
@@ -40,7 +65,11 @@ const AddManualActivity = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block mb-1">Type</label>
-          <select value={type} onChange={e => setType(e.target.value)} className="w-full px-3 py-2 bg-bg-secondary border border-border-secondary rounded">
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="w-full px-3 py-2 bg-bg-secondary border border-border-secondary rounded"
+          >
             <option value={ACTIVITY_TYPES.RUN}>Run</option>
             <option value={ACTIVITY_TYPES.WALK}>Walk</option>
             <option value={ACTIVITY_TYPES.CYCLE}>Cycle</option>
@@ -48,17 +77,50 @@ const AddManualActivity = () => {
         </div>
         <div>
           <label className="block mb-1">Date</label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-3 py-2 bg-bg-secondary border border-border-secondary rounded" />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full px-3 py-2 bg-bg-secondary border border-border-secondary rounded"
+          />
         </div>
         <div>
           <label className="block mb-1">Distance ({distanceUnit})</label>
-          <input type="number" step="0.01" value={distance} onChange={e => setDistance(e.target.value)} className="w-full px-3 py-2 bg-bg-secondary border border-border-secondary rounded" />
+          <input
+            type="number"
+            step="0.01"
+            value={distance}
+            onChange={(e) => setDistance(e.target.value)}
+            className="w-full px-3 py-2 bg-bg-secondary border border-border-secondary rounded"
+          />
         </div>
         <div>
           <label className="block mb-1">Duration (minutes)</label>
-          <input type="number" step="1" value={duration} onChange={e => setDuration(e.target.value)} className="w-full px-3 py-2 bg-bg-secondary border border-border-secondary rounded" />
+          <input
+            type="number"
+            step="1"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            className="w-full px-3 py-2 bg-bg-secondary border border-border-secondary rounded"
+          />
         </div>
-        <button type="submit" className="w-full px-4 py-2 bg-primary text-white rounded">Save</button>
+        <div>
+          <label className="block mb-1">
+            Average Speed ({distanceUnit === 'km' ? 'km/h' : 'mph'})
+          </label>
+          <input
+            type="text"
+            value={avgSpeed}
+            readOnly
+            className="w-full px-3 py-2 bg-bg-secondary border border-border-secondary rounded"
+          />
+        </div>
+        <button
+          type="submit"
+          className="w-full px-4 py-2 bg-primary text-white rounded"
+        >
+          Save
+        </button>
       </form>
     </div>
   );
