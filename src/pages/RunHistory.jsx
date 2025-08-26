@@ -449,9 +449,15 @@ ${additionalContent ? `\n${additionalContent}` : ''}
     <div className="run-history">
       <div className="p-4 space-y-6 bg-bg-primary min-h-screen">
         <h2 className="page-title">{getActivityText('history')}</h2>
-        <div className="my-4">
-          <Link 
-            to="/nostr-stats" 
+        <div className="my-4 flex flex-col gap-2 md:flex-row">
+          <Link
+            to="/add-activity"
+            className="w-full text-center px-4 py-3 bg-bg-secondary hover:bg-bg-tertiary border border-border-secondary rounded-lg text-text-primary font-semibold transition-colors duration-150 block md:w-auto md:inline-block"
+          >
+            Add Activity
+          </Link>
+          <Link
+            to="/nostr-stats"
             className="w-full text-center px-4 py-3 bg-bg-secondary hover:bg-bg-tertiary border border-border-secondary rounded-lg text-text-primary font-semibold transition-colors duration-150 block md:w-auto md:inline-block"
           >
             Nostr Workout Record
