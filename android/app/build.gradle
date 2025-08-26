@@ -8,7 +8,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "club.runstr.app"
+    namespace "com.runstr.runs"
     compileSdk rootProject.ext.compileSdkVersion
 
     // Define signing configurations
@@ -32,7 +32,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.runstr.app"
+        applicationId "com.runstr.runs"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
 

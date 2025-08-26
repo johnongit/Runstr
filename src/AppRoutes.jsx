@@ -36,6 +36,7 @@ const safeLazy = (importer, componentName) => {
 // Lazy load components with better error handling
 const RunTracker = safeLazy(() => import('./components/RunTracker'), 'RunTracker');
 const RunHistory = safeLazy(() => import('./pages/RunHistory'), 'RunHistory');
+const AddManualActivity = safeLazy(() => import('./pages/AddManualActivity'), 'AddManualActivity');
 const RunClub = safeLazy(() => import('./pages/RunClub'), 'RunClub');
 const Wallet = safeLazy(() => import('./pages/Wallet'), 'Wallet');
 const Music = safeLazy(() => import('./pages/Music'), 'Music');
@@ -81,6 +82,7 @@ const AppRoutes = () => {
     <Suspense fallback={<LoadingComponent />}>
       <Routes>
         <Route path="/history" element={<RunHistory />} />
+        <Route path="/add-activity" element={<AddManualActivity />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/club" element={<RunClub />} />
         <Route path="/nwc" element={<NWC />} />

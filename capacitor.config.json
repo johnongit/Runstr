@@ -1,6 +1,6 @@
 {
-  "appId": "com.runstr.app",
-  "appName": "Runstr",
+  "appId": "com.runstr.runs",
+  "appName": "Runs",
   "webDir": "dist",
   "plugins": {
     "StatusBar": {

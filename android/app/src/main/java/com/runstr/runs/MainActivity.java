@@ -1,4 +1,4 @@
-package com.runstr.app;
+package com.runstr.runs;
 
 import com.getcapacitor.BridgeActivity;
 
