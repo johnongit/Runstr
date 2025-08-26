@@ -1,6 +1,6 @@
 {
-  "name": "RUNSTR",
-  "short_name": "RUNSTR",
+  "name": "Runs",
+  "short_name": "Runs",
   "description": "Track your runs and connect with runners on Nostr",
   "start_url": "/",
   "display": "standalone",
